@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -11,8 +12,9 @@ import (
 // services) as needed rather than inventing a second struct — see
 // RegisterRoutes for how h is built and threaded through.
 type handlers struct {
-	staffSvc *staff.Service
-	render   *Renderer
+	staffSvc   *staff.Service
+	pointsRepo *points.PointsRepo // Task 5 (points + staff screens)
+	render     *Renderer
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a

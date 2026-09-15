@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -16,16 +17,15 @@ import (
 // db is accepted for symmetry with web.RegisterRoutes and so Tasks 2-5 can
 // build their own repositories here without this signature changing again
 // — Foundation itself doesn't query the database directly, staffSvc
-// (login/logout/session lookup) is all it needs.
+// (login/logout/session lookup) is all it needs. Task 5 (points + staff
+// screens) is the first to use db directly, via points.NewPointsRepo.
 func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) error {
-	_ = db // reserved for Tasks 2-5's repositories; see doc comment above
-
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
 	}
 
-	h := &handlers{staffSvc: staffSvc, render: renderer}
+	h := &handlers{staffSvc: staffSvc, render: renderer, pointsRepo: points.NewPointsRepo(db)}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
 	mux.HandleFunc("POST /admin/login", h.loginSubmit)
@@ -49,8 +49,15 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) err
 	mux.HandleFunc("GET /admin/products", ownerOrManager(h.stubPage("products", "Товары")))
 	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.stubPage("products", "Импорт товаров")))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.stubPage("reports", "Отчёты")))
-	mux.HandleFunc("GET /admin/points", ownerOnly(h.stubPage("points", "Склад и точки")))
-	mux.HandleFunc("GET /admin/staff", ownerOnly(h.stubPage("staff", "Сотрудники")))
+
+	// Task 5: points of sale + staff — both owner-only, list + add-modal +
+	// toggle-active. See internal/admin/points_page.go/staff_page.go.
+	mux.HandleFunc("GET /admin/points", ownerOnly(h.pointsPage))
+	mux.HandleFunc("POST /admin/points", ownerOnly(h.pointsCreate))
+	mux.HandleFunc("POST /admin/points/{id}/toggle", ownerOnly(h.pointsToggle))
+	mux.HandleFunc("GET /admin/staff", ownerOnly(h.staffPage))
+	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))
+	mux.HandleFunc("POST /admin/staff/{id}/toggle", ownerOnly(h.staffToggle))
 
 	mux.Handle("GET /admin/static/", http.StripPrefix("/admin/static/", http.FileServer(http.Dir("admin/static"))))
 

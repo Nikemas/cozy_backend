@@ -1,8 +1,112 @@
-{{/* staff.gohtml — stub for Task 5 (Сотрудники, Cozy Admin.dc.html lines
-     644-664 + staffModal ~706-741). Owner-only. Foundation only wires the
-     route + layout; Task 5 replaces this file's content, not the
-     routing. */}}
+{{/* staff.gohtml — Task 5 (Сотрудники, Cozy Admin.dc.html lines 644-664 +
+     staffModal 706-741). Owner-only. .Data is admin.staffPageData
+     (internal/admin/staff_page.go). */}}
 {{define "content"}}
-<h1>Сотрудники</h1>
-<p>скоро</p>
+{{/* $pdata: .Data is admin.staffPageData, but PageData.Data is an `any`
+     that Foundation's own generic render-exec test leaves nil for other
+     screens' fixtures — captured once so both the list below and the
+     modal's point select further down can each guard against that nil
+     case ({{if $pdata}}/{{with $pdata}}) without erroring on a
+     nil-interface field access. */}}
+{{$pdata := .Data}}
+<div class="admin-screen-narrow">
+  <div class="admin-list-toolbar admin-list-toolbar--end">
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openStaffModal()">+ Добавить сотрудника</button>
+  </div>
+
+  {{with $pdata}}
+  {{if .Error}}<div class="admin-form-error">{{.Error}}</div>{{end}}
+
+  <div class="admin-row-list">
+    {{if not .Rows}}
+      <div class="admin-row-list__empty">Пока нет сотрудников</div>
+    {{end}}
+    {{range .Rows}}
+    <div class="admin-row">
+      <div class="admin-row__avatar">{{.Initials}}</div>
+      <div class="admin-row__info">
+        <div class="admin-row__title">{{.Name}}</div>
+        <div class="admin-row__subtitle">{{.Phone}}</div>
+      </div>
+      <span class="admin-chip {{.RoleClass}}">{{.RoleLabel}}</span>
+      <div class="admin-row__scope">{{.Scope}}</div>
+      <form method="post" action="/admin/staff/{{.ID}}/toggle">
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
+      </form>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="admin-row-list"><div class="admin-row-list__empty">Пока нет сотрудников</div></div>
+  {{end}}
+</div>
+
+{{/* Add-staff modal — design canvas's staffModal block (lines 706-741).
+     Two deviations from the canvas, both because the canvas has no real
+     backend behind it: (1) the role <select>'s values are the actual
+     staff.Role strings ("manager"/"point_staff") instead of the canvas's
+     display-text values, so the server can parse them directly; (2) a
+     "Точка" select is added (hidden unless role=point_staff, via
+     toggleStaffPointField() below) because
+     staff.Service.CreateStaff requires point_id for point_staff and
+     rejects it for owner/manager — the canvas's staffModal has no such
+     field since it only ever models owner/manager staff. */}}
+<div id="admin-staff-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--lg">
+    <div class="admin-modal__title">Новый сотрудник</div>
+    <form method="post" action="/admin/staff">
+      <div class="admin-field">
+        <label for="staff-name">Имя</label>
+        <input id="staff-name" name="name" placeholder="Айгерим Б." required>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="staff-phone">Телефон</label>
+          <input id="staff-phone" name="phone" placeholder="+996 555 123 456" required>
+        </div>
+        <div class="admin-field">
+          <label for="staff-role">Роль</label>
+          <select id="staff-role" name="role" onchange="toggleStaffPointField()">
+            <option value="manager">Менеджер</option>
+            <option value="point_staff">Кладовщик</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-field" id="staff-point-field" style="display:none">
+        <label for="staff-point">Точка</label>
+        <select id="staff-point" name="point_id">
+          {{if $pdata}}{{range $pdata.Points}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+        </select>
+      </div>
+      <div class="admin-field">
+        <label for="staff-password">Пароль</label>
+        <div class="admin-password-row">
+          <input id="staff-password" name="password" placeholder="Минимум 6 символов" minlength="6" required>
+          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword()">Сгенерировать</button>
+        </div>
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffModal()">Отмена</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openStaffModal() {
+  document.getElementById('admin-staff-modal').style.display = 'flex';
+  toggleStaffPointField();
+}
+function closeStaffModal() { document.getElementById('admin-staff-modal').style.display = 'none'; }
+function toggleStaffPointField() {
+  var role = document.getElementById('staff-role').value;
+  document.getElementById('staff-point-field').style.display = role === 'point_staff' ? 'flex' : 'none';
+}
+function generateStaffPassword() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var pass = '';
+  for (var i = 0; i < 8; i++) { pass += chars.charAt(Math.floor(Math.random() * chars.length)); }
+  document.getElementById('staff-password').value = pass;
+}
+</script>
 {{end}}

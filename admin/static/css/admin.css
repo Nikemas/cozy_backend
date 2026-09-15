@@ -276,6 +276,80 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-modal__text { font-size: 14px; color: var(--admin-muted); margin-top: 8px; line-height: 1.5; }
 .admin-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
+/* ---------- Points / Staff screens (Task 5, design canvas lines
+   620-742) ---------- */
+
+.admin-screen-narrow { max-width: 900px; display: flex; flex-direction: column; gap: 16px; }
+
+.admin-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-list-toolbar--end { justify-content: flex-end; }
+.admin-list-note { font-size: 13px; color: var(--admin-muted); max-width: 480px; text-wrap: pretty; }
+
+.admin-form-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-danger);
+  background: var(--admin-danger-tint);
+  border-radius: var(--admin-radius-field);
+  padding: 10px 14px;
+}
+
+.admin-row-list {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  overflow: hidden;
+}
+.admin-row-list__empty { padding: 28px 24px; text-align: center; font-size: 14px; color: var(--admin-muted); }
+
+.admin-row {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--admin-border);
+  flex-wrap: wrap;
+}
+.admin-row:last-child { border-bottom: none; }
+
+.admin-row__icon,
+.admin-row__avatar {
+  width: 40px; height: 40px; flex: none;
+  border-radius: 12px;
+  background: var(--admin-primary-tint);
+  color: var(--admin-primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-row__avatar { font-size: 14px; font-weight: 700; }
+
+.admin-row__info { flex: 1; min-width: 160px; }
+.admin-row__title { font-size: 15px; font-weight: 600; color: var(--admin-text); }
+.admin-row__subtitle { font-size: 13px; color: var(--admin-muted); }
+.admin-row__scope { font-size: 13px; color: var(--admin-muted); width: 130px; }
+
+.admin-btn--row { height: 38px; padding: 0 14px; font-size: 13px; }
+
+/* Active/inactive status chips (points + staff toggle state) — active
+   reuses the same green as in-stock/delivered order-status chips,
+   inactive the same neutral grey as the "placed" order-status chip. */
+.admin-chip--active { color: #2E7D32; background: #E8F5E9; }
+.admin-chip--inactive { color: #8A8A86; background: #EDEDEB; }
+
+/* Staff role chips — not modeled in the design canvas (it only shows
+   owner/manager without distinct styling); this task's own choice: owner
+   reuses the primary tint, manager the same blue as the "confirmed"
+   order-status chip, point_staff a neutral grey. */
+.admin-chip--role-owner { color: var(--admin-primary); background: var(--admin-primary-tint); }
+.admin-chip--role-manager { color: #1565C0; background: #E8F1FB; }
+.admin-chip--role-point-staff { color: #8A8A86; background: #EDEDEB; }
+
+.admin-modal--md { width: 440px; }
+.admin-modal--lg { width: 460px; }
+.admin-field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.admin-password-row { display: flex; gap: 8px; }
+.admin-password-row input { flex: 1; }
+
 /* ---------- Responsive sidebar (design canvas lines 966-983) ---------- */
 
 /* Tablet (768-1023px): icon-only collapsed sidebar, no labels. */
