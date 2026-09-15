@@ -78,7 +78,7 @@
 - [x] Все три ветки смержены в `main` (`git merge --no-ff` x3)
 - [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто на объединённом коде
 - [x] Конфликт в `cmd/server/main.go` — не возник, авто-мерж; конфликт был только в этом файле (`tasks/todo.md`) и `tasks/plan.md`, разрешён вручную
-- [ ] Ревью с пользователем перед следующей волной (admin CRUD каталога, MinIO, заказы, Bakai)
+- [x] Ревью с пользователем перед следующей волной (admin CRUD каталога, MinIO, заказы, Bakai) — плюс отдельное параллельное ревью безопасности/корректности всех трёх потоков (см. коммиты "review A/B/C"), нашли и починили timing-атаку на staff-логин, integer overflow в пагинации, null-vs-[] в JSON, permissions в CI — всё смержено, `golangci-lint` 0 issues
 
 ---
 
@@ -112,3 +112,48 @@
 - `registerAdminRoutes(mux, db)` → `registerAdminRoutes(mux, db, mediaClient *media.Client)` — минимальное изменение сигнатуры (не тела/структуры функции), т.к. `media.Client` строится из `cfg`, которого раньше не было в этой функции; аналогично тому, как `authSvc`/`cfg` уже передаются в `registerWebRoutes`.
 - Решение по MinIO при старте: `EnsureBucket` при недоступном MinIO **логирует warning и не останавливает загрузку сервера** — сайт/API продолжают работать, ломается только загрузка фото. Выбрано намеренно (см. бриф задачи): в отличие от `DATABASE_URL`/`db.PingContext`, MinIO — не критичная для боота зависимость.
 - Ключ объекта кладётся под фиксированный префикс `products/` (`products/<uuid><ext>`) — не было явно указано в задаче, но снижает риск коллизий/перезаписи и облегчает будущую политику доступа/жизненного цикла бакета по префиксу.
+
+---
+
+## Wave 2 (параллельно, 2 агента — заказы/Bakai сознательно исключены)
+
+**Почему не 4 потока:** параллельная сессия (`kozy-01`) уже строит `internal/orders/{cart,order}.go` + миграцию `cart_items` для сайта (checkout-флоу) — независимая реализация заказов с нашей стороны прямо сейчас была бы третьей подряд коллизией. Заказы (шаг 7) и Bakai (шаг 8, зависит от заказов) — отложены до её коммита. Также фоновой задачей (`task_293f5b84`, отдельная сессия пользователя) чинится утечка сырых ошибок через `apperr.Internal` — не пересекается с этой волной по файлам.
+
+### Task D: Admin CRUD каталога (шаг 12 ТЗ)
+
+**Description:** Запись поверх уже готового read-only `internal/catalog` (категории/товары/вариации/остатки), под RBAC из Task A. Загрузка фото — НЕ в этой задаче (см. Task E): эндпоинт товара принимает уже готовые `object_key` (строки), которые фронт админки получает от MinIO-эндпоинтов Task E отдельным вызовом — так Task D и Task E не пересекаются по файлам и не зависят друг от друга по реализации.
+
+**Acceptance criteria:**
+- [ ] `POST/PUT/DELETE /admin/api/categories(/:id)` — owner/manager
+- [ ] `POST/PUT/DELETE /admin/api/products(/:id)` — owner/manager; тело включает `category_id`, `name_ru/ky`, `description_ru/ky`, `brand`, `base_price`, `is_active`
+- [ ] `POST/PUT/DELETE /admin/api/products/:id/variants(/:variantId)` — owner/manager (size/color/sku/price_override)
+- [ ] `PUT /admin/api/products/:id/variants/:variantId/images` — owner/manager; принимает список `object_key` (+ `sort_order`), пишет в `product_images`
+- [ ] `PUT /admin/api/stock/:variantId/:pointId` — owner/manager (любая точка) ИЛИ point_staff **только если `pointId == staff.PointID` из сессии** — иначе 403, даже если формально прошёл `RequireRole`
+
+**Verification:**
+- [ ] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...`, `golangci-lint run ./...` — чисто
+- [ ] Тесты на RBAC-нюанс point_staff+чужая точка (403) и point_staff+своя точка (200) — без реальной БД, через fake-репозитории (см. `internal/staff/fakes_test.go` как образец)
+- [ ] Manual: живой Postgres недоступен на этой машине — не прогнано
+
+**Dependencies:** None (каталог и RBAC уже смержены в `main`)
+
+**Files likely touched:**
+- `internal/catalog/{category,product,variant,stock}.go` — добавить write-методы (Create/Update/Delete) рядом с существующими read-методами, не переписывая их
+- `internal/httpapi/admin_catalog.go` — новый файл, защищённые роуты
+- `cmd/server/main.go` — вызов регистрации внутри `registerAdminRoutes`
+
+**Estimated scope:** Medium/Large (может стоит разбить на под-агента, если разрастётся)
+
+---
+
+### Task E: MinIO-интеграция (шаг 6 ТЗ) — DONE, см. полное описание выше ("Task E: MinIO-интеграция, presigned upload/get")
+
+---
+
+## Checkpoint: после Task D, E
+
+- [x] Task E смержен в `main` (коммит "Add MinIO media integration (Task E, wave 2)")
+- [ ] Task D ещё в работе — смержить, когда будет готов
+- [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто на текущем `main` (с Task E)
+- [ ] `golangci-lint run ./...` на весь репозиторий — 0 issues кроме одного предсуществующего в `internal/i18n/i18n.go` (не наша задача, вынесено отдельно как `task_2f5cfe35`)
+- [ ] Ревью с пользователем после Task D; затем — заказы/Bakai, когда `kozy-01` закоммитит cart/orders
