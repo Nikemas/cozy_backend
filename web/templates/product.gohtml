@@ -13,9 +13,8 @@
 {{$d := .Data}}
 <div id="product-detail" class="product-detail">
   <div class="product-photo">
-    <!-- TODO(favorites): wire once internal/storefront.Favorites exists
-         (Task 4) — decorative only for now. -->
-    <button class="product-photo__fav" type="button" aria-label="{{t "nav.favorites"}}" title="{{t "common.soon"}}">
+    <button class="product-photo__fav" type="button" aria-label="{{t "nav.favorites"}}"
+            hx-post="{{$d.FavoriteActionURL}}" hx-target="#toast-slot" hx-swap="innerHTML">
       <i class="ti ti-heart"></i>
     </button>
     {{if $d.HasPhoto}}

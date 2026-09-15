@@ -48,10 +48,8 @@
   <div class="shop-grid">
     {{range $d.Products}}
     <div class="product-card">
-      <!-- TODO(favorites): wire the heart toggle once
-           internal/storefront.Favorites exists (Task 4) — decorative
-           only for now, per web-plan's task boundaries. -->
-      <button class="product-card__fav" type="button" aria-label="{{t "nav.favorites"}}" title="{{t "common.soon"}}">
+      <button class="product-card__fav" type="button" aria-label="{{t "nav.favorites"}}"
+              hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
         <i class="ti ti-heart"></i>
       </button>
       <a class="product-card__link" href="{{.DetailURL}}">

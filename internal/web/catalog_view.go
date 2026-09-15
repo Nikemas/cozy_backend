@@ -82,6 +82,7 @@ type CategoryChip struct {
 
 // ProductCard is one tile in the shop grid.
 type ProductCard struct {
+	ID        string
 	Name      string
 	Brand     string
 	PriceText string
@@ -160,6 +161,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	for _, p := range products {
 		name := pickName(p.NameRu, p.NameKy, lang)
 		cards = append(cards, ProductCard{
+			ID:        p.ID,
 			Name:      name,
 			Brand:     stringOr(p.Brand, ""),
 			PriceText: formatMoney(p.BasePrice),
@@ -245,9 +247,10 @@ type ProductData struct {
 	SelectedColor     string
 	SelectedVariantID string // "" if the size/color combo doesn't exist
 
-	ProductPath   string
-	CartActionURL string
-	BuyActionURL  string
+	ProductPath       string
+	CartActionURL     string
+	BuyActionURL      string
+	FavoriteActionURL string
 }
 
 // SizeOption/ColorOption back the size/color picker buttons. Href always
@@ -371,6 +374,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		ProductPath:       productPath,
 		CartActionURL:     productPath + "/cart",
 		BuyActionURL:      productPath + "/buy",
+		FavoriteActionURL: "/favorites/" + product.ID,
 	}, nil
 }
 

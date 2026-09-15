@@ -80,6 +80,7 @@ toast.added_to_cart: Добавлено в корзину
 toast.repeat_added: Товары добавлены в корзину
 toast.repeat_soon: Скоро
 toast.removed_from_favorites: Убрано из избранного
+toast.added_to_favorites: Добавлено в избранное
 toast.no_variants: Товар временно недоступен
 toast.cart_soon: Корзина скоро заработает
 toast.address_saved: Адрес сохранён

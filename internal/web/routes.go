@@ -86,6 +86,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 
 	// Favorites: HTMX-only mutation endpoints (remove / add-to-cart) that
 	// swap the grid/toast in place — see internal/web/favorites_handlers.go.
+	mux.Handle("POST /favorites/{id}", withSession(apperr.Wrap(h.favAdd)))
 	mux.Handle("DELETE /favorites/{id}", withSession(apperr.Wrap(h.favRemove)))
 	mux.Handle("POST /favorites/{id}/cart", withSession(apperr.Wrap(h.favAddToCart)))
 

@@ -86,6 +86,28 @@ func (h *handlers) renderFavGrid(w http.ResponseWriter, r *http.Request, custome
 	return h.render.RenderPartial(w, "fav", "_fav_grid", page)
 }
 
+// favAdd favorites a product (HTMX: hx-post from the shop grid's and the
+// product page's heart button — see shop.gohtml/product.gohtml). Both
+// Task 2 and Task 4 had merged before either wired this route: Task 2's
+// heart buttons shipped decorative (this task's domain didn't exist yet
+// in its worktree), and this task only wired removal from the fav
+// screen. Fixing it here rather than leaving two dead heart icons on the
+// site.
+func (h *handlers) favAdd(w http.ResponseWriter, r *http.Request) error {
+	customerID := CustomerID(r)
+	if customerID == "" {
+		return apperr.Unauthorized("unauthorized", "войдите в аккаунт")
+	}
+	productID := r.PathValue("id")
+
+	if err := h.favoriteRepo.Add(r.Context(), customerID, productID); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(toastOOB(h.t(h.resolveLang(r), "toast.added_to_favorites"))))
+	return nil
+}
+
 // favRemove un-favorites a product (HTMX: hx-delete from fav.gohtml's
 // "убрать из избранного" button) and re-renders the grid in place.
 func (h *handlers) favRemove(w http.ResponseWriter, r *http.Request) error {

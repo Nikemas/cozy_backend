@@ -80,6 +80,7 @@ toast.added_to_cart: Себетке кошулду
 toast.repeat_added: Товарлар себетке кошулду
 toast.repeat_soon: Жакында
 toast.removed_from_favorites: Тандалгандардан алынды
+toast.added_to_favorites: Тандалгандарга кошулду
 toast.no_variants: Товар убактылуу жеткиликсиз
 toast.cart_soon: Себет жакында иштейт
 toast.address_saved: Дарек сакталды
