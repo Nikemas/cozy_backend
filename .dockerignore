@@ -1,0 +1,31 @@
+# Build context for docker/Dockerfile is the repo root ("docker build -f
+# docker/Dockerfile -t cozy_backend ."), so anything not excluded here gets
+# sent to the daemon and is COPYed into the builder stage by `COPY . .`.
+# None of this ends up in the final distroless runtime image (only
+# /out/server and /src/migrations are copied out of the builder), but it
+# still shouldn't be sent to the daemon or sit in a cached builder layer.
+
+# Version control - never needed for the build, and can carry old history.
+.git
+.gitignore
+
+# Local secrets / env files. Never bake real credentials into an image
+# layer. .env.example is a template with placeholder values only, so it's
+# safe to keep (not excluded).
+.env
+.env.*
+!.env.example
+
+# Agent/editor tooling: parallel agent worktrees (each a full repo copy)
+# and planning scratch docs. Not needed by the build and can be large.
+.claude
+tasks
+
+# Local-dev-only compose file (postgres + minio) - unrelated to the
+# production image built from docker/Dockerfile.
+docker/docker-compose.yml
+
+# Misc local artifacts.
+*.log
+.DS_Store
+/bin/
