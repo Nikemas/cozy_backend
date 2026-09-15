@@ -24,6 +24,10 @@ var screenPages = map[string]string{
 	"lang":      "lang.gohtml",
 	"done":      "done.gohtml",
 	"addresses": "addresses.gohtml",
+	// "checkout" isn't one of COZY_WEB_DESIGN.md's original 9 screens — it's
+	// a new screen Task 3 adds per web-plan Task 3 (delivery-address-or-
+	// pickup-point selection, not covered 1:1 by the design canvas).
+	"checkout": "checkout.gohtml",
 }
 
 // layoutPartials are parsed alongside every page: the shared chrome from
@@ -132,11 +136,13 @@ func (rr *Renderer) T(lang, key string) string {
 	return rr.bundle.T(lang, key)
 }
 
-// RenderPartial executes one named template (e.g. "_profile_auth",
-// "_address_list", "_fav_grid") from screen's parsed set directly,
-// without the surrounding "layout" — used by HTMX handlers that swap a
-// single fragment instead of reloading the whole page. name must be one
-// of layoutPartials' {{define}} names.
+// RenderPartial executes one named template directly, without the
+// surrounding "layout" wrapper — either a shared fragment from
+// layoutPartials (e.g. "_profile_auth", "_address_list", "_fav_grid") or a
+// `{{define}}` block inside screen's own file (e.g. a cart-stepper
+// fragment in cart.gohtml). Used by HTMX endpoints that swap one fragment
+// of an already-loaded page instead of doing a full page reload. name must
+// match a `{{define "name"}}` block visible in screen's parsed template set.
 func (rr *Renderer) RenderPartial(w http.ResponseWriter, screen, name string, data PageData) error {
 	byScreen, ok := rr.tmpl[data.Lang]
 	if !ok {

@@ -38,9 +38,8 @@ type handlers struct {
 	variants   *catalog.VariantRepo
 	stock      *catalog.StockRepo
 
-	// Orders domain — Foundation's frozen contract, bodies are still 501
-	// stubs until Task 3 lands. Named cartRepo (not cart) to avoid
-	// colliding with the /cart screen handler below.
+	// Orders domain — Task 3's real implementation now. Named cartRepo
+	// (not cart) to avoid colliding with the /cart screen handler below.
 	cartRepo  *orders.CartRepo
 	ordersSvc *orders.Service
 }
@@ -63,11 +62,6 @@ type ProfileData struct {
 	Step  string
 	Phone string
 	Error string
-}
-
-// DoneData backs done.gohtml.
-type DoneData struct {
-	OrderNumber string
 }
 
 // isHX reports whether r was issued by htmx (hx-post/hx-get/...) rather
@@ -149,11 +143,17 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 	}
 
 	if list, oerr := h.ordersSvc.ListOrders(r.Context(), customerID); oerr != nil {
-		// Expected to be a 501 apperr until Task 3 lands — not an error
-		// worth logging above debug.
-		slog.Debug("web: orders count unavailable (orders domain may not be implemented yet)", "err", oerr)
+		slog.Debug("web: orders count unavailable", "err", oerr)
 	} else {
 		data.OrdersCount = len(list)
+	}
+
+	if items, cerr := h.cartRepo.List(r.Context(), customerID); cerr != nil {
+		slog.Warn("web: failed to load cart count for header badge", "customer_id", customerID, "err", cerr)
+	} else {
+		for _, it := range items {
+			data.CartCount += it.Qty
+		}
 	}
 
 	return data
@@ -163,9 +163,8 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 // of this file so handlers.go stays the thin per-screen dispatch table
 // Foundation set up.
 
-func (h *handlers) cart(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "cart", h.base(r, "cart"))
-}
+// cart, checkout and done handlers live in cart_handlers.go /
+// checkout_handlers.go (Task 3 — Cart + Checkout + Done).
 
 func (h *handlers) profile(w http.ResponseWriter, r *http.Request) error {
 	data := h.base(r, "profile")
@@ -207,12 +206,6 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	})
 	http.Redirect(w, r, "/lang", http.StatusSeeOther)
 	return nil
-}
-
-func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
-	data := h.base(r, "done")
-	data.Data = DoneData{OrderNumber: r.PathValue("orderNumber")}
-	return h.render.Render(w, "done", data)
 }
 
 // renderProfileAuth renders the current login-flow step: just the

@@ -1,11 +1,63 @@
 {{define "content"}}
-<div class="screen-placeholder">
-  <h1>{{t "screen.cart.title"}}</h1>
-  {{if .Authed}}
-  <p class="muted">{{t "common.soon"}}</p>
-  <!-- TODO(orders): cart lines + stepper + checkout (Task 3, orders.CartRepo) -->
+{{template "cart_page" .}}
+{{end}}
+
+{{/*
+  cart_page is split out from "content" so the HTMX stepper (cartIncrement/
+  cartDecrement in internal/web/cart_handlers.go) can re-render just this
+  fragment via Renderer.RenderPartial, instead of the full layout, when a
+  qty button is clicked (see COZY_WEB_DESIGN.md §3.3: "степпер qty" without
+  a page reload).
+*/}}
+{{define "cart_page"}}
+<div id="cart-page" class="cart-page">
+  {{if not .Authed}}
+  <div class="screen-placeholder">
+    <h1>{{t "screen.cart.title"}}</h1>
+    <p class="muted">{{t "sidebar.login"}}: <a href="/profile">{{t "nav.profile"}}</a></p>
+  </div>
+  {{else if not .Data.Lines}}
+  <div class="cart-empty">
+    <i class="ti ti-shopping-cart-off"></i>
+    <h1>{{t "screen.cart.title"}}</h1>
+    <p class="muted">{{t "cart.empty"}}</p>
+    <a class="btn btn--primary" href="/">{{t "cart.go_to_catalog"}}</a>
+  </div>
   {{else}}
-  <p class="muted">{{t "sidebar.login"}}: <a href="/profile">{{t "nav.profile"}}</a></p>
+  <h1>{{t "screen.cart.title"}}</h1>
+  <div class="cart-layout">
+    <div class="cart-lines">
+      {{range .Data.Lines}}
+      <div class="cart-line">
+        <div class="cart-line__thumb"><i class="ti ti-shoe"></i></div>
+        <div class="cart-line__info">
+          <div class="cart-line__name">{{.ProductName}}</div>
+          <div class="cart-line__meta">{{.Size}} · {{.Color}}</div>
+        </div>
+        <div class="stepper">
+          <form hx-post="/cart/items/{{.VariantID}}/decrement" hx-target="#cart-page" hx-swap="outerHTML">
+            <button type="submit" class="stepper__btn" aria-label="{{t "cart.decrease"}}">
+              <i class="ti {{if eq .Qty 1}}ti-trash{{else}}ti-minus{{end}}"></i>
+            </button>
+          </form>
+          <span class="stepper__qty">{{.Qty}}</span>
+          <form hx-post="/cart/items/{{.VariantID}}/increment" hx-target="#cart-page" hx-swap="outerHTML">
+            <button type="submit" class="stepper__btn" aria-label="{{t "cart.increase"}}"><i class="ti ti-plus"></i></button>
+          </form>
+        </div>
+        <div class="cart-line__sum">{{printf "%.0f" .LineTotal}} сом</div>
+      </div>
+      {{end}}
+    </div>
+
+    <aside class="cart-summary">
+      <div class="cart-summary__title">{{t "cart.summary"}}</div>
+      <div class="cart-summary__row"><span>{{t "cart.items_total"}}</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
+      <div class="cart-summary__row"><span>{{t "cart.delivery"}}</span><span>{{.Data.DeliveryLabel}}</span></div>
+      <div class="cart-summary__row cart-summary__row--total"><span>{{t "cart.total"}}</span><span>{{printf "%.0f" .Data.GrandTotal}} сом</span></div>
+      <a class="btn btn--primary cart-summary__cta" href="/checkout">{{t "cart.checkout"}}</a>
+    </aside>
+  </div>
   {{end}}
 </div>
 {{end}}

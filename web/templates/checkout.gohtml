@@ -1,0 +1,60 @@
+{{/*
+  checkout isn't one of COZY_WEB_DESIGN.md's original 9 screens — the
+  canvas prototype has no dedicated checkout step (cart's "Оформить
+  заказ" goes straight to done). Per web-plan Task 3 / Open Questions,
+  this is a minimal screen built in the same visual language as the rest
+  of the site (see .checkout-option/.lang-option in site.css) rather than
+  a 1:1 design port. No payment step by design (Bakai is out of scope).
+*/}}
+{{define "content"}}
+<div class="checkout-page">
+  <h1>{{t "screen.checkout.title"}}</h1>
+
+  {{if and (not .Data.Addresses) (not .Data.Points)}}
+  <p class="muted">{{t "checkout.unavailable"}}</p>
+  {{else}}
+  <form method="post" action="/checkout" class="checkout-form">
+    <div class="checkout-options">
+      <label class="checkout-option{{if .Data.Addresses}} checkout-option--active{{end}}">
+        <input type="radio" name="fulfillment" value="delivery"{{if .Data.Addresses}} checked{{end}}{{if not .Data.Addresses}} disabled{{end}}>
+        <span class="checkout-option__title"><i class="ti ti-truck-delivery"></i> {{t "checkout.delivery"}}</span>
+      </label>
+      {{if .Data.Addresses}}
+      <div class="checkout-sublist">
+        {{range $i, $a := .Data.Addresses}}
+        <label class="checkout-suboption">
+          <input type="radio" name="address_id" value="{{$a.ID}}"{{if eq $i 0}} checked{{end}}>
+          <span>{{if $a.Label}}{{$a.Label}} — {{end}}{{$a.AddressText}}</span>
+        </label>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="muted checkout-hint">{{t "checkout.no_addresses"}}</p>
+      {{end}}
+
+      <label class="checkout-option{{if not .Data.Addresses}} checkout-option--active{{end}}">
+        <input type="radio" name="fulfillment" value="pickup"{{if not .Data.Addresses}} checked{{end}}{{if not .Data.Points}} disabled{{end}}>
+        <span class="checkout-option__title"><i class="ti ti-building-store"></i> {{t "checkout.pickup"}}</span>
+      </label>
+      {{if .Data.Points}}
+      <div class="checkout-sublist">
+        {{range $i, $p := .Data.Points}}
+        <label class="checkout-suboption">
+          <input type="radio" name="point_id" value="{{$p.ID}}"{{if eq $i 0}} checked{{end}}>
+          <span>{{$p.Name}} — {{$p.Address}}</span>
+        </label>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="muted checkout-hint">{{t "checkout.no_points"}}</p>
+      {{end}}
+    </div>
+
+    <aside class="checkout-summary">
+      <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
+      <button type="submit" class="btn btn--primary checkout-summary__cta">{{t "checkout.place_order"}}</button>
+    </aside>
+  </form>
+  {{end}}
+</div>
+{{end}}

@@ -40,6 +40,7 @@ screen.branches.title: Филиалдар
 screen.lang.title: Тил
 screen.done.title: Буйрутма тастыкталды
 screen.addresses.title: Жеткирүү дареги
+screen.checkout.title: Буйрутманы тариздөө
 
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Кодду алуу
@@ -119,3 +120,23 @@ product.delivery.return: Алмаштыруу жана кайтаруу 14 кү�
 product.unavailable: Бул өлчөм/түс азырынча жок
 product.add_to_cart: Себетке
 product.buy_now: Азыр буйрутма берүү
+
+cart.empty: Себетиңиз бош
+cart.go_to_catalog: Каталогго
+cart.summary: Буйрутма жыйынтыгы
+cart.items_total: Товарлар
+cart.delivery: Жеткирүү
+cart.total: Жыйынтык
+cart.checkout: Буйрутма берүү
+cart.increase: Санын көбөйтүү
+cart.decrease: Санын азайтуу
+
+checkout.delivery: Жеткирүү
+checkout.pickup: Өзү алып кетүү
+checkout.no_addresses: Дареги азырынча жок — өзү алып кетүүнү тандасаңыз болот.
+checkout.no_points: Жеткиликтүү дүкөндөр жок.
+checkout.unavailable: Алуу ыкмалары убактылуу жеткиликсиз.
+checkout.place_order: Буйрутма берүү
+
+done.total: Жыйынтык
+done.delivery_window: Курьер жеткирүү убактысын тактоо үчүн байланышат
