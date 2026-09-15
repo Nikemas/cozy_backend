@@ -18,6 +18,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/notify"
+	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
 func main() {
@@ -107,7 +108,8 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 // registerAdminRoutes mounts /admin/* — html/template pages behind a staff
 // session, RBAC-gated per internal/auth.
 func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
-	_ = db
+	staffSvc := staff.NewService(db)
+	staff.RegisterRoutes(mux, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
