@@ -201,9 +201,51 @@
 - [ ] **Task H** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). [детали](plan.md#task-h-admin-staff-api)
 - [ ] **Task I** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). [детали](plan.md#task-i-admin-orders-api)
 - [ ] **Task J** — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](plan.md#task-j-admin-reports-api)
-- [ ] **Task K** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках). [детали](plan.md#task-k-импорт-товаров)
+- [x] **Task K** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках). DONE, см. полное описание ниже.
 
 Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task J и Task K (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task H.
+
+### Task K: Импорт товаров (`POST /admin/products/import`, §8 ТЗ) — DONE
+
+**Description:** Массовая загрузка товаров из CSV/Excel-файла с построчным отчётом об ошибках, per §8 ТЗ ("Массовая загрузка товаров — импорт CSV/Excel (`excelize`/`encoding/csv`), отдельный хендлер `POST /admin/products/import`, с построчным отчётом об ошибках после загрузки"). Поверх уже существующих write-репозиториев каталога из Task D (`ProductRepo.Create`, `VariantRepo.Create`, `CategoryRepo.ResolveID`) — эта задача только парсит файл и по одной строке за раз вызывает их, не меняя ни одного из них.
+
+**Acceptance criteria:**
+- [x] `internal/catalog/import.go` — парсинг CSV (`encoding/csv`) и `.xlsx` (`excelize`) в общую промежуточную структуру строки (`name_ru`, `name_ky`, `category`, `price`, опционально `brand`/`description_ru`/`description_ky`/`size`/`color`/`sku`/`price_override`, опционально колонки остатков по точкам)
+- [x] Для каждой строки: `CategoryRepo.ResolveID` (slug или id), валидация обязательных полей и что `price` — неотрицательное число, затем `ProductRepo.Create` (и `VariantRepo.Create`, если есть `size`+`color`)
+- [x] Плохая строка не прерывает пакет — собирается `{row, message}` по каждой ошибке, обработка продолжается со следующей строки
+- [x] Возврат `{imported int, errors []RowError}`
+- [x] `POST /admin/products/import` (**не** под `/admin/api/`, как явно указано в §8 ТЗ и в брифе задачи), `multipart/form-data` с полем `file`; формат (CSV/`.xlsx`) определяется по расширению имени файла и/или `Content-Type` — нераспознанная комбинация даёт `apperr.BadRequest` ДО попытки парсинга
+- [x] За `staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)`
+- [x] Ответ `{imported, errors: [{row, message}]}`
+- [x] `RegisterAdminImportRoutes(mux, db, staffSvc)` — единая точка входа
+- [x] Тесты: тяжёлые table-driven тесты парсинга/валидации на CSV-фикстурах (валидные строки, отсутствующее обязательное поле, битая цена, неизвестная категория, смешанный валидный+невалидный пакет), плюс те же сценарии на XLSX (через `excelize.NewFile()` в памяти, без файла на диске); тесты определения формата (расширение/Content-Type → CSV/xlsx/отклонено) как чистая логика — всё через фейки `productCreator`/`variantCreator`/`categoryResolver`/`stockSetter`, без обращения к БД
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...`, `go vet ./...` — чисто
+- [x] `go test ./...` — чисто (39 новых тестов между `internal/catalog/import_test.go` и `internal/httpapi/admin_import_test.go`, plus все существующие пакеты по-прежнему `ok`)
+- [x] `go mod tidy` прогнан (после того, как import-код уже был написан, как и требовалось) — `github.com/xuri/excelize/v2` теперь прямая зависимость
+- [x] `golangci-lint run ./internal/catalog/... ./internal/httpapi/... ./cmd/...` — 0 issues. `golangci-lint run ./...` на весь репозиторий — 1 **предсуществующее** замечание в `internal/i18n/i18n.go:83` (errcheck на `f.Close`) из несвязанного параллельного потока — не создано и не тронуто этой задачей
+- [ ] Нет локального Postgres на этой машине — реальный round-trip через `ProductRepo`/`VariantRepo`/`CategoryRepo`/`StockRepo` против живой БД не прогнан; сами эти репозитории уже покрыты своими тестами в Task D, эта задача вызывает их через маленькие интерфейсы и тестирует только код вызова
+
+**Dependencies:** Task A (RBAC), Task D (`catalog.ProductRepo`/`VariantRepo`/`CategoryRepo`/`StockRepo` — не менялись)
+
+**Files touched:**
+- `internal/catalog/import.go` (новый) — `ImportFormat`, `DetectImportFormat`, `RowError`, `ImportResult`, `ImportDeps` + маленькие интерфейсы `productCreator`/`variantCreator`/`categoryResolver`/`stockSetter`, `ImportProducts`, CSV/XLSX-парсинг в общую `importRow`
+- `internal/catalog/import_test.go` (новый) — table-driven тесты парсинга/валидации (CSV и XLSX), тесты `DetectImportFormat`
+- `internal/httpapi/admin_import.go` (новый) — `RegisterAdminImportRoutes(mux, db, staffSvc)` + `importProductsHandler` (multipart-извлечение файла, определение формата, вызов `catalog.ImportProducts`)
+- `internal/httpapi/admin_import_test.go` (новый) — handler-тесты через multipart-запросы с фейковыми `catalog.ImportDeps` (без БД): отсутствующий файл, нераспознанный формат, happy path CSV, content-type fallback без расширения, построчные ошибки при HTTP 200, полный отказ файла при HTTP 400
+- `go.mod`/`go.sum` — новая прямая зависимость `github.com/xuri/excelize/v2` (и её транзитивные зависимости) — та же библиотека, что тянет Task J (Admin Reports API) для экспорта в Excel; при мерже обеих веток ожидается тривиальный конфликт в `go.mod`/`go.sum`, разрешаемый через `go mod tidy` после мержа, как и предупреждалось в брифе
+
+**Design decisions:**
+- **Остатки по точкам (опциональная часть §8 "опционально размеры/цвета/остатки по точкам") реализованы, но упрощённо.** Колонка `stock:<pointId>` в файле передаёт `pointId` напрямую в `StockRepo.Upsert` — без резолва человекочитаемого слага, как это делает `CategoryRepo.ResolveID` для категорий. Причина: в кодовой базе на момент этой задачи нет резолвера id-или-слаг для точек продаж (Task G, Admin Points of Sale API, — отдельный параллельный поток, ещё не смёржен), а придумывать его в рамках этой задачи было бы расширением чужой доменной области. Компромисс осознанный: колонка остатков по точкам ожидает реальный UUID точки, а не название.
+- **Ошибка выставления остатка — предупреждение, а не отказ строки.** Если товар и вариация успешно созданы, но `StockRepo.Upsert` для одной из колонок `stock:*` в этой строке падает (например, точка с таким id не существует), строка всё равно засчитывается в `imported` (создание товара — обязательное требование задачи; остатки — явно факультативные), а в `errors` добавляется отдельная запись с тем же номером строки и сообщением вида "товар создан, но остаток по точке ... не выставлен: ...". Так админ видит частичный успех вместо того, чтобы решить, что вся строка провалилась, хотя товар на самом деле уже создан.
+- **Синтаксически битый файл (не читается как CSV/XLSX вовсе) — отказ всего запроса (400), а не построчная ошибка.** `encoding/csv` не может безопасно продолжить чтение после структурной ошибки парсинга (например, незакрытая кавычка) — заголовки/границы полей могут быть неоднозначны для всех последующих строк. Требование "плохая строка не должна ронять пачку" относится к ошибкам валидации/бизнес-логики конкретной строки (не хватает поля, некорректная цена, неизвестная категория, ошибка создания вариации/остатка) — а не к синтаксически нечитаемому файлу целиком.
+- **Номер строки в `RowError.Row` считает заголовок как строку 1** (первая строка данных — строка 2), а не 1-based индекс среди только строк данных — так номер совпадает с тем, что админ увидит, открыв файл в Excel/Google Sheets.
+- **Определение колонок — по имени заголовка (регистронезависимо, с обрезкой пробелов и BOM), а не по позиции.** Это устойчивее к перестановке столбцов в шаблоне и к экспортам с BOM (частый артефакт CSV из Excel).
+- **`RegisterAdminImportRoutes` НЕ подключена в `cmd/server/main.go`.** `registerAdminRoutes` сейчас активно правится параллельным потоком (Task G/I/J и др.) — добавление ещё одной строки туда было явно названо в брифе как "безопасный дефолт — не подключать при сомнении" именно из-за интенсивной конкурентной правки этой функции прямо сейчас. Подключение — тривиальная одна строка (`httpapi.RegisterAdminImportRoutes(mux, db, staffSvc)` рядом с `httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)`), оставлена на усмотрение того, кто будет мержить эту волну.
+
+**Deviations:** Основная часть акцептанс-критериев (парсинг CSV/Excel, построчная валидация и создание товара+вариации, `POST /admin/products/import` под RBAC, построчный отчёт об ошибках) выполнена без отклонений. Опциональная часть (остатки по точкам) реализована частично — см. Design decisions выше про формат колонки `stock:<pointId>` (сырой UUID, а не слаг) и про то, что ошибка остатка — предупреждение, а не провал строки. `registerAdminRoutes` в `cmd/server/main.go` сознательно не тронут — см. Design decisions.
 
 ### Checkpoint: после Task G–K
 
