@@ -1,9 +1,18 @@
+# Third-party actions below are pinned to exact version tags (e.g.
+# @v7.0.1), not commit SHAs. Deliberate choice for this small shop: tags
+# are mutable in principle, but every action here is a widely-used,
+# actively-audited one from its ecosystem's own org (actions/*, docker/*,
+# golangci/*), and exact-patch tags are far more maintainable (readable
+# diffs, easy Dependabot bumps) than 40-char SHAs. Revisit if any of these
+# actions' trust level changes.
 name: CI
 
 on:
   push:
   pull_request:
 
+# Least-privilege default for the GITHUB_TOKEN: this workflow only reads
+# the repo to lint/test it, it never pushes, comments, or touches packages.
 permissions:
   contents: read
 

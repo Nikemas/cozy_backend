@@ -30,6 +30,11 @@
 #     (DATABASE_URL, JWT_SECRET, etc. — see .env.example) from a .env file
 #     or systemd unit already present there. This workflow does not
 #     create or manage that file.
+#
+# Third-party actions below are pinned to exact version tags (e.g.
+# @v7.4.0), not commit SHAs — see the same note in ci.yml. Same reasoning
+# applies here: actions/*, docker/*, appleboy/ssh-action are established,
+# widely-depended-on actions, and tags keep bumps easy for a small shop.
 # ---------------------------------------------------------------------------
 name: Deploy
 
@@ -38,9 +43,10 @@ on:
     branches:
       - main
 
+# No blanket write access at the workflow level: each job below declares
+# only the GITHUB_TOKEN scope it actually needs (least privilege).
 permissions:
   contents: read
-  packages: write
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -49,6 +55,10 @@ jobs:
   build-and-push:
     name: Build & push image
     runs-on: ubuntu-latest
+    # Needs to push the built image to GHCR with the built-in token.
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -74,17 +84,27 @@ jobs:
     name: Deploy over SSH
     needs: build-and-push
     runs-on: ubuntu-latest
+    # This job never checks out code or calls the GitHub API (it only
+    # opens an SSH session to the VPS), so it needs no GITHUB_TOKEN scope
+    # at all.
+    permissions: {}
     steps:
       - name: docker compose pull && up -d on the VPS
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          # Forwarded to the remote shell via `envs:` below instead of
+          # being interpolated straight into the `script:` text, so the
+          # secret value isn't baked into the literal script string.
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SSH_PORT }}
+          envs: DEPLOY_PATH
           script: |
             set -e
-            cd "${{ secrets.DEPLOY_PATH }}"
+            cd "$DEPLOY_PATH"
             docker compose pull
             docker compose up -d
             docker image prune -f
