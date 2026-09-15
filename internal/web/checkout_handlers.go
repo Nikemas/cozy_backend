@@ -59,7 +59,7 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	items, err := h.carts.List(r.Context(), customerID)
+	items, err := h.cartRepo.List(r.Context(), customerID)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		return apperr.BadRequest("fulfillment_required", "выберите способ получения")
 	}
 
-	items, err := h.carts.List(r.Context(), customerID)
+	items, err := h.cartRepo.List(r.Context(), customerID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		inputs[i] = orders.OrderItemInput{VariantID: it.VariantID, Quantity: it.Qty}
 	}
 
-	order, err := h.orderService.CreateOrder(r.Context(), customerID, inputs, addressID, pickupPointID)
+	order, err := h.ordersSvc.CreateOrder(r.Context(), customerID, inputs, addressID, pickupPointID)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 	// shouldn't fail the checkout the customer is watching complete — it
 	// just leaves a stale line they can remove manually later.
 	for _, it := range items {
-		if err := h.carts.Remove(r.Context(), customerID, it.VariantID); err != nil {
+		if err := h.cartRepo.Remove(r.Context(), customerID, it.VariantID); err != nil {
 			slog.Warn("web: failed to clear cart item after order", "customer_id", customerID, "variant_id", it.VariantID, "err", err)
 		}
 	}
@@ -164,7 +164,7 @@ func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	order, err := h.orderService.GetOrder(r.Context(), customerID, r.PathValue("orderNumber"))
+	order, err := h.ordersSvc.GetOrder(r.Context(), customerID, r.PathValue("orderNumber"))
 	if err != nil {
 		return err
 	}

@@ -83,7 +83,7 @@ func (h *handlers) cartAddItem(w http.ResponseWriter, r *http.Request) error {
 		qty = n
 	}
 
-	if err := h.carts.Add(r.Context(), customerID, variantID, qty); err != nil {
+	if err := h.cartRepo.Add(r.Context(), customerID, variantID, qty); err != nil {
 		return err
 	}
 
@@ -114,7 +114,7 @@ func (h *handlers) cartAdjustQty(w http.ResponseWriter, r *http.Request, delta i
 	}
 	variantID := r.PathValue("variantID")
 
-	items, err := h.carts.List(r.Context(), customerID)
+	items, err := h.cartRepo.List(r.Context(), customerID)
 	if err != nil {
 		return err
 	}
@@ -128,10 +128,10 @@ func (h *handlers) cartAdjustQty(w http.ResponseWriter, r *http.Request, delta i
 
 	newQty := current + delta
 	if newQty <= 0 {
-		if err := h.carts.Remove(r.Context(), customerID, variantID); err != nil {
+		if err := h.cartRepo.Remove(r.Context(), customerID, variantID); err != nil {
 			return err
 		}
-	} else if err := h.carts.UpdateQty(r.Context(), customerID, variantID, newQty); err != nil {
+	} else if err := h.cartRepo.UpdateQty(r.Context(), customerID, variantID, newQty); err != nil {
 		return err
 	}
 
