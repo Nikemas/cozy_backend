@@ -17,6 +17,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
+	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
@@ -50,10 +51,24 @@ func run() error {
 	sms := notify.NewNikitaClient(cfg.NikitaAPIKey)
 	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
 
+	mediaClient, err := media.NewClient(cfg)
+	if err != nil {
+		return err
+	}
+	// A MinIO outage at startup shouldn't stop the whole backend from
+	// booting — the site/API keep working, only photo uploads would fail
+	// until this is resolved — so log and continue rather than returning
+	// an error here.
+	ensureBucketCtx, cancelEnsureBucket := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelEnsureBucket()
+	if err := mediaClient.EnsureBucket(ensureBucketCtx); err != nil {
+		slog.Warn("minio bucket check/create failed at startup; photo uploads will not work until this is resolved", "err", err)
+	}
+
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
 	registerAPIRoutes(mux, db, authSvc)
-	registerAdminRoutes(mux, db)
+	registerAdminRoutes(mux, db, mediaClient)
 	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
 		return err
 	}
@@ -112,9 +127,10 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 
 // registerAdminRoutes mounts /admin/* — html/template pages behind a staff
 // session, RBAC-gated per internal/auth.
-func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
+func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client) {
 	staffSvc := staff.NewService(db)
 	staff.RegisterRoutes(mux, staffSvc)
+	media.RegisterRoutes(mux, mediaClient, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
