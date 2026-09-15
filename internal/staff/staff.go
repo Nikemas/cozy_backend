@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 )
 
 // Role mirrors the Postgres staff_role enum (owner/manager/point_staff).
@@ -27,6 +28,7 @@ type Staff struct {
 	Role         Role
 	PointID      *string // NULL for owner/manager
 	IsActive     bool
+	CreatedAt    time.Time
 }
 
 // Repo reads staff rows. Password verification and session issuance live
@@ -43,7 +45,7 @@ func NewRepo(db *sql.DB) *Repo {
 // exists.
 func (r *Repo) GetByPhone(ctx context.Context, phone string) (*Staff, error) {
 	const q = `
-		SELECT id, phone, password_hash, name, role, point_id, is_active
+		SELECT id, phone, password_hash, name, role, point_id, is_active, created_at
 		FROM staff
 		WHERE phone = $1`
 	return r.scanOne(r.db.QueryRowContext(ctx, q, phone))
@@ -53,7 +55,7 @@ func (r *Repo) GetByPhone(ctx context.Context, phone string) (*Staff, error) {
 // exists. Used by the session middleware to resolve a session's staff_id.
 func (r *Repo) GetByID(ctx context.Context, id string) (*Staff, error) {
 	const q = `
-		SELECT id, phone, password_hash, name, role, point_id, is_active
+		SELECT id, phone, password_hash, name, role, point_id, is_active, created_at
 		FROM staff
 		WHERE id = $1`
 	return r.scanOne(r.db.QueryRowContext(ctx, q, id))
@@ -61,7 +63,7 @@ func (r *Repo) GetByID(ctx context.Context, id string) (*Staff, error) {
 
 func (r *Repo) scanOne(row *sql.Row) (*Staff, error) {
 	var s Staff
-	err := row.Scan(&s.ID, &s.Phone, &s.PasswordHash, &s.Name, &s.Role, &s.PointID, &s.IsActive)
+	err := row.Scan(&s.ID, &s.Phone, &s.PasswordHash, &s.Name, &s.Role, &s.PointID, &s.IsActive, &s.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
