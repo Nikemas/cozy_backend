@@ -18,15 +18,25 @@
 
   <div class="aside__card">
     <div class="aside__title">{{t "sidebar.categories"}}</div>
-    <!-- TODO(catalog): real category tree via catalog.CategoryRepo.Tree (Task 2) -->
+    {{if eq .Screen "shop"}}
+    {{range .Data.Categories}}
+    <a class="aside__pill{{if .Active}} aside__pill--active{{end}}"
+       href="{{.Href}}"
+       hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+       hx-include="#shop-q, #shop-price-max">{{.Label}}</a>
+    {{end}}
+    {{else}}
     <a class="aside__pill" href="/">{{t "sidebar.category.all"}}</a>
-    <a class="aside__pill" href="/catalog/women">{{t "sidebar.category.women"}}</a>
-    <a class="aside__pill" href="/catalog/men">{{t "sidebar.category.men"}}</a>
+    {{end}}
   </div>
 
   <div class="aside__card">
     <div class="aside__title">{{t "sidebar.style"}}</div>
-    <!-- TODO(catalog): real style facets (Task 2) -->
+    <!-- Not wired: internal/catalog has no "style" concept on
+         products/categories (see products/categories migrations) — this
+         would need a schema change out of Task 2's scope (it doesn't own
+         internal/catalog's tables). Left decorative/disabled rather than
+         faking a filter that doesn't do anything. -->
     <div class="aside__chips">
       <span class="chip">Sneakers</span>
       <span class="chip">Boots</span>
@@ -36,17 +46,33 @@
 
   <div class="aside__card">
     <div class="aside__title">{{t "sidebar.brand"}}</div>
-    <!-- TODO(catalog): real brand facets (Task 2) -->
+    <!-- Not wired: catalog.ListFilter has no Brand field (only
+         category/size/color/price/q/sort/page) and adding one means
+         rewriting ProductRepo.List's existing query body, which Task 2
+         was told not to do ("не переписывая их тела") while Task D
+         concurrently adds admin write methods to the same file. Left
+         decorative/disabled — see report deviation. -->
     <label class="aside__checkbox"><input type="checkbox" disabled> Nike</label>
     <label class="aside__checkbox"><input type="checkbox" disabled> Adidas</label>
   </div>
 
   <div class="aside__card">
-    <div class="aside__title">{{t "sidebar.price"}}</div>
-    <!-- TODO(catalog): wire to ProductFilter.PriceMax (Task 2) -->
+    <div class="aside__title">{{t "sidebar.price"}}{{if eq .Screen "shop"}}{{if .Data.PriceMax}} {{.Data.PriceMax}}{{end}}{{end}}</div>
+    {{if eq .Screen "shop"}}
+    <input type="range" id="shop-price-max" name="price_max" min="1000" max="6000" step="100"
+           value="{{if .Data.PriceMax}}{{.Data.PriceMax}}{{else}}6000{{end}}"
+           hx-get="{{.Data.BasePath}}" hx-trigger="change"
+           hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+           hx-include="#shop-q">
+    {{else}}
     <input type="range" min="1000" max="6000" step="100" disabled>
+    {{end}}
   </div>
 
+  {{if eq .Screen "shop"}}
+  <a class="aside__reset" href="/">{{t "sidebar.reset"}}</a>
+  {{else}}
   <button class="aside__reset" type="button" disabled>{{t "sidebar.reset"}}</button>
+  {{end}}
 </aside>
 {{end}}

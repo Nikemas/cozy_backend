@@ -1,7 +1,81 @@
+{{/* product screen (COZY_WEB_DESIGN.md §3.2) — Task 2.
+     "_product_detail" is a separate named block so the size/color
+     pickers can hx-get the same product URL (with ?size=&color=
+     updated) and swap in just this fragment via hx-select, exactly like
+     shop.gohtml's _shop_results — see catalog_view.go's doc comment. */}}
 {{define "content"}}
-<div class="screen-placeholder">
-  <h1>{{t "screen.product.title"}}</h1>
-  <p class="muted">{{t "common.soon"}}</p>
-  <!-- TODO(catalog): product detail, size/color, "в корзину" + "Заказать сразу" (Task 2, calling orders.CartRepo.Add / orders.Service.CreateOrder) -->
+<div class="product-page">
+  {{template "_product_detail" .}}
+</div>
+{{end}}
+
+{{define "_product_detail"}}
+{{$d := .Data}}
+<div id="product-detail" class="product-detail">
+  <div class="product-photo">
+    <!-- TODO(favorites): wire once internal/storefront.Favorites exists
+         (Task 4) — decorative only for now. -->
+    <button class="product-photo__fav" type="button" aria-label="{{t "nav.favorites"}}" title="{{t "common.soon"}}">
+      <i class="ti ti-heart"></i>
+    </button>
+    {{if $d.HasPhoto}}
+    <img src="{{$d.PhotoURL}}" alt="{{$d.Name}}">
+    {{else}}
+    <svg width="260" height="160" viewBox="0 0 100 60" aria-hidden="true">
+      <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
+      <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    {{end}}
+  </div>
+
+  {{if $d.Brand}}<div class="product-meta__brand">{{$d.Brand}}</div>{{end}}
+  <div class="product-meta__name">{{$d.Name}}</div>
+  <div class="product-meta__price">{{$d.PriceText}}</div>
+
+  {{if $d.Sizes}}
+  <div class="product-section-title">{{t "product.size"}}</div>
+  <div class="product-options">
+    {{range $d.Sizes}}
+    <a class="product-option{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
+       href="{{.Href}}"
+       hx-get="{{.Href}}" hx-target="#product-detail" hx-select="#product-detail" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if $d.Colors}}
+  <div class="product-section-title">{{t "product.color"}}</div>
+  <div class="product-options">
+    {{range $d.Colors}}
+    <a class="product-option product-option--color{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
+       href="{{.Href}}"
+       hx-get="{{.Href}}" hx-target="#product-detail" hx-select="#product-detail" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="product-delivery">
+    <div class="product-delivery__row"><i class="ti ti-truck-delivery"></i> {{t "product.delivery.courier"}}</div>
+    <div class="product-delivery__row"><i class="ti ti-building-store"></i> {{t "product.delivery.pickup"}}</div>
+    <div class="product-delivery__row"><i class="ti ti-refresh"></i> {{t "product.delivery.return"}}</div>
+  </div>
+
+  {{if not $d.SelectedVariantID}}
+  <div class="muted product-unavailable">{{t "product.unavailable"}}</div>
+  {{end}}
+
+  <form class="product-actions">
+    <input type="hidden" name="size" value="{{$d.SelectedSize}}">
+    <input type="hidden" name="color" value="{{$d.SelectedColor}}">
+    <button type="button" class="product-actions__cart" {{if not $d.SelectedVariantID}}disabled{{end}}
+            hx-post="{{$d.CartActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
+            aria-label="{{t "product.add_to_cart"}}">
+      <i class="ti ti-shopping-cart-plus"></i>
+    </button>
+    <button type="button" class="btn btn--primary product-actions__buy" {{if not $d.SelectedVariantID}}disabled{{end}}
+            hx-post="{{$d.BuyActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML">
+      {{t "product.buy_now"}} · {{$d.PriceText}}
+    </button>
+  </form>
 </div>
 {{end}}

@@ -50,3 +50,21 @@ lang.ru: Орусча
 lang.ky: Кыргызча
 
 toast.added_to_cart: Себетке кошулду
+toast.coming_soon: Жакында кошобуз
+
+# Task 2 (Catalog: shop + product) keys.
+shop.banner.eyebrow: Жаңы коллекция
+shop.banner.title: Кроссовкаларга 30% чейин арзандатуу
+shop.results_word: товар
+shop.empty: Эч нерсе табылган жок
+shop.prev: Артка
+shop.next: Кийинки
+
+product.size: Өлчөм
+product.color: Түс
+product.delivery.courier: Бишкек боюнча жеткирүү — 200 сом, 1 күн
+product.delivery.pickup: Филиалдан алуу — акысыз
+product.delivery.return: Алмаштыруу жана кайтаруу 14 күн
+product.unavailable: Бул өлчөм/түс азырынча жок
+product.add_to_cart: Себетке
+product.buy_now: Азыр буйрутма берүү

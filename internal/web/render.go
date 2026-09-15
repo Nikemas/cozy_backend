@@ -54,6 +54,13 @@ type PageData struct {
 	FavCount    int
 	OrdersCount int
 
+	// SearchQuery mirrors the shop screen's current `q` filter so
+	// _header.gohtml's search box can keep showing it across
+	// navigations/HTMX partial-swaps without reaching into the
+	// screen-specific .Data payload (which isn't `shop`'s ShopData on
+	// every other screen). Empty on every screen except shop (Task 2).
+	SearchQuery string
+
 	Toast string
 	Data  any
 }

@@ -8,8 +8,10 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -21,6 +23,20 @@ type handlers struct {
 	auth      *auth.Service
 	customers *storefront.CustomerRepo
 	render    *Renderer
+	bundle    *i18n.Bundle
+
+	// Catalog domain (Task B, already merged to main) — Task 2 only calls
+	// these, it doesn't implement them. See internal/catalog/*.go.
+	categories *catalog.CategoryRepo
+	products   *catalog.ProductRepo
+	variants   *catalog.VariantRepo
+	stock      *catalog.StockRepo
+
+	// Orders domain — Foundation's frozen contract, bodies are still 501
+	// stubs until Task 3 lands (see product_actions.go). Named cartRepo
+	// (not cart) to avoid colliding with the /cart screen handler below.
+	cartRepo *orders.CartRepo
+	orderSvc *orders.Service
 }
 
 // ProfileData backs profile.gohtml's unauthenticated login form. Step is
@@ -83,13 +99,9 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 	return data
 }
 
-func (h *handlers) shop(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "shop", h.base(r, "shop"))
-}
-
-func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "product", h.base(r, "product"))
-}
+// shop and product are implemented in catalog_view.go (Task 2) — kept out
+// of this file so handlers.go stays the thin per-screen dispatch table
+// Foundation set up.
 
 func (h *handlers) cart(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "cart", h.base(r, "cart"))
