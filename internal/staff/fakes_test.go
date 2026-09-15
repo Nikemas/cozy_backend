@@ -2,7 +2,10 @@ package staff
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
 // fakeStaffGetter is an in-memory staffGetter for tests, keyed by phone and
@@ -62,4 +65,91 @@ func (f *fakeSessionStore) revokeByHash(_ context.Context, tokenHash string) err
 	now := time.Now()
 	s.RevokedAt = &now
 	return nil
+}
+
+// fakeStaffAdmin is an in-memory staffAdmin for tests. Its Update method
+// replicates the same "at least one active owner" invariant that the real
+// Repo.Update enforces inside a Postgres transaction (see admin.go) — there
+// being only one goroutine in these tests, no locking is needed to get the
+// same check-then-write behavior, just the same decision logic. This is
+// what lets Service.UpdateStaff's validation and error propagation be
+// tested without a live database.
+type fakeStaffAdmin struct {
+	byID map[string]*Staff
+}
+
+func newFakeStaffAdmin(staffers ...*Staff) *fakeStaffAdmin {
+	f := &fakeStaffAdmin{byID: map[string]*Staff{}}
+	for _, s := range staffers {
+		cp := *s
+		f.byID[s.ID] = &cp
+	}
+	return f
+}
+
+func (f *fakeStaffAdmin) List(_ context.Context) ([]Staff, error) {
+	list := make([]Staff, 0, len(f.byID))
+	for _, s := range f.byID {
+		list = append(list, *s)
+	}
+	return list, nil
+}
+
+func (f *fakeStaffAdmin) Create(_ context.Context, in StaffCreateInput) (*Staff, error) {
+	for _, s := range f.byID {
+		if s.Phone == in.Phone {
+			return nil, apperr.Conflict("phone_taken", "этот номер телефона уже используется")
+		}
+	}
+	s := &Staff{
+		ID:           fmt.Sprintf("new-%d", len(f.byID)+1),
+		Phone:        in.Phone,
+		PasswordHash: in.PasswordHash,
+		Name:         in.Name,
+		Role:         in.Role,
+		PointID:      in.PointID,
+		IsActive:     true,
+	}
+	f.byID[s.ID] = s
+	cp := *s
+	return &cp, nil
+}
+
+func (f *fakeStaffAdmin) Update(_ context.Context, id string, in StaffUpdateInput) (*Staff, error) {
+	current, ok := f.byID[id]
+	if !ok {
+		return nil, apperr.NotFound("staff_not_found", "сотрудник не найден")
+	}
+
+	losesOwnerStatus := current.Role == RoleOwner && current.IsActive && (in.Role != RoleOwner || !in.IsActive)
+	if losesOwnerStatus {
+		others := 0
+		for oid, s := range f.byID {
+			if oid != id && s.Role == RoleOwner && s.IsActive {
+				others++
+			}
+		}
+		if others == 0 {
+			return nil, apperr.Conflict("last_owner", "нельзя понизить или деактивировать последнего владельца")
+		}
+	}
+
+	passwordHash := current.PasswordHash
+	if in.PasswordHash != nil {
+		passwordHash = *in.PasswordHash
+	}
+
+	updated := &Staff{
+		ID:           current.ID,
+		Phone:        current.Phone,
+		PasswordHash: passwordHash,
+		Name:         in.Name,
+		Role:         in.Role,
+		PointID:      in.PointID,
+		IsActive:     in.IsActive,
+		CreatedAt:    current.CreatedAt,
+	}
+	f.byID[id] = updated
+	cp := *updated
+	return &cp, nil
 }

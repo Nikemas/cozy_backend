@@ -3,6 +3,7 @@ package staff
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -38,16 +39,33 @@ type sessionStore interface {
 	revokeByHash(ctx context.Context, tokenHash string) error
 }
 
-// Service implements staff login/logout and session resolution.
+// staffAdmin is the subset of *Repo that Service's admin CRUD methods
+// (CreateStaff/UpdateStaff/ListStaff) depend on — mirrors the
+// staffGetter/sessionStore pattern above so this stays testable with a fake
+// instead of a live database. The real *Repo.Update implementation owns the
+// last-owner-invariant transaction; a test fake replicates that same
+// business rule in memory to exercise Service's validation and error
+// propagation without Postgres.
+type staffAdmin interface {
+	List(ctx context.Context) ([]Staff, error)
+	Create(ctx context.Context, in StaffCreateInput) (*Staff, error)
+	Update(ctx context.Context, id string, in StaffUpdateInput) (*Staff, error)
+}
+
+// Service implements staff login/logout, session resolution, and (for
+// RoleOwner only, gated at the route level) admin CRUD over staff accounts.
 type Service struct {
 	staff    staffGetter
 	sessions sessionStore
+	admin    staffAdmin
 }
 
 func NewService(db *sql.DB) *Service {
+	repo := NewRepo(db)
 	return &Service{
-		staff:    NewRepo(db),
+		staff:    repo,
 		sessions: newSessionRepo(db),
+		admin:    repo,
 	}
 }
 
@@ -120,4 +138,123 @@ func (s *Service) authenticatedStaff(ctx context.Context, sessionToken string) (
 
 func invalidCredentials() error {
 	return apperr.Unauthorized("invalid_credentials", "неверный телефон или пароль")
+}
+
+// CreateStaffInput carries the create form of a staff account, as decoded
+// from the request body — Password is plaintext here; Service hashes it
+// before it ever reaches the repo.
+type CreateStaffInput struct {
+	Phone    string
+	Password string
+	Name     string
+	Role     Role
+	PointID  *string
+}
+
+// UpdateStaffInput carries the update form of a staff account. Password is
+// nil to leave the stored password unchanged — the PUT endpoint's password
+// field is optional for exactly that reason.
+type UpdateStaffInput struct {
+	Name     string
+	Role     Role
+	PointID  *string
+	IsActive bool
+	Password *string
+}
+
+// ListStaff returns every staff account for the admin staff list. Response
+// DTOs are built by the route handler, not here — Staff.PasswordHash never
+// leaves this package as JSON.
+func (s *Service) ListStaff(ctx context.Context) ([]Staff, error) {
+	return s.admin.List(ctx)
+}
+
+// CreateStaff validates in, hashes the plaintext password with bcrypt (same
+// cost factor as everywhere else in this package,
+// bcrypt.DefaultCost — see Login), and creates the staff account.
+// point_id/role compatibility is checked here, in Go, before ever reaching
+// the database: point_id is required for point_staff and forbidden for
+// owner/manager. Duplicate phone and unknown point_id are caught by the
+// repo's Postgres constraint translation (see translateStaffWriteErr) and
+// surface here as ordinary *apperr.AppError values.
+func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff, error) {
+	if strings.TrimSpace(in.Phone) == "" {
+		return nil, apperr.BadRequest("invalid_phone", "телефон обязателен")
+	}
+	if strings.TrimSpace(in.Name) == "" {
+		return nil, apperr.BadRequest("invalid_name", "имя обязательно")
+	}
+	if in.Password == "" {
+		return nil, apperr.BadRequest("invalid_password", "пароль обязателен")
+	}
+	if err := validateStaffRolePointID(in.Role, in.PointID); err != nil {
+		return nil, err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.admin.Create(ctx, StaffCreateInput{
+		Phone:        in.Phone,
+		PasswordHash: string(hash),
+		Name:         in.Name,
+		Role:         in.Role,
+		PointID:      in.PointID,
+	})
+}
+
+// UpdateStaff validates in the same way CreateStaff does, hashes the new
+// password when one is given, and delegates to the repo, which enforces the
+// last-active-owner invariant atomically (see Repo.Update). A rejection of
+// that invariant — apperr.Conflict("last_owner", ...) — surfaces here
+// unchanged, and leaves the staff account untouched.
+func (s *Service) UpdateStaff(ctx context.Context, id string, in UpdateStaffInput) (*Staff, error) {
+	if strings.TrimSpace(in.Name) == "" {
+		return nil, apperr.BadRequest("invalid_name", "имя обязательно")
+	}
+	if err := validateStaffRolePointID(in.Role, in.PointID); err != nil {
+		return nil, err
+	}
+
+	upd := StaffUpdateInput{
+		Name:     in.Name,
+		Role:     in.Role,
+		PointID:  in.PointID,
+		IsActive: in.IsActive,
+	}
+	if in.Password != nil {
+		if *in.Password == "" {
+			return nil, apperr.BadRequest("invalid_password", "пароль не может быть пустым")
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(*in.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, err
+		}
+		h := string(hash)
+		upd.PasswordHash = &h
+	}
+
+	return s.admin.Update(ctx, id, upd)
+}
+
+// validateStaffRolePointID enforces §"Business rules" 1: point_id is
+// required when role is point_staff, and must be absent for owner/manager.
+// Shared by CreateStaff and UpdateStaff so the rule can't drift between the
+// two.
+func validateStaffRolePointID(role Role, pointID *string) error {
+	switch role {
+	case RoleOwner, RoleManager:
+		if pointID != nil && strings.TrimSpace(*pointID) != "" {
+			return apperr.BadRequest("point_id_forbidden", "point_id должен быть пустым для роли owner/manager")
+		}
+	case RolePointStaff:
+		if pointID == nil || strings.TrimSpace(*pointID) == "" {
+			return apperr.BadRequest("point_id_required", "point_id обязателен для роли point_staff")
+		}
+	default:
+		return apperr.BadRequest("invalid_role", "неизвестная роль")
+	}
+	return nil
 }
