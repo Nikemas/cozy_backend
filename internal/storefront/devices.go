@@ -1,0 +1,52 @@
+package storefront
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/Nikemas/cozy_backend/internal/apperr"
+)
+
+// Platforms accepted by DeviceTokenRepo.Register — matches the `platform`
+// comment on migration 000014_create_device_tokens ("ios|android").
+const (
+	PlatformIOS     = "ios"
+	PlatformAndroid = "android"
+)
+
+func validPlatform(platform string) bool {
+	return platform == PlatformIOS || platform == PlatformAndroid
+}
+
+// DeviceTokenRepo is the read/write contract for a customer's registered
+// FCM device tokens (migration 000014_create_device_tokens), used to push
+// order-status notifications to the Flutter app.
+type DeviceTokenRepo struct {
+	db *sql.DB
+}
+
+func NewDeviceTokenRepo(db *sql.DB) *DeviceTokenRepo {
+	return &DeviceTokenRepo{db: db}
+}
+
+// Register upserts an FCM device token for customerID. fcm_token is UNIQUE,
+// so re-registering a token that's already on file (e.g. the same physical
+// device, reinstalled or logged in as a different customer) updates the
+// owning customer_id and platform in place rather than erroring — this
+// deliberately lets a fresher registration "steal" a token from whichever
+// customer last owned it, since a stale FK to the previous customer would
+// otherwise silently keep sending that customer's push notifications to a
+// device they no longer use.
+func (r *DeviceTokenRepo) Register(ctx context.Context, customerID, fcmToken, platform string) error {
+	if !validPlatform(platform) {
+		return apperr.BadRequest("invalid_platform", "platform должен быть ios или android")
+	}
+
+	const q = `
+		INSERT INTO device_tokens (customer_id, fcm_token, platform)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (fcm_token) DO UPDATE
+		SET customer_id = EXCLUDED.customer_id, platform = EXCLUDED.platform`
+	_, err := r.db.ExecContext(ctx, q, customerID, fcmToken, platform)
+	return err
+}

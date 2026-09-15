@@ -46,3 +46,12 @@ func CustomerIDFromContext(ctx context.Context) (string, bool) {
 	id, ok := ctx.Value(customerIDKey).(string)
 	return id, ok
 }
+
+// NewContextWithCustomerID returns a context carrying customerID exactly as
+// RequireCustomer would after a valid token — for tests in other packages
+// (internal/httpapi's favorites/addresses/devices handler tests) that need
+// to invoke a customer-scoped handler without going through a real JWT.
+// Mirrors internal/staff.NewContextWithStaff, added for the same reason.
+func NewContextWithCustomerID(ctx context.Context, customerID string) context.Context {
+	return context.WithValue(ctx, customerIDKey, customerID)
+}

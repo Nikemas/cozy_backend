@@ -132,6 +132,7 @@ func registerHealthRoutes(mux *http.ServeMux, db *sql.DB) {
 func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 	httpapi.RegisterAuthRoutes(mux, authSvc)
 	httpapi.RegisterCatalogRoutes(mux, db)
+	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
 }
 
 // registerAdminRoutes mounts /admin/* — html/template pages behind a staff
