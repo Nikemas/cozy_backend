@@ -257,9 +257,26 @@
 - [x] `openapi.yaml` дополнен всеми путями Wave 3 (points/staff CRUD/orders/reports/import) плюс ранее не задокументированными Task G/H (favorites/addresses/devices/orders/cart для мобильного приложения) — 38 путей всего, провалидировано `openapi_spec_validator` — `OK`
 - [ ] Ревью с пользователем перед Wave 4
 
-## Wave 4 (не начата): internal/admin — HTML/HTMX-слой
+## Wave 4: internal/admin — HTML/HTMX-слой (см. `tasks/plan.md` → «Wave 4»)
 
-Страница логина, layout+сайдбар с ролевой видимостью, экраны Товары/Заказы/Отчёты/Точки/Сотрудники/Импорт поверх API из Wave 3. Стартует после чек-пойнта Wave 3 — см. Open Questions в `plan.md`.
+Дизайн-канвас получен 2026-09-15 (`design/Cozy Admin/Cozy Admin.dc.html`, Claude Design проект `20e92866-8abe-4e59-bf60-7c5190724978`) — Wave 4 больше не блокирована отсутствием дизайна.
+
+- [ ] **Task 1** — Foundation: layout, auth-gate, ролевая видимость сайдбара, страница входа, токены. Соло, блокирует всё. [детали](plan.md#task-1-foundation--layout-auth-токены-роутинг-internaladmin)
+
+### Checkpoint: после Task 1
+- [ ] `go build/vet/test` чисто
+- [ ] Вход/выход работают, auth-gate тестами покрыт
+- [ ] Смержено в `main`
+
+- [ ] **Task 2** — Товары (список+форма+импорт). [детали](plan.md#task-2-товары--список-форма-импорт)
+- [ ] **Task 3** — Заказы (список+детально). [детали](plan.md#task-3-заказы--список-и-детально)
+- [ ] **Task 4** — Отчёты. [детали](plan.md#task-4-отчёты)
+- [ ] **Task 5** — Точки продаж + Сотрудники. [детали](plan.md#task-5-точки-продаж--сотрудники)
+
+### Checkpoint: после Task 2–5
+- [ ] Все 4 ветки смержены, `go build/vet/test/gofmt` чисто
+- [ ] Полный обход всех 10 экранов без 500/паники
+- [ ] Визуальная сверка с `Cozy Admin.dc.html`, ревью с пользователем
 
 ---
 
