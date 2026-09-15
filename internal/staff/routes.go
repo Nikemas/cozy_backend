@@ -12,6 +12,24 @@ import (
 // Max-Age attribute.
 var sessionCookieMaxAge = int(sessionTTL.Seconds())
 
+// SessionCookieName and SessionCookieMaxAge re-export the private
+// sessionCookieName/sessionCookieMaxAge above so internal/admin's HTML
+// login/logout (which can't set a JSON body, so can't reuse the
+// POST /admin/api/login handler below directly) can set/read the exact
+// same cookie — same name, same Max-Age — and stay compatible with
+// sessions this package's own JSON login/logout create and consume.
+const SessionCookieName = sessionCookieName
+
+var SessionCookieMaxAge = sessionCookieMaxAge
+
+// SetSessionCookie re-exports setSessionCookie below for internal/admin's
+// HTML login/logout, so both surfaces set the cookie with identical
+// attributes (HttpOnly/Secure/SameSite/Path) instead of a second
+// hand-copied http.SetCookie call risking drift from this one.
+func SetSessionCookie(w http.ResponseWriter, token string, maxAge int) {
+	setSessionCookie(w, token, maxAge)
+}
+
 // RegisterRoutes mounts the staff login/logout flow under /admin/api/*.
 func RegisterRoutes(mux *http.ServeMux, svc *Service) {
 	mux.Handle("POST /admin/api/login", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {

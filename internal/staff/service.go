@@ -3,6 +3,7 @@ package staff
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"strings"
 	"time"
 
@@ -134,6 +135,22 @@ func (s *Service) authenticatedStaff(ctx context.Context, sessionToken string) (
 		return nil, nil
 	}
 	return st, nil
+}
+
+// StaffFromRequest resolves the staff_session cookie on r to the active
+// staff member it belongs to, or (nil, nil) if there's no valid session
+// (missing cookie, unknown/expired/revoked session, or a deactivated staff
+// account). It's the HTML-page counterpart of RequireRole: RequireRole
+// answers JSON API requests with a 401/403 body when the session is
+// invalid, which doesn't make sense for a page a person is looking at in a
+// browser — internal/admin's own auth-gate calls this instead and decides
+// what to render/redirect to itself.
+func (s *Service) StaffFromRequest(r *http.Request) (*Staff, error) {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return nil, nil
+	}
+	return s.authenticatedStaff(r.Context(), cookie.Value)
 }
 
 func invalidCredentials() error {

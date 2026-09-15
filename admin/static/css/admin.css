@@ -1,0 +1,317 @@
+/* admin/static/css/admin.css — internal/admin's own, self-contained token +
+ * layout stylesheet. Wave 4 plan (tasks/plan.md, Task 1) leaves the choice
+ * of "extend design-system/tokens.css" vs "own admin.css" to the
+ * implementor; this file is the chosen option, mirroring how internal/web
+ * already owns web/static/css/site.css rather than sharing a stylesheet
+ * with any other app. Colors/radii below are copied verbatim from the
+ * design canvas (Cozy Admin.dc.html) and tasks/plan.md Task 1's brief —
+ * don't invent new values here, extend this file instead.
+ */
+
+:root {
+  --admin-bg: #F5F5F3;
+  --admin-surface: #FFFFFF;
+  --admin-border: #E5E5E3;
+  --admin-text: #1A1A1A;
+  --admin-muted: #8A8A86;
+  --admin-primary: #FF7A1A;
+  --admin-primary-hover: #E56200;
+  --admin-primary-tint: #FFEEDF;
+  --admin-danger: #C62828;
+  --admin-danger-tint: #FFEBEE;
+
+  --admin-radius-card: 16px;
+  --admin-radius-field: 10px;
+  /* Deliberately squared, not the mobile app's pill radius — visually
+     distinguishes admin chips (status/stock labels etc., Tasks 2-5) from
+     the Flutter app's chips. */
+  --admin-radius-chip: 8px;
+
+  --admin-sidebar-width: 240px;
+  --admin-sidebar-width-collapsed: 72px;
+}
+
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--admin-primary); text-decoration: none; }
+a:hover { color: var(--admin-primary-hover); }
+* { box-sizing: border-box; }
+input, select, textarea, button { font-family: inherit; }
+h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Buttons / fields (shared primitives for Tasks 2-5) ---------- */
+
+.admin-btn {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--admin-radius-field);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.admin-btn--primary { background: var(--admin-primary); color: #FFFFFF; }
+.admin-btn--primary:hover { background: var(--admin-primary-hover); }
+.admin-btn--secondary { background: var(--admin-surface); color: var(--admin-text); border: 1px solid var(--admin-border); font-weight: 600; }
+.admin-btn--dark { background: var(--admin-text); color: #FFFFFF; }
+.admin-btn--danger { background: var(--admin-danger); color: #FFFFFF; }
+
+.admin-chip {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: var(--admin-radius-chip);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.admin-field label { font-size: 13px; font-weight: 600; color: var(--admin-text); }
+.admin-field input,
+.admin-field select {
+  height: 44px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-field);
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  outline: none;
+}
+
+/* ---------- Login / no-access (no sidebar chrome) ---------- */
+
+.admin-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--admin-bg);
+  padding: 24px;
+}
+.admin-login__card {
+  width: 400px;
+  max-width: 100%;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  padding: 36px 32px 32px;
+  text-align: center;
+}
+.admin-login__logo { display: flex; justify-content: center; margin-bottom: 28px; }
+.admin-login__logo img { border-radius: 20px; display: block; }
+.admin-login__card form { text-align: left; }
+.admin-login__title { font-size: 17px; font-weight: 700; color: var(--admin-text); margin-bottom: 8px; }
+.admin-login__error { font-size: 13px; color: var(--admin-danger); margin-bottom: 8px; }
+.admin-login__submit { margin-top: 12px; width: 100%; }
+.admin-login__hint { margin-top: 18px; font-size: 12px; color: var(--admin-muted); text-align: center; }
+
+.admin-password { position: relative; display: flex; }
+.admin-password input { flex: 1; padding-right: 44px; }
+.admin-password__toggle {
+  position: absolute; right: 4px; top: 4px;
+  width: 36px; height: 36px;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--admin-muted);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- App shell (sidebar + header + content) ---------- */
+
+.admin-shell { display: flex; min-height: 100vh; background: var(--admin-bg); }
+
+.admin-sidebar {
+  background: var(--admin-surface);
+  border-right: 1px solid var(--admin-border);
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: var(--admin-sidebar-width);
+  z-index: 55;
+}
+.admin-sidebar__logo { padding: 22px 20px 18px; display: flex; justify-content: flex-start; }
+.admin-sidebar__logo img { width: 48px; height: 48px; border-radius: 12px; display: block; }
+
+.admin-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+.admin-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--admin-radius-field);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  font-weight: 500;
+  background: transparent;
+  color: var(--admin-text);
+}
+.admin-nav__item svg { flex: none; }
+.admin-nav__item.active { background: var(--admin-primary-tint); color: var(--admin-primary); font-weight: 700; }
+
+.admin-sidebar__spacer { flex: 1; }
+.admin-sidebar__footer {
+  border-top: 1px solid var(--admin-border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.admin-sidebar__user { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: center; }
+.admin-sidebar__initials {
+  width: 36px; height: 36px; flex: none;
+  border-radius: var(--admin-radius-field);
+  background: var(--admin-primary-tint);
+  color: var(--admin-primary);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-sidebar__userinfo { min-width: 0; flex: 1; }
+.admin-sidebar__username { font-size: 13px; font-weight: 600; color: var(--admin-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-sidebar__userrole { font-size: 11px; color: var(--admin-muted); }
+.admin-sidebar__logoutform { align-self: flex-start; }
+.admin-sidebar__logout { border: none; background: transparent; padding: 0; font-size: 12px; color: var(--admin-muted); cursor: pointer; }
+
+.admin-drawer-backdrop { display: none; position: fixed; inset: 0; background: rgba(26, 26, 26, 0.35); z-index: 50; }
+
+.admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.admin-header {
+  min-height: 68px;
+  flex: none;
+  background: var(--admin-surface);
+  border-bottom: 1px solid var(--admin-border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.admin-header__hamburger,
+.admin-header__back {
+  width: 40px; height: 40px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-field);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-header__back { width: 32px; height: 32px; }
+.admin-header__hamburger { display: none; }
+.admin-header__title { font-size: 19px; font-weight: 700; color: var(--admin-text); }
+.admin-header__spacer { flex: 1; }
+.admin-header__search {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+  max-width: 280px;
+}
+.admin-header__search svg { position: absolute; left: 12px; top: 13px; color: var(--admin-muted); }
+.admin-header__search input {
+  width: 100%; height: 42px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-field);
+  background: var(--admin-bg);
+  padding: 0 12px 0 36px;
+  font-size: 14px;
+  color: var(--admin-text);
+  outline: none;
+}
+
+.admin-content { padding: 24px; flex: 1; }
+
+/* ---------- Toast ---------- */
+
+.admin-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 70;
+  background: var(--admin-text);
+  color: #FFFFFF;
+  border-radius: 12px;
+  padding: 13px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(26, 26, 26, 0.22);
+  animation: toastIn 0.18s ease;
+}
+
+/* ---------- Generic confirm modal (Tasks 2-5 reuse via openConfirmModal()) ---------- */
+
+.admin-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(26, 26, 26, 0.35);
+  align-items: center; justify-content: center;
+  z-index: 60;
+  animation: fadeIn 0.14s ease;
+}
+.admin-modal {
+  width: 420px;
+  max-width: calc(100% - 48px);
+  background: var(--admin-surface);
+  border-radius: var(--admin-radius-card);
+  padding: 24px;
+}
+.admin-modal__title { font-size: 17px; font-weight: 700; color: var(--admin-text); }
+.admin-modal__text { font-size: 14px; color: var(--admin-muted); margin-top: 8px; line-height: 1.5; }
+.admin-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+/* ---------- Responsive sidebar (design canvas lines 966-983) ---------- */
+
+/* Tablet (768-1023px): icon-only collapsed sidebar, no labels. */
+@media (max-width: 1023px) {
+  .admin-sidebar { width: var(--admin-sidebar-width-collapsed); }
+  .admin-sidebar__logo { padding: 20px 0 18px; justify-content: center; }
+  .admin-sidebar__logo img { width: 40px; height: 40px; }
+  .admin-nav__item { justify-content: center; padding: 0; }
+  .admin-nav__label,
+  .admin-sidebar__userinfo,
+  .admin-sidebar__logoutform { display: none; }
+}
+
+/* Mobile (<768px): sidebar becomes a hidden-by-default overlay drawer,
+   toggled by the header hamburger (see toggleAdminDrawer() in
+   layout.gohtml). This block is intentionally AFTER the tablet block so
+   its rules win the cascade at widths below 768px too (equal specificity,
+   later source order wins) without needing !important. */
+@media (max-width: 767px) {
+  .admin-header__hamburger { display: flex; }
+  .admin-sidebar {
+    display: none;
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: var(--admin-sidebar-width);
+    z-index: 100;
+    box-shadow: 0 0 40px rgba(26, 26, 26, 0.18);
+  }
+  .admin-sidebar__logo { padding: 22px 20px 18px; justify-content: flex-start; }
+  .admin-sidebar__logo img { width: 48px; height: 48px; }
+  .admin-nav__item { justify-content: flex-start; padding: 0 12px; }
+  .admin-nav__label,
+  .admin-sidebar__userinfo,
+  .admin-sidebar__logoutform { display: flex; }
+  .admin-sidebar__logout { display: block; }
+
+  body.admin-drawer-open .admin-sidebar { display: flex; }
+  body.admin-drawer-open .admin-drawer-backdrop { display: block; }
+}

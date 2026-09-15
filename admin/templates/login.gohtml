@@ -1,0 +1,37 @@
+{{/* login.gohtml — Cozy Admin.dc.html lines 28-54, translated close to
+     verbatim from the canvas's inline-styled markup into html/template +
+     admin.css classes. PageData.ShowSidebar is false for this screen, so
+     layout.gohtml renders this content with no sidebar/header chrome. */}}
+{{define "content"}}
+<div class="admin-login">
+  <div class="admin-login__card">
+    <div class="admin-login__logo">
+      <img src="/admin/static/img/cozy-logo.png" alt="Cozy" width="84" height="84">
+    </div>
+    <form method="post" action="/admin/login">
+      <div class="admin-field">
+        <label>Номер телефона</label>
+        <input type="tel" name="phone" value="{{.Phone}}" placeholder="+996 555 123 456" required autofocus>
+      </div>
+      <div class="admin-field" style="margin-bottom: 8px">
+        <label>Пароль</label>
+        <div class="admin-password">
+          <input type="password" name="password" id="admin-password-input" placeholder="••••••••" required>
+          <button type="button" class="admin-password__toggle" onclick="toggleAdminPassword()" aria-label="Показать пароль">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        </div>
+      </div>
+      {{if .Err}}<div class="admin-login__error">{{.Err}}</div>{{end}}
+      <button type="submit" class="admin-btn admin-btn--primary admin-login__submit">Войти</button>
+    </form>
+    <div class="admin-login__hint">Доступ выдаёт владелец магазина</div>
+  </div>
+</div>
+<script>
+function toggleAdminPassword() {
+  var input = document.getElementById('admin-password-input');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+{{end}}

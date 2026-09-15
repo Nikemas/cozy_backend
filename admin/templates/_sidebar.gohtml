@@ -1,0 +1,34 @@
+{{/* _sidebar renders the app shell's <aside> — logo, role-filtered nav
+     (see internal/admin/nav.go's navItemsForRole, computed server-side
+     instead of the design canvas's client-side navDefs.filter), and the
+     signed-in staff member's initials/name/role + logout button. Only
+     rendered when PageData.ShowSidebar is true (layout.gohtml). */}}
+{{define "_sidebar"}}
+<div class="admin-drawer-backdrop" onclick="toggleAdminDrawer(false)"></div>
+<aside class="admin-sidebar">
+  <div class="admin-sidebar__logo">
+    <img src="/admin/static/img/cozy-logo.png" alt="Cozy" width="48" height="48">
+  </div>
+  <nav class="admin-nav">
+    {{range .NavItems}}
+    <a href="{{.URL}}" title="{{.Label}}" class="admin-nav__item{{if .Active}} active{{end}}">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{.IconPath}}"></path></svg>
+      <span class="admin-nav__label">{{.Label}}</span>
+    </a>
+    {{end}}
+  </nav>
+  <div class="admin-sidebar__spacer"></div>
+  <div class="admin-sidebar__footer">
+    <div class="admin-sidebar__user">
+      <div class="admin-sidebar__initials">{{.Initials}}</div>
+      <div class="admin-sidebar__userinfo">
+        <div class="admin-sidebar__username">{{.Staff.Name}}</div>
+        <div class="admin-sidebar__userrole">{{.RoleLabel}}</div>
+      </div>
+    </div>
+    <form method="post" action="/admin/logout" class="admin-sidebar__logoutform">
+      <button type="submit" class="admin-sidebar__logout">Выйти</button>
+    </form>
+  </div>
+</aside>
+{{end}}
