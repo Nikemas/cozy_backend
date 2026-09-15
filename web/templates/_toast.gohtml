@@ -1,5 +1,13 @@
+{{/* toast-slot is a stable container present on every page load so
+     HTMX responses elsewhere on the site can push a toast in via an
+     out-of-band swap (hx-swap-oob="innerHTML" on #toast-slot) without
+     needing to target it explicitly from every button. */}}
 {{define "_toast"}}
-{{if .Toast}}
-<div class="toast"><i class="ti ti-circle-check"></i> {{.Toast}}</div>
+<div id="toast-slot">
+{{if .Toast}}{{template "_toast_inner" .Toast}}{{end}}
+</div>
 {{end}}
+
+{{define "_toast_inner"}}
+<div class="toast"><i class="ti ti-circle-check"></i> {{.}}</div>
 {{end}}

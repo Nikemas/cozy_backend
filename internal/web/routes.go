@@ -13,8 +13,10 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -33,11 +35,18 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	}
 
 	h := &handlers{
-		db:        db,
-		cfg:       cfg,
-		auth:      authSvc,
-		customers: storefront.NewCustomerRepo(db),
-		render:    renderer,
+		db:           db,
+		cfg:          cfg,
+		auth:         authSvc,
+		customers:    storefront.NewCustomerRepo(db),
+		addressRepo:  storefront.NewAddressRepo(db),
+		favoriteRepo: storefront.NewFavoriteRepo(db),
+		products:     catalog.NewProductRepo(db),
+		variants:     catalog.NewVariantRepo(db),
+		cartRepo:     orders.NewCartRepo(db),
+		ordersSvc:    orders.NewService(db),
+		render:       renderer,
+		bundle:       bundle,
 	}
 
 	withSession := WithSession([]byte(cfg.JWTSecret))
@@ -55,10 +64,32 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("POST /lang", withSession(apperr.Wrap(h.setLang)))
 	mux.Handle("GET /order/{orderNumber}/done", withSession(apperr.Wrap(h.done)))
 
-	// Web login: cookie wrapper over the existing OTP service.
+	// Web login: cookie wrapper over the existing OTP service, extended
+	// with the 3rd step (name-for-a-new-customer) this task adds.
 	mux.Handle("POST /login/otp/request", withSession(apperr.Wrap(h.loginRequestOTP)))
 	mux.Handle("POST /login/otp/verify", withSession(apperr.Wrap(h.loginVerifyOTP)))
+	mux.Handle("POST /login/name", withSession(apperr.Wrap(h.loginSetName)))
 	mux.Handle("POST /logout", withSession(apperr.Wrap(h.logout)))
+
+	// Favorites: HTMX-only mutation endpoints (remove / add-to-cart) that
+	// swap the grid/toast in place — see internal/web/favorites_handlers.go.
+	mux.Handle("DELETE /favorites/{id}", withSession(apperr.Wrap(h.favRemove)))
+	mux.Handle("POST /favorites/{id}/cart", withSession(apperr.Wrap(h.favAddToCart)))
+
+	// Delivery addresses: full page + HTMX CRUD partials — see
+	// internal/web/addresses_handlers.go. Route order matters here: the
+	// static "/addresses/new" and "/addresses/cancel" must be registered
+	// so they aren't shadowed by "/addresses/{id}/edit" — net/http's
+	// ServeMux already prefers the more specific (literal-segment)
+	// pattern over one with a wildcard in the same position, so this is
+	// just for readability, not correctness.
+	mux.Handle("GET /addresses", withSession(apperr.Wrap(h.addressesScreen)))
+	mux.Handle("GET /addresses/new", withSession(apperr.Wrap(h.addressNewForm)))
+	mux.Handle("GET /addresses/cancel", withSession(apperr.Wrap(h.addressCancelForm)))
+	mux.Handle("GET /addresses/{id}/edit", withSession(apperr.Wrap(h.addressEditForm)))
+	mux.Handle("POST /addresses", withSession(apperr.Wrap(h.addressCreate)))
+	mux.Handle("POST /addresses/{id}", withSession(apperr.Wrap(h.addressUpdate)))
+	mux.Handle("DELETE /addresses/{id}", withSession(apperr.Wrap(h.addressDelete)))
 
 	// SEO + static assets.
 	mux.Handle("GET /sitemap.xml", apperr.Wrap(h.sitemap))

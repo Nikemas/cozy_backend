@@ -39,14 +39,45 @@ screen.orders.title: Заказы
 screen.branches.title: Филиалы
 screen.lang.title: Язык
 screen.done.title: Заказ оформлен
+screen.addresses.title: Адреса доставки
 
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Получить код
-auth.enter_code: Введите код из SMS
+auth.enter_code: Введите код из SMS, отправленного на
 auth.confirm: Подтвердить
+auth.resend_code: Отправить код ещё раз
+auth.enter_name: Как вас зовут?
+auth.name_placeholder: Имя
+auth.save_name: Продолжить
 auth.logout: Выход из аккаунта
 
 lang.ru: Русский
 lang.ky: Кыргызча
 
+profile.addresses: Адреса доставки
+profile.language: Язык
+profile.support: Поддержка
+
+address.add: Добавить адрес
+address.empty: У вас пока нет сохранённых адресов
+address.label_placeholder: Название (Дом, Работа)
+address.text_placeholder: Улица, дом, квартира
+address.set_default: Сделать основным
+address.default_badge: Основной
+
+fav.remove: Убрать из избранного
+fav.add_to_cart: В корзину
+fav.empty: В избранном пока пусто
+fav.empty_cta: В каталог
+
+common.save: Сохранить
+common.cancel: Отмена
+common.edit: Изменить
+common.delete: Удалить
+
 toast.added_to_cart: Добавлено в корзину
+toast.removed_from_favorites: Убрано из избранного
+toast.no_variants: Товар временно недоступен
+toast.cart_soon: Корзина скоро заработает
+toast.address_saved: Адрес сохранён
+toast.address_deleted: Адрес удалён

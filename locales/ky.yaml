@@ -39,14 +39,45 @@ screen.orders.title: Буйрутмалар
 screen.branches.title: Филиалдар
 screen.lang.title: Тил
 screen.done.title: Буйрутма тастыкталды
+screen.addresses.title: Жеткирүү дареги
 
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Кодду алуу
-auth.enter_code: SMS коддун санын киргизиңиз
+auth.enter_code: Жиберилген SMS коддун санын киргизиңиз
 auth.confirm: Ырастоо
+auth.resend_code: Кодду кайра жиберүү
+auth.enter_name: Атыңыз кандай?
+auth.name_placeholder: Атыңыз
+auth.save_name: Улантуу
 auth.logout: Аккаунттан чыгуу
 
 lang.ru: Орусча
 lang.ky: Кыргызча
 
+profile.addresses: Жеткирүү дареги
+profile.language: Тил
+profile.support: Колдоо
+
+address.add: Дарек кошуу
+address.empty: Сакталган даректер жок
+address.label_placeholder: Аталышы (Үй, Иш)
+address.text_placeholder: Көчө, үй, батир
+address.set_default: Негизги кылуу
+address.default_badge: Негизги
+
+fav.remove: Тандалгандардан алып салуу
+fav.add_to_cart: Себетке
+fav.empty: Тандалгандар азырынча бош
+fav.empty_cta: Каталогго
+
+common.save: Сактоо
+common.cancel: Жокко чыгаруу
+common.edit: Өзгөртүү
+common.delete: Өчүрүү
+
 toast.added_to_cart: Себетке кошулду
+toast.removed_from_favorites: Тандалгандардан алынды
+toast.no_variants: Товар убактылуу жеткиликсиз
+toast.cart_soon: Себет жакында иштейт
+toast.address_saved: Дарек сакталды
+toast.address_deleted: Дарек өчүрүлдү
