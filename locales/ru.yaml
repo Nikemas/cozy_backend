@@ -50,3 +50,23 @@ lang.ru: Русский
 lang.ky: Кыргызча
 
 toast.added_to_cart: Добавлено в корзину
+toast.repeat_added: Товары добавлены в корзину
+toast.repeat_soon: Скоро
+
+order.status.placed: Оформлен
+order.status.confirmed: Подтверждён
+order.status.courier_assigned: Курьер в пути
+order.status.delivered: Доставлен
+order.status.cancelled: Отменён
+order.action.track: Отследить
+order.action.repeat: Повторить
+order.item.size_prefix: размер
+order.empty.title: Пока нет заказов
+order.empty.subtitle: Оформите первый заказ в каталоге
+order.empty.cta: В каталог
+order.number_prefix: Заказ
+
+branches.title: Филиалы
+branches.you_are_here: Вы здесь
+branches.route: Маршрут
+branches.empty: Пока нет доступных точек продаж

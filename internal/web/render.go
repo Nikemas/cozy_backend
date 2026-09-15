@@ -62,13 +62,14 @@ type PageData struct {
 // built once at startup so a broken .gohtml file fails fast in
 // RegisterRoutes rather than mid-request.
 type Renderer struct {
-	tmpl map[string]map[string]*template.Template // lang -> screen -> template set
+	bundle *i18n.Bundle
+	tmpl   map[string]map[string]*template.Template // lang -> screen -> template set
 }
 
 // NewRenderer parses every screen's templates for every supported
 // language.
 func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
-	rr := &Renderer{tmpl: map[string]map[string]*template.Template{}}
+	rr := &Renderer{bundle: bundle, tmpl: map[string]map[string]*template.Template{}}
 
 	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
 		rr.tmpl[lang] = map[string]*template.Template{}
@@ -105,4 +106,12 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return t.ExecuteTemplate(w, "layout", data)
+}
+
+// T translates key into lang outside of template execution — for handlers
+// that need translated copy for something other than static page content
+// (e.g. a toast message set on a redirect response), so they don't have to
+// hardcode Russian.
+func (rr *Renderer) T(lang, key string) string {
+	return rr.bundle.T(lang, key)
 }

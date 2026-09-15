@@ -15,6 +15,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -33,11 +34,14 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	}
 
 	h := &handlers{
-		db:        db,
-		cfg:       cfg,
-		auth:      authSvc,
-		customers: storefront.NewCustomerRepo(db),
-		render:    renderer,
+		db:         db,
+		cfg:        cfg,
+		auth:       authSvc,
+		customers:  storefront.NewCustomerRepo(db),
+		branchRepo: storefront.NewBranchRepo(db),
+		ordersSvc:  orders.NewService(db),
+		cartRepo:   orders.NewCartRepo(db),
+		render:     renderer,
 	}
 
 	withSession := WithSession([]byte(cfg.JWTSecret))
@@ -50,6 +54,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /favorites", withSession(apperr.Wrap(h.favorites)))
 	mux.Handle("GET /profile", withSession(apperr.Wrap(h.profile)))
 	mux.Handle("GET /orders", withSession(apperr.Wrap(h.orders)))
+	mux.Handle("POST /orders/{orderID}/repeat", withSession(apperr.Wrap(h.repeatOrder)))
 	mux.Handle("GET /branches", withSession(apperr.Wrap(h.branches)))
 	mux.Handle("GET /lang", withSession(apperr.Wrap(h.langScreen)))
 	mux.Handle("POST /lang", withSession(apperr.Wrap(h.setLang)))

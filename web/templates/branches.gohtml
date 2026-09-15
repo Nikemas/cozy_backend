@@ -1,7 +1,81 @@
 {{define "content"}}
-<div class="screen-placeholder">
-  <h1>{{t "screen.branches.title"}}</h1>
-  <p class="muted">{{t "common.soon"}}</p>
-  <!-- TODO(storefront): pseudo-map + points_of_sale list (Task 5) -->
+<div class="branches-screen">
+  <h1 class="screen-title">{{t "branches.title"}}</h1>
+
+  {{if .Data.Empty}}
+  <div class="orders-empty">
+    <i class="ti ti-map-pin-off orders-empty__icon"></i>
+    <div class="muted">{{t "branches.empty"}}</div>
+  </div>
+  {{else}}
+  <div class="branches-layout">
+    <!-- Decorative CSS pseudo-map (COZY_WEB_DESIGN.md §3.7): a grid
+         background + hand-placed % pins, no real geocoding/maps API. -->
+    <div class="branches-map" id="branches-map">
+      <div class="branches-map__road branches-map__road--v"></div>
+      <div class="branches-map__road branches-map__road--h"></div>
+      {{range .Data.Pins}}
+      <button type="button"
+              class="branches-map__pin{{if .FirstInSet}} branches-map__pin--active{{end}}"
+              style="left:{{.X}}%;top:{{.Y}}%;"
+              data-branch="{{.Index}}"
+              aria-label="{{.Number}}">
+        <span class="branches-map__pin-shape"><span class="branches-map__pin-num">{{.Number}}</span></span>
+      </button>
+      {{end}}
+      <div class="branches-map__legend">
+        <span class="branches-map__legend-dot"></span> {{t "branches.you_are_here"}}
+      </div>
+    </div>
+
+    <div class="branches-list">
+      {{range .Data.Cards}}
+      <div class="branch-card{{if .FirstInSet}} branch-card--active{{end}}" data-branch="{{.Index}}" tabindex="0">
+        <div class="branch-card__row">
+          <div class="branch-card__badge">{{.Number}}</div>
+          <div class="branch-card__info">
+            <div class="branch-card__name">{{.Name}}</div>
+            <div class="branch-card__address">{{.Address}}</div>
+          </div>
+        </div>
+        <div class="branch-card__footer">
+          <span class="branch-card__distance">{{.Distance}}</span>
+          <a class="branch-card__route" href="{{.RouteURL}}" target="_blank" rel="noopener noreferrer">
+            <i class="ti ti-navigation"></i> {{t "branches.route"}}
+          </a>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
 </div>
+
+<script>
+  // Pure client-side pin <-> card selection sync — no HTMX round trip
+  // needed for this interaction (COZY_WEB_DESIGN.md §3.7 / web-plan Task 5).
+  (function () {
+    var map = document.getElementById("branches-map");
+    if (!map) return;
+
+    function select(branchIndex) {
+      document.querySelectorAll(".branches-map__pin").forEach(function (el) {
+        el.classList.toggle("branches-map__pin--active", el.dataset.branch === branchIndex);
+      });
+      document.querySelectorAll(".branch-card").forEach(function (el) {
+        el.classList.toggle("branch-card--active", el.dataset.branch === branchIndex);
+      });
+    }
+
+    document.querySelectorAll(".branches-map__pin").forEach(function (el) {
+      el.addEventListener("click", function () { select(el.dataset.branch); });
+    });
+    document.querySelectorAll(".branch-card").forEach(function (el) {
+      el.addEventListener("click", function () { select(el.dataset.branch); });
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el.dataset.branch); }
+      });
+    });
+  })();
+</script>
 {{end}}

@@ -1,7 +1,56 @@
 {{define "content"}}
-<div class="screen-placeholder">
-  <h1>{{t "screen.orders.title"}}</h1>
-  <p class="muted">{{t "common.soon"}}</p>
-  <!-- TODO(orders): order history + "Повторить" (Task 5, orders.Service.ListOrders) -->
+<div class="orders-screen">
+  <h1 class="screen-title">{{t "screen.orders.title"}}</h1>
+
+  {{if .Data.Empty}}
+  <div class="orders-empty">
+    <i class="ti ti-package orders-empty__icon"></i>
+    <div class="orders-empty__title">{{t "order.empty.title"}}</div>
+    <div class="muted">{{t "order.empty.subtitle"}}</div>
+    <a class="btn btn--primary orders-empty__cta" href="/">{{t "order.empty.cta"}}</a>
+  </div>
+  {{else}}
+  <div class="orders-list">
+    {{range .Data.Orders}}
+    <div class="order-card">
+      <div class="order-card__header">
+        <div>
+          <div class="order-card__number">{{t "order.number_prefix"}} {{.Number}}</div>
+          <div class="order-card__date muted">{{.DateLabel}}</div>
+        </div>
+        <span class="order-status {{.StatusClass}}">{{t .StatusKey}}</span>
+      </div>
+
+      <div class="order-card__items">
+        {{range .Items}}
+        <div class="order-item">
+          <div class="order-item__thumb"><i class="ti ti-shoe"></i></div>
+          <div class="order-item__title">{{.Title}}</div>
+          <div class="order-item__qty muted">×{{.Qty}}</div>
+        </div>
+        {{end}}
+      </div>
+
+      <div class="order-card__footer">
+        <div class="order-card__total">{{.TotalLabel}}</div>
+        <div class="order-card__actions">
+          {{if .ShowTrack}}
+          <button class="btn btn--track" type="button" disabled title="{{t .StatusKey}}">
+            <i class="ti ti-map-pin"></i> {{t "order.action.track"}}
+          </button>
+          {{end}}
+          {{if .ShowRepeat}}
+          <form method="post" action="/orders/{{.ID}}/repeat">
+            <button class="btn btn--repeat" type="submit">
+              <i class="ti ti-repeat"></i> {{t "order.action.repeat"}}
+            </button>
+          </form>
+          {{end}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
 </div>
 {{end}}
