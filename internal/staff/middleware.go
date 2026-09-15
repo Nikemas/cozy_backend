@@ -22,6 +22,15 @@ func FromContext(ctx context.Context) (*Staff, bool) {
 	return st, ok
 }
 
+// NewContextWithStaff attaches st to ctx the same way RequireRole does. It
+// exists for handler-level tests in other packages that need to exercise a
+// FromContext-gated handler directly (e.g. an extra RBAC check a handler
+// makes beyond the role check RequireRole already covers) without spinning
+// up a real login/session flow.
+func NewContextWithStaff(ctx context.Context, st *Staff) context.Context {
+	return context.WithValue(ctx, staffCtxKey, st)
+}
+
 // RequireRole returns middleware that resolves the staff_session cookie to
 // an active session and staff member, then allows the request through only
 // if that staff member's role is one of roles.

@@ -111,6 +111,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	staffSvc := staff.NewService(db)
 	staff.RegisterRoutes(mux, staffSvc)
+	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
