@@ -197,15 +197,15 @@
 
 Пользователь явно попросил начать реализацию админки с бека. HTML/HTMX-слой (`internal/admin`) — не в этой волне, см. Wave 4 ниже.
 
-- [ ] **Task G** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). [детали](plan.md#task-g-admin-points-of-sale-api)
-- [ ] **Task H** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). [детали](plan.md#task-h-admin-staff-api)
-- [ ] **Task I** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). [детали](plan.md#task-i-admin-orders-api)
-- [x] **Task J** (в брифе этой сессии — «Task O») — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](#task-j-admin-reports-api-задача-о-в-брифе--done)
-- [ ] **Task K** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках). [детали](plan.md#task-k-импорт-товаров)
+- [ ] **Task L** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). Не наша задача — ведёт другая сессия.
+- [ ] **Task M** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). Не наша задача — ведёт другая сессия.
+- [ ] **Task N** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). Не наша задача — ведёт другая сессия.
+- [x] **Task O** (в брифе агента — «Task J», см. ниже) — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](#task-j-admin-reports-api-задача-о-в-брифе--done)
+- [ ] **Task P** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках) — в работе, наша задача.
 
-Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task J и Task K (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task H.
+Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task O и Task P (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task M.
 
-### Checkpoint: после Task G–K
+### Checkpoint: после Task L–P
 
 - [ ] Все 5 веток смержены в `main`
 - [ ] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто
