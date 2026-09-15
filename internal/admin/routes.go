@@ -18,14 +18,12 @@ import (
 // — Foundation itself doesn't query the database directly, staffSvc
 // (login/logout/session lookup) is all it needs.
 func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) error {
-	_ = db // reserved for Tasks 2-5's repositories; see doc comment above
-
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
 	}
 
-	h := &handlers{staffSvc: staffSvc, render: renderer}
+	h := &handlers{staffSvc: staffSvc, render: renderer, reports: newReportsRepo(db)}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
 	mux.HandleFunc("POST /admin/login", h.loginSubmit)
@@ -48,7 +46,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) err
 	mux.HandleFunc("GET /admin/orders", ownerOrManager(h.stubPage("orders", "Заказы")))
 	mux.HandleFunc("GET /admin/products", ownerOrManager(h.stubPage("products", "Товары")))
 	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.stubPage("products", "Импорт товаров")))
-	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.stubPage("reports", "Отчёты")))
+	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
 	mux.HandleFunc("GET /admin/points", ownerOnly(h.stubPage("points", "Склад и точки")))
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.stubPage("staff", "Сотрудники")))
 

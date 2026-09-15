@@ -13,6 +13,7 @@ import (
 type handlers struct {
 	staffSvc *staff.Service
 	render   *Renderer
+	reports  reportsBackend
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a
