@@ -1,7 +1,74 @@
-{{/* reports.gohtml — stub for Task 4 (Отчёты, Cozy Admin.dc.html lines
-     558-617). Foundation only wires the route + layout; Task 4 replaces
-     this file's content, not the routing. */}}
+{{/* reports.gohtml — Отчёты (Task 4, Wave 4), replacing Foundation's stub.
+     Cozy Admin.dc.html lines 558-618: period select + Excel export, 4 stat
+     cards, a per-day CSS bar chart, "Топ товаров" and "По брендам" ranked
+     lists. .Data is a *internal/admin/reports.go's ReportsData, built by
+     handlers.buildReportsData — see that file for how each field here is
+     computed from internal/reports.AggregateSales' output. */}}
 {{define "content"}}
-<h1>Отчёты</h1>
-<p>скоро</p>
+<div class="admin-reports">
+  <form method="get" class="admin-reports__toolbar">
+    <select name="period" class="admin-reports__period" onchange="this.form.submit()">
+      {{range .Data.Periods}}
+      <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+    <div class="admin-reports__spacer"></div>
+    <a class="admin-btn admin-btn--secondary" href="{{.Data.ExportURL}}">Экспорт в Excel</a>
+  </form>
+
+  <div class="admin-stat-grid">
+    {{range .Data.Stats}}
+    <div class="admin-stat-card">
+      <div class="admin-stat-card__label">{{.Label}}</div>
+      <div class="admin-stat-card__value">{{.Value}}</div>
+      <div class="admin-stat-card__note">{{.Note}}</div>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="admin-reports__card">
+    <div class="admin-reports__chart-title">Продажи по дням</div>
+    <div class="admin-reports__chart-note">{{.Data.ChartNote}}</div>
+    <div class="admin-bars">
+      {{range .Data.Bars}}
+      <div class="admin-bars__col">
+        <div class="admin-bars__bar" style="height: {{.HeightPct}}%" title="{{.Revenue}}"></div>
+        <div class="admin-bars__label">{{.Day}}</div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="admin-reports__lists">
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">Топ товаров</div>
+      {{if .Data.TopProducts}}
+        {{range .Data.TopProducts}}
+        <div class="admin-ranked-list__row">
+          <div class="admin-ranked-list__rank">{{.Rank}}</div>
+          <div class="admin-ranked-list__name">{{.Name}}</div>
+          <div class="admin-ranked-list__value">{{.Qty}}</div>
+        </div>
+        {{end}}
+      {{else}}
+      <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+      {{end}}
+    </div>
+
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">По брендам</div>
+      {{if .Data.TopBrands}}
+        {{range .Data.TopBrands}}
+        <div class="admin-ranked-list__row">
+          <div class="admin-ranked-list__name">{{.Name}}</div>
+          <div class="admin-brand-bar"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div>
+          <div class="admin-ranked-list__value admin-ranked-list__value--wide">{{.Sum}}</div>
+        </div>
+        {{end}}
+      {{else}}
+      <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+      {{end}}
+    </div>
+  </div>
+</div>
 {{end}}

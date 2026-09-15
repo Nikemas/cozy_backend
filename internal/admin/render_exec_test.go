@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -101,6 +102,17 @@ func TestRenderShellScreensExecute(t *testing.T) {
 					Initials:    initialsFor(st.Name),
 					RoleLabel:   roleLabel(st.Role),
 					NavItems:    navItemsForRole(st.Role, sc.screen),
+				}
+				// reports.gohtml ranges over .Data's fields (Periods,
+				// Stats, Bars, ...) — unlike the other still-stub
+				// screens, a nil Data here would fail at Execute time,
+				// not just render an empty stub.
+				if sc.screen == "reports" {
+					data.Data = ReportsData{
+						Periods: reportPeriodOptions(defaultReportPeriod()),
+						Stats:   buildStatCards(nil),
+						Bars:    buildBars(nil, time.Now().UTC(), time.Now().UTC()),
+					}
 				}
 				w := httptest.NewRecorder()
 				if err := rr.Render(w, sc.screen, data); err != nil {
