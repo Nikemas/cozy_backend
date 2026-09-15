@@ -2,33 +2,47 @@
 <div class="profile">
   {{if .Authed}}
     <div class="card profile-card">
-      <h1>{{t "screen.profile.title"}}</h1>
-      <p class="profile-card__row"><strong>customer_id:</strong> {{.CustomerID}}</p>
-      {{if .MaskedPhone}}<p class="profile-card__row">{{.MaskedPhone}}</p>{{end}}
-      <form method="post" action="/logout">
-        <button type="submit" class="btn btn--danger">{{t "auth.logout"}}</button>
-      </form>
+      <div class="profile-card__avatar"><i class="ti ti-user"></i></div>
+      <div class="profile-card__info">
+        <div class="profile-card__name">{{if .CustomerName}}{{.CustomerName}}{{else}}{{t "nav.profile"}}{{end}}</div>
+        {{if .MaskedPhone}}<div class="profile-card__phone">{{.MaskedPhone}}</div>{{end}}
+      </div>
     </div>
-    <p class="muted">{{t "common.soon"}}</p>
-    <!-- TODO(storefront): stats tiles, addresses, menu (Task 4) -->
+
+    {{/* Only "orders" and "favorites" — the design's 3rd tile ("бонусы")
+         is hardcoded fake data with no backing entity in the DB, so it's
+         intentionally not rendered (see Task 4 notes in tasks/web-plan.md). */}}
+    <div class="profile-stats">
+      <a class="profile-stat" href="/orders">
+        <div class="profile-stat__value">{{.OrdersCount}}</div>
+        <div class="profile-stat__label">{{t "sidebar.orders"}}</div>
+      </a>
+      <a class="profile-stat" href="/favorites">
+        <div class="profile-stat__value">{{.FavCount}}</div>
+        <div class="profile-stat__label">{{t "sidebar.favorites"}}</div>
+      </a>
+    </div>
+
+    <div class="profile-menu">
+      <a class="profile-menu__item" href="/orders">
+        <i class="ti ti-package"></i> <span>{{t "sidebar.orders"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+      </a>
+      <a class="profile-menu__item" href="/addresses">
+        <i class="ti ti-map-pin"></i> <span>{{t "profile.addresses"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+      </a>
+      <a class="profile-menu__item" href="/lang">
+        <i class="ti ti-language"></i> <span>{{t "profile.language"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+      </a>
+      <div class="profile-menu__item profile-menu__item--disabled">
+        <i class="ti ti-headset"></i> <span>{{t "profile.support"}}</span> <span class="muted">{{t "common.soon"}}</span>
+      </div>
+    </div>
+
+    <form method="post" action="/logout" hx-post="/logout">
+      <button type="submit" class="btn btn--danger">{{t "auth.logout"}}</button>
+    </form>
   {{else}}
-    <div class="card auth-card">
-      <h1>{{t "screen.profile.title"}}</h1>
-      {{if eq .Data.Step "otp"}}
-        <p>{{t "auth.enter_code"}}</p>
-        <form method="post" action="/login/otp/verify" class="form-stack">
-          <input type="hidden" name="phone" value="{{.Data.Phone}}">
-          <input type="text" name="code" inputmode="numeric" placeholder="0000" maxlength="8" required>
-          <button type="submit" class="btn btn--primary">{{t "auth.confirm"}}</button>
-        </form>
-      {{else}}
-        <form method="post" action="/login/otp/request" class="form-stack">
-          <input type="tel" name="phone" placeholder="{{t "auth.phone_placeholder"}}" required>
-          <button type="submit" class="btn btn--primary">{{t "auth.get_code"}}</button>
-        </form>
-      {{end}}
-    </div>
-    <!-- TODO(auth-web): real 3-step HTMX flow incl. name-for-new-customer step (Task 4) -->
+    {{template "_profile_auth" .}}
   {{end}}
 </div>
 {{end}}

@@ -1,0 +1,32 @@
+{{/* The favorites grid — its own template so HTMX remove-from-favorites
+     can swap just this fragment (id="fav-grid") back in after a card is
+     removed, per COZY_WEB_DESIGN.md §3.4. */}}
+{{define "_fav_grid"}}
+<div id="fav-grid" class="fav-grid">
+  {{if .Data.Items}}
+    {{range .Data.Items}}
+    <div class="fav-card">
+      <div class="fav-card__photo"><i class="ti ti-shoe"></i></div>
+      <div class="fav-card__body">
+        {{if .Brand}}<div class="fav-card__brand">{{.Brand}}</div>{{end}}
+        <div class="fav-card__name">{{.Name}}</div>
+        <div class="fav-card__price">{{.Price}}</div>
+      </div>
+      <div class="fav-card__actions">
+        <button type="button" class="btn btn--ghost" hx-delete="/favorites/{{.ProductID}}" hx-target="#fav-grid" hx-swap="outerHTML">
+          <i class="ti ti-heart-off"></i> {{t "fav.remove"}}
+        </button>
+        <button type="button" class="btn btn--primary" hx-post="/favorites/{{.ProductID}}/cart" hx-swap="none">
+          <i class="ti ti-shopping-cart"></i> {{t "fav.add_to_cart"}}
+        </button>
+      </div>
+    </div>
+    {{end}}
+  {{else}}
+    <div class="empty-state">
+      <p class="muted">{{t "fav.empty"}}</p>
+      <a class="btn btn--primary" href="/">{{t "fav.empty_cta"}}</a>
+    </div>
+  {{end}}
+</div>
+{{end}}

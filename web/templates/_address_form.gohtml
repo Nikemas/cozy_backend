@@ -1,0 +1,22 @@
+{{/* The create/edit form for one delivery address. Rendered with an
+     *AddressFormData as its own dot (see _address_list.gohtml), not a
+     PageData — so it only references .ID/.Label/.AddressText/.IsDefault/
+     .Error directly. */}}
+{{define "_address_form"}}
+<form class="address-form form-stack" hx-target="#address-panel" hx-swap="outerHTML"
+      hx-post="{{if .ID}}/addresses/{{.ID}}{{else}}/addresses{{end}}"
+      method="post" action="{{if .ID}}/addresses/{{.ID}}{{else}}/addresses{{end}}">
+  {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+  <input type="text" name="label" placeholder="{{t "address.label_placeholder"}}" value="{{.Label}}">
+  <textarea name="address_text" placeholder="{{t "address.text_placeholder"}}" required rows="2">{{.AddressText}}</textarea>
+  <label class="aside__checkbox">
+    <input type="checkbox" name="is_default" {{if .IsDefault}}checked{{end}}> {{t "address.set_default"}}
+  </label>
+  <div class="address-form__actions">
+    <button type="submit" class="btn btn--primary">{{t "common.save"}}</button>
+    <button type="button" class="link-btn" hx-get="/addresses/cancel" hx-target="#address-panel" hx-swap="outerHTML">
+      {{t "common.cancel"}}
+    </button>
+  </div>
+</form>
+{{end}}

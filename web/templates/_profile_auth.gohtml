@@ -1,0 +1,41 @@
+{{/* The unauthenticated profile screen's 3-step login form: phone ->
+     otp -> name (only for a brand-new phone number). Shared between the
+     full profile.gohtml page and every HTMX step's partial response
+     (internal/web/handlers.go's renderProfileAuth), so a no-JS visitor
+     gets the exact same markup via a full page reload. */}}
+{{define "_profile_auth"}}
+<div class="card auth-card" id="auth-card">
+  <h1>{{t "screen.profile.title"}}</h1>
+
+  {{if eq .Data.Step "otp"}}
+    <p class="muted">{{t "auth.enter_code"}} {{.Data.Phone}}</p>
+    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    <form class="form-stack" hx-post="/login/otp/verify" hx-target="#auth-card" hx-swap="outerHTML"
+          method="post" action="/login/otp/verify">
+      <input type="hidden" name="phone" value="{{.Data.Phone}}">
+      <input type="text" name="code" inputmode="numeric" placeholder="0000" maxlength="8" required autofocus>
+      <button type="submit" class="btn btn--primary">{{t "auth.confirm"}}</button>
+    </form>
+    <form class="auth-card__resend" hx-post="/login/otp/request" hx-target="#auth-card" hx-swap="outerHTML"
+          method="post" action="/login/otp/request">
+      <input type="hidden" name="phone" value="{{.Data.Phone}}">
+      <button type="submit" class="link-btn">{{t "auth.resend_code"}}</button>
+    </form>
+  {{else if eq .Data.Step "name"}}
+    <p class="muted">{{t "auth.enter_name"}}</p>
+    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    <form class="form-stack" hx-post="/login/name" hx-target="#auth-card" hx-swap="outerHTML"
+          method="post" action="/login/name">
+      <input type="text" name="name" placeholder="{{t "auth.name_placeholder"}}" required autofocus>
+      <button type="submit" class="btn btn--primary">{{t "auth.save_name"}}</button>
+    </form>
+  {{else}}
+    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    <form class="form-stack" hx-post="/login/otp/request" hx-target="#auth-card" hx-swap="outerHTML"
+          method="post" action="/login/otp/request">
+      <input type="tel" name="phone" placeholder="{{t "auth.phone_placeholder"}}" required>
+      <button type="submit" class="btn btn--primary">{{t "auth.get_code"}}</button>
+    </form>
+  {{end}}
+</div>
+{{end}}

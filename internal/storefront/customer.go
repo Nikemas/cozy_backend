@@ -6,6 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
+
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
 type Customer struct {
@@ -37,6 +40,30 @@ func (r *CustomerRepo) GetOrCreateByPhone(ctx context.Context, phone string) (*C
 		return nil, err
 	}
 	return &c, nil
+}
+
+// SetName records name for an existing customer — used by the web login
+// flow's third step ("как вас зовут") for a phone number that just
+// verified its OTP but has no name on file yet.
+func (r *CustomerRepo) SetName(ctx context.Context, id, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return apperr.BadRequest("invalid_name", "укажите имя")
+	}
+
+	const q = `UPDATE customers SET name = $2, updated_at = now() WHERE id = $1`
+	res, err := r.db.ExecContext(ctx, q, id, name)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return apperr.NotFound("customer_not_found", "покупатель не найден")
+	}
+	return nil
 }
 
 // GetByID returns the customer with id, or nil if none exists. Used by

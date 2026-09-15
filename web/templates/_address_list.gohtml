@@ -1,0 +1,42 @@
+{{/* The address list + inline create/edit form, both inside one
+     #address-panel container — every HTMX address action (new/edit/
+     cancel/save/delete) swaps this whole fragment back in, so the list
+     is always consistent with the latest write. */}}
+{{define "_address_list"}}
+<div id="address-panel" class="address-panel">
+  <div class="address-list">
+    {{if .Data.Items}}
+      {{range .Data.Items}}
+      <div class="address-card{{if .IsDefault}} address-card--default{{end}}">
+        <div class="address-card__body">
+          {{if .Label}}
+            <div class="address-card__label">{{.Label}}{{if .IsDefault}} · {{t "address.default_badge"}}{{end}}</div>
+          {{else if .IsDefault}}
+            <div class="address-card__label">{{t "address.default_badge"}}</div>
+          {{end}}
+          <div class="address-card__text">{{.AddressText}}</div>
+        </div>
+        <div class="address-card__actions">
+          <button type="button" class="link-btn" hx-get="/addresses/{{.ID}}/edit" hx-target="#address-panel" hx-swap="outerHTML">
+            {{t "common.edit"}}
+          </button>
+          <button type="button" class="link-btn link-btn--danger" hx-delete="/addresses/{{.ID}}" hx-target="#address-panel" hx-swap="outerHTML">
+            {{t "common.delete"}}
+          </button>
+        </div>
+      </div>
+      {{end}}
+    {{else if not .Data.Form}}
+      <p class="muted">{{t "address.empty"}}</p>
+    {{end}}
+  </div>
+
+  {{if .Data.Form}}
+    {{template "_address_form" .Data.Form}}
+  {{else}}
+    <button type="button" class="btn btn--primary" hx-get="/addresses/new" hx-target="#address-panel" hx-swap="outerHTML">
+      <i class="ti ti-plus"></i> {{t "address.add"}}
+    </button>
+  {{end}}
+</div>
+{{end}}
