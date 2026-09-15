@@ -136,6 +136,7 @@ func registerHealthRoutes(mux *http.ServeMux, db *sql.DB) {
 func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 	httpapi.RegisterAuthRoutes(mux, authSvc)
 	httpapi.RegisterCatalogRoutes(mux, db)
+	httpapi.RegisterPublicPointsRoutes(mux, db)
 	httpapi.RegisterOrderRoutes(mux, db, authSvc)
 	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
 }
