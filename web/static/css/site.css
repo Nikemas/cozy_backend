@@ -352,6 +352,170 @@ button, input { font-family: inherit; }
 .done-screen { text-align: center; padding: 60px 20px; }
 .done-screen__check { font-size: 56px; color: var(--cozy-accent); margin-bottom: 16px; }
 
+.screen-title { font-size: var(--cozy-fs-22); font-weight: 700; color: var(--cozy-ink); margin: 0 0 18px; }
+
+/* ---- Orders (COZY_WEB_DESIGN.md §3.6) ---- */
+.orders-list { max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
+.order-card {
+  background: var(--cozy-surface);
+  border: 0.5px solid var(--cozy-border);
+  border-radius: var(--cozy-r-16);
+  padding: 18px;
+}
+.order-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
+.order-card__number { font-size: var(--cozy-fs-14); font-weight: 700; color: var(--cozy-ink); }
+.order-card__date { margin-top: 2px; }
+.order-status {
+  font-size: var(--cozy-fs-12);
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--cozy-r-6);
+  white-space: nowrap;
+}
+.order-status--placed,
+.order-status--confirmed { background: var(--cozy-surface-2); color: var(--cozy-ink-2); }
+.order-status--transit { background: var(--cozy-accent-bg); color: var(--cozy-accent-ink); }
+.order-status--delivered { background: var(--cozy-surface-2); color: var(--cozy-ink-2); }
+.order-status--cancelled { background: #FDECEC; color: var(--cozy-danger); }
+
+.order-card__items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.order-item { display: flex; align-items: center; gap: 12px; }
+.order-item__thumb {
+  width: 48px; height: 48px; flex-shrink: 0;
+  border-radius: var(--cozy-r-10);
+  background: var(--cozy-surface-2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--cozy-ink-4); font-size: 20px;
+}
+.order-item__title { flex: 1; min-width: 0; font-size: var(--cozy-fs-14); color: var(--cozy-ink); }
+.order-item__qty { flex-shrink: 0; }
+
+.order-card__footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 12px; border-top: 0.5px solid var(--cozy-border);
+}
+.order-card__total { font-size: var(--cozy-fs-15); font-weight: 700; color: var(--cozy-ink); }
+.order-card__actions { display: flex; gap: 8px; }
+.btn--track, .btn--repeat {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; padding: 10px 16px; border-radius: var(--cozy-r-10);
+  font-size: var(--cozy-fs-13); font-weight: 700; cursor: pointer;
+}
+.btn--track { background: var(--cozy-accent-bg); color: var(--cozy-accent-ink); cursor: default; }
+.btn--repeat { background: var(--cozy-surface-2); color: var(--cozy-ink); }
+.btn--repeat:hover { background: var(--cozy-border); }
+
+.orders-empty { text-align: center; padding: 60px 24px; color: var(--cozy-ink-3); }
+.orders-empty__icon { font-size: 40px; color: var(--cozy-ink-5); display: block; margin-bottom: 12px; }
+.orders-empty__title { font-size: var(--cozy-fs-15); font-weight: 700; color: var(--cozy-ink); margin-bottom: 6px; }
+.orders-empty__cta { margin-top: 18px; }
+
+/* ---- Branches (COZY_WEB_DESIGN.md §3.7) ---- */
+.branches-layout { display: flex; gap: 20px; align-items: flex-start; }
+.branches-map {
+  flex: 1.4;
+  position: relative;
+  height: 480px;
+  border-radius: var(--cozy-r-18);
+  background-color: var(--cozy-map-bg);
+  background-image:
+    linear-gradient(var(--cozy-map-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cozy-map-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  overflow: hidden;
+}
+.branches-map__road { position: absolute; background: var(--cozy-map-road); }
+.branches-map__road--v { left: 18%; top: 0; bottom: 0; width: 12px; }
+.branches-map__road--h { top: 62%; left: 0; right: 0; height: 12px; }
+.branches-map__pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+/* Teardrop pin shape: the outer element rotates -45deg for the classic
+   map-pin silhouette, the inner number counter-rotates +45deg so the
+   digit itself stays upright. */
+.branches-map__pin-shape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--cozy-ink);
+  box-shadow: var(--cozy-shadow-pin);
+}
+.branches-map__pin--active .branches-map__pin-shape { background: var(--cozy-accent); }
+.branches-map__pin-num {
+  transform: rotate(45deg);
+  color: var(--cozy-surface);
+  font-size: var(--cozy-fs-13);
+  font-weight: 700;
+}
+.branches-map__legend {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  background: var(--cozy-surface);
+  border-radius: var(--cozy-r-10);
+  padding: 8px 12px;
+  font-size: var(--cozy-fs-12);
+  color: var(--cozy-ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--cozy-shadow-chip);
+}
+.branches-map__legend-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--cozy-geo);
+  display: inline-block;
+}
+
+.branches-list { flex: 1; min-width: 0; }
+.branch-card {
+  border: 0.5px solid var(--cozy-border);
+  background: var(--cozy-surface);
+  border-radius: var(--cozy-r-16);
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.branch-card--active { border-color: var(--cozy-accent); background: var(--cozy-accent-bg-3); }
+.branch-card__row { display: flex; align-items: flex-start; gap: 12px; }
+.branch-card__badge {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: var(--cozy-r-9);
+  background: var(--cozy-ink);
+  color: var(--cozy-surface);
+  font-size: var(--cozy-fs-13);
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.branch-card--active .branch-card__badge { background: var(--cozy-accent); }
+.branch-card__info { flex: 1; min-width: 0; }
+.branch-card__name { font-size: 14.5px; font-weight: 700; color: var(--cozy-ink); margin-bottom: 3px; }
+.branch-card__address { font-size: 12.5px; color: var(--cozy-ink-2); margin-bottom: 2px; }
+.branch-card__footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.branch-card__distance { font-size: 12.5px; font-weight: 700; color: var(--cozy-accent); }
+.branch-card__route {
+  border: none;
+  background: var(--cozy-accent-bg);
+  color: var(--cozy-accent);
+  font-size: var(--cozy-fs-12);
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: var(--cozy-r-8);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.branch-card__route:hover { background: var(--cozy-accent-bg-2); }
+
 /* ---- Responsive: collapse the sidebar below the aside's own width ---- */
 @media (max-width: 860px) {
   .page { flex-direction: column; }
@@ -360,4 +524,7 @@ button, input { font-family: inherit; }
   .search { order: 3; max-width: none; flex-basis: 100%; }
   .page { padding: 16px 16px 40px; }
   .footer__inner { padding: 20px 16px; }
+  .branches-layout { flex-direction: column; }
+  .branches-map { width: 100%; height: 320px; }
+  .order-card__footer { flex-wrap: wrap; }
 }

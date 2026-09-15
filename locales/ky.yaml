@@ -50,3 +50,23 @@ lang.ru: Орусча
 lang.ky: Кыргызча
 
 toast.added_to_cart: Себетке кошулду
+toast.repeat_added: Товарлар себетке кошулду
+toast.repeat_soon: Жакында
+
+order.status.placed: Тариздалды
+order.status.confirmed: Ырасталды
+order.status.courier_assigned: Курьер жолдо
+order.status.delivered: Жеткирилди
+order.status.cancelled: Жокко чыгарылды
+order.action.track: Байкоо
+order.action.repeat: Кайталоо
+order.item.size_prefix: өлчөм
+order.empty.title: Азырынча буйрутма жок
+order.empty.subtitle: Каталогдон биринчи буйрутманы тариздеңиз
+order.empty.cta: Каталогго
+order.number_prefix: Буйрутма
+
+branches.title: Филиалдар
+branches.you_are_here: Сиз бул жердесиз
+branches.route: Маршрут
+branches.empty: Азырынча жеткиликтүү дүкөндөр жок

@@ -10,17 +10,21 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 const langCookieName = "cozy_lang"
 
 type handlers struct {
-	db        *sql.DB
-	cfg       *config.Config
-	auth      *auth.Service
-	customers *storefront.CustomerRepo
-	render    *Renderer
+	db         *sql.DB
+	cfg        *config.Config
+	auth       *auth.Service
+	customers  *storefront.CustomerRepo
+	branchRepo *storefront.BranchRepo
+	ordersSvc  *orders.Service
+	cartRepo   *orders.CartRepo
+	render     *Renderer
 }
 
 // ProfileData backs profile.gohtml's unauthenticated login form. Step is
@@ -108,13 +112,7 @@ func (h *handlers) profile(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "profile", data)
 }
 
-func (h *handlers) orders(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "orders", h.base(r, "orders"))
-}
-
-func (h *handlers) branches(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "branches", h.base(r, "branches"))
-}
+// h.orders and h.branches now live in orders_handlers.go / branches_handlers.go.
 
 func (h *handlers) langScreen(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "lang", h.base(r, "lang"))
