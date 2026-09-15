@@ -69,11 +69,13 @@ func TestRenderNoAccessExecutes(t *testing.T) {
 	}
 }
 
-// TestRenderShellScreensExecute exercises every stub screen inside the
-// full app shell (sidebar + header), for both an owner (sees all 5 nav
-// items) and a manager (sees 3) — covers the sidebar/header partials
-// executing with a real *staff.Staff and a non-empty NavItems slice, not
-// just the bare stub content.
+// TestRenderShellScreensExecute exercises every remaining stub screen
+// inside the full app shell (sidebar + header), for both an owner (sees
+// all 5 nav items) and a manager (sees 3) — covers the sidebar/header
+// partials executing with a real *staff.Staff and a non-empty NavItems
+// slice, not just the bare stub content. "orders" is covered separately
+// in orders_test.go (Task 3): it now renders real OrdersListData instead
+// of a bare stub, so it needs a populated .Data, unlike the screens below.
 func TestRenderShellScreensExecute(t *testing.T) {
 	rr := newTestRenderer(t)
 
@@ -84,7 +86,6 @@ func TestRenderShellScreensExecute(t *testing.T) {
 		screen string
 		title  string
 	}{
-		{"orders", "Заказы"},
 		{"products", "Товары"},
 		{"reports", "Отчёты"},
 		{"points", "Склад и точки"},

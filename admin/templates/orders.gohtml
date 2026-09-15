@@ -1,7 +1,92 @@
-{{/* orders.gohtml — stub for Task 3 (Заказы: список/детально,
-     Cozy Admin.dc.html lines 405-556). Foundation only wires the route +
-     layout; Task 3 replaces this file's content, not the routing. */}}
+{{/* orders.gohtml — Заказы list (Cozy Admin.dc.html lines 405-497): status
+     chips + date-range filter, desktop table / mobile cards (same .Rows,
+     switched by the @media rule on .admin-orders-table/.admin-orders-cards
+     in admin.css), empty state. Data is internal/admin/orders.go's
+     OrdersListData. No client-side skeleton loading — the page only
+     renders once the server already has the rows (Task 3 brief: "skip —
+     no fake delay needed server-side"). */}}
 {{define "content"}}
 <h1>Заказы</h1>
-<p>скоро</p>
+
+<div class="admin-orders-filters">
+  <div class="admin-orders-chips">
+    {{range .Data.StatusChips}}
+    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}">{{.Label}}</a>
+    {{end}}
+  </div>
+  <select class="admin-orders-range" onchange="if(this.value) location.href=this.value">
+    {{range .Data.RangeOptions}}
+    <option value="{{.URL}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
+    {{end}}
+  </select>
+</div>
+
+<div class="admin-card">
+  {{if .Data.Empty}}
+  <div class="admin-empty">
+    <div class="admin-empty__icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12"></path></svg>
+    </div>
+    <div class="admin-empty__title">Пока нет заказов</div>
+    <div class="admin-empty__text">По выбранным фильтрам ничего не найдено</div>
+  </div>
+  {{else}}
+  <div class="admin-orders-table">
+    <table>
+      <thead>
+        <tr>
+          <th>№ заказа</th>
+          <th>Дата</th>
+          <th>Покупатель</th>
+          <th>Товаров</th>
+          <th style="text-align:right">Сумма</th>
+          <th>Оплата</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Rows}}
+        <tr onclick="location.href='{{.URL}}'">
+          <td class="admin-orders-table__num">{{.Number}}</td>
+          <td class="admin-orders-table__muted">{{.DateLabel}}</td>
+          <td class="admin-orders-table__phone">{{.Phone}}</td>
+          <td>{{.ItemsCount}}</td>
+          <td class="admin-orders-table__sum">{{.TotalLabel}}</td>
+          <td class="admin-orders-table__muted">{{.PaymentLabel}}</td>
+          <td><span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-orders-cards">
+    {{range .Data.Rows}}
+    <div class="admin-order-card" onclick="location.href='{{.URL}}'">
+      <div class="admin-order-card__top">
+        <div class="admin-order-card__num">{{.Number}}</div>
+        <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>
+      </div>
+      <div class="admin-order-card__phone">{{.Phone}}</div>
+      <div class="admin-order-card__meta">
+        <span>{{.DateLabel}}</span>
+        <span>{{.ItemsLabel}}</span>
+        <span>{{.PaymentLabel}}</span>
+        <span class="admin-order-card__sum">{{.TotalLabel}}</span>
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="admin-orders-footer">
+    <div class="admin-orders-count">{{.Data.CountLabel}}</div>
+    {{if or .Data.HasPrev .Data.HasNext}}
+    <div class="admin-orders-pager">
+      {{if .Data.HasPrev}}<a href="{{.Data.PrevURL}}" class="admin-btn admin-btn--secondary">Назад</a>{{end}}
+      {{if .Data.HasNext}}<a href="{{.Data.NextURL}}" class="admin-btn admin-btn--secondary">Дальше</a>{{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
 {{end}}

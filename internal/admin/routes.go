@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 // RegisterRoutes mounts the admin HTML/HTMX panel on mux under /admin/*
@@ -14,18 +16,25 @@ import (
 // admin_*.go, all Wave 3), which this package's pages call into via HTMX
 // for anything beyond Foundation's stub screens.
 //
-// db is accepted for symmetry with web.RegisterRoutes and so Tasks 2-5 can
-// build their own repositories here without this signature changing again
-// — Foundation itself doesn't query the database directly, staffSvc
-// (login/logout/session lookup) is all it needs. Task 5 (points + staff
-// screens) is the first to use db directly, via points.NewPointsRepo.
+// db backs each screen's own repos/services as Tasks 2-5 land — see
+// handlers.go's handlers struct for the full set.
 func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) error {
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
 	}
 
-	h := &handlers{staffSvc: staffSvc, render: renderer, reports: newReportsRepo(db), pointsRepo: points.NewPointsRepo(db)}
+	h := &handlers{
+		staffSvc: staffSvc,
+		render:   renderer,
+
+		reports:    newReportsRepo(db),
+		pointsRepo: points.NewPointsRepo(db),
+
+		ordersSvc: orders.NewService(db),
+		customers: storefront.NewCustomerRepo(db),
+		addresses: storefront.NewAddressRepo(db),
+	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
 	mux.HandleFunc("POST /admin/login", h.loginSubmit)
@@ -45,7 +54,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) err
 	// per Wave 4 Task 1's acceptance criteria ("RegisterRoutes регистрирует
 	// все 6 путей ... сразу, но с заглушечными хендлерами") — Tasks 2-5
 	// replace stubPage(...) with their real handlers, not these routes.
-	mux.HandleFunc("GET /admin/orders", ownerOrManager(h.stubPage("orders", "Заказы")))
+	mux.HandleFunc("GET /admin/orders", ownerOrManager(h.ordersListPage))
+	mux.HandleFunc("GET /admin/orders/{id}", ownerOrManager(h.orderDetailPage))
+	mux.HandleFunc("POST /admin/orders/{id}/status", ownerOrManager(h.orderStatusUpdate))
 	mux.HandleFunc("GET /admin/products", ownerOrManager(h.stubPage("products", "Товары")))
 	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.stubPage("products", "Импорт товаров")))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))

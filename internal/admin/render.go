@@ -26,13 +26,14 @@ const templatesDir = "admin/templates"
 // 2-5 don't add new entries here — per the Wave 4 plan they replace an
 // existing stub .gohtml's content, not the routing/screen set itself.
 var screenPages = map[string]string{
-	"login":     "login.gohtml",
-	"no_access": "no_access.gohtml",
-	"orders":    "orders.gohtml",
-	"products":  "products.gohtml",
-	"reports":   "reports.gohtml",
-	"points":    "points.gohtml",
-	"staff":     "staff.gohtml",
+	"login":        "login.gohtml",
+	"no_access":    "no_access.gohtml",
+	"orders":       "orders.gohtml",
+	"order_detail": "order_detail.gohtml", // Task 3: /admin/orders/{id}, not in the sidebar's navDefs — reached only by drilling into the orders list.
+	"products":     "products.gohtml",
+	"reports":      "reports.gohtml",
+	"points":       "points.gohtml",
+	"staff":        "staff.gohtml",
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell
@@ -61,7 +62,7 @@ type NavItem struct {
 // Screens wire their own content through Data; everything else backs the
 // shared layout/sidebar/header/toast/modal state.
 type PageData struct {
-	Screen      string // "login", "no_access", "orders", "products", "reports", "points", "staff"
+	Screen      string // "login", "no_access", "orders", "order_detail", "products", "reports", "points", "staff"
 	PageTitle   string
 	ShowSidebar bool // false only for "login"/"no_access", which have no chrome
 	ShowBack    bool
