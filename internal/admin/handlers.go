@@ -3,7 +3,9 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 // handlers holds everything the admin panel's HTTP handlers need. Task
@@ -13,6 +15,16 @@ import (
 type handlers struct {
 	staffSvc *staff.Service
 	render   *Renderer
+
+	// Task 3 (Заказы, internal/admin/orders.go): the order-management
+	// service plus the small set of other Wave 3 repos its detail page
+	// enriches an order with (customer phone, delivery address, pickup
+	// point address) — see orders.go's adminOrdersService for exactly
+	// which *orders.Service methods are used.
+	ordersSvc adminOrdersService
+	customers *storefront.CustomerRepo
+	addresses *storefront.AddressRepo
+	points    *points.PointsRepo
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a

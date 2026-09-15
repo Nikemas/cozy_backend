@@ -1,0 +1,67 @@
+{{/* order_detail.gohtml — Заказ detail (Cozy Admin.dc.html lines 499-556):
+     header (number + status chip), покупатель/доставка cards, состав
+     заказа + итого, status-change buttons. Data is internal/admin/
+     orders.go's OrderDetailData. New screen added to render.go's
+     screenPages (Task 3) — not in the sidebar (internal/admin/nav.go's
+     navDefs), reached only by clicking a row on orders.gohtml. */}}
+{{define "content"}}
+<div class="admin-order-detail">
+  <div class="admin-card admin-order-detail__header">
+    <div>
+      <div class="admin-order-detail__title">Заказ {{.Data.Number}}</div>
+      <div class="admin-order-detail__date">{{.Data.DateLabel}}</div>
+    </div>
+    <span class="admin-chip {{.Data.StatusClass}}">{{.Data.StatusLabel}}</span>
+  </div>
+
+  <div class="admin-order-detail__grid">
+    <div class="admin-card">
+      <div class="admin-order-detail__label">Покупатель</div>
+      <div class="admin-order-detail__value">{{.Data.Phone}}</div>
+      <div class="admin-order-detail__sub">{{.Data.PaymentLabel}}</div>
+    </div>
+    <div class="admin-card">
+      <div class="admin-order-detail__label">Доставка</div>
+      <div class="admin-order-detail__address">{{.Data.AddressText}}</div>
+      <div class="admin-order-detail__sub">Комментарий: {{.Data.Comment}}</div>
+    </div>
+  </div>
+
+  <div class="admin-card admin-order-detail__items">
+    <div class="admin-order-detail__items-title">Состав заказа</div>
+    <table>
+      <tbody>
+        {{range .Data.Items}}
+        <tr>
+          <td class="admin-order-detail__thumb"><div class="admin-order-detail__thumb-box"></div></td>
+          <td>
+            <div class="admin-order-detail__item-name">{{.Name}}</div>
+            <div class="admin-order-detail__item-variant">{{.Variant}}</div>
+          </td>
+          <td class="admin-order-detail__item-qty">{{.Qty}}</td>
+          <td class="admin-order-detail__item-price">{{.PriceLabel}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    <div class="admin-order-detail__total">
+      <span>Итого</span>
+      <span class="admin-order-detail__total-sum">{{.Data.TotalLabel}}</span>
+    </div>
+  </div>
+
+  {{if .Data.StatusButtons}}
+  <div class="admin-card">
+    <div class="admin-order-detail__label">Сменить статус</div>
+    <div class="admin-order-detail__statusbtns">
+      {{range .Data.StatusButtons}}
+      <form method="post" action="/admin/orders/{{$.Data.ID}}/status">
+        <input type="hidden" name="status" value="{{.Value}}">
+        <button type="submit" class="admin-status-btn {{.Class}}">{{.Label}}</button>
+      </form>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

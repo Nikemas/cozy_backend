@@ -276,6 +276,163 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-modal__text { font-size: 14px; color: var(--admin-muted); margin-top: 8px; line-height: 1.5; }
 .admin-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
+/* ---------- Заказы: list + detail (Task 3, Cozy Admin.dc.html 405-556) --
+   Status colors below are copied verbatim from the design canvas's STATUS
+   script constant (~line 791) — courier_assigned uses the canvas's short
+   "courier" class suffix (a mockup variable name, not the real enum
+   value; see internal/admin/orders.go's orderStatusMetaFor). */
+
+.admin-chip--all { background: var(--admin-primary); color: #FFFFFF; }
+.admin-chip--placed { color: #5C5C58; background: #EDEDEB; }
+.admin-chip--confirmed { color: #1565C0; background: #E8F1FB; }
+.admin-chip--courier { color: #6A3FB5; background: #F1EAFB; }
+.admin-chip--delivered { color: #2E7D32; background: #E8F5E9; }
+.admin-chip--cancelled { color: #C62828; background: #FFEBEE; }
+
+.admin-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  padding: 24px;
+}
+
+/* -- Filter row (status chips + date-range select) -- */
+
+.admin-orders-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-orders-chips { display: flex; gap: 8px; overflow-x: auto; flex: 1; min-width: 0; padding-bottom: 2px; }
+.admin-chip-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: var(--admin-radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex: none;
+}
+.admin-chip-btn.active { border-color: transparent; }
+.admin-orders-range {
+  height: 44px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-field);
+  background: var(--admin-surface);
+  font-size: 14px;
+  color: var(--admin-text);
+  padding: 0 12px;
+}
+
+/* -- List: card wrapper (table/cards/empty state all render inside) -- */
+
+.admin-orders-filters + .admin-card { padding: 0; overflow: hidden; }
+
+.admin-empty { padding: 64px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.admin-empty__icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: var(--admin-primary-tint);
+  color: var(--admin-primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-empty__title { font-size: 15px; font-weight: 600; color: var(--admin-text); }
+.admin-empty__text { font-size: 13px; color: var(--admin-muted); }
+
+/* -- Desktop table -- */
+
+.admin-orders-table { overflow-x: auto; }
+.admin-orders-table table { width: 100%; min-width: 900px; border-collapse: collapse; }
+.admin-orders-table th {
+  height: 44px;
+  padding: 0 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+.admin-orders-table td {
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 14px;
+  color: var(--admin-text);
+}
+.admin-orders-table tr { cursor: pointer; }
+.admin-orders-table tbody tr:hover { background: var(--admin-bg); }
+.admin-orders-table__num { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-orders-table__muted { color: var(--admin-muted); font-size: 13px; white-space: nowrap; }
+.admin-orders-table__phone { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-orders-table__sum { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* -- Mobile cards (hidden on desktop; swapped in below 768px) -- */
+
+.admin-orders-cards { display: none; }
+.admin-order-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-bottom: 1px solid var(--admin-border); cursor: pointer; }
+.admin-order-card__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.admin-order-card__num { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.admin-order-card__phone { font-size: 14px; font-variant-numeric: tabular-nums; }
+.admin-order-card__meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--admin-muted); }
+.admin-order-card__sum { font-size: 14px; font-weight: 700; color: var(--admin-text); font-variant-numeric: tabular-nums; }
+
+.admin-orders-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--admin-border); flex-wrap: wrap; gap: 10px; }
+.admin-orders-count { font-size: 13px; color: var(--admin-muted); }
+.admin-orders-pager { display: flex; gap: 8px; }
+
+@media (max-width: 767px) {
+  .admin-orders-table { display: none; }
+  .admin-orders-cards { display: block; }
+}
+
+/* -- Detail -- */
+
+.admin-order-detail { max-width: 1100px; display: flex; flex-direction: column; gap: 16px; }
+.admin-order-detail__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.admin-order-detail__title { font-size: 22px; font-weight: 700; color: var(--admin-text); font-variant-numeric: tabular-nums; }
+.admin-order-detail__date { font-size: 13px; color: var(--admin-muted); margin-top: 4px; }
+.admin-order-detail__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.admin-order-detail__label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--admin-muted); margin-bottom: 12px; }
+.admin-order-detail__value { font-size: 16px; font-weight: 600; color: var(--admin-text); font-variant-numeric: tabular-nums; }
+.admin-order-detail__sub { font-size: 13px; color: var(--admin-muted); margin-top: 6px; }
+.admin-order-detail__address { font-size: 15px; color: var(--admin-text); line-height: 1.5; }
+
+.admin-order-detail__items { padding: 0; overflow: hidden; }
+.admin-order-detail__items-title { padding: 20px 24px 14px; font-size: 15px; font-weight: 700; color: var(--admin-text); }
+.admin-order-detail__items table { width: 100%; border-collapse: collapse; }
+.admin-order-detail__items td { padding: 0 16px; border-top: 1px solid var(--admin-border); height: 72px; }
+.admin-order-detail__items td:first-child { padding-left: 24px; width: 76px; }
+.admin-order-detail__items td:last-child { padding-right: 24px; }
+.admin-order-detail__thumb-box { width: 52px; height: 52px; border-radius: 10px; background: var(--admin-bg); }
+.admin-order-detail__item-name { font-size: 14px; font-weight: 600; color: var(--admin-text); }
+.admin-order-detail__item-variant { font-size: 12px; color: var(--admin-muted); }
+.admin-order-detail__item-qty { font-size: 14px; color: var(--admin-muted); width: 90px; }
+.admin-order-detail__item-price { font-size: 14px; font-weight: 600; color: var(--admin-text); text-align: right; width: 140px; font-variant-numeric: tabular-nums; }
+.admin-order-detail__total { border-top: 1px solid var(--admin-border); padding: 18px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.admin-order-detail__total span:first-child { font-size: 13px; color: var(--admin-muted); }
+.admin-order-detail__total-sum { font-size: 19px; font-weight: 800; color: var(--admin-text); font-variant-numeric: tabular-nums; }
+
+.admin-order-detail__statusbtns { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-status-btn {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--admin-radius-field);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.admin-status-btn.admin-chip--placed { background: #EDEDEB; color: #5C5C58; }
+.admin-status-btn.admin-chip--confirmed { background: #E8F1FB; color: #1565C0; }
+.admin-status-btn.admin-chip--courier { background: #F1EAFB; color: #6A3FB5; }
+.admin-status-btn.admin-chip--delivered { background: #E8F5E9; color: #2E7D32; }
+.admin-status-btn.admin-chip--cancelled { background: #FFEBEE; color: #C62828; }
+
 /* ---------- Responsive sidebar (design canvas lines 966-983) ---------- */
 
 /* Tablet (768-1023px): icon-only collapsed sidebar, no labels. */
