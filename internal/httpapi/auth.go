@@ -8,6 +8,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 // RegisterAuthRoutes mounts the OTP login flow under /api/v1/auth/*.
@@ -36,12 +37,12 @@ func RegisterAuthRoutes(mux *http.ServeMux, svc *auth.Service) {
 			return err
 		}
 
-		access, refresh, err := svc.VerifyOTP(r.Context(), req.Phone, req.Code)
+		access, refresh, customer, err := svc.VerifyOTP(r.Context(), req.Phone, req.Code)
 		if err != nil {
 			return err
 		}
 
-		return writeJSON(w, http.StatusOK, tokenPairResponse(access, refresh))
+		return writeJSON(w, http.StatusOK, verifyOTPResponse(access, refresh, customer))
 	}))
 
 	mux.Handle("POST /api/v1/auth/refresh", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
@@ -65,6 +66,28 @@ func tokenPairResponse(access, refresh string) map[string]string {
 	return map[string]string{
 		"access_token":  access,
 		"refresh_token": refresh,
+	}
+}
+
+// verifyOTPResponseBody is the response shape of POST /api/v1/auth/otp/verify:
+// a token pair plus the just-authenticated customer's own profile, so the
+// mobile app doesn't need a second round-trip to GET /api/v1/customer right
+// after login.
+type verifyOTPResponseBody struct {
+	AccessToken  string                  `json:"access_token"`
+	RefreshToken string                  `json:"refresh_token"`
+	Customer     customerProfileResponse `json:"customer"`
+}
+
+func verifyOTPResponse(access, refresh string, customer *storefront.Customer) verifyOTPResponseBody {
+	var c customerProfileResponse
+	if customer != nil {
+		c = newCustomerProfileResponse(*customer)
+	}
+	return verifyOTPResponseBody{
+		AccessToken:  access,
+		RefreshToken: refresh,
+		Customer:     c,
 	}
 }
 

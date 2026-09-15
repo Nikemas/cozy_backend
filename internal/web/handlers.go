@@ -254,7 +254,7 @@ func (h *handlers) loginVerifyOTP(w http.ResponseWriter, r *http.Request) error 
 	phone := r.FormValue("phone")
 	code := r.FormValue("code")
 
-	access, _, err := h.auth.VerifyOTP(r.Context(), phone, code)
+	access, _, _, err := h.auth.VerifyOTP(r.Context(), phone, code)
 	if err != nil {
 		return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Error: errMessage(err)})
 	}

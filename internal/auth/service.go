@@ -87,33 +87,40 @@ func (s *Service) checkRateLimit(ctx context.Context, phone string) error {
 
 // VerifyOTP checks the code against the active OTP transaction for phone
 // and, if correct, gets-or-creates the customer and issues a token pair.
-func (s *Service) VerifyOTP(ctx context.Context, rawPhone, code string) (accessToken, refreshTokenStr string, err error) {
+// The customer is also returned (already fetched internally to get its ID
+// for the token pair) so callers like the mobile JSON API can return the
+// profile inline without a second round-trip right after login.
+func (s *Service) VerifyOTP(ctx context.Context, rawPhone, code string) (accessToken, refreshTokenStr string, customer *storefront.Customer, err error) {
 	phone, err := NormalizePhone(rawPhone)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	active, err := s.otp.latestActive(ctx, phone)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	if active == nil {
-		return "", "", apperr.BadRequest("otp_expired", "код устарел, запросите новый")
+		return "", "", nil, apperr.BadRequest("otp_expired", "код устарел, запросите новый")
 	}
 
 	if err := s.sms.VerifyCode(ctx, active.Token, code); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	if err := s.otp.markConsumed(ctx, active.ID); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
-	customer, err := s.customers.GetOrCreateByPhone(ctx, phone)
+	customer, err = s.customers.GetOrCreateByPhone(ctx, phone)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
-	return s.issueTokenPair(ctx, customer.ID)
+	accessToken, refreshTokenStr, err = s.issueTokenPair(ctx, customer.ID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return accessToken, refreshTokenStr, customer, nil
 }
 
 // Refresh rotates a refresh token: the old one is revoked and a new pair
