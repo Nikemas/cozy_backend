@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"errors"
 	"html/template"
 	"net/http"
 
@@ -115,15 +114,6 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) error {
 	}
 	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 	return nil
-}
-
-// isNotImplemented reports whether err is the 501 apperr that every
-// internal/orders method currently returns (Task 3 hasn't shipped real
-// bodies yet). Any other error is treated normally (apperr.Wrap ->
-// JSON error / 5xx log).
-func isNotImplemented(err error) bool {
-	var appErr *apperr.AppError
-	return errors.As(err, &appErr) && appErr.Status == http.StatusNotImplemented
 }
 
 // renderToastFragment writes the same toast markup _toast.gohtml renders
