@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -124,7 +125,7 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 		orderBy = "created_at DESC"
 	}
 
-	limitArgs := append(append([]any{}, args...), pageSize, (page-1)*pageSize)
+	limitArgs := append(append([]any{}, args...), pageSize, safeOffset(page, pageSize))
 	listQuery := fmt.Sprintf(`
 		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
 		       brand, base_price, is_active, created_at, updated_at
@@ -137,9 +138,9 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
-	var products []Product
+	products := []Product{}
 	for rows.Next() {
 		var p Product
 		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
@@ -153,6 +154,27 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 	}
 
 	return products, total, nil
+}
+
+// safeOffset computes the SQL OFFSET for a page/pageSize pair without
+// overflowing when page is adversarially large (e.g. a `?page=` query
+// param near math.MaxInt): (page-1)*pageSize would otherwise wrap around to
+// an arbitrary, possibly negative, int that Postgres rejects with "OFFSET
+// must not be negative". No real catalog has anywhere near
+// math.MaxInt32/pageSize pages, so clamping page at that ceiling still
+// yields the same practical result (zero rows) as a literal huge offset
+// would, without risking overflow.
+func safeOffset(page, pageSize int) int {
+	if page <= 1 {
+		return 0
+	}
+	if pageSize <= 0 {
+		pageSize = DefaultPageSize
+	}
+	if maxPage := math.MaxInt32 / pageSize; page > maxPage {
+		page = maxPage
+	}
+	return (page - 1) * pageSize
 }
 
 // GetByID returns a single active product. Returns apperr.NotFound if it

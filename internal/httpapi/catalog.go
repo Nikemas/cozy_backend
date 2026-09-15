@@ -85,11 +85,15 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB) {
 			})
 		}
 
-		resp := productDetailResponse{Product: *product}
+		resp := productDetailResponse{Product: *product, Variants: make([]variantDetail, 0, len(productVariants))}
 		for _, v := range productVariants {
+			stockForVariant := stockByVariant[v.ID]
+			if stockForVariant == nil {
+				stockForVariant = []stockPoint{}
+			}
 			resp.Variants = append(resp.Variants, variantDetail{
 				Variant: v,
-				Stock:   stockByVariant[v.ID],
+				Stock:   stockForVariant,
 			})
 		}
 

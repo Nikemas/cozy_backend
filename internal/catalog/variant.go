@@ -36,9 +36,9 @@ func (r *VariantRepo) ListByProduct(ctx context.Context, productID string) ([]Va
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
-	var variants []Variant
+	variants := []Variant{}
 	for rows.Next() {
 		var v Variant
 		if err := rows.Scan(&v.ID, &v.ProductID, &v.Size, &v.Color, &v.SKU, &v.PriceOverride); err != nil {
