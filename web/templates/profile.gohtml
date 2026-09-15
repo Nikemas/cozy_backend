@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="profile">
+  {{if .Authed}}
+    <div class="card profile-card">
+      <h1>{{t "screen.profile.title"}}</h1>
+      <p class="profile-card__row"><strong>customer_id:</strong> {{.CustomerID}}</p>
+      {{if .MaskedPhone}}<p class="profile-card__row">{{.MaskedPhone}}</p>{{end}}
+      <form method="post" action="/logout">
+        <button type="submit" class="btn btn--danger">{{t "auth.logout"}}</button>
+      </form>
+    </div>
+    <p class="muted">{{t "common.soon"}}</p>
+    <!-- TODO(storefront): stats tiles, addresses, menu (Task 4) -->
+  {{else}}
+    <div class="card auth-card">
+      <h1>{{t "screen.profile.title"}}</h1>
+      {{if eq .Data.Step "otp"}}
+        <p>{{t "auth.enter_code"}}</p>
+        <form method="post" action="/login/otp/verify" class="form-stack">
+          <input type="hidden" name="phone" value="{{.Data.Phone}}">
+          <input type="text" name="code" inputmode="numeric" placeholder="0000" maxlength="8" required>
+          <button type="submit" class="btn btn--primary">{{t "auth.confirm"}}</button>
+        </form>
+      {{else}}
+        <form method="post" action="/login/otp/request" class="form-stack">
+          <input type="tel" name="phone" placeholder="{{t "auth.phone_placeholder"}}" required>
+          <button type="submit" class="btn btn--primary">{{t "auth.get_code"}}</button>
+        </form>
+      {{end}}
+    </div>
+    <!-- TODO(auth-web): real 3-step HTMX flow incl. name-for-new-customer step (Task 4) -->
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,11 @@
+{{define "content"}}
+<div class="screen-placeholder">
+  <h1>{{t "screen.cart.title"}}</h1>
+  {{if .Authed}}
+  <p class="muted">{{t "common.soon"}}</p>
+  <!-- TODO(orders): cart lines + stepper + checkout (Task 3, orders.CartRepo) -->
+  {{else}}
+  <p class="muted">{{t "sidebar.login"}}: <a href="/profile">{{t "nav.profile"}}</a></p>
+  {{end}}
+</div>
+{{end}}

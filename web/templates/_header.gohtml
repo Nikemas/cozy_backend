@@ -1,0 +1,33 @@
+{{define "_header"}}
+<header class="header">
+  <div class="header__inner">
+    <a class="logo" href="/">
+      <span class="logo__mark">Cozy</span>
+    </a>
+
+    <nav class="nav">
+      <a href="/" class="nav__link{{if eq .Screen "shop"}} nav__link--active{{end}}">{{t "nav.catalog"}}</a>
+      <a href="/branches" class="nav__link{{if eq .Screen "branches"}} nav__link--active{{end}}">{{t "nav.branches"}}</a>
+    </nav>
+
+    <form class="search" method="get" action="/">
+      <i class="ti ti-search"></i>
+      <input type="search" name="q" placeholder="{{t "search.placeholder"}}">
+    </form>
+
+    <div class="header__actions">
+      <a class="icon-btn{{if eq .Screen "fav"}} icon-btn--active{{end}}" href="/favorites" aria-label="{{t "nav.favorites"}}">
+        <i class="ti ti-heart"></i>
+        {{if gt .FavCount 0}}<span class="badge">{{.FavCount}}</span>{{end}}
+      </a>
+      <a class="icon-btn{{if eq .Screen "cart"}} icon-btn--active{{end}}" href="/cart" aria-label="{{t "nav.cart"}}">
+        <i class="ti ti-shopping-cart"></i>
+        {{if gt .CartCount 0}}<span class="badge">{{.CartCount}}</span>{{end}}
+      </a>
+      <a class="avatar-btn" href="/profile" aria-label="{{t "nav.profile"}}">
+        <i class="ti ti-user"></i>
+      </a>
+    </div>
+  </div>
+</header>
+{{end}}

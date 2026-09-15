@@ -19,6 +19,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/web"
 )
 
 func main() {
@@ -46,11 +47,16 @@ func run() error {
 		return err
 	}
 
+	sms := notify.NewNikitaClient(cfg.NikitaAPIKey)
+	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
+
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
-	registerAPIRoutes(mux, db, cfg)
+	registerAPIRoutes(mux, db, authSvc)
 	registerAdminRoutes(mux, db)
-	registerWebRoutes(mux, db)
+	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -99,9 +105,7 @@ func registerHealthRoutes(mux *http.ServeMux, db *sql.DB) {
 // registerAPIRoutes mounts /api/v1/* — JSON REST for the Flutter app and
 // HTMX/AJAX calls from the site. Handlers land here as each domain package
 // (auth, catalog, orders, ...) is implemented.
-func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
-	sms := notify.NewNikitaClient(cfg.NikitaAPIKey)
-	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
+func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 	httpapi.RegisterAuthRoutes(mux, authSvc)
 	httpapi.RegisterCatalogRoutes(mux, db)
 }
@@ -114,6 +118,6 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
-func registerWebRoutes(mux *http.ServeMux, db *sql.DB) {
-	_ = db
+func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+	return web.RegisterRoutes(mux, db, cfg, authSvc)
 }

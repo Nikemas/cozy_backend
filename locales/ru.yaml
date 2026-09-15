@@ -1,0 +1,52 @@
+# Cozy web — Russian layout strings (Task 1: Foundation).
+# Flat "key: value" pairs only — internal/i18n's loader is a deliberately
+# small subset of YAML (no nesting/lists/multi-line scalars). Each
+# parallel task (2-5) adds its own screen's keys to BOTH locale files as
+# it builds that screen — merge new lines in, don't rewrite the file.
+
+nav.catalog: Каталог
+nav.branches: Филиалы
+nav.favorites: Избранное
+nav.cart: Корзина
+nav.profile: Профиль
+
+search.placeholder: Поиск обуви
+
+sidebar.login: Войти в аккаунт
+sidebar.orders: Заказы
+sidebar.favorites: Избранное
+sidebar.categories: Категории
+sidebar.category.all: Все
+sidebar.category.women: Женское
+sidebar.category.men: Мужское
+sidebar.style: Стиль
+sidebar.brand: Бренд
+sidebar.price: Цена до
+sidebar.reset: Сбросить фильтры
+
+footer.rights: © Cozy. Все права защищены.
+footer.branches: Филиалы
+
+common.soon: Скоро
+common.back_home: На главную
+
+screen.shop.title: Каталог
+screen.product.title: Товар
+screen.cart.title: Корзина
+screen.fav.title: Избранное
+screen.profile.title: Профиль
+screen.orders.title: Заказы
+screen.branches.title: Филиалы
+screen.lang.title: Язык
+screen.done.title: Заказ оформлен
+
+auth.phone_placeholder: +996 700 000 000
+auth.get_code: Получить код
+auth.enter_code: Введите код из SMS
+auth.confirm: Подтвердить
+auth.logout: Выход из аккаунта
+
+lang.ru: Русский
+lang.ky: Кыргызча
+
+toast.added_to_cart: Добавлено в корзину

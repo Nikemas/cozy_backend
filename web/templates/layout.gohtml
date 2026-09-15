@@ -1,0 +1,25 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cozy — {{t (printf "screen.%s.title" .Screen)}}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/static/css/site.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+{{template "_header" .}}
+<div class="page">
+  {{template "_aside_filters" .}}
+  <main class="main">
+    {{template "content" .}}
+  </main>
+</div>
+{{template "_footer" .}}
+{{template "_toast" .}}
+</body>
+</html>
+{{end}}

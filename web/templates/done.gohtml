@@ -1,0 +1,10 @@
+{{define "content"}}
+<div class="screen-placeholder done-screen">
+  <div class="done-screen__check"><i class="ti ti-circle-check"></i></div>
+  <h1>{{t "screen.done.title"}}</h1>
+  {{if .Data.OrderNumber}}<p>{{.Data.OrderNumber}}</p>{{end}}
+  <p class="muted">{{t "common.soon"}}</p>
+  <!-- TODO(orders): real order summary + delivery window (Task 3) -->
+  <a class="btn btn--primary" href="/">{{t "common.back_home"}}</a>
+</div>
+{{end}}

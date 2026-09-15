@@ -1,0 +1,52 @@
+# Cozy web — Kyrgyz layout strings (Task 1: Foundation).
+# Same flat "key: value" contract as ru.yaml — see internal/i18n. Only the
+# shared layout keys (header/aside/footer) are translated here; full ky
+# coverage of every screen is Phase 2 (see tasks/web-plan.md). Tasks 2-5
+# add their own screens' keys to both files, line-by-line.
+
+nav.catalog: Каталог
+nav.branches: Филиалдар
+nav.favorites: Тандалгандар
+nav.cart: Себет
+nav.profile: Профиль
+
+search.placeholder: Бут кийимди издөө
+
+sidebar.login: Аккаунтка кирүү
+sidebar.orders: Буйрутмалар
+sidebar.favorites: Тандалгандар
+sidebar.categories: Категориялар
+sidebar.category.all: Баары
+sidebar.category.women: Аялдар
+sidebar.category.men: Эркектер
+sidebar.style: Стиль
+sidebar.brand: Бренд
+sidebar.price: Баасы чейин
+sidebar.reset: Чыпкаларды тазалоо
+
+footer.rights: © Cozy. Бардык укуктар корголгон.
+footer.branches: Филиалдар
+
+common.soon: Жакында
+common.back_home: Башкы бетке
+
+screen.shop.title: Каталог
+screen.product.title: Товар
+screen.cart.title: Себет
+screen.fav.title: Тандалгандар
+screen.profile.title: Профиль
+screen.orders.title: Буйрутмалар
+screen.branches.title: Филиалдар
+screen.lang.title: Тил
+screen.done.title: Буйрутма тастыкталды
+
+auth.phone_placeholder: +996 700 000 000
+auth.get_code: Кодду алуу
+auth.enter_code: SMS коддун санын киргизиңиз
+auth.confirm: Ырастоо
+auth.logout: Аккаунттан чыгуу
+
+lang.ru: Орусча
+lang.ky: Кыргызча
+
+toast.added_to_cart: Себетке кошулду

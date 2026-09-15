@@ -5,6 +5,7 @@ package storefront
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 type Customer struct {
@@ -32,6 +33,24 @@ func (r *CustomerRepo) GetOrCreateByPhone(ctx context.Context, phone string) (*C
 
 	var c Customer
 	err := r.db.QueryRowContext(ctx, q, phone).Scan(&c.ID, &c.Phone, &c.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// GetByID returns the customer with id, or nil if none exists. Used by
+// the web session middleware to resolve a session cookie's customer_id
+// into profile data (name, phone) for the header/aside account card and
+// the profile screen.
+func (r *CustomerRepo) GetByID(ctx context.Context, id string) (*Customer, error) {
+	const q = `SELECT id, phone, name FROM customers WHERE id = $1`
+
+	var c Customer
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&c.ID, &c.Phone, &c.Name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

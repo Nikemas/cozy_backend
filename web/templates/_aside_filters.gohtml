@@ -1,0 +1,52 @@
+{{define "_aside_filters"}}
+<aside class="aside">
+  {{if .Authed}}
+  <div class="aside__card">
+    <div class="aside__account">
+      <div class="aside__avatar"><i class="ti ti-user"></i></div>
+      <div class="aside__account-info">
+        <div class="aside__account-name">{{if .CustomerName}}{{.CustomerName}}{{else}}{{t "nav.profile"}}{{end}}</div>
+        <div class="aside__account-phone">{{.MaskedPhone}}</div>
+      </div>
+    </div>
+    <a class="aside__link" href="/orders"><i class="ti ti-package"></i> {{t "sidebar.orders"}} <span class="aside__link-count">{{.OrdersCount}}</span></a>
+    <a class="aside__link" href="/favorites"><i class="ti ti-heart"></i> {{t "sidebar.favorites"}} <span class="aside__link-count">{{.FavCount}}</span></a>
+  </div>
+  {{else}}
+  <a class="btn btn--primary aside__login" href="/profile">{{t "sidebar.login"}}</a>
+  {{end}}
+
+  <div class="aside__card">
+    <div class="aside__title">{{t "sidebar.categories"}}</div>
+    <!-- TODO(catalog): real category tree via catalog.CategoryRepo.Tree (Task 2) -->
+    <a class="aside__pill" href="/">{{t "sidebar.category.all"}}</a>
+    <a class="aside__pill" href="/catalog/women">{{t "sidebar.category.women"}}</a>
+    <a class="aside__pill" href="/catalog/men">{{t "sidebar.category.men"}}</a>
+  </div>
+
+  <div class="aside__card">
+    <div class="aside__title">{{t "sidebar.style"}}</div>
+    <!-- TODO(catalog): real style facets (Task 2) -->
+    <div class="aside__chips">
+      <span class="chip">Sneakers</span>
+      <span class="chip">Boots</span>
+      <span class="chip">Casual</span>
+    </div>
+  </div>
+
+  <div class="aside__card">
+    <div class="aside__title">{{t "sidebar.brand"}}</div>
+    <!-- TODO(catalog): real brand facets (Task 2) -->
+    <label class="aside__checkbox"><input type="checkbox" disabled> Nike</label>
+    <label class="aside__checkbox"><input type="checkbox" disabled> Adidas</label>
+  </div>
+
+  <div class="aside__card">
+    <div class="aside__title">{{t "sidebar.price"}}</div>
+    <!-- TODO(catalog): wire to ProductFilter.PriceMax (Task 2) -->
+    <input type="range" min="1000" max="6000" step="100" disabled>
+  </div>
+
+  <button class="aside__reset" type="button" disabled>{{t "sidebar.reset"}}</button>
+</aside>
+{{end}}

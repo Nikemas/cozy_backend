@@ -1,0 +1,15 @@
+{{define "content"}}
+<div class="screen-placeholder lang-list">
+  <h1>{{t "screen.lang.title"}}</h1>
+  <form method="post" action="/lang" class="lang-options">
+    <button type="submit" name="lang" value="ru" class="lang-option{{if eq .Lang "ru"}} lang-option--active{{end}}">
+      <span>{{t "lang.ru"}}</span>
+      {{if eq .Lang "ru"}}<i class="ti ti-check"></i>{{end}}
+    </button>
+    <button type="submit" name="lang" value="ky" class="lang-option{{if eq .Lang "ky"}} lang-option--active{{end}}">
+      <span>{{t "lang.ky"}}</span>
+      {{if eq .Lang "ky"}}<i class="ti ti-check"></i>{{end}}
+    </button>
+  </form>
+</div>
+{{end}}
