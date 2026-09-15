@@ -15,6 +15,14 @@ import (
 // customer's own data.
 const sessionTTL = 12 * time.Hour
 
+// dummyPasswordHash is a valid bcrypt hash of an arbitrary, never-used
+// password. Login runs a bcrypt compare against this hash whenever the
+// phone number isn't found, so an unknown phone costs the same CPU time as
+// a real one with a wrong password — without it, the missing bcrypt call
+// makes "phone not found" measurably faster than "wrong password" and lets
+// an attacker enumerate valid staff phone numbers via response timing.
+const dummyPasswordHash = "$2a$10$UnWYtHLgrH/2tNOF3VF.k.Mno4/aqJ1u8/dKRjqdLBiwUsDvBTD7W"
+
 // staffGetter is the subset of *Repo that Service depends on. Defined as an
 // interface so tests can inject a fake in-memory lookup instead of a real
 // database.
@@ -47,26 +55,32 @@ func NewService(db *sql.DB) *Service {
 // password_hash) and, on success, creates a server-side session and
 // returns its opaque token for the caller to set as an httpOnly cookie.
 // Wrong password, unknown phone, or an inactive staff account all fail the
-// same way — apperr.Unauthorized — so a login attempt can't be used to
-// enumerate valid phone numbers or find disabled accounts.
+// same way — apperr.Unauthorized, and a bcrypt compare always runs — so a
+// login attempt can't be used to enumerate valid phone numbers or find
+// disabled accounts, whether by response content or by timing.
 func (s *Service) Login(ctx context.Context, phone, password string) (sessionToken string, err error) {
 	st, err := s.staff.GetByPhone(ctx, phone)
 	if err != nil {
 		return "", err
 	}
-	if st == nil || !st.IsActive {
+
+	// Always compare against a bcrypt hash, even when the phone isn't
+	// found, so this call takes the same amount of time either way.
+	pwHash := dummyPasswordHash
+	if st != nil {
+		pwHash = st.PasswordHash
+	}
+	cmpErr := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(password))
+
+	if st == nil || !st.IsActive || cmpErr != nil {
 		return "", invalidCredentials()
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(st.PasswordHash), []byte(password)); err != nil {
-		return "", invalidCredentials()
-	}
-
-	raw, hash, err := newSessionToken()
+	raw, tokenHash, err := newSessionToken()
 	if err != nil {
 		return "", err
 	}
-	if err := s.sessions.create(ctx, st.ID, hash, time.Now().Add(sessionTTL)); err != nil {
+	if err := s.sessions.create(ctx, st.ID, tokenHash, time.Now().Add(sessionTTL)); err != nil {
 		return "", err
 	}
 

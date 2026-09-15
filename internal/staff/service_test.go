@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -58,6 +59,35 @@ func TestLoginUnknownPhone(t *testing.T) {
 
 	_, err := svc.Login(context.Background(), "+996700000099", "whatever")
 	assertUnauthorized(t, err)
+}
+
+// TestLoginUnknownPhoneRunsBcryptCompare is a regression test for a timing
+// side-channel: Login must run a bcrypt compare even when the phone isn't
+// found (against a fixed dummy hash), so an unknown phone takes about as
+// long as a known phone with a wrong password. Without it, an attacker
+// could enumerate valid staff phone numbers by timing login responses,
+// since a plain map/DB miss returns far faster than a bcrypt compare does.
+//
+// Comparing two measured durations against each other is flaky under load,
+// so instead this asserts a floor: bcrypt.CompareHashAndPassword at
+// bcrypt.DefaultCost takes on the order of tens of milliseconds on typical
+// hardware, while a map lookup miss takes nanoseconds. Only an actual
+// bcrypt call clears a 5ms floor.
+func TestLoginUnknownPhoneRunsBcryptCompare(t *testing.T) {
+	svc, _ := newTestService(t)
+
+	start := time.Now()
+	_, err := svc.Login(context.Background(), "+996700000099", "whatever")
+	elapsed := time.Since(start)
+
+	assertUnauthorized(t, err)
+
+	const minExpectedBcryptTime = 5 * time.Millisecond
+	if elapsed < minExpectedBcryptTime {
+		t.Fatalf("Login() for an unknown phone returned in %s, expected at least %s — "+
+			"looks like bcrypt.CompareHashAndPassword was skipped, reintroducing a timing side-channel",
+			elapsed, minExpectedBcryptTime)
+	}
 }
 
 func TestLoginInactiveStaff(t *testing.T) {
