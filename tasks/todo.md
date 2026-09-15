@@ -200,7 +200,7 @@
 - [ ] **Task G** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). [детали](plan.md#task-g-admin-points-of-sale-api)
 - [ ] **Task H** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). [детали](plan.md#task-h-admin-staff-api)
 - [ ] **Task I** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). [детали](plan.md#task-i-admin-orders-api)
-- [ ] **Task J** — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](plan.md#task-j-admin-reports-api)
+- [x] **Task J** (в брифе этой сессии — «Task O») — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](#task-j-admin-reports-api-задача-о-в-брифе--done)
 - [ ] **Task K** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках). [детали](plan.md#task-k-импорт-товаров)
 
 Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task J и Task K (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task H.
@@ -302,3 +302,51 @@
 - **`cmd/server/main.go` подключён этой же задачей** (одна строка в `registerAPIRoutes`, рядом с уже существующими `RegisterAuthRoutes`/`RegisterCatalogRoutes`) — конфликт с параллельным потоком заказов маловероятен: это независимая строка в маленькой функции, а не структурная правка.
 
 **Deviations:** нет отклонений от acceptance criteria брифа. Добавлен один небольшой экспорт (`auth.NewContextWithCustomerID`), не описанный явно в брифе, но по прямой аналогии с уже принятым в кодовой базе паттерном (`staff.NewContextWithStaff`, Task D) — нужен исключительно для тестируемости хендлеров без живого JWT/БД. Примечание: Task H независимо добавила ту же функцию в параллельной ветке — при мерже обеих задач в `main` осталась одна копия (идентичны по поведению, отличались только комментарием).
+
+---
+
+## Task J: Admin Reports API («Task O» в брифе этой сессии) — DONE
+
+**Description:** Отчёт по продажам для админки (§8/§14 ТЗ): агрегация заказов по дню/товару/точке продаж за диапазон дат, отдаётся как JSON и как настоящий `.xlsx` (через `excelize`). Доступ — только `owner`/`manager` (`point_staff` получает 403). Бриф этой сессии называл задачу «Task O»; в `tasks/plan.md`/`todo.md` тот же пункт Wave 3 значится как «Task J» — использовано название репозитория, чтобы не плодить дублирующиеся номера задач.
+
+**Acceptance criteria:**
+- [x] Чистая функция агрегации (`reports.AggregateSales(orders []orders.Order, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error)`) — без обращения к БД, тестируется полностью на литералах `orders.Order`
+- [x] Отдельный repo/query слой (`internal/reports/repo.go`, `*Repo`) грузит заказы (с items) за `[from, to)` из Postgres, по образцу `orders.(*Service).ListOrders`/`attachItems`, но с фильтром по `created_at`, а не по `customer_id` — репорт общеадминский, не привязан к покупателю
+- [x] `GET /admin/api/reports/sales?from=&to=&group_by=day|product|point` → JSON-агрегат; `from`/`to` в формате `YYYY-MM-DD`
+- [x] Валидация: `from <= to` и `group_by ∈ {day, product, point}` — иначе `apperr.BadRequest`; обе проверки — чистые функции (`reports.ValidateRange`, `reports.ParseGroupBy`), протестированы без HTTP/БД
+- [x] Пустой диапазон / нет заказов → валидный пустой отчёт (`200`, `rows: []`), не ошибка
+- [x] `GET /admin/api/reports/sales.xlsx?...` — тот же отчёт и те же параметры, но настоящий `.xlsx` через `github.com/xuri/excelize/v2`, с `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` и `Content-Disposition: attachment; filename="sales_report.xlsx"`
+- [x] Оба эндпоинта — за `staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)`; `point_staff` получает 403 (обеспечивается тем же `RequireRole`, что уже покрыт своими тестами в `internal/staff/middleware_test.go` — отдельного RBAC-теста в `internal/httpapi` для этой задачи не заводилось, по аналогии с тем, как `admin_catalog_test.go` не дублирует такой тест для роутов категорий/товаров, а тестирует только настоящую RBAC-нюансировку stock-роута)
+- [x] `RegisterAdminReportsRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service)` — единая точка входа
+- [ ] **Не подключено в `cmd/server/main.go`** — сознательно, по прямому указанию брифа: `registerAdminRoutes` в этот момент активно правится параллельной сессией (Task G/H/I этой же волны), so подключение оставлено на усмотрение чек-пойнта после мержа всех веток Wave 3, а не сделано втихую здесь
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...`, `go vet ./...` — чисто
+- [x] `go test ./...` — чисто, все пакеты `ok`; `internal/reports/sales_test.go` — table-driven тесты на `ParseGroupBy`/`ParseReportDate`/`ValidateRange`/`AggregateSales` (день/товар/точка, пустой вход, все заказы отменены, сортировка, fallback имени точки, «один и тот же товар двумя строками одного заказа считает заказ один раз»); `internal/httpapi/admin_reports_test.go` — хендлеры через фейковый `salesRepo` (без БД), включая проверку, что XLSX-хендлер реально читается обратно через `excelize.OpenReader` (заголовки колонок + значения строк совпадают)
+- [x] `go mod tidy` прогнан **после** того, как код, импортирующий `excelize`, уже был написан (как и предупреждал бриф — иначе `tidy` вычистил бы неиспользуемую зависимость обратно); добавил `github.com/xuri/excelize/v2` в `go.mod`/`go.sum` — при мерже с параллельной веткой Task K (тоже тянет `excelize`) ожидается тривиальный конфликт go.sum/go.mod, разрешаемый как «оставить обе/одну версию», как и предупреждал бриф
+- [x] `golangci-lint run ./...` — **1 предсуществующее** замечание (`internal/i18n/i18n.go:83`, errcheck на `f.Close`) — не создано и не изменено этой задачей, файл не трогался; `golangci-lint run ./internal/reports/... ./internal/httpapi/...` — **0 issues**
+- [ ] Нет локального Postgres на этой машине — SQL в `reports.Repo.{LoadOrders,attachItems,PointNames}` вычитан построчно (шаблон 1-в-1 повторяет уже рабочий `orders.(*Service).ListOrders`/`attachItems`, только с другим WHERE), но не прогнан против живой БД; `.xlsx`-эндпоинт не открывался в настоящем Excel — вместо этого сгенерированный в тесте файл распарсен обратно тем же `excelize.OpenReader` и сверен по заголовкам/ячейкам (см. `TestSalesReportXLSXHandlerProducesReadableWorkbook`), что подтверждает корректность ZIP/XLSX-структуры и данных, но не заменяет ручное открытие в Excel/LibreOffice
+
+**Dependencies:** `internal/orders` (типы `Order`/`OrderItem`, не менялись), `internal/staff.Service.RequireRole` (не менялся), новая прямая зависимость `github.com/xuri/excelize/v2`
+
+**Files touched:**
+- `internal/reports/sales.go` (новый) — `GroupBy`, `ParseGroupBy`, `ParseReportDate`, `ValidateRange`, `Row`, `AggregateSales` + внутренние `aggregateByOrder`/`aggregateByItem`/`sortedRows` — вся логика чистая, без БД
+- `internal/reports/repo.go` (новый) — `Repo`, `NewRepo`, `LoadOrders`, `attachItems`, `PointNames`
+- `internal/reports/sales_test.go` (новый) — table-driven тесты на всё вышеперечисленное
+- `internal/httpapi/admin_reports.go` (новый) — `salesRepo` интерфейс, `RegisterAdminReportsRoutes`, `salesReportJSONHandler`, `salesReportXLSXHandler` + JSON/XLSX-представления
+- `internal/httpapi/admin_reports_test.go` (новый) — хендлер-тесты на фейковом `salesRepo`
+- `go.mod`/`go.sum` — добавлен `github.com/xuri/excelize/v2` и его транзитивные зависимости
+
+**Design decisions:**
+- **Отменённые (`cancelled`) заказы полностью исключены из отчёта** — не только из выручки (как буквально сказано в брифе), но и из `order_count`/`item_count` тоже. Обоснование: строка отчёта вида «3 заказа, 0 сом выручки» читается как противоречие, а не как полезные данные; более простое и последовательное чтение брифа — «отменённые заказы не в отчёте вообще». Если впоследствии понадобится отдельная метрика по отменам (например, % отмен), это отдельная фича поверх той же `Repo.LoadOrders`, не переиспользующая `AggregateSales`.
+- **Разный «естественный юнит» агрегации в зависимости от `group_by`.** Для `day`/`point` юнит агрегации — целый заказ (`order.TotalAmount` уже посчитан и округлён при создании заказа, пересчитывать его суммированием строк было бы двойной работой и источником рассинхрона). Для `product` юнит — строка заказа (`order_item`), потому что один заказ может содержать несколько разных товаров, и разложить его выручку по товарам можно только на уровне строк (`item.Price * item.Quantity`). `order_count` для `product`-группировки — количество *уникальных* заказов, содержащих товар (через `map[orderID]bool`), а не количество строк — иначе один заказ с двумя вариациями одного товара считался бы дважды.
+- **Ключ группировки `product` — `ProductNameSnapshot`, а не `VariantID`.** §8/§14 ТЗ говорит про отчёт «по товару», а не «по вариации» (размер/цвет) — `product_name_snapshot` уже денормализован в `order_items` именно для таких отчётов, независимо от того, что случилось с товаром в каталоге позже.
+- **Ключ группировки `point` резолвится в человекочитаемое имя через отдельный `Repo.PointNames()`**, а не через `internal/pos`/`internal/points` (такого пакета в `main` на момент этой задачи не существует — админка точек продаж это Task G/I той же волны, разрабатывается параллельно). `PointNames` читает `points_of_sale` напрямую (таблица существует с миграции 000003) — минимальная независимая зависимость вместо ожидания чужой ветки. Заказ без точки (`point_id IS NULL`) или с точкой, не найденной в `PointNames` (устарело/удалено), получает ключ `"unknown"`/сырой id соответственно, а не роняет отчёт.
+- **`to` в query-параметрах — включительно (календарный день), а `Repo.LoadOrders` — `[from, to)` исключительно по правому краю.** Хендлер сдвигает верхнюю границу на `+1 день` перед вызовом `LoadOrders`, чтобы `to=2026-01-31` включал весь день 31 января, а не только его полночь. Задокументировано в докстрингах `LoadOrders` и `loadSalesRows`.
+- **`cmd/server/main.go` НЕ подключён** — по прямому указанию брифа: `registerAdminRoutes` сейчас активно правится параллельной сессией (Task G/H/I той же волны), риск конфликта высокий и явно назван в задаче как повод не трогать этот файл. `RegisterAdminReportsRoutes(mux, db, staffSvc)` готов к подключению одной строкой при следующем чек-пойнте волны.
+
+**Deviations:**
+1. **Нумерация задачи.** Бриф этой сессии называет задачу «Task O», но в `tasks/plan.md`/`tasks/todo.md` (Wave 3 checklist) тот же пункт значится как «Task J» — сама секция с детальным описанием акцептанс-критериев по анкорной ссылке `plan.md#task-j-admin-reports-api` в `plan.md` на момент начала работы отсутствовала (файл короче, чем ссылки на него в `todo.md` подразумевают — видимо, ещё не дописан для Wave 3). Использованы акцептанс-критерии из брифа сессии (они были исчерпывающими) и название «Task J» для соответствия уже существующему чек-листу Wave 3 в `todo.md`, чтобы не плодить два номера для одной и той же фичи.
+2. **Отменённые заказы исключены полностью, не только из выручки** — см. Design decisions выше; явно вызвано брифом как решение на усмотрение исполнителя.
+3. **Ветка была отстроена от устаревшего `HEAD`** (репозиторий рабочей копии на момент старта отставал от `main`: `internal/orders`/`internal/staff`, упомянутые в брифе, отсутствовали). Перед началом работы ветка перебазирована (`git rebase main`) на актуальный `main` — без этого шага задача была невыполнима (нужные пакеты физически отсутствовали в дереве).
