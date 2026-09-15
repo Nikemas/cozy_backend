@@ -198,3 +198,147 @@ func (r *ProductRepo) GetByID(ctx context.Context, id string) (*Product, error) 
 	}
 	return &p, nil
 }
+
+// GetByIDAny returns a product by id regardless of is_active, for admin use
+// — unlike GetByID, a soft-deleted (is_active=false) product must still be
+// resolvable so it can be edited, reactivated, or have its variants/images
+// managed. Returns apperr.NotFound if no such product exists at all.
+func (r *ProductRepo) GetByIDAny(ctx context.Context, id string) (*Product, error) {
+	const q = `
+		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
+		       brand, base_price, is_active, created_at, updated_at
+		FROM products
+		WHERE id = $1`
+
+	var p Product
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu,
+		&p.DescriptionKy, &p.Brand, &p.BasePrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("product_not_found", "товар не найден")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// ProductInput carries the writable fields of a product, shared by Create
+// and Update.
+type ProductInput struct {
+	CategoryID    string
+	NameRu        string
+	NameKy        string
+	DescriptionRu *string
+	DescriptionKy *string
+	Brand         *string
+	BasePrice     float64
+	IsActive      bool
+}
+
+func (in ProductInput) validate() error {
+	if strings.TrimSpace(in.CategoryID) == "" {
+		return apperr.BadRequest("invalid_category_id", "category_id обязателен")
+	}
+	if strings.TrimSpace(in.NameRu) == "" {
+		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен")
+	}
+	if strings.TrimSpace(in.NameKy) == "" {
+		return apperr.BadRequest("invalid_name_ky", "name_ky обязателен")
+	}
+	if in.BasePrice < 0 {
+		return apperr.BadRequest("invalid_base_price", "base_price не может быть отрицательным")
+	}
+	return nil
+}
+
+// Create inserts a new product and returns the row as stored.
+func (r *ProductRepo) Create(ctx context.Context, in ProductInput) (*Product, error) {
+	if err := in.validate(); err != nil {
+		return nil, err
+	}
+
+	const q = `
+		INSERT INTO products (category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, category_id, name_ru, name_ky, description_ru, description_ky,
+		          brand, base_price, is_active, created_at, updated_at`
+
+	var p Product
+	err := r.db.QueryRowContext(ctx, q, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
+		in.Brand, in.BasePrice, in.IsActive).
+		Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
+			&p.Brand, &p.BasePrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, translateProductWriteErr(err)
+	}
+	return &p, nil
+}
+
+// Update replaces every writable field of the product with the given id,
+// including is_active — so Update can also be used to reactivate a
+// previously soft-deleted product. Returns apperr.NotFound if no such
+// product exists.
+func (r *ProductRepo) Update(ctx context.Context, id string, in ProductInput) (*Product, error) {
+	if err := in.validate(); err != nil {
+		return nil, err
+	}
+
+	const q = `
+		UPDATE products
+		SET category_id = $2, name_ru = $3, name_ky = $4, description_ru = $5, description_ky = $6,
+		    brand = $7, base_price = $8, is_active = $9, updated_at = now()
+		WHERE id = $1
+		RETURNING id, category_id, name_ru, name_ky, description_ru, description_ky,
+		          brand, base_price, is_active, created_at, updated_at`
+
+	var p Product
+	err := r.db.QueryRowContext(ctx, q, id, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
+		in.Brand, in.BasePrice, in.IsActive).
+		Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
+			&p.Brand, &p.BasePrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("product_not_found", "товар не найден")
+	}
+	if err != nil {
+		return nil, translateProductWriteErr(err)
+	}
+	return &p, nil
+}
+
+// Delete soft-deletes a product by setting is_active = false, rather than a
+// real DELETE FROM: order_items.product_name_snapshot (and similar
+// snapshot columns) denormalize the product's details at order time, but
+// order_items.variant_id still has a live foreign key into
+// product_variants -> products, so a hard delete of a previously-ordered
+// product would either be blocked by that FK or (if variants were also
+// deleted) destroy history a past order still needs to reference. Setting
+// is_active = false reuses the column public reads already filter on, so a
+// soft-deleted product simply stops appearing in the public catalog and
+// admin can restore it later via Update. Idempotent: deleting an
+// already-inactive product still succeeds.
+func (r *ProductRepo) Delete(ctx context.Context, id string) error {
+	const q = `UPDATE products SET is_active = false, updated_at = now() WHERE id = $1`
+
+	res, err := r.db.ExecContext(ctx, q, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return apperr.NotFound("product_not_found", "товар не найден")
+	}
+	return nil
+}
+
+// translateProductWriteErr maps Postgres constraint violations from
+// Create/Update into apperr responses. category_id is the only foreign key
+// on products, so a violation there means the given category doesn't exist.
+func translateProductWriteErr(err error) error {
+	if pgErrCode(err) == pgForeignKeyViolation {
+		return apperr.BadRequest("invalid_category_id", "категория не найдена")
+	}
+	return err
+}

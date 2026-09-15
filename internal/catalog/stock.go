@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
 // StockEntry mirrors one row of the `stock` table: the quantity of a
@@ -63,4 +65,32 @@ func (r *StockRepo) ByVariantIDs(ctx context.Context, variantIDs []string) ([]St
 		return nil, err
 	}
 	return entries, nil
+}
+
+// Upsert sets the quantity of variantID at pointID, inserting the row if
+// one doesn't exist yet (a variant has no stock row at a point until
+// someone sets one there) or updating it in place otherwise. Returns
+// apperr.BadRequest for a negative quantity, or if variantID/pointID
+// doesn't reference an existing variant/point of sale.
+func (r *StockRepo) Upsert(ctx context.Context, variantID, pointID string, quantity int) (*StockEntry, error) {
+	if quantity < 0 {
+		return nil, apperr.BadRequest("invalid_quantity", "quantity не может быть отрицательным")
+	}
+
+	const q = `
+		INSERT INTO stock (variant_id, point_id, quantity, updated_at)
+		VALUES ($1, $2, $3, now())
+		ON CONFLICT (variant_id, point_id) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()
+		RETURNING variant_id, point_id, quantity, updated_at`
+
+	var e StockEntry
+	err := r.db.QueryRowContext(ctx, q, variantID, pointID, quantity).
+		Scan(&e.VariantID, &e.PointID, &e.Quantity, &e.UpdatedAt)
+	if pgErrCode(err) == pgForeignKeyViolation {
+		return nil, apperr.BadRequest("invalid_variant_or_point", "вариация или точка продаж не найдена")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
 }

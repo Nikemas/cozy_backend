@@ -119,30 +119,44 @@
 
 **Почему не 4 потока:** параллельная сессия (`kozy-01`) уже строит `internal/orders/{cart,order}.go` + миграцию `cart_items` для сайта (checkout-флоу) — независимая реализация заказов с нашей стороны прямо сейчас была бы третьей подряд коллизией. Заказы (шаг 7) и Bakai (шаг 8, зависит от заказов) — отложены до её коммита. Также фоновой задачей (`task_293f5b84`, отдельная сессия пользователя) чинится утечка сырых ошибок через `apperr.Internal` — не пересекается с этой волной по файлам.
 
-### Task D: Admin CRUD каталога (шаг 12 ТЗ)
+### Task D: Admin CRUD для каталога (шаг 12 ТЗ, RBAC-запись поверх Task A+B) — DONE
 
-**Description:** Запись поверх уже готового read-only `internal/catalog` (категории/товары/вариации/остатки), под RBAC из Task A. Загрузка фото — НЕ в этой задаче (см. Task E): эндпоинт товара принимает уже готовые `object_key` (строки), которые фронт админки получает от MinIO-эндпоинтов Task E отдельным вызовом — так Task D и Task E не пересекаются по файлам и не зависят друг от друга по реализации.
+**Description:** Write-сторона каталога поверх read-only репозиториев из Task B и RBAC-мидлвари из Task A: CRUD категорий/товаров/вариаций, замена списка фото товара (только запись `object_key` в `product_images`, без обращения к MinIO — это отдельная задача) и запись остатков по точкам, с RBAC-нюансом для `point_staff` (см. §5 ТЗ).
 
 **Acceptance criteria:**
-- [ ] `POST/PUT/DELETE /admin/api/categories(/:id)` — owner/manager
-- [ ] `POST/PUT/DELETE /admin/api/products(/:id)` — owner/manager; тело включает `category_id`, `name_ru/ky`, `description_ru/ky`, `brand`, `base_price`, `is_active`
-- [ ] `POST/PUT/DELETE /admin/api/products/:id/variants(/:variantId)` — owner/manager (size/color/sku/price_override)
-- [ ] `PUT /admin/api/products/:id/variants/:variantId/images` — owner/manager; принимает список `object_key` (+ `sort_order`), пишет в `product_images`
-- [ ] `PUT /admin/api/stock/:variantId/:pointId` — owner/manager (любая точка) ИЛИ point_staff **только если `pointId == staff.PointID` из сессии** — иначе 403, даже если формально прошёл `RequireRole`
+- [x] `POST/PUT/DELETE /admin/api/categories` и `/admin/api/categories/{id}` — owner/manager
+- [x] `POST/PUT/DELETE /admin/api/products` и `/admin/api/products/{id}` — owner/manager
+- [x] `POST/PUT/DELETE /admin/api/products/{id}/variants` и `/admin/api/products/{id}/variants/{variantId}` — owner/manager
+- [x] `PUT /admin/api/products/{id}/images` — owner/manager, тело — список `{object_key, sort_order}`, только запись строк в `product_images`
+- [x] `PUT /admin/api/stock/{variantId}/{pointId}` — owner/manager (любая точка) и point_staff (**только своя точка**, `staff.PointID`, иначе `apperr.Forbidden`)
+- [x] Тесты на RBAC-нюанс остатков: point_staff на своей точке (200) и на чужой (403) — `internal/httpapi/admin_catalog_test.go`
 
 **Verification:**
-- [ ] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...`, `golangci-lint run ./...` — чисто
-- [ ] Тесты на RBAC-нюанс point_staff+чужая точка (403) и point_staff+своя точка (200) — без реальной БД, через fake-репозитории (см. `internal/staff/fakes_test.go` как образец)
-- [ ] Manual: живой Postgres недоступен на этой машине — не прогнано
+- [x] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...`, `golangci-lint run ./...` — чисто
+- [ ] Manual: нет локального Postgres/Docker на этой машине — live-DB тест не прогнан, только ревью SQL
 
-**Dependencies:** None (каталог и RBAC уже смержены в `main`)
+**Dependencies:** Task A (RBAC), Task B (read-репозитории каталога)
 
-**Files likely touched:**
-- `internal/catalog/{category,product,variant,stock}.go` — добавить write-методы (Create/Update/Delete) рядом с существующими read-методами, не переписывая их
-- `internal/httpapi/admin_catalog.go` — новый файл, защищённые роуты
-- `cmd/server/main.go` — вызов регистрации внутри `registerAdminRoutes`
+**Files touched:**
+- `internal/catalog/{category,product,variant,stock}.go` — добавлены Create/Update/Delete (и `GetByIDAny` у продукта, `GetByID` у вариации), без изменения существующих read-методов
+- `internal/catalog/image.go` — новый `ImageRepo.ReplaceForProduct` (delete+insert в одной транзакции)
+- `internal/catalog/pgerr.go` — общий хелпер разбора `*pgconn.PgError` (unique/FK-violation) в `apperr`
+- `internal/catalog/{category,product,variant,stock,image,pgerr}_write_test.go` — тесты на чистую валидацию (без БД, через `NewXRepo(nil)`, т.к. валидация всегда выполняется до обращения к `r.db`)
+- `internal/httpapi/admin_catalog.go` — `RegisterAdminCatalogRoutes(mux, db, staffSvc)` + все хендлеры
+- `internal/httpapi/admin_catalog_test.go` — handler-level тесты RBAC-нюанса остатков (fake `stockUpserter`, `staff.NewContextWithStaff`)
+- `internal/staff/middleware.go` — добавлен `NewContextWithStaff` (симметрично `FromContext`), нужен тестам в других пакетах для проверки хендлеров без реальной сессии
+- `cmd/server/main.go` — одна строка в `registerAdminRoutes`
 
-**Estimated scope:** Medium/Large (может стоит разбить на под-агента, если разрастётся)
+**Design decisions:**
+- **Soft-delete для товаров** (`is_active = false` вместо `DELETE`) — как и предполагалось в брифе: `order_items` хранит только снапшот (`product_name_snapshot` и т.п.), но `order_items.variant_id` — живой FK в `product_variants`, так что жёсткое удаление уже заказанного товара либо упёрлось бы в FK, либо (при каскадном удалении вариаций) снесло бы историю. `is_active` уже используется публичным чтением, так что soft-delete просто скрывает товар из каталога; `Update` может его же реактивировать.
+- **Категории — hard delete.** У `categories` нет колонки `is_active`, добавлять её ради этой волны — расширение схемы за рамками брифа. Вместо этого: обычный `DELETE`, а нарушение FK (категория используется в `products.category_id` или как `parent_id` у подкатегории) перехватывается по SQLSTATE `23503` и превращается в `apperr.Conflict` (409), а не падает 500-кой или удаляет молча.
+- **Вариации — тоже hard delete, с той же перехваткой FK.** У `product_variants` тоже нет `is_active`; но `order_items.variant_id` — живой FK без `ON DELETE`, так что удалить вариацию, по которой уже есть заказы, физически нельзя — Postgres сам защищает историю, а мы просто транслируем `23503` в 409 вместо 500. Компромисс: админ не может удалить вариацию, у которой когда-либо был заказ (может только обнулить остаток) — если это неприемлемо, нужна отдельная миграция с `is_active` у `product_variants`, сознательно не делал её в этой волне.
+- **`is_active` товара — `*bool` на входе (HTTP-уровень).** Если поле не передано в JSON — по умолчанию `true` (и на create, и на update), чтобы отсутствие поля не превращалось в Go zero-value `false` и не деактивировало товар незаметно для админа.
+- **Остатки — upsert (`INSERT ... ON CONFLICT DO UPDATE`)**, не отдельные Create/Update — PK `(variant_id, point_id)` и естественная семантика «выставить количество» делают различие create/update у остатков бессмысленным для клиента.
+- **Транзакция для замены фото — не через общий `withTx`**, которого пока не существует в кодовой базе (упоминается в §4 ТЗ, но ещё не реализован ни в одном пакете) — вместо того чтобы придумывать общий хелпер, который может пересечься с тем, что параллельно делает поток `internal/orders`, транзакция открыта локально внутри `ImageRepo.ReplaceForProduct`.
+- **`NewContextWithStaff` в `internal/staff`** — минимальное добавление (симметричное уже существующему `FromContext`), нужно ровно для того, чтобы `internal/httpapi` мог тестировать `updateStockHandler` (в частности RBAC-нюанс point_staff) без живой БД/сессии — `staff.Service`/`staff.Staff` не даёт собрать контекст извне пакета иначе.
+
+**Deviations:** нет отклонений от acceptance criteria брифа; решения по soft/hard-delete и умолчанию `is_active` — сознательные и описаны выше, т.к. бриф оставлял их на усмотрение исполнителя.
 
 ---
 
@@ -152,8 +166,8 @@
 
 ## Checkpoint: после Task D, E
 
-- [x] Task E смержен в `main` (коммит "Add MinIO media integration (Task E, wave 2)")
-- [ ] Task D ещё в работе — смержить, когда будет готов
-- [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто на текущем `main` (с Task E)
+- [x] Обе ветки смержены в `main`
+- [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто
+- [x] Конфликт в `cmd/server/main.go` (обе строки в `registerAdminRoutes`) и в этом файле — разрешён вручную
 - [ ] `golangci-lint run ./...` на весь репозиторий — 0 issues кроме одного предсуществующего в `internal/i18n/i18n.go` (не наша задача, вынесено отдельно как `task_2f5cfe35`)
-- [ ] Ревью с пользователем после Task D; затем — заказы/Bakai, когда `kozy-01` закоммитит cart/orders
+- [ ] Ревью с пользователем; затем — заказы/Bakai, когда `kozy-01` закоммитит cart/orders
