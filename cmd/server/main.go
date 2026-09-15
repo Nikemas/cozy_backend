@@ -143,6 +143,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc)
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
+	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
