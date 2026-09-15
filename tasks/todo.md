@@ -507,3 +507,45 @@
 **Merge note:** при интеграции в `main` конфликт в `cmd/server/main.go` (обе Task L и Task N добавили строку в `registerAdminRoutes`) разрешён вручную — оставлены обе строки. Заодно подключена `httpapi.RegisterAdminReportsRoutes(...)`, которую мердж Task O (`552406c`) добавил в кодовую базу, но не подключил к `main.go` (сознательно, чтобы не трогать файл, который в тот момент активно правили параллельные задачи этой же волны) — без этой правки `/admin/api/reports/sales*` был бы мёртвым кодом. Коммит мерджа: `fb888eb`.
 
 **Open item, не блокирует:** точный код ответа для `point_staff` на чужой заказ решён как 403 (`apperr.Forbidden`), консистентно с RBAC остатков в Task D — см. Open Questions в `tasks/plan.md`.
+
+---
+
+## Task P: Customer own-profile API (found during mobile integration testing) — DONE
+
+**Description:** Task G (favorites/addresses/devices) не закрыла один пробел: залогиненный покупатель не мог прочитать или записать собственный профиль (`customers.name`) через мобильное API — обнаружено во время интеграционного тестирования Flutter-приложения. Доменная логика уже существовала (`storefront.CustomerRepo.{GetByID,SetName}`, добавлены параллельной сессией для веб-логина), эта задача только оборачивает её JSON-хендлерами поверх уже существующей `auth.Service.RequireCustomer`.
+
+**Acceptance criteria:**
+- [x] `GET /api/v1/customer` — возвращает `{id, phone, name}` собственного профиля аутентифицированного покупателя (`name` отсутствует в ответе, если ещё не задано)
+- [x] `PUT /api/v1/customer` — тело `{name}`, вызывает `SetName`, возвращает обновлённый профиль в том же формате
+- [x] Оба роута — за `authSvc.RequireCustomer(...)`
+- [x] Защита от паники: если `GetByID` вернул `nil, nil` для id из валидного JWT (не должно случаться, но не должно и падать) — чистый `apperr.NotFound("customer_not_found", ...)`, не nil-pointer panic
+- [x] Валидация пустого имени не дублируется в хендлере — `SetName` уже возвращает `apperr.BadRequest("invalid_name", ...)`, хендлер просто пробрасывает ошибку
+- [x] Подключено через существующую точку входа `RegisterCustomerRoutes` (`internal/httpapi/customer.go`) — по аналогии с `registerFavoritesRoutes`/`registerAddressesRoutes`/`registerDevicesRoutes`, без правок `cmd/server/main.go`
+- [x] Тесты в стиле `favorites_test.go`/`addresses_test.go` (фейк `customerProfileStore` через интерфейс `GetByID`/`SetName`, без живой БД): happy path GET, happy path PUT, PUT с пустым именем (пробрасывает `invalid_name`), 401 без аутентификации, защита от `nil`-профиля
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...` — чисто
+- [x] `go vet ./...` — чисто
+- [x] `go test ./...` — чисто, все пакеты `ok`
+- [x] `golangci-lint run ./...` — **1 предсуществующее** замечание (`internal/i18n/i18n.go:83`, `f.Close` не проверен, errcheck) — тот же файл, не в этой задаче (см. идентичное замечание в Task G); `golangci-lint run ./internal/httpapi/... ./internal/storefront/... ./internal/auth/... ./internal/web/... ./cmd/...` — **0 issues**
+- [ ] Manual: нет живого Postgres на этой машине — SQL в `GetByID`/`SetName` уже существовал и был протестирован ранее (Task G / веб-логин), новых SQL-запросов эта задача не добавляет
+
+**Dependencies:** `storefront.CustomerRepo.{GetByID,SetName}` (уже существовали), `auth.Service.RequireCustomer`/`auth.CustomerIDFromContext` (Task G)
+
+**Files touched:**
+- `internal/httpapi/customer_profile.go` (новый) — `registerCustomerProfileRoutes`, `customerProfileStore`, хендлеры GET/PUT, `customerProfileResponse` DTO
+- `internal/httpapi/customer_profile_test.go` (новый) — 6 тестов (см. acceptance criteria)
+- `internal/httpapi/customer.go` — добавлен вызов `registerCustomerProfileRoutes(mux, db, authSvc)` в `RegisterCustomerRoutes`
+
+**Design decisions:**
+- **`customerProfileResponse` — отдельный DTO с `json`-тегами**, а не прямая отдача `storefront.Customer` — то же обоснование, что и `addressResponse` в Task G: `storefront.Customer` не имеет собственных json-тегов (рендерится через `html/template` в `internal/web`), поэтому новый handler-локальный DTO вместо правки общего доменного типа, который правит параллельная сессия.
+- **`GetByID`/`SetName` за одним интерфейсом `customerProfileStore`**, а не два отдельных интерфейса (как `favoriteLister`/`favoriteWriter`) — обе операции читают/пишут один и тот же ресурс («мой профиль»), а не разные ресурсы, так что разделение не добавляло бы ясности.
+- **`PUT` делает `SetName`, затем повторный `GetByID`**, а не собирает ответ вручную из известного нового имени — гарантирует, что ответ всегда отражает фактическое состояние в БД (например, если `SetName`/схема когда-нибудь начнут делать что-то ещё с записью), ценой одного лишнего запроса; на объёмах профиля это не проблема.
+
+**Optional stretch goal — сделано:** `POST /api/v1/auth/otp/verify` теперь дополнительно возвращает `customer` в теле ответа (`{access_token, refresh_token, customer: {id, phone, name}}`), чтобы мобильному приложению не нужен был второй раунд-трип сразу после логина.
+- `auth.Service.VerifyOTP` возвращает четвёртое значение `*storefront.Customer` (уже получаемый внутри через `GetOrCreateByPhone` — просто перестал отбрасываться после `issueTokenPair`). Оценено как низкий риск: только 2 вызывающих места на всю кодовую базу (`internal/httpapi/auth.go`, `internal/web/handlers.go`), оба тривиально обновлены (второй просто добавляет `_` для нового возврата, поведение веб-логина не меняется), юнит-тестов на `VerifyOTP` в `internal/auth` нет (нужен живой Postgres), так что сигнатура не ломает существующее покрытие.
+- `internal/httpapi/auth.go` — новый `verifyOTPResponseBody`/`verifyOTPResponse(access, refresh, customer)`, переиспользует `customerProfileResponse`/`newCustomerProfileResponse` из `customer_profile.go` (тот же пакет) вместо дублирования DTO.
+- `internal/web/handlers.go` — `loginVerifyOTP` уже делал отдельный `GetByID` сразу после `VerifyOTP` (для проверки `needsName`), эта логика не тронута — просто добавлен `_` под новый возврат вместо повторного использования, чтобы не расширять scope этой задачи правкой соседнего потока.
+
+**Deviations:** нет отклонений от acceptance criteria брифа.
