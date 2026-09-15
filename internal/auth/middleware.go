@@ -46,3 +46,12 @@ func CustomerIDFromContext(ctx context.Context) (string, bool) {
 	id, ok := ctx.Value(customerIDKey).(string)
 	return id, ok
 }
+
+// NewContextWithCustomerID attaches customerID to ctx the same way
+// RequireCustomer does. It exists for handler-level tests in other packages
+// (orders, storefront, ...) that need to exercise a
+// CustomerIDFromContext-gated handler directly, without spinning up a real
+// OTP login flow or signing a JWT — mirrors staff.NewContextWithStaff.
+func NewContextWithCustomerID(ctx context.Context, customerID string) context.Context {
+	return context.WithValue(ctx, customerIDKey, customerID)
+}

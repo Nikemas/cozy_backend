@@ -190,3 +190,34 @@
 **Files touched:**
 - `openapi.yaml` (новый)
 - `README.md` — секция «API-документация»
+
+---
+
+## Task H: Customer-facing orders + cart JSON API (§6 ТЗ, мобильное приложение) — DONE
+
+**Description:** `/api/v1/{orders,cart}` — JSON REST для залогиненного покупателя (Flutter mobile), поверх уже готового домена `internal/orders` (`Service.{CreateOrder,ListOrders,GetOrder}`, `CartRepo.{List,Add,UpdateQty,Remove}` — реализованы и покрыты тестами параллельной задачей, домен не менялся) и только что добавленной JWT-мидлвари `auth.Service.RequireCustomer`. Корзина монтируется в этом же файле/функции, т.к. она customer-scoped JSON того же вида, что и заказы, и по доккомменту `orders.CartItem` явно designed для переиспользования web+mobile.
+
+**Acceptance criteria:**
+- [x] `POST /api/v1/orders` — тело `{items:[{variant_id,quantity}], address_id?, pickup_point_id?}` → `orders.OrderItemInput` + прямой проброс `address_id`/`pickup_point_id` в `CreateOrder` (валидация "ровно один из двух" — целиком в `orders.Service.CreateOrder`, хендлер её не дублирует)
+- [x] `GET /api/v1/orders` — история заказов покупателя (`ListOrders`, новые сверху, с `Items`)
+- [x] `GET /api/v1/orders/{id}` — `{id}` = UUID или `order_number` (`COZY-YYYYMMDD-NNN`), передаётся в `GetOrder` как есть — она сама разбирает оба варианта и скоупит по `customerID`
+- [x] `GET /api/v1/cart`, `POST /api/v1/cart/{variantId}` (body `{quantity}`), `PUT /api/v1/cart/{variantId}` (body `{quantity}`), `DELETE /api/v1/cart/{variantId}` — тонкие обёртки над `CartRepo`
+- [x] Все шесть роутов — за `authSvc.RequireCustomer(...)`; `customerID` берётся из `auth.CustomerIDFromContext`, ни один хендлер не доверяет `customer_id` в теле/пути
+- [x] `RegisterOrderRoutes(mux, db, authSvc)` — единая точка входа; подключена в `cmd/server/main.go` (`registerAPIRoutes`) одной строкой — оказалась тривиальной и бесконфликтной на момент коммита, так что подключена, как разрешено в задании
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...`, `go vet ./...` — чисто
+- [x] `go test ./...` — чисто; новые тесты в `internal/httpapi/orders_test.go` — фейки `fakeOrderService`/`fakeCartService` за небольшими интерфейсами (`orderService`/`cartService`, по образцу `stockUpserter` из `admin_catalog.go`), без обращения к БД: маппинг `items`→`OrderItemInput`, проброс `address_id`/`pickup_point_id` как есть (в т.ч. явный тест, что хендлер НЕ повторяет валидацию "ровно один способ получения" — просто пропускает ошибку `invalid_fulfillment` от сервиса), 401 без аутентификации, 400 на битый JSON, скоуп по `customerID` для orders/cart
+- [x] `golangci-lint run ./internal/httpapi/... ./internal/auth/...` — 0 issues; `golangci-lint run ./...` на весь репозиторий — 1 issue, предсуществующий (`internal/i18n/i18n.go:83`, errcheck на `f.Close`), не относится к этой задаче — см. пометку в Task E выше
+- [ ] Живого Postgres нет на этой машине — ручной curl-прогон не сделан; сам `internal/orders` уже покрыт sqlmock-тестами параллельной задачей, эта задача только добавляет HTTP-слой поверх него
+
+**Dependencies:** `internal/orders` (домен заказов/корзины, смержен параллельной задачей — не менялся), `auth.Service.RequireCustomer`/`auth.CustomerIDFromContext` (только что смержены)
+
+**Files touched:**
+- `internal/httpapi/orders.go` (новый) — `RegisterOrderRoutes` + хендлеры orders/cart
+- `internal/httpapi/orders_test.go` (новый)
+- `internal/auth/middleware.go` — добавлен `NewContextWithCustomerID(ctx, customerID) context.Context`, по образцу `staff.NewContextWithStaff` — нужен, чтобы тесты хендлеров в `internal/httpapi` могли положить `customerID` в контекст напрямую, не поднимая настоящий JWT/OTP-флоу
+- `cmd/server/main.go` — одна строка `httpapi.RegisterOrderRoutes(mux, db, authSvc)` внутри `registerAPIRoutes`
+
+**Deviations:** нет отклонений от постановки. Единственное самостоятельное решение — добавить `auth.NewContextWithCustomerID` (в задании не упоминался): без него хендлер-тесты в другом пакете не могли положить customerID в приватный ключ контекста `auth`-пакета, а гонять их через настоящий `RequireCustomer`+подписанный JWT было бы избыточно (эта мидлварь уже покрыта своими тестами в `internal/auth/middleware_test.go`) — паттерн 1-в-1 повторяет уже существующий `staff.NewContextWithStaff`.
