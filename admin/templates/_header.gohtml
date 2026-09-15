@@ -1,0 +1,25 @@
+{{/* _header renders the app shell's sticky <header>: mobile hamburger
+     (drives the CSS-only drawer via toggleAdminDrawer, layout.gohtml),
+     optional back button, page title, and an optional search box — Tasks
+     2-5 set ShowBack/ShowSearch/SearchQuery on their own screens as
+     needed; Foundation's stub screens leave both off. */}}
+{{define "_header"}}
+<header class="admin-header">
+  <button type="button" class="admin-header__hamburger" onclick="toggleAdminDrawer(true)" aria-label="Меню">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+  </button>
+  {{if .ShowBack}}
+  <button type="button" class="admin-header__back" onclick="history.back()" aria-label="Назад">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+  </button>
+  {{end}}
+  <div class="admin-header__title">{{.PageTitle}}</div>
+  <div class="admin-header__spacer"></div>
+  {{if .ShowSearch}}
+  <div class="admin-header__search">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+    <input type="search" name="q" value="{{.SearchQuery}}" placeholder="Поиск">
+  </div>
+  {{end}}
+</header>
+{{end}}

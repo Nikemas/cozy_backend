@@ -1,0 +1,23 @@
+{{/* _confirm_modal is the generic confirm dialog from the design canvas's
+     `confirmModal` block (Cozy Admin.dc.html lines ~772-783: a
+     confirmTitle/confirmText/onConfirm dialog, already generic there —
+     distinct from that file's product-delete-specific `modalOpen` block
+     at ~671-682, "Удалить товар?"). Foundation ships the markup empty
+     (hidden, no title/text baked in) and lets Tasks 2-5 fill it in and
+     show it via the shared openConfirmModal(title, text, confirmURL) JS
+     helper (layout.gohtml) — e.g. a delete-product button's onclick calls
+     openConfirmModal('Удалить товар?', '<name> будет удалён...',
+     '/admin/api/products/123') instead of each screen building its own
+     modal. */}}
+{{define "_confirm_modal"}}
+<div id="admin-confirm-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal">
+    <div class="admin-modal__title" id="admin-confirm-title"></div>
+    <div class="admin-modal__text" id="admin-confirm-text"></div>
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeConfirmModal()">Отмена</button>
+      <button type="button" id="admin-confirm-action" class="admin-btn admin-btn--dark">Подтвердить</button>
+    </div>
+  </div>
+</div>
+{{end}}

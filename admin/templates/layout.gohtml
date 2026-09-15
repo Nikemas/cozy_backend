@@ -1,0 +1,68 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cozy Admin — {{.PageTitle}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/admin/static/css/admin.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+{{if .ShowSidebar}}
+<div class="admin-shell">
+  {{template "_sidebar" .}}
+  <main class="admin-main">
+    {{template "_header" .}}
+    <div class="admin-content">
+      {{template "content" .}}
+    </div>
+  </main>
+</div>
+{{else}}
+  {{template "content" .}}
+{{end}}
+{{template "_toast" .}}
+{{template "_confirm_modal" .}}
+<script>
+// toggleAdminDrawer opens/closes the mobile sidebar drawer (design canvas's
+// drawerOpen/toggleDrawer state, translated to a body class since this is
+// server-rendered rather than a live React-style component) — see the
+// @media (max-width: 767px) rules in admin.css. Called with no argument it
+// toggles; called with true/false it forces that state (used by the
+// backdrop's onclick to always close).
+function toggleAdminDrawer(open) {
+  if (typeof open === 'boolean') {
+    document.body.classList.toggle('admin-drawer-open', open);
+  } else {
+    document.body.classList.toggle('admin-drawer-open');
+  }
+}
+
+// openConfirmModal/closeConfirmModal drive the shared #admin-confirm-modal
+// partial (_confirm_modal.gohtml) — Tasks 2-5 reuse this instead of each
+// wiring their own modal for "delete this row?"-style prompts. confirmURL,
+// when given, is wired as the confirm button's hx-post target so HTMX
+// performs the actual mutation; omit it and handle the click yourself
+// (e.g. set a plain onclick on #admin-confirm-action) for a non-HTMX
+// confirm action.
+function openConfirmModal(title, text, confirmURL) {
+  document.getElementById('admin-confirm-title').textContent = title;
+  document.getElementById('admin-confirm-text').textContent = text;
+  var btn = document.getElementById('admin-confirm-action');
+  if (confirmURL) {
+    btn.setAttribute('hx-post', confirmURL);
+    if (window.htmx) { window.htmx.process(btn); }
+  }
+  document.getElementById('admin-confirm-modal').style.display = 'flex';
+}
+function closeConfirmModal() {
+  document.getElementById('admin-confirm-modal').style.display = 'none';
+}
+</script>
+</body>
+</html>
+{{end}}

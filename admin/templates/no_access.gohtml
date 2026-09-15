@@ -1,0 +1,19 @@
+{{/* no_access.gohtml — landing page for a staff member whose role has no
+     admin screen at all in this wave (point_staff — see the RBAC mapping
+     in tasks/plan.md Wave 4). Reuses the login screen's chrome-free
+     centered-card look rather than the full sidebar shell, since there's
+     no nav to show them. */}}
+{{define "content"}}
+<div class="admin-login">
+  <div class="admin-login__card">
+    <div class="admin-login__logo">
+      <img src="/admin/static/img/cozy-logo.png" alt="Cozy" width="84" height="84">
+    </div>
+    <div class="admin-login__title">Нет доступа</div>
+    <div class="admin-login__hint">У вашей роли пока нет доступа к админ-панели.</div>
+    <form method="post" action="/admin/logout" style="margin-top: 18px">
+      <button type="submit" class="admin-btn admin-btn--secondary admin-login__submit">Выйти</button>
+    </form>
+  </div>
+</div>
+{{end}}

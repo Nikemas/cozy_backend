@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/Nikemas/cozy_backend/internal/admin"
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
@@ -78,7 +79,9 @@ func run() error {
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
 	registerAPIRoutes(mux, db, authSvc)
-	registerAdminRoutes(mux, db, mediaClient)
+	if err := registerAdminRoutes(mux, db, mediaClient); err != nil {
+		return err
+	}
 	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
 		return err
 	}
@@ -137,9 +140,11 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
 }
 
-// registerAdminRoutes mounts /admin/* — html/template pages behind a staff
-// session, RBAC-gated per internal/auth.
-func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client) {
+// registerAdminRoutes mounts /admin/* — both the JSON API under
+// /admin/api/* (Wave 3) and, as of Wave 4 Task 1, the html/template admin
+// panel itself under /admin/* — behind a staff session, RBAC-gated per
+// internal/staff.
+func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client) error {
 	staffSvc := staff.NewService(db)
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc)
@@ -148,6 +153,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminReportsRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminImportRoutes(mux, db, staffSvc)
+	return admin.RegisterRoutes(mux, db, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
