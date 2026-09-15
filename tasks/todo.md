@@ -197,20 +197,21 @@
 
 Пользователь явно попросил начать реализацию админки с бека. HTML/HTMX-слой (`internal/admin`) — не в этой волне, см. Wave 4 ниже.
 
-- [ ] **Task L** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). Не наша задача — ведёт другая сессия.
-- [ ] **Task M** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). Не наша задача — ведёт другая сессия.
-- [ ] **Task N** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). Не наша задача — ведёт другая сессия.
+- [x] **Task L** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). Смержено в `main` (`b14e94d`). [детали](#task-l-admin-points-of-sale-api--done)
+- [x] **Task M** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). Смержено в `main` (`5a6274d`). [детали](#task-m-admin-staff-api--done)
+- [x] **Task N** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). Смержено в `main` (`fb888eb`). [детали](#task-n-admin-orders-api--done)
 - [x] **Task O** (в брифе агента — «Task J», см. ниже) — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](#task-j-admin-reports-api-задача-о-в-брифе--done)
-- [ ] **Task P** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках) — в работе, наша задача.
+- [ ] **Task P** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках) — в работе, другая сессия.
 
 Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task O и Task P (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task M.
 
 ### Checkpoint: после Task L–P
 
-- [ ] Все 5 веток смержены в `main`
-- [ ] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто
-- [ ] `go.mod`/`go.sum` — одна версия `excelize`, `go mod tidy` прогнан
-- [ ] `openapi.yaml` дополнен новыми путями (отдельная маленькая задача по аналогии с Task F)
+- [x] Task L, M, N, O смержены в `main` (`b14e94d`, `5a6274d`, `fb888eb`, через `552406c`); Task P ещё в работе
+- [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто на `main` после мерджа L/M/N (проверено на `e8c1cfe`)
+- [x] `httpapi.RegisterAdminReportsRoutes(...)` подключён в `registerAdminRoutes` при мердже Task N (`fb888eb`) — Task O оставила её неподключённой намеренно (см. её Deviations), `/admin/api/reports/sales*` был мёртвым кодом до этого коммита
+- [ ] `go.mod`/`go.sum` — одна версия `excelize`, `go mod tidy` прогнан — актуально для мерджа Task P (L/M/N excelize не трогали)
+- [ ] `openapi.yaml` дополнен новыми путями (отдельная маленькая задача по аналогии с Task F) — после мерджа Task P
 - [ ] Ревью с пользователем перед Wave 4
 
 ## Wave 4 (не начата): internal/admin — HTML/HTMX-слой
@@ -350,3 +351,99 @@
 1. **Нумерация задачи.** Бриф этой сессии называет задачу «Task O», но в `tasks/plan.md`/`tasks/todo.md` (Wave 3 checklist) тот же пункт значится как «Task J» — сама секция с детальным описанием акцептанс-критериев по анкорной ссылке `plan.md#task-j-admin-reports-api` в `plan.md` на момент начала работы отсутствовала (файл короче, чем ссылки на него в `todo.md` подразумевают — видимо, ещё не дописан для Wave 3). Использованы акцептанс-критерии из брифа сессии (они были исчерпывающими) и название «Task J» для соответствия уже существующему чек-листу Wave 3 в `todo.md`, чтобы не плодить два номера для одной и той же фичи.
 2. **Отменённые заказы исключены полностью, не только из выручки** — см. Design decisions выше; явно вызвано брифом как решение на усмотрение исполнителя.
 3. **Ветка была отстроена от устаревшего `HEAD`** (репозиторий рабочей копии на момент старта отставал от `main`: `internal/orders`/`internal/staff`, упомянутые в брифе, отсутствовали). Перед началом работы ветка перебазирована (`git rebase main`) на актуальный `main` — без этого шага задача была невыполнима (нужные пакеты физически отсутствовали в дереве).
+
+---
+
+## Task L: Admin Points of Sale API — DONE
+
+**Description:** CRUD точек продаж (`/admin/api/points`), только `owner`, см. `tasks/plan.md` → Wave 3 → Task L.
+
+**Acceptance criteria:**
+- [x] `GET /admin/api/points` — список всех точек, включая неактивные
+- [x] `POST /admin/api/points` — создание (`name`, `address`), `is_active=true` по умолчанию
+- [x] `PUT /admin/api/points/{id}` — редактирование (`name`, `address`, `is_active`)
+- [x] `DELETE /admin/api/points/{id}` — SQLSTATE `23503` (точка используется в `staff`/`stock`/`orders`) → `apperr.Conflict("point_in_use", ...)`, не 500
+- [x] Все 4 роута — только `staff.RoleOwner`
+
+**Verification:**
+- [x] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...` — чисто
+- [x] `golangci-lint run ./internal/points/... ./cmd/server/...` — 0 issues
+- [ ] Manual: нет живого Postgres на этой машине — не прогнано
+
+**Dependencies:** None (`points_of_sale` уже смигрирована, `staff.Service.RequireRole` уже есть)
+
+**Files touched:**
+- `internal/points/{points,pgerr,routes}.go` (новый пакет) + `internal/points/points_test.go`
+- `cmd/server/main.go` — импорт `internal/points` + `points.RegisterRoutes(mux, db, staffSvc)` в `registerAdminRoutes`
+
+**Deviations:**
+- Ветка была создана от устаревшего `HEAD` (`3b6f6b5`, до всех волн 1–2) — как и у параллельных задач этой же волны, `git merge main --ff-only` перед началом работы, чистый fast-forward, ничего не потеряно.
+- Раздельные `createPointRequest`/`updatePointRequest` DTO вместо одного общего с `*bool`-дефолтом (как `productRequest` в Task D) — спека описывает два разных по составу полей тела запроса, два явных DTO точнее это выражают.
+- `pgErrCode`/SQLSTATE-хелпер продублирован локально в `internal/points/pgerr.go` — оригинал в `internal/catalog/pgerr.go` неэкспортирован, импортировать нельзя.
+
+---
+
+## Task M: Admin Staff API — DONE
+
+**Description:** CRUD сотрудников (`/admin/api/staff`), только `owner`, с инвариантом «нельзя понизить/деактивировать последнего активного owner». Расширяет существующий `internal/staff` (не переписывает login/logout/RBAC). См. `tasks/plan.md` → Wave 3 → Task M.
+
+**Acceptance criteria:**
+- [x] `GET /admin/api/staff` — список без `password_hash` в ответе
+- [x] `POST /admin/api/staff` — создание (`phone`, `password`, `name`, `role`, `point_id`), bcrypt-хеш пароля
+- [x] `PUT /admin/api/staff/{id}` — редактирование (`name`, `role`, `point_id`, `is_active`, опционально новый `password`)
+- [x] Инвариант «последний owner»: попытка понизить/деактивировать единственного активного owner → `apperr.Conflict("last_owner", ...)`, изменение не применяется
+- [x] `point_id` обязателен для `point_staff`, запрещён для `owner`/`manager` — валидация на входе
+- [x] Несуществующий `point_id` (`23503`) → `apperr.BadRequest`; занятый `phone` (`23505`) → `apperr.Conflict`
+- [x] Все 3 роута — только `staff.RoleOwner`
+- [x] Все существующие тесты `internal/staff` (login/logout/RequireRole) не сломаны
+
+**Verification:**
+- [x] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...` — чисто, включая 11 ранее существовавших тестов `internal/staff`
+- [x] `golangci-lint run ./internal/staff/...` — 0 issues
+- [ ] Manual: нет живого Postgres на этой машине — не прогнано
+
+**Dependencies:** None (не зависит от Task L — `point_id` валидируется через FK/`23503`, без импорта `internal/points`)
+
+**Files touched:**
+- `internal/staff/staff.go` — добавлено поле `CreatedAt`
+- `internal/staff/admin.go` (новый) — `Repo.{List,Create,Update}`, `countOtherActiveOwners`, `translateStaffWriteErr`
+- `internal/staff/pgerr.go` (новый) — локальный SQLSTATE-хелпер (тот же приём, что в Task L)
+- `internal/staff/service.go` — `staffAdmin` интерфейс, `Service.{ListStaff,CreateStaff,UpdateStaff}`, общая `validateStaffRolePointID`
+- `internal/staff/routes.go` — 3 новых роута + `staffResponse` DTO (без `password_hash` по построению)
+- `internal/staff/{admin_test,fakes_test}.go` (новые) — 16 новых тестов, включая last-owner инвариант
+- `cmd/server/main.go` — без изменений (роуты добавлены внутрь уже существующего `staff.RegisterRoutes`)
+
+**Design decisions:**
+- **Last-owner инвариант — локальная транзакция**, не отдельный общий `withTx`-хелпер (в кодовой базе такого пока нет — см. прецедент `internal/catalog/image.go`'s `ImageRepo.ReplaceForProduct`): `Repo.Update` блокирует целевую строку (`SELECT ... FOR UPDATE`), и если апдейт понижает/деактивирует активного owner — считает остальных активных owner'ов тем же приёмом (`SELECT ... FOR UPDATE`, посчитано в Go, т.к. `COUNT(*) ... FOR UPDATE` в Postgres не разрешён — агрегаты нельзя комбинировать с блокировкой строк).
+- **Известное, принятое ограничение:** порядок блокировки (сперва целевая строка, потом остальные owner) не защищён от deadlock в патологическом сценарии одновременного понижения двух *разных* owner'ов в группе ровно из N owner'ов — в этом редком случае Postgres сам откатит одну из двух транзакций (детектор дедлоков), корректность инварианта не нарушается, но проигравшая транзакция получит сырую ошибку вместо чистого `apperr.Conflict`. Осознанный компромисс — живого Postgres для нагрузочной проверки не было.
+
+---
+
+## Task N: Admin Orders API — DONE
+
+**Description:** Список заказов с фильтрами, детали, смена статуса для админки (`/admin/api/orders`), с RBAC-скоупом по точке для `point_staff`. Расширяет `internal/orders` новым файлом (не трогает существующие customer-facing методы). См. `tasks/plan.md` → Wave 3 → Task N.
+
+**Acceptance criteria:**
+- [x] `GET /admin/api/orders` — фильтры `status`, `point_id`, `from`/`to`, `q` (по `order_number`), `page`; `point_staff` — `point_id`-фильтр молча переопределяется на свою точку
+- [x] `GET /admin/api/orders/{id}` — UUID или `order_number`, с `Items`; `point_staff` на чужую/незакреплённую (`point_id IS NULL`) точку → 403
+- [x] `PUT /admin/api/orders/{id}/status` — валидный переход по состояниям (`placed→confirmed→courier_assigned→delivered`, `cancelled` из любого кроме `delivered`); неверный переход → `apperr.BadRequest("invalid_status_transition", ...)`, реализовано как чистая функция `validStatusTransition`, покрыта полной 5×5 таблицей тестов
+- [x] `point_staff` не может менять статус заказа чужой/незакреплённой точки (тот же RBAC-нюанс, что и для detail)
+- [x] Все три роута доступны `owner`/`manager`/`point_staff`, скоуп применяется внутри хендлеров (паттерн `updateStockHandler` из Task D)
+
+**Verification:**
+- [x] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...` — чисто
+- [x] `golangci-lint run ./internal/orders/... ./internal/httpapi/... ./cmd/server/...` — 0 issues
+- [ ] Manual: нет живого Postgres на этой машине — не прогнано
+
+**Dependencies:** None (`internal/orders`, `staff.RequireRole`/`staff.FromContext` уже есть)
+
+**Files touched:**
+- `internal/orders/admin.go` (новый) — `Service.{AdminListOrders,AdminGetOrder,AdminUpdateStatus}`, `validStatusTransition`
+- `internal/orders/admin_test.go` (новый) — полная таблица переходов статусов + edge-кейсы пагинации
+- `internal/httpapi/admin_orders.go` (новый) — `RegisterAdminOrdersRoutes` + 3 хендлера + `staffCanAccessOrderPoint`
+- `internal/httpapi/admin_orders_test.go` (новый) — полная RBAC-матрица (list override, forbidden на чужую/nil точку, owner/manager без ограничений, невалидный статус → 400)
+- `cmd/server/main.go` — `httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)` в `registerAdminRoutes`
+
+**Merge note:** при интеграции в `main` конфликт в `cmd/server/main.go` (обе Task L и Task N добавили строку в `registerAdminRoutes`) разрешён вручную — оставлены обе строки. Заодно подключена `httpapi.RegisterAdminReportsRoutes(...)`, которую мердж Task O (`552406c`) добавил в кодовую базу, но не подключил к `main.go` (сознательно, чтобы не трогать файл, который в тот момент активно правили параллельные задачи этой же волны) — без этой правки `/admin/api/reports/sales*` был бы мёртвым кодом. Коммит мерджа: `fb888eb`.
+
+**Open item, не блокирует:** точный код ответа для `point_staff` на чужой заказ решён как 403 (`apperr.Forbidden`), консистентно с RBAC остатков в Task D — см. Open Questions в `tasks/plan.md`.
