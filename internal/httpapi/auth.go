@@ -1,0 +1,82 @@
+// Package httpapi holds the /api/v1/* JSON REST handlers shared by the
+// Flutter app and HTMX/AJAX calls from the site.
+package httpapi
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/auth"
+)
+
+// RegisterAuthRoutes mounts the OTP login flow under /api/v1/auth/*.
+func RegisterAuthRoutes(mux *http.ServeMux, svc *auth.Service) {
+	mux.Handle("POST /api/v1/auth/otp/request", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		var req struct {
+			Phone string `json:"phone"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			return err
+		}
+
+		if err := svc.RequestOTP(r.Context(), req.Phone); err != nil {
+			return err
+		}
+
+		return writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+	}))
+
+	mux.Handle("POST /api/v1/auth/otp/verify", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		var req struct {
+			Phone string `json:"phone"`
+			Code  string `json:"code"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			return err
+		}
+
+		access, refresh, err := svc.VerifyOTP(r.Context(), req.Phone, req.Code)
+		if err != nil {
+			return err
+		}
+
+		return writeJSON(w, http.StatusOK, tokenPairResponse(access, refresh))
+	}))
+
+	mux.Handle("POST /api/v1/auth/refresh", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			return err
+		}
+
+		access, refresh, err := svc.Refresh(r.Context(), req.RefreshToken)
+		if err != nil {
+			return err
+		}
+
+		return writeJSON(w, http.StatusOK, tokenPairResponse(access, refresh))
+	}))
+}
+
+func tokenPairResponse(access, refresh string) map[string]string {
+	return map[string]string{
+		"access_token":  access,
+		"refresh_token": refresh,
+	}
+}
+
+func decodeJSON(r *http.Request, dst any) error {
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		return apperr.BadRequest("bad_request", "некорректное тело запроса")
+	}
+	return nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, body any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(body)
+}

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS staff;
+DROP TYPE IF EXISTS staff_role;
