@@ -156,6 +156,98 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 	return products, total, nil
 }
 
+// AdminListFilter carries the query params accepted by the admin products
+// list (internal/admin) — unlike ListFilter/List, ListForAdmin never
+// filters on is_active, so a deactivated product stays visible/manageable
+// for staff. CategoryIDs is a pre-resolved set of category ids (a leaf
+// subcategory id, or a top-level category id plus every one of its
+// children) — internal/admin resolves the slug-based chip filter into ids
+// via CategoryRepo.Tree before calling this, so this package doesn't need
+// to know about the tree shape itself.
+type AdminListFilter struct {
+	CategoryIDs []string
+	Query       string
+	Page        int // 1-based
+	PageSize    int
+}
+
+// buildAdminListConditions turns filter into SQL WHERE fragments and their
+// positional args — split out from ListForAdmin as a pure function so the
+// query-building logic can be unit tested without a database.
+func buildAdminListConditions(filter AdminListFilter) ([]string, []any) {
+	var conditions []string
+	var args []any
+
+	if len(filter.CategoryIDs) > 0 {
+		args = append(args, filter.CategoryIDs)
+		conditions = append(conditions, fmt.Sprintf("category_id = ANY($%d)", len(args)))
+	}
+	if filter.Query != "" {
+		args = append(args, "%"+filter.Query+"%")
+		idx := len(args)
+		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d)", idx, idx))
+	}
+
+	return conditions, args
+}
+
+// ListForAdmin returns every product matching filter (active or not) plus
+// the total count of matching rows (ignoring pagination), for the admin
+// products screen (internal/admin) — the admin-facing sibling of List,
+// which is public-read-only and always restricted to is_active = true.
+func (r *ProductRepo) ListForAdmin(ctx context.Context, filter AdminListFilter) ([]Product, int, error) {
+	page := filter.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = DefaultPageSize
+	}
+
+	conditions, args := buildAdminListConditions(filter)
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	var total int
+	countQuery := "SELECT COUNT(*) FROM products " + where
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	limitArgs := append(append([]any{}, args...), pageSize, safeOffset(page, pageSize))
+	listQuery := fmt.Sprintf(`
+		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
+		       brand, base_price, is_active, created_at, updated_at
+		FROM products
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d`, where, len(args)+1, len(args)+2)
+
+	rows, err := r.db.QueryContext(ctx, listQuery, limitArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	products := []Product{}
+	for rows.Next() {
+		var p Product
+		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
+			&p.Brand, &p.BasePrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		products = append(products, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return products, total, nil
+}
+
 // safeOffset computes the SQL OFFSET for a page/pageSize pair without
 // overflowing when page is adversarially large (e.g. a `?page=` query
 // param near math.MaxInt): (page-1)*pageSize would otherwise wrap around to

@@ -1,0 +1,306 @@
+{{/* product_form.gohtml — Wave 4 Task 2 (Товары: форма создания/
+     редактирования, Cozy Admin.dc.html lines 254-374). PageData.Data is a
+     *admin.ProductFormData built by productNewPage/productEditPage/
+     rerenderFormOnError (products.go). */}}
+{{define "content"}}
+{{with .Data}}
+<form method="post" action="{{if .IsEdit}}/admin/products/{{.ProductID}}{{else}}/admin/products{{end}}" class="admin-product-form" id="product-form">
+  <input type="hidden" name="category_id" id="pf-category-id" value="{{.CategoryID}}">
+
+  {{if .Err}}
+  <div class="admin-form-error">{{.Err}}</div>
+  {{end}}
+
+  <div class="admin-form-grid">
+    <div class="admin-card admin-card--pad">
+      <div class="admin-langtabs">
+        <button type="button" class="admin-langtabs__btn active" data-lang="ru" onclick="pfSetLang('ru')">Русский</button>
+        <button type="button" class="admin-langtabs__btn" data-lang="ky" onclick="pfSetLang('ky')">Кыргызча</button>
+      </div>
+
+      <div class="admin-field admin-lang-field" data-lang="ru">
+        <label>Название (рус.)</label>
+        <input type="text" name="name_ru" value="{{.NameRu}}" placeholder="Nike Air Max 90" required>
+      </div>
+      <div class="admin-field admin-lang-field" data-lang="ky" hidden>
+        <label>Название (кырг.)</label>
+        <input type="text" name="name_ky" value="{{.NameKy}}" placeholder="Nike Air Max 90" required>
+      </div>
+
+      <div class="admin-form-row3">
+        <div class="admin-field">
+          <label>Категория</label>
+          <select id="pf-category" onchange="pfOnCategoryChange()">
+            {{range .Categories}}
+            <option value="{{.ID}}" data-slug="{{.Slug}}"{{if eq .ID $.Data.TopCategoryID}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="admin-field">
+          <div class="admin-field__labelrow">
+            <label>Подкатегория</label>
+            <button type="button" class="admin-linkbtn" onclick="pfNewSubcategory()">+ Новая</button>
+          </div>
+          <select id="pf-subcategory" onchange="pfOnSubcategoryChange()">
+            <option value="">Без подкатегории</option>
+          </select>
+        </div>
+        <div class="admin-field">
+          <label>Бренд</label>
+          <input type="text" name="brand" list="pf-brand-list" value="{{.Brand}}" placeholder="Nike">
+          <datalist id="pf-brand-list">
+            <option value="Nike"><option value="Adidas"><option value="Puma">
+            <option value="New Balance"><option value="Reebok"><option value="Asics">
+            <option value="Converse"><option value="Vans">
+          </datalist>
+        </div>
+      </div>
+
+      <div class="admin-field" style="max-width:260px">
+        <label>Базовая цена, сом</label>
+        <input type="text" inputmode="decimal" name="base_price" value="{{.BasePrice}}" placeholder="4500">
+      </div>
+
+      <div class="admin-field admin-lang-field" data-lang="ru">
+        <label>Описание (рус.)</label>
+        <textarea name="description_ru" placeholder="Короткое описание модели, материал, особенности">{{.DescriptionRu}}</textarea>
+      </div>
+      <div class="admin-field admin-lang-field" data-lang="ky" hidden>
+        <label>Описание (кырг.)</label>
+        <textarea name="description_ky" placeholder="Короткое описание модели, материал, особенности">{{.DescriptionKy}}</textarea>
+      </div>
+    </div>
+
+    <div class="admin-card admin-card--pad">
+      <div class="admin-card__title">Фотографии</div>
+      <div class="admin-card__hint">Первое фото — главное. Загрузка идёт напрямую в хранилище.</div>
+      <div id="pf-photo-slots" class="admin-photo-grid"></div>
+      <button type="button" class="admin-photo-add" onclick="pfPickPhoto()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"></path></svg>
+        <span>Добавить фото</span>
+      </button>
+      <input type="file" id="pf-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="pfFileChosen(event)">
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <div class="admin-card__pad-sm">
+      <div class="admin-card__title">Вариации</div>
+      <div class="admin-card__hint">Размер × цвет и количество на складе</div>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-variants-table">
+        <thead>
+          <tr>
+            <th>Размер</th>
+            <th>Цвет</th>
+            <th>Кол-во (склад)</th>
+            <th>Уровень</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pf-variant-rows">
+          {{range .Variants}}
+          <tr class="admin-variant-row">
+            <td><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42"></td>
+            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="Белый"></td>
+            <td><input type="number" min="0" name="variant_qty" value="{{.Qty}}" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>
+            <td><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
+            <td><button type="button" class="admin-variant-remove" onclick="this.closest('tr').remove()" aria-label="Удалить вариацию">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    <div class="admin-card__pad-sm">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="pfAddVariant()">+ Добавить вариацию</button>
+    </div>
+  </div>
+
+  <div class="admin-form-sticky">
+    <a href="/admin/products" class="admin-btn admin-btn--secondary">Отмена</a>
+    <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+  </div>
+</form>
+
+<div id="pf-image-inputs">
+  {{range .Images}}
+  <input type="hidden" name="image_object_key" value="{{.ObjectKey}}" form="product-form">
+  {{end}}
+</div>
+
+<script id="pf-category-tree" type="application/json">{{.CategoriesJSON}}</script>
+
+<script>
+(function () {
+  var initialTop = {{.TopCategoryID}};
+  var initialSub = {{.SubCategoryID}};
+  var initialCategoryID = {{.CategoryID}};
+
+  // --- language tabs (name/description ru vs ky, both always submitted) ---
+  window.pfSetLang = function (lang) {
+    document.querySelectorAll('.admin-langtabs__btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.lang === lang);
+    });
+    document.querySelectorAll('.admin-lang-field').forEach(function (f) {
+      f.hidden = f.dataset.lang !== lang;
+    });
+  };
+
+  // --- category / subcategory selects ---
+  var tree = [];
+  try { tree = JSON.parse(document.getElementById('pf-category-tree').textContent || '[]'); } catch (e) { tree = []; }
+
+  function subcategoriesFor(topID) {
+    for (var i = 0; i < tree.length; i++) {
+      if (tree[i].ID === topID) return tree[i].Children || [];
+    }
+    return [];
+  }
+
+  function populateSubcategories(topID, selectSubID) {
+    var sel = document.getElementById('pf-subcategory');
+    sel.innerHTML = '<option value="">Без подкатегории</option>';
+    subcategoriesFor(topID).forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.value = c.ID; opt.textContent = c.Name;
+      if (c.ID === selectSubID) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  window.pfOnCategoryChange = function () {
+    var topID = document.getElementById('pf-category').value;
+    populateSubcategories(topID, '');
+    document.getElementById('pf-category-id').value = topID;
+  };
+  window.pfOnSubcategoryChange = function () {
+    var subSel = document.getElementById('pf-subcategory');
+    var topID = document.getElementById('pf-category').value;
+    document.getElementById('pf-category-id').value = subSel.value || topID;
+  };
+
+  populateSubcategories(initialTop || (tree[0] && tree[0].ID) || '', initialSub || '');
+  if (!initialCategoryID) { document.getElementById('pf-category-id').value = document.getElementById('pf-category').value; }
+
+  window.pfNewSubcategory = function () {
+    var topSel = document.getElementById('pf-category');
+    var topID = topSel.value;
+    if (!topID) { alert('Сначала выберите категорию'); return; }
+    var nameRu = prompt('Название подкатегории (рус.)');
+    if (!nameRu) return;
+    var nameKy = prompt('Название подкатегории (кырг.)', nameRu) || nameRu;
+    var slug = prompt('Slug (латиницей, например "classic")', nameRu.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    if (!slug) return;
+    fetch('/admin/api/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id: topID, name_ru: nameRu, name_ky: nameKy, slug: slug, sort_order: 0 })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('save failed');
+      return r.json();
+    }).then(function (cat) {
+      var top = null;
+      for (var i = 0; i < tree.length; i++) { if (tree[i].ID === topID) top = tree[i]; }
+      if (top) { top.Children = top.Children || []; top.Children.push({ ID: cat.id, Name: cat.name_ru, Slug: cat.slug }); }
+      populateSubcategories(topID, cat.id);
+      document.getElementById('pf-category-id').value = cat.id;
+    }).catch(function () { alert('Не удалось создать подкатегорию'); });
+  };
+
+  // --- variants ---
+  window.pfUpdateBadge = function (input) {
+    var qty = parseInt(input.value, 10) || 0;
+    var badge = input.closest('tr').querySelector('.admin-variant-badge');
+    var label, fg, bg;
+    if (qty === 0) { label = 'Нет в наличии'; fg = '#C62828'; bg = '#FFEBEE'; }
+    else if (qty < 5) { label = qty + ' шт'; fg = '#B85C00'; bg = '#FFF3E0'; }
+    else { label = qty + ' шт'; fg = '#2E7D32'; bg = '#E8F5E9'; }
+    badge.textContent = label;
+    badge.style.color = fg;
+    badge.style.background = bg;
+  };
+  window.pfAddVariant = function () {
+    var tbody = document.getElementById('pf-variant-rows');
+    var tr = document.createElement('tr');
+    tr.className = 'admin-variant-row';
+    tr.innerHTML =
+      '<td><input type="hidden" name="variant_id" value=""><input type="text" name="variant_size" class="admin-variant-input" placeholder="42"></td>' +
+      '<td><input type="text" name="variant_color" class="admin-variant-input" placeholder="Белый"></td>' +
+      '<td><input type="number" min="0" name="variant_qty" value="0" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>' +
+      '<td><span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span></td>' +
+      '<td><button type="button" class="admin-variant-remove" onclick="this.closest(\'tr\').remove()" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></td>';
+    tbody.appendChild(tr);
+  };
+
+  // --- photos: presigned upload straight to MinIO, then a hidden
+  // image_object_key input records the key for the form submit. Preview
+  // uses a local blob URL — no need to know the public bucket URL
+  // client-side before the product is actually saved. ---
+  var MAX_SLOTS = 6;
+  var slotsEl = document.getElementById('pf-photo-slots');
+  var inputsEl = document.getElementById('pf-image-inputs');
+
+  function renderSlots() {
+    slotsEl.innerHTML = '';
+    var hiddenInputs = inputsEl.querySelectorAll('input[name="image_object_key"]');
+    hiddenInputs.forEach(function (input, i) {
+      var slot = document.createElement('div');
+      slot.className = 'admin-photo-slot';
+      var img = document.createElement('img');
+      img.src = input.dataset.previewUrl || input.value;
+      slot.appendChild(img);
+      if (i === 0) {
+        var main = document.createElement('span');
+        main.className = 'admin-photo-slot__main';
+        main.textContent = 'Главное';
+        slot.appendChild(main);
+      }
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'admin-photo-slot__remove';
+      rm.innerHTML = '&times;';
+      rm.onclick = function () { input.remove(); renderSlots(); };
+      slot.appendChild(rm);
+      slotsEl.appendChild(slot);
+    });
+  }
+  renderSlots();
+
+  window.pfPickPhoto = function () {
+    var count = inputsEl.querySelectorAll('input[name="image_object_key"]').length;
+    if (count >= MAX_SLOTS) { alert('Максимум ' + MAX_SLOTS + ' фото'); return; }
+    document.getElementById('pf-file-input').click();
+  };
+
+  window.pfFileChosen = function (evt) {
+    var file = evt.target.files[0];
+    evt.target.value = '';
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
+
+    fetch('/admin/api/media/presign-upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_type: file.type })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('presign failed');
+      return r.json();
+    }).then(function (presign) {
+      return fetch(presign.upload_url, { method: 'PUT', body: file }).then(function (putRes) {
+        if (!putRes.ok) throw new Error('upload failed');
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'image_object_key';
+        input.setAttribute('form', 'product-form');
+        input.value = presign.object_key;
+        input.dataset.previewUrl = URL.createObjectURL(file);
+        inputsEl.appendChild(input);
+        renderSlots();
+      });
+    }).catch(function () { alert('Не удалось загрузить фото'); });
+  };
+})();
+</script>
+{{end}}
+{{end}}

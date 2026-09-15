@@ -1,0 +1,103 @@
+{{/* product_import.gohtml — Wave 4 Task 2 (Товары: импорт, Cozy Admin.dc.html
+     lines 376-403). PageData.Data is a *admin.ImportPageData built by
+     productImportPage (products.go). The actual upload/parse is done by
+     this page's own JS, POSTing straight to the existing
+     POST /admin/products/import JSON endpoint — see products.go's package
+     doc comment for why. */}}
+{{define "content"}}
+{{with .Data}}
+<div class="admin-import">
+  <div class="admin-card admin-card--pad">
+    <div class="admin-import__dropzone" id="import-dropzone">
+      <div class="admin-import__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5"></path></svg>
+      </div>
+      <div class="admin-import__title">Перетащите Excel или CSV файл сюда</div>
+      <div class="admin-table__muted">или</div>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="document.getElementById('import-file-input').click()">Выберите файл</button>
+      <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none">
+    </div>
+  </div>
+
+  <div id="import-result" hidden>
+    <div class="admin-import__success" id="import-success"></div>
+    <div class="admin-card admin-card--pad" id="import-errors-card" hidden>
+      <div class="admin-import__errors-title" id="import-errors-title"></div>
+      <div id="import-errors-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var importURL = {{.ImportURL}};
+  var dropzone = document.getElementById('import-dropzone');
+  var fileInput = document.getElementById('import-file-input');
+  var resultEl = document.getElementById('import-result');
+  var successEl = document.getElementById('import-success');
+  var errorsCard = document.getElementById('import-errors-card');
+  var errorsTitle = document.getElementById('import-errors-title');
+  var errorsList = document.getElementById('import-errors-list');
+
+  function pluralRu(n, one, few, many) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) return many;
+    if (b > 1 && b < 5) return few;
+    if (b === 1) return one;
+    return many;
+  }
+
+  function runImport(file) {
+    if (!file) return;
+    var form = new FormData();
+    form.append('file', file);
+    dropzone.style.opacity = '0.6';
+    fetch(importURL, { method: 'POST', body: form })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || 'Ошибка импорта'); });
+        return r.json();
+      })
+      .then(function (res) {
+        dropzone.style.opacity = '1';
+        resultEl.hidden = false;
+        var imported = res.imported || 0;
+        successEl.textContent = 'Импортировано: ' + imported + ' ' + pluralRu(imported, 'товар', 'товара', 'товаров');
+        var errs = res.errors || [];
+        if (errs.length) {
+          errorsCard.hidden = false;
+          errorsTitle.textContent = 'Пропущено с ошибками: ' + errs.length + ' ' + pluralRu(errs.length, 'строка', 'строки', 'строк');
+          errorsList.innerHTML = '';
+          errs.forEach(function (e) {
+            var row = document.createElement('div');
+            row.className = 'admin-import__error-row';
+            var rowNum = e.row || e.line || '?';
+            var msg = e.message || e.error || String(e);
+            row.textContent = 'Строка ' + rowNum + ' — ' + msg;
+            errorsList.appendChild(row);
+          });
+        } else {
+          errorsCard.hidden = true;
+        }
+      })
+      .catch(function (err) {
+        dropzone.style.opacity = '1';
+        alert(err.message || 'Не удалось выполнить импорт');
+      });
+  }
+
+  fileInput.addEventListener('change', function (e) { runImport(e.target.files[0]); });
+
+  ['dragenter', 'dragover'].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.remove('dragover'); });
+  });
+  dropzone.addEventListener('drop', function (e) {
+    var file = e.dataTransfer.files && e.dataTransfer.files[0];
+    runImport(file);
+  });
+})();
+</script>
+{{end}}
+{{end}}

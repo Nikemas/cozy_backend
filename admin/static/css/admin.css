@@ -417,13 +417,6 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-chip--delivered { color: #2E7D32; background: #E8F5E9; }
 .admin-chip--cancelled { color: #C62828; background: #FFEBEE; }
 
-.admin-card {
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-card);
-  padding: 24px;
-}
-
 /* -- Filter row (status chips + date-range select) -- */
 
 .admin-orders-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -454,9 +447,168 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
   padding: 0 12px;
 }
 
+/* ---------- Task 2 (Товары): shared card/chip primitives ----------
+   .admin-card is the bare surface+border+radius+overflow:hidden shell;
+   .admin-card--pad/--pad-sm add padding where a screen needs it — kept
+   separate (rather than baking padding into .admin-card itself) because
+   several screens wrap a table/list directly in .admin-card and add
+   their own inner padding instead (e.g. .admin-orders-filters + .admin-
+   card below, .admin-order-detail__items). Order detail's plain info
+   cards opt into padding explicitly via .admin-card--pad — see
+   order_detail.gohtml. */
+
+.admin-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  overflow: hidden;
+}
+.admin-card--pad { padding: 24px; }
+
 /* -- List: card wrapper (table/cards/empty state all render inside) -- */
 
 .admin-orders-filters + .admin-card { padding: 0; overflow: hidden; }
+.admin-card__pad-sm { padding: 14px 20px; }
+.admin-card__title { font-size: 15px; font-weight: 700; color: var(--admin-text); margin-bottom: 4px; }
+.admin-card__hint { font-size: 12px; color: var(--admin-muted); margin-bottom: 16px; }
+
+.admin-chipbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; overflow-x: auto; padding-bottom: 2px; }
+.admin-chipbar--sub { margin: -6px 0 16px; }
+.admin-chipbar__label { font-size: 12px; color: var(--admin-muted); }
+
+/* Category/subcategory filter chip — exact colors from the design canvas
+   (Cozy Admin.dc.html's chip active/inactive formula): active is filled
+   orange with white text, inactive is an outlined neutral pill. Kept as
+   real classes (not per-chip inline styles) since every chip on this
+   screen uses exactly one of these two looks. */
+.admin-chip-filter {
+  display: inline-block;
+  height: 44px;
+  line-height: 42px;
+  padding: 0 16px;
+  border-radius: var(--admin-radius-chip);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.admin-chip-filter.active { border-color: var(--admin-primary); background: var(--admin-primary); color: #FFFFFF; }
+.admin-chip-filter--sm { height: 32px; line-height: 30px; padding: 0 12px; font-size: 13px; }
+
+/* ---------- Task 2: products list (table + cards) ---------- */
+
+.admin-products__toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-products__toolbar .admin-chipbar { flex: 1; min-width: 0; }
+.admin-products__actions { display: flex; gap: 8px; }
+
+.admin-table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; min-width: 1040px; border-collapse: collapse; }
+.admin-table th {
+  height: 44px;
+  padding: 0 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+.admin-table__photo-col { width: 68px; padding: 0 20px !important; }
+.admin-table__num-col { text-align: right !important; }
+.admin-table__menu-col { width: 52px; padding: 0 20px !important; }
+.admin-table td { padding: 0 16px; border-bottom: 1px solid var(--admin-border); height: 56px; font-size: 14px; color: var(--admin-text); }
+.admin-table tbody tr:hover { background: #FAFAF8; }
+.admin-table__name { font-size: 14px; font-weight: 600; color: var(--admin-text); display: block; }
+.admin-table__brand { font-size: 12px; color: var(--admin-muted); }
+.admin-table__muted { color: var(--admin-muted); white-space: nowrap; }
+.admin-table__num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.admin-thumb {
+  width: 48px; height: 48px;
+  border-radius: 10px;
+  background-color: #F1F1EF;
+  background-size: cover;
+  background-position: center;
+  flex: none;
+}
+.admin-thumb--empty { background-image: none !important; }
+.admin-thumb--card { width: 64px; height: 64px; }
+
+.admin-rowmenu { position: relative; display: inline-block; text-align: left; }
+.admin-rowmenu__trigger {
+  width: 28px; height: 28px;
+  border: none; background: transparent;
+  color: var(--admin-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+}
+.admin-rowmenu__trigger:hover { background: #F1F1EF; }
+.admin-rowmenu__panel {
+  display: none;
+  position: absolute;
+  right: 0; top: 36px;
+  z-index: 20;
+  width: 190px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(26, 26, 26, 0.12);
+  padding: 6px;
+  animation: fadeIn 0.12s ease;
+}
+.admin-rowmenu.open .admin-rowmenu__panel { display: block; }
+.admin-rowmenu__form { margin: 0; }
+.admin-rowmenu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--admin-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+.admin-rowmenu__item:hover { background: var(--admin-bg); }
+.admin-rowmenu__item--danger { color: var(--admin-danger); }
+.admin-rowmenu__item--danger:hover { background: var(--admin-danger-tint); }
+
+.admin-cards { display: none; }
+.admin-cardrow {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid var(--admin-border);
+  color: inherit;
+  text-decoration: none;
+}
+.admin-cardrow:hover { background: #FAFAF8; }
+.admin-cardrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.admin-cardrow__meta { font-size: 12px; color: var(--admin-muted); }
+.admin-cardrow__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-cardrow__price { font-size: 14px; font-weight: 700; color: var(--admin-text); font-variant-numeric: tabular-nums; }
+.admin-cards__count { padding: 14px 16px; font-size: 13px; color: var(--admin-muted); }
+
+.admin-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid var(--admin-border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-pagesize { display: flex; align-items: center; gap: 8px; margin: 0; }
+.admin-pagesize__select { height: 34px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); background: var(--admin-surface); font-size: 13px; color: var(--admin-text); padding: 0 8px; }
 
 .admin-empty { padding: 64px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .admin-empty__icon {
@@ -560,6 +712,108 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-status-btn.admin-chip--courier { background: #F1EAFB; color: #6A3FB5; }
 .admin-status-btn.admin-chip--delivered { background: #E8F5E9; color: #2E7D32; }
 .admin-status-btn.admin-chip--cancelled { background: #FFEBEE; color: #C62828; }
+
+@media (max-width: 767px) {
+  .admin-table-wrap { display: none; }
+  .admin-table-footer { display: none; }
+  .admin-cards { display: block; }
+}
+
+/* ---------- Task 2: product create/edit form ---------- */
+
+.admin-product-form { display: flex; flex-direction: column; gap: 16px; max-width: 1280px; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.admin-form-row3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.admin-form-error {
+  background: var(--admin-danger-tint);
+  color: var(--admin-danger);
+  border-radius: var(--admin-radius-field);
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-langtabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--admin-bg); padding: 4px; border-radius: 10px; width: fit-content; }
+.admin-langtabs__btn { height: 34px; padding: 0 14px; border: none; border-radius: 8px; background: transparent; color: var(--admin-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.admin-langtabs__btn.active { background: var(--admin-surface); color: var(--admin-text); box-shadow: 0 1px 2px rgba(26,26,26,0.08); }
+
+.admin-field textarea {
+  min-height: 108px;
+  resize: vertical;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-field);
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--admin-text);
+  outline: none;
+  line-height: 1.5;
+  font-family: inherit;
+  background: var(--admin-surface);
+}
+.admin-field__labelrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.admin-linkbtn { border: none; background: transparent; padding: 0; font-size: 12px; font-weight: 600; color: var(--admin-primary); cursor: pointer; }
+
+.admin-photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.admin-photo-slot { position: relative; width: 100%; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--admin-bg); border: 1px solid var(--admin-border); }
+.admin-photo-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.admin-photo-slot__main { position: absolute; left: 6px; bottom: 6px; background: rgba(26,26,26,0.65); color: #FFF; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+.admin-photo-slot__remove {
+  position: absolute; right: 6px; top: 6px;
+  width: 22px; height: 22px;
+  border: none; border-radius: 50%;
+  background: rgba(26,26,26,0.65); color: #FFF;
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.admin-photo-add {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px dashed #D6D6D2;
+  border-radius: 12px;
+  height: 64px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--admin-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.admin-variants-table th { border-top: 1px solid var(--admin-border); }
+.admin-variant-input { width: 100%; max-width: 140px; height: 40px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); padding: 0 12px; font-size: 14px; color: var(--admin-text); outline: none; font-variant-numeric: tabular-nums; background: var(--admin-surface); }
+.admin-variant-input--qty { max-width: 96px; }
+.admin-variant-remove { width: 28px; height: 28px; border: none; background: transparent; color: var(--admin-muted); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.admin-variant-remove:hover { background: var(--admin-danger-tint); color: var(--admin-danger); }
+
+.admin-form-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  box-shadow: 0 -6px 20px rgba(26, 26, 26, 0.04);
+}
+
+/* ---------- Task 2: import screen ---------- */
+
+.admin-import { max-width: 720px; display: flex; flex-direction: column; gap: 16px; }
+.admin-import__dropzone {
+  border: 1px dashed #D6D6D2;
+  border-radius: 12px;
+  padding: 48px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.admin-import__dropzone.dragover { background: var(--admin-primary-tint); border-color: var(--admin-primary); }
+.admin-import__icon { width: 52px; height: 52px; border-radius: 14px; background: var(--admin-primary-tint); color: var(--admin-primary); display: flex; align-items: center; justify-content: center; }
+.admin-import__title { font-size: 15px; font-weight: 600; color: var(--admin-text); }
+.admin-import__success { background: #E8F5E9; border: 1px solid #CDE8CF; border-radius: var(--admin-radius-card); padding: 18px 20px; font-size: 14px; font-weight: 600; color: #2E7D32; }
+.admin-import__errors-title { font-size: 14px; font-weight: 700; color: #B85C00; margin-bottom: 10px; }
+.admin-import__error-row { font-size: 13px; color: var(--admin-text); padding: 4px 0; }
 
 /* ---------- Responsive sidebar (design canvas lines 966-983) ---------- */
 

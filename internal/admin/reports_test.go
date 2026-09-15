@@ -207,9 +207,9 @@ func TestBuildTopBrandsWidthRelativeToTopBrand(t *testing.T) {
 	}
 }
 
-// --- formatMoney ---
+// --- formatMoney (defined in products_view.go, exercised here too) ---
 
-func TestFormatMoney(t *testing.T) {
+func TestFormatMoneyReports(t *testing.T) {
 	cases := []struct {
 		in   float64
 		want string

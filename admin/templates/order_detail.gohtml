@@ -6,7 +6,7 @@
      navDefs), reached only by clicking a row on orders.gohtml. */}}
 {{define "content"}}
 <div class="admin-order-detail">
-  <div class="admin-card admin-order-detail__header">
+  <div class="admin-card admin-card--pad admin-order-detail__header">
     <div>
       <div class="admin-order-detail__title">Заказ {{.Data.Number}}</div>
       <div class="admin-order-detail__date">{{.Data.DateLabel}}</div>
@@ -15,12 +15,12 @@
   </div>
 
   <div class="admin-order-detail__grid">
-    <div class="admin-card">
+    <div class="admin-card admin-card--pad">
       <div class="admin-order-detail__label">Покупатель</div>
       <div class="admin-order-detail__value">{{.Data.Phone}}</div>
       <div class="admin-order-detail__sub">{{.Data.PaymentLabel}}</div>
     </div>
-    <div class="admin-card">
+    <div class="admin-card admin-card--pad">
       <div class="admin-order-detail__label">Доставка</div>
       <div class="admin-order-detail__address">{{.Data.AddressText}}</div>
       <div class="admin-order-detail__sub">Комментарий: {{.Data.Comment}}</div>
@@ -51,7 +51,7 @@
   </div>
 
   {{if .Data.StatusButtons}}
-  <div class="admin-card">
+  <div class="admin-card admin-card--pad">
     <div class="admin-order-detail__label">Сменить статус</div>
     <div class="admin-order-detail__statusbtns">
       {{range .Data.StatusButtons}}

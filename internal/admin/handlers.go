@@ -3,6 +3,9 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
@@ -16,7 +19,7 @@ type handlers struct {
 	staffSvc   *staff.Service
 	render     *Renderer
 	reports    reportsBackend
-	pointsRepo *points.PointsRepo // Task 5 (points + staff screens), also used by Task 3's order detail
+	pointsRepo *points.PointsRepo // Task 5 (points + staff screens), also used by Task 2's product form and Task 3's order detail
 
 	// Task 3 (Заказы, internal/admin/orders.go): the order-management
 	// service plus the small set of other Wave 3 repos its detail page
@@ -26,6 +29,15 @@ type handlers struct {
 	ordersSvc adminOrdersService
 	customers *storefront.CustomerRepo
 	addresses *storefront.AddressRepo
+
+	// Task 2 (products: list/form/import) — see products.go.
+	categories *catalog.CategoryRepo
+	products   *catalog.ProductRepo
+	variants   *catalog.VariantRepo
+	images     *catalog.ImageRepo
+	stock      *catalog.StockRepo
+	media      *media.Client
+	cfg        *config.Config
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a
@@ -125,19 +137,6 @@ func (h *handlers) noAccessPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.render.Render(w, "no_access", data); err != nil {
 		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
-	}
-}
-
-// stubPage returns a handler that renders screen inside the full app
-// shell with just a title — Task 2-5 replace these with real content
-// without touching RegisterRoutes' wiring (auth-gate, layout, nav).
-func (h *handlers) stubPage(screen, title string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		st, _ := staff.FromContext(r.Context())
-		data := h.shellPageData(screen, title, st)
-		if err := h.render.Render(w, screen, data); err != nil {
-			http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
-		}
 	}
 }
 

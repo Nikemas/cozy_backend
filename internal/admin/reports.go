@@ -394,29 +394,6 @@ func buildTopBrands(brandRows []reports.Row) []BrandBar {
 	return out
 }
 
-// formatMoney renders a KGS amount the way internal/web's own formatMoney
-// (catalog_view.go) does — thousands grouped with a space, " сом" suffix,
-// no decimals. Duplicated rather than exported cross-package: it's a tiny,
-// self-contained helper and internal/web has no reason to expose it just
-// for this one other caller.
-func formatMoney(v float64) string {
-	n := int64(math.Round(v))
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	digits := strconv.FormatInt(n, 10)
-
-	var grouped []byte
-	for i := 0; i < len(digits); i++ {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			grouped = append(grouped, ' ')
-		}
-		grouped = append(grouped, digits[i])
-	}
-	out := string(grouped)
-	if neg {
-		out = "-" + out
-	}
-	return out + " сом"
-}
+// formatMoney is defined once for the package in products_view.go (the
+// same KGS thousands-grouped, no-decimals formatting internal/web's own
+// formatMoney uses) — reused here rather than redefined.

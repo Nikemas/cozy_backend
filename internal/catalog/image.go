@@ -58,6 +58,34 @@ func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string)
 	return out, rows.Err()
 }
 
+// ListByProduct returns every image of productID, ordered by sort_order —
+// unlike PrimaryForProducts (batch, one image per product, for storefront
+// grid thumbnails), this is the single-product, full-list read the admin
+// product edit form (internal/admin) needs to repopulate its photo slots.
+func (r *ImageRepo) ListByProduct(ctx context.Context, productID string) ([]ProductImage, error) {
+	const q = `
+		SELECT id, product_id, object_key, sort_order
+		FROM product_images
+		WHERE product_id = $1
+		ORDER BY sort_order`
+
+	rows, err := r.db.QueryContext(ctx, q, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	images := []ProductImage{}
+	for rows.Next() {
+		var pi ProductImage
+		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder); err != nil {
+			return nil, err
+		}
+		images = append(images, pi)
+	}
+	return images, rows.Err()
+}
+
 // ImageInput carries the writable fields of one product image.
 type ImageInput struct {
 	ObjectKey string
