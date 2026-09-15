@@ -87,7 +87,7 @@ func (c *NikitaClient) call(ctx context.Context, path string, body []byte, out *
 	if err != nil {
 		return apperr.New(http.StatusBadGateway, "sms_provider_unreachable", "не удалось связаться с провайдером SMS")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return json.NewDecoder(resp.Body).Decode(out)
 }

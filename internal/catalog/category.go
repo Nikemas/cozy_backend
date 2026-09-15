@@ -45,7 +45,7 @@ func (r *CategoryRepo) Tree(ctx context.Context) ([]*Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var flat []*Category
 	for rows.Next() {
@@ -71,7 +71,7 @@ func buildTree(flat []*Category) []*Category {
 		byID[c.ID] = c
 	}
 
-	var roots []*Category
+	roots := make([]*Category, 0, len(flat))
 	for _, c := range flat {
 		if c.ParentID == nil {
 			roots = append(roots, c)

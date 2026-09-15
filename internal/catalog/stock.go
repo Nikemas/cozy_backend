@@ -49,9 +49,9 @@ func (r *StockRepo) ByVariantIDs(ctx context.Context, variantIDs []string) ([]St
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
-	var entries []StockEntry
+	entries := []StockEntry{}
 	for rows.Next() {
 		var e StockEntry
 		if err := rows.Scan(&e.VariantID, &e.PointID, &e.Quantity, &e.UpdatedAt); err != nil {

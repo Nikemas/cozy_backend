@@ -42,8 +42,14 @@ func TestBuildTreeNestsByParentID(t *testing.T) {
 }
 
 func TestBuildTreeEmpty(t *testing.T) {
-	if roots := buildTree(nil); len(roots) != 0 {
+	roots := buildTree(nil)
+	if len(roots) != 0 {
 		t.Fatalf("got %d roots for empty input, want 0", len(roots))
+	}
+	// GET /api/v1/categories must serialize an empty tree as `[]`, not
+	// `null` — the API contract is an array of categories.
+	if roots == nil {
+		t.Fatal("buildTree(nil) returned a nil slice, want a non-nil empty slice so it JSON-marshals as [] not null")
 	}
 }
 
