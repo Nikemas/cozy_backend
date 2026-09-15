@@ -1,0 +1,666 @@
+openapi: 3.0.3
+info:
+  title: Cozy API
+  description: |
+    REST API for Cozy (Bishkek shoe shop) — covers `/api/v1/*` (public storefront,
+    used by the Flutter app and the site's AJAX/HTMX calls) and `/admin/api/*`
+    (staff-only admin panel), per §6 of `docs/Cozy — Технический ТЗ для
+    разработчика.md`.
+
+    This file documents only endpoints that actually exist in the code today.
+    Per §6/§13 of the ТЗ, still to be added in later waves: `/api/v1/favorites`,
+    `/api/v1/addresses`, `/api/v1/orders`, `/api/v1/payments/bakai/webhook`,
+    `/api/v1/devices`, and `/admin/api/{orders,reports,points,staff}` — extend
+    this spec as each lands, don't let it drift from the real route table
+    (`internal/httpapi`, `internal/staff`, `internal/media`).
+  version: "0.3.0"
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev (see cozy_backend/README.md)
+
+tags:
+  - name: Auth
+    description: Customer login via SMS OTP (Nikita SMSPro) — see §5 ТЗ.
+  - name: Catalog
+    description: Public, unauthenticated read-only catalog.
+  - name: Admin — Staff
+    description: Staff login/logout (server-side session cookie).
+  - name: Admin — Catalog
+    description: Write side of the catalog, RBAC-gated (owner/manager, stock also point_staff).
+  - name: Admin — Media
+    description: Presigned MinIO uploads for product photos.
+  - name: System
+    description: Liveness/readiness probes.
+
+security: []
+
+paths:
+  # ---------------------------------------------------------------- Auth ---
+  /api/v1/auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: Request an SMS OTP code
+      description: |
+        Validates the phone number, rate-limits it (max one request per 60s,
+        5 per hour), then asks Nikita SMSPro to text a one-time code. Always
+        returns 200 regardless of whether the phone belongs to an existing
+        customer, so the response can't be used to enumerate customers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  description: Kyrgyz mobile number, any of `+996XXXXXXXXX`, `996XXXXXXXXX`, or local `0XXXXXXXXX`.
+                  example: "+996700123456"
+      responses:
+        "200":
+          description: Code sent (or, from the caller's point of view, request accepted).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: sent }
+        "400":
+          description: Malformed phone number.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "429":
+          description: Resend cooldown (`otp_cooldown`) or hourly cap (`otp_rate_limited`) hit.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: Nikita SMSPro unreachable or returned an unexpected status.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: Nikita SMSPro account out of funds (`sms_provider_out_of_funds`).
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify an SMS OTP code and receive tokens
+      description: |
+        Verifies the code against the active OTP transaction for the phone.
+        On success, gets-or-creates the customer record and issues an access
+        token (JWT, 15 min TTL) and a refresh token (opaque, 30 days TTL,
+        stored server-side hashed for revocation).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string, example: "+996700123456" }
+                code: { type: string, example: "123456" }
+      responses:
+        "200":
+          description: Verified — token pair issued.
+          content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
+        "400":
+          description: Malformed phone, or `otp_expired`/`otp_invalid` from Nikita SMSPro.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate a refresh token for a new token pair
+      description: The old refresh token is revoked; a new access+refresh pair is issued.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: New token pair issued.
+          content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
+        "401":
+          description: "`invalid_refresh_token` — unknown, expired, or already-revoked token."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  # ------------------------------------------------------------- Catalog ---
+  /api/v1/categories:
+    get:
+      tags: [Catalog]
+      summary: Category tree
+      responses:
+        "200":
+          description: Root categories, each with nested `children`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+
+  /api/v1/products:
+    get:
+      tags: [Catalog]
+      summary: List products
+      description: Only `is_active = true` products are returned.
+      parameters:
+        - name: category
+          in: query
+          description: Category `id` (UUID) or `slug`.
+          schema: { type: string }
+        - name: size
+          in: query
+          schema: { type: string }
+        - name: color
+          in: query
+          schema: { type: string }
+        - name: price_min
+          in: query
+          schema: { type: number, format: double }
+        - name: price_max
+          in: query
+          schema: { type: number, format: double }
+        - name: q
+          in: query
+          description: Free-text search against `name_ru`/`name_ky` (`ILIKE`).
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [newest, price_asc, price_desc], default: newest }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200":
+          description: Paginated product list.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductListResponse" }
+        "400":
+          description: Malformed `price_min`/`price_max`/`sort`/`page`, or unknown `category`.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/products/{id}:
+    get:
+      tags: [Catalog]
+      summary: Product detail — variants + per-point stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Product with its variants and stock.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductDetailResponse" }
+        "404":
+          description: "`product_not_found` — missing or inactive (identical response either way)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  # --------------------------------------------------------- Admin/Staff ---
+  /admin/api/login:
+    post:
+      tags: [Admin — Staff]
+      summary: Staff login
+      description: |
+        On success, sets an httpOnly/Secure `staff_session` cookie (12h TTL).
+        Wrong password, unknown phone, and a deactivated account all return
+        the same 401 — including matching response *timing*, since the
+        handler always runs a bcrypt compare to avoid a phone-enumeration
+        timing side-channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: "Logged in; see `Set-Cookie: staff_session=...`."
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, example: ok } } }
+          headers:
+            Set-Cookie:
+              schema: { type: string, example: "staff_session=...; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200" }
+        "401":
+          description: "`invalid_credentials` — wrong password, unknown phone, or deactivated staff (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /admin/api/logout:
+    post:
+      tags: [Admin — Staff]
+      summary: Staff logout
+      description: Revokes the session server-side and clears the cookie. Safe to call with no/invalid cookie.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: Logged out.
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, example: ok } } }
+
+  # ------------------------------------------------------- Admin/Catalog ---
+  /admin/api/categories:
+    post:
+      tags: [Admin — Catalog]
+      summary: Create a category
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CategoryInput" } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Category" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/api/categories/{id}:
+    put:
+      tags: [Admin — Catalog]
+      summary: Update a category
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CategoryInput" } } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Category" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Catalog]
+      summary: Delete a category
+      description: Hard delete. Blocked (`409 category_in_use`) if referenced by a product or a subcategory.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/api/products:
+    post:
+      tags: [Admin — Catalog]
+      summary: Create a product
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ProductInput" } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/api/products/{id}:
+    put:
+      tags: [Admin — Catalog]
+      summary: Update a product
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ProductInput" } } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Catalog]
+      summary: Delete (soft-delete) a product
+      description: Sets `is_active = false` rather than a hard delete, so past `order_items` snapshots stay intact.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deactivated. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/products/{id}/variants:
+    post:
+      tags: [Admin — Catalog]
+      summary: Add a variant (size/color) to a product
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VariantInput" } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Variant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: Product not found., content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+
+  /admin/api/products/{id}/variants/{variantId}:
+    put:
+      tags: [Admin — Catalog]
+      summary: Update a variant
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VariantInput" } } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Variant" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: "Variant not found, or doesn't belong to `id`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+    delete:
+      tags: [Admin — Catalog]
+      summary: Delete a variant
+      description: Hard delete. Blocked (`409`) if the variant has ever appeared in an order.
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: "Variant not found, or doesn't belong to `id`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/api/products/{id}/images:
+    put:
+      tags: [Admin — Catalog]
+      summary: Replace a product's photo list
+      description: |
+        Writes `{object_key, sort_order}` rows into `product_images` —
+        replaces the full set for the product. Does not talk to MinIO; call
+        `POST /admin/api/media/presign-upload` first to get an `object_key`,
+        upload the file straight to MinIO with the returned URL, then call
+        this endpoint.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "#/components/schemas/ImageInput" }
+      responses:
+        "200":
+          description: The product's new photo list.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ProductImage" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/stock/{variantId}/{pointId}:
+    put:
+      tags: [Admin — Catalog]
+      summary: Set stock quantity for a variant at a point of sale
+      description: |
+        `owner`/`manager` may set stock at any point. `point_staff` may only
+        set stock at their own point (`staff.point_id`) — a `point_staff`
+        member targeting a different point gets `403 forbidden` even though
+        `RequireRole` itself let the role through.
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: pointId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties: { quantity: { type: integer, minimum: 0 } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/StockEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Insufficient role, or `point_staff` targeting a point other than their own.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  # --------------------------------------------------------- Admin/Media ---
+  /admin/api/media/presign-upload:
+    post:
+      tags: [Admin — Media]
+      summary: Get a presigned MinIO upload URL for a product photo
+      description: |
+        Generates the `object_key` server-side (the client can't choose a
+        path) and validates `content_type` against an allow-list
+        (`image/jpeg`, `image/png`, `image/webp`). The admin frontend uploads
+        the file directly to `upload_url` (no bytes pass through this
+        backend), then calls `PUT /admin/api/products/{id}/images` with the
+        returned `object_key`.
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content_type]
+              properties:
+                content_type: { type: string, enum: [image/jpeg, image/png, image/webp] }
+      responses:
+        "200":
+          description: Presigned upload URL (valid 10 minutes).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_url: { type: string, format: uri }
+                  object_key: { type: string, example: "products/3fae1c9e-....jpg" }
+        "400":
+          description: Unsupported/missing `content_type`.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500":
+          description: MinIO presign call failed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  # -------------------------------------------------------------- System ---
+  /healthz:
+    get:
+      tags: [System]
+      summary: Liveness probe
+      responses:
+        "200": { description: Process is up. }
+
+  /readyz:
+    get:
+      tags: [System]
+      summary: Readiness probe
+      description: Also pings the database.
+      responses:
+        "200": { description: Ready to serve traffic. }
+        "503":
+          description: "`db_unavailable`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+components:
+  securitySchemes:
+    staffSessionCookie:
+      type: apiKey
+      in: cookie
+      name: staff_session
+      description: Server-side staff session, set by `POST /admin/api/login`.
+    customerBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Customer access token from `POST /api/v1/auth/otp/verify` or
+        `/api/v1/auth/refresh`. Not yet enforced on any endpoint in this
+        file — reserved for customer-scoped routes (favorites, addresses,
+        orders) as they're implemented.
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired session/token.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    Forbidden:
+      description: Authenticated, but the staff role doesn't permit this action.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    NotFound:
+      description: Resource doesn't exist.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    Conflict:
+      description: Blocked by a foreign-key reference (e.g. still in use elsewhere).
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      description: The uniform shape every `apperr.AppError` serializes to.
+      properties:
+        code: { type: string, example: invalid_phone }
+        message: { type: string, example: "укажите номер в формате +996XXXXXXXXX" }
+
+    TokenPair:
+      type: object
+      properties:
+        access_token: { type: string, description: "JWT, 15 min TTL." }
+        refresh_token: { type: string, description: "Opaque token, 30 day TTL." }
+
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        parent_id: { type: string, format: uuid, nullable: true }
+        name_ru: { type: string }
+        name_ky: { type: string }
+        slug: { type: string }
+        sort_order: { type: integer }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/Category" }
+
+    CategoryInput:
+      type: object
+      required: [name_ru, name_ky, slug]
+      properties:
+        parent_id: { type: string, format: uuid, nullable: true }
+        name_ru: { type: string }
+        name_ky: { type: string }
+        slug: { type: string }
+        sort_order: { type: integer, default: 0 }
+
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        name_ru: { type: string }
+        name_ky: { type: string }
+        description_ru: { type: string, nullable: true }
+        description_ky: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        base_price: { type: number, format: double }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductInput:
+      type: object
+      required: [category_id, name_ru, name_ky, base_price]
+      properties:
+        category_id: { type: string, format: uuid }
+        name_ru: { type: string }
+        name_ky: { type: string }
+        description_ru: { type: string, nullable: true }
+        description_ky: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        base_price: { type: number, format: double, minimum: 0 }
+        is_active: { type: boolean, nullable: true, description: "Defaults to true if omitted." }
+
+    Variant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        size: { type: string }
+        color: { type: string }
+        sku: { type: string, nullable: true }
+        price_override: { type: number, format: double, nullable: true }
+
+    VariantInput:
+      type: object
+      required: [size, color]
+      properties:
+        size: { type: string }
+        color: { type: string }
+        sku: { type: string, nullable: true }
+        price_override: { type: number, format: double, nullable: true }
+
+    ProductImage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        object_key: { type: string }
+        sort_order: { type: integer }
+
+    ImageInput:
+      type: object
+      required: [object_key]
+      properties:
+        object_key: { type: string }
+        sort_order: { type: integer, default: 0 }
+
+    StockEntry:
+      type: object
+      properties:
+        variant_id: { type: string, format: uuid }
+        point_id: { type: string, format: uuid }
+        quantity: { type: integer }
+        updated_at: { type: string, format: date-time }
+
+    StockPoint:
+      type: object
+      properties:
+        point_id: { type: string, format: uuid }
+        quantity: { type: integer }
+
+    ProductListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+
+    ProductDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          properties:
+            variants:
+              type: array
+              items: { $ref: "#/components/schemas/VariantDetail" }
+
+    VariantDetail:
+      allOf:
+        - $ref: "#/components/schemas/Variant"
+        - type: object
+          properties:
+            stock:
+              type: array
+              items: { $ref: "#/components/schemas/StockPoint" }

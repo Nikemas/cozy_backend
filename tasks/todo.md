@@ -169,5 +169,24 @@
 - [x] Обе ветки смержены в `main`
 - [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто
 - [x] Конфликт в `cmd/server/main.go` (обе строки в `registerAdminRoutes`) и в этом файле — разрешён вручную
-- [ ] `golangci-lint run ./...` на весь репозиторий — 0 issues кроме одного предсуществующего в `internal/i18n/i18n.go` (не наша задача, вынесено отдельно как `task_2f5cfe35`)
+- [x] `golangci-lint run ./...` на весь репозиторий — 0 issues (замечание в `internal/i18n/i18n.go` закрыто фоновой задачей `task_2f5cfe35`)
 - [ ] Ревью с пользователем; затем — заказы/Bakai, когда `kozy-01` закоммитит cart/orders
+
+---
+
+## Task F: OpenAPI-спецификация (§6 ТЗ) — DONE
+
+**Description:** `openapi.yaml` в корне `cozy_backend`, документирующий все реально существующие эндпоинты `/api/v1/*` и `/admin/api/*` (Auth, Catalog, Admin — Staff/Catalog/Media, System) — не заявляет ничего, чего ещё нет в коде. Отложено сознательно: `/api/v1/{favorites,addresses,orders,devices}`, `/api/v1/payments/bakai/webhook`, `/admin/api/{orders,reports,points,staff}` — добавить по мере реализации в следующих волнах.
+
+**Acceptance criteria:**
+- [x] Все 19 текущих путей (grep по `mux.Handle(` в `internal/httpapi`, `internal/staff`, `internal/media`, `cmd/server`) описаны — методы, параметры, тела запросов/ответов, коды ошибок из реального кода `apperr.New(...)` в каждом хендлере
+- [x] Схемы `Category`/`Product`/`Variant`/`StockEntry`/`ProductImage` и их `*Input`-варианты сверены построчно с Go-структурами (`json`-теги) в `internal/catalog`
+- [x] Security schemes: `staffSessionCookie` (cookie `staff_session`) для admin-роутов, `customerBearerAuth` — задокументирован для будущих customer-scoped роутов, пока нигде не применяется (ни один текущий `/api/v1` эндпоинт не требует JWT)
+
+**Verification:**
+- [x] `python3 -m openapi_spec_validator openapi.yaml` — `OK`
+- [x] Ручная сверка каждого пути с исходным кодом хендлера (не сгенерировано вслепую)
+
+**Files touched:**
+- `openapi.yaml` (новый)
+- `README.md` — секция «API-документация»

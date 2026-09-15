@@ -48,6 +48,10 @@ docker build -f docker/Dockerfile -t cozy_backend .
 
 CI (`.github/workflows/ci.yml`) на каждый push/PR гоняет `gofmt -l .`, `go vet ./...`, `go test ./...` и `golangci-lint`. Деплой (`.github/workflows/deploy.yml`) — пока шаблон: собирает и пушит образ в GHCR и деплоит по SSH (`docker compose pull && up -d`), но реального VPS ещё нет — см. комментарий в начале файла, какие секреты репозитория нужно завести, когда он появится.
 
+## API-документация
+
+Полная OpenAPI 3.0-спецификация всех реализованных эндпоинтов — [`openapi.yaml`](openapi.yaml) (§6 ТЗ). Открыть в любом Swagger UI/Redoc или сгенерировать клиент для Flutter. Обновлять по мере добавления новых эндпоинтов — файл описывает только то, что реально есть в коде.
+
 ## Статус
 
 Готово: каркас (конфиг, роутер, `apperr`, подключение к Postgres), миграции всех таблиц из §3 ТЗ + `otp_codes`/`refresh_tokens`, вход покупателя по OTP (Nikita SMSPro) с JWT access/refresh.
