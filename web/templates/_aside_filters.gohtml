@@ -59,8 +59,8 @@
   <div class="aside__card">
     <div class="aside__title">{{t "sidebar.price"}}{{if eq .Screen "shop"}}{{if .Data.PriceMax}} {{.Data.PriceMax}}{{end}}{{end}}</div>
     {{if eq .Screen "shop"}}
-    <input type="range" id="shop-price-max" name="price_max" min="1000" max="6000" step="100"
-           value="{{if .Data.PriceMax}}{{.Data.PriceMax}}{{else}}6000{{end}}"
+    <input type="range" id="shop-price-max" name="price_max" min="{{.Data.PriceSliderMin}}" max="{{.Data.PriceSliderMax}}" step="100"
+           value="{{if .Data.PriceMax}}{{.Data.PriceMax}}{{else}}{{.Data.PriceSliderMax}}{{end}}"
            hx-get="{{.Data.BasePath}}" hx-trigger="change"
            hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
            hx-include="#shop-q">

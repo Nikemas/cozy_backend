@@ -43,7 +43,7 @@ func (r *BranchRepo) List(ctx context.Context) ([]Branch, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	branches := make([]Branch, 0)
 	for rows.Next() {

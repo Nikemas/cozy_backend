@@ -48,7 +48,16 @@ func run() error {
 		return err
 	}
 
-	sms := notify.NewNikitaClient(cfg.NikitaAPIKey)
+	var sms notify.OTPSender
+	if cfg.SMSMockOTP {
+		if cfg.Env == "prod" {
+			return errors.New("SMS_MOCK_OTP is set but APP_ENV=prod — refusing to start with a fake OTP provider in production")
+		}
+		slog.Warn("notify: SMS_MOCK_OTP is on — every login accepts code 0000, no real SMS is sent. Never set this in production.")
+		sms = notify.NewMockClient()
+	} else {
+		sms = notify.NewNikitaClient(cfg.NikitaAPIKey)
+	}
 	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
 
 	mediaClient, err := media.NewClient(cfg)

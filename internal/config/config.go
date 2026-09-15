@@ -25,6 +25,15 @@ type Config struct {
 	BakaiWebhookToken string
 
 	NikitaAPIKey string
+
+	// SMSMockOTP switches the OTP provider to a local mock (any phone,
+	// code always "0000", no network call, no real SMS) — for local dev
+	// only. Off by default and refused outright when Env == "prod" (see
+	// cmd/server/main.go), because APP_ENV itself already defaults to
+	// "dev" when unset — this flag being opt-in is the only thing
+	// standing between "someone forgot to set APP_ENV in prod" and every
+	// login on the live site accepting code 0000.
+	SMSMockOTP bool
 }
 
 func Load() (*Config, error) {
@@ -46,6 +55,7 @@ func Load() (*Config, error) {
 		BakaiWebhookToken: os.Getenv("BAKAI_WEBHOOK_TOKEN"),
 
 		NikitaAPIKey: os.Getenv("NIKITA_API_KEY"),
+		SMSMockOTP:   getEnv("SMS_MOCK_OTP", "false") == "true",
 	}
 
 	if cfg.DatabaseURL == "" {

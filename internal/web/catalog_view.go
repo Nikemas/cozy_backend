@@ -51,6 +51,11 @@ type ShopData struct {
 	Query    string
 	PriceMax int // 0 = no price filter applied
 
+	// PriceSliderMin/Max are the range input's fixed bounds — see
+	// priceSliderMin/Max's doc comment for why they're a placeholder.
+	PriceSliderMin int
+	PriceSliderMax int
+
 	Page       int
 	TotalPages int
 	HasPrev    bool
@@ -192,18 +197,20 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	}
 
 	sd := &ShopData{
-		BasePath:   basePath,
-		Query:      filter.Query,
-		PriceMax:   priceMax,
-		Page:       filter.Page,
-		TotalPages: totalPages,
-		HasPrev:    filter.Page > 1,
-		HasNext:    filter.Page < totalPages,
-		ShowBanner: filter.Query == "" && categorySlug == "",
-		Categories: chips,
-		Products:   cards,
-		Total:      total,
-		NoResults:  len(cards) == 0,
+		BasePath:       basePath,
+		Query:          filter.Query,
+		PriceMax:       priceMax,
+		PriceSliderMin: priceSliderMin,
+		PriceSliderMax: priceSliderMax,
+		Page:           filter.Page,
+		TotalPages:     totalPages,
+		HasPrev:        filter.Page > 1,
+		HasNext:        filter.Page < totalPages,
+		ShowBanner:     filter.Query == "" && categorySlug == "",
+		Categories:     chips,
+		Products:       cards,
+		Total:          total,
+		NoResults:      len(cards) == 0,
 	}
 	sd.PrevHref = shopPageHref(basePath, filter, filter.Page-1)
 	sd.NextHref = shopPageHref(basePath, filter, filter.Page+1)
