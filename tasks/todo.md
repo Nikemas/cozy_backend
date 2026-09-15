@@ -507,3 +507,35 @@
 **Merge note:** при интеграции в `main` конфликт в `cmd/server/main.go` (обе Task L и Task N добавили строку в `registerAdminRoutes`) разрешён вручную — оставлены обе строки. Заодно подключена `httpapi.RegisterAdminReportsRoutes(...)`, которую мердж Task O (`552406c`) добавил в кодовую базу, но не подключил к `main.go` (сознательно, чтобы не трогать файл, который в тот момент активно правили параллельные задачи этой же волны) — без этой правки `/admin/api/reports/sales*` был бы мёртвым кодом. Коммит мерджа: `fb888eb`.
 
 **Open item, не блокирует:** точный код ответа для `point_staff` на чужой заказ решён как 403 (`apperr.Forbidden`), консистентно с RBAC остатков в Task D — см. Open Questions в `tasks/plan.md`.
+
+---
+
+## Публичный эндпоинт точек продаж для самовывоза в мобильном приложении (гэп, найден при интеграционном тестировании) — DONE
+
+**Description:** Read-сторона точек продаж (`internal/storefront/branches.go`, `BranchRepo.List`) для веб-версии уже существовала, но публичного (без авторизации) JSON-эндпоинта для мобильного приложения не было — из-за этого пункт самовывоза в чекауте Flutter-приложения не мог получить список реальных точек. Это не в изначальном плане волн (`tasks/plan.md`), а точечный фикс гэпа, обнаруженного при интеграционном тестировании мобильного приложения.
+
+**Acceptance criteria:**
+- [x] `GET /api/v1/points` — публичный, без авторизации (как `/api/v1/categories`/`/api/v1/products`, а не как `RequireCustomer`-эндпоинты favorites/addresses/orders)
+- [x] Отдаёт все активные точки продаж (`BranchRepo.List` уже фильтрует по `is_active` и сортирует по имени) как `{"items": [{"id","name","address"}]}`
+- [x] Пустой список → `{"items": []}`, не `null`
+
+**Response shape decision:** выбран `{"items": [...]}`, а не голый массив. В `internal/httpapi` уже есть оба паттерна для списков без пагинации: `favoritesResponse`/`addressListResponse` — оба `{items: [...]}`; голый массив отдаёт только `GET /api/v1/categories`, но это дерево категорий (иерархия), а не плоский список — не прямой прецедент для этого случая. Среди сравнимых (плоский список, без пагинации) эндпоинтов `{items: [...]}` — более частый и, значит, более консистентный выбор.
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...` — чисто
+- [x] `go vet ./...` — чисто
+- [x] `go test ./...` — все пакеты `ok`, включая новые `internal/httpapi/points_test.go`
+- [x] `golangci-lint run ./internal/httpapi/... ./cmd/...` — 0 issues (единственная репозиторная лint-находка — предсуществующий `errcheck` в `internal/i18n/i18n.go`, не связан с этой задачей и не тронут)
+- [ ] Manual: нет живого Postgres на этой машине — `BranchRepo.List`'s SQL уже покрыт существующим кодом веб-стороны, здесь только вызывается из нового хендлера через fake за интерфейсом `branchLister`
+
+**Dependencies:** `internal/storefront.BranchRepo` (уже существует, не менялся)
+
+**Files touched:**
+- `internal/httpapi/points.go` (новый) — `RegisterPublicPointsRoutes`, `branchLister` интерфейс, `pointResponse`/`pointsResponse` DTO, `listPointsHandler`
+- `internal/httpapi/points_test.go` (новый) — fake `branchLister`, happy path, пустой список (`{items: []}`, не `null`), публичный доступ без авторизации
+- `cmd/server/main.go` — одна строка `httpapi.RegisterPublicPointsRoutes(mux, db)` в `registerAPIRoutes`, рядом с `httpapi.RegisterCatalogRoutes(mux, db)`
+
+**Design decisions:**
+- Отдельный handler-local DTO (`pointResponse`) с `json`-тегами, а не теги на самом `storefront.Branch` — по тому же паттерну, что `addressResponse` в `addresses.go`: `Branch` рендерится через `html/template` в `internal/web` и не должен приобретать JSON-специфичную зависимость, плюс над ним могла параллельно работать другая сессия.
+- Не трогал `internal/storefront/branches.go` и `internal/points` (не связанный admin-only CRUD-пакет с тем же словом "points" в имени) — по инструкции брифа.
