@@ -6,8 +6,21 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
+
+// pgForeignKeyViolation is the Postgres SQLSTATE for a foreign-key
+// constraint violation (see internal/catalog/pgerr.go for the same
+// pattern — kept local here rather than exported cross-package for one
+// constant).
+const pgForeignKeyViolation = "23503"
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation
+}
 
 // Address mirrors one row of customer_addresses (migration
 // 000002_create_customer_addresses) — a saved delivery address for a
@@ -194,6 +207,9 @@ func (r *AddressRepo) Update(ctx context.Context, customerID, id string, in Addr
 func (r *AddressRepo) Delete(ctx context.Context, customerID, id string) error {
 	res, err := r.db.ExecContext(ctx, `DELETE FROM customer_addresses WHERE id = $1 AND customer_id = $2`, id, customerID)
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return apperr.Conflict("address_in_use", "этот адрес использован в заказе, его нельзя удалить")
+		}
 		return err
 	}
 	n, err := res.RowsAffected()
