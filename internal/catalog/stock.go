@@ -67,6 +67,42 @@ func (r *StockRepo) ByVariantIDs(ctx context.Context, variantIDs []string) ([]St
 	return entries, nil
 }
 
+// TotalByProductIDs returns the sum of stock quantity (across every point
+// and every variant) per product, keyed by product_id — products with no
+// stock rows at all are simply absent from the map (treat as 0). Used by
+// the admin products list (internal/admin) for the "Остаток" stock-level
+// chip without an N+1 query per row, mirroring the batch-by-IDs shape of
+// ImageRepo.PrimaryForProducts/VariantRepo.CountByProductIDs.
+func (r *StockRepo) TotalByProductIDs(ctx context.Context, productIDs []string) (map[string]int, error) {
+	if len(productIDs) == 0 {
+		return map[string]int{}, nil
+	}
+
+	const q = `
+		SELECT pv.product_id, COALESCE(SUM(s.quantity), 0)
+		FROM product_variants pv
+		LEFT JOIN stock s ON s.variant_id = pv.id
+		WHERE pv.product_id = ANY($1)
+		GROUP BY pv.product_id`
+
+	rows, err := r.db.QueryContext(ctx, q, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[string]int, len(productIDs))
+	for rows.Next() {
+		var productID string
+		var total int
+		if err := rows.Scan(&productID, &total); err != nil {
+			return nil, err
+		}
+		out[productID] = total
+	}
+	return out, rows.Err()
+}
+
 // Upsert sets the quantity of variantID at pointID, inserting the row if
 // one doesn't exist yet (a variant has no stock row at a point until
 // someone sets one there) or updating it in place otherwise. Returns

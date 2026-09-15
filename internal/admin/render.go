@@ -26,13 +26,15 @@ const templatesDir = "admin/templates"
 // 2-5 don't add new entries here — per the Wave 4 plan they replace an
 // existing stub .gohtml's content, not the routing/screen set itself.
 var screenPages = map[string]string{
-	"login":     "login.gohtml",
-	"no_access": "no_access.gohtml",
-	"orders":    "orders.gohtml",
-	"products":  "products.gohtml",
-	"reports":   "reports.gohtml",
-	"points":    "points.gohtml",
-	"staff":     "staff.gohtml",
+	"login":          "login.gohtml",
+	"no_access":      "no_access.gohtml",
+	"orders":         "orders.gohtml",
+	"products":       "products.gohtml",
+	"product_form":   "product_form.gohtml",
+	"product_import": "product_import.gohtml",
+	"reports":        "reports.gohtml",
+	"points":         "points.gohtml",
+	"staff":          "staff.gohtml",
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell

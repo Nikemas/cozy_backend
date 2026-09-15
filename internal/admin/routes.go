@@ -4,6 +4,10 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/media"
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -13,19 +17,29 @@ import (
 // admin_*.go, all Wave 3), which this package's pages call into via HTMX
 // for anything beyond Foundation's stub screens.
 //
-// db is accepted for symmetry with web.RegisterRoutes and so Tasks 2-5 can
-// build their own repositories here without this signature changing again
-// — Foundation itself doesn't query the database directly, staffSvc
-// (login/logout/session lookup) is all it needs.
-func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) error {
-	_ = db // reserved for Tasks 2-5's repositories; see doc comment above
-
+// mediaClient and cfg back Task 2's product photo upload (presigned MinIO
+// PUT + a direct, non-presigned GET URL built the same way
+// internal/web's handlers.photoURL already does) — reusing the single
+// *media.Client cmd/server/main.go already constructs for
+// media.RegisterRoutes, not a second instance.
+func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config) error {
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
 	}
 
-	h := &handlers{staffSvc: staffSvc, render: renderer}
+	h := &handlers{
+		staffSvc:   staffSvc,
+		render:     renderer,
+		categories: catalog.NewCategoryRepo(db),
+		products:   catalog.NewProductRepo(db),
+		variants:   catalog.NewVariantRepo(db),
+		images:     catalog.NewImageRepo(db),
+		stock:      catalog.NewStockRepo(db),
+		points:     points.NewPointsRepo(db),
+		media:      mediaClient,
+		cfg:        cfg,
+	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
 	mux.HandleFunc("POST /admin/login", h.loginSubmit)
@@ -46,11 +60,34 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) err
 	// все 6 путей ... сразу, но с заглушечными хендлерами") — Tasks 2-5
 	// replace stubPage(...) with their real handlers, not these routes.
 	mux.HandleFunc("GET /admin/orders", ownerOrManager(h.stubPage("orders", "Заказы")))
-	mux.HandleFunc("GET /admin/products", ownerOrManager(h.stubPage("products", "Товары")))
-	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.stubPage("products", "Импорт товаров")))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.stubPage("reports", "Отчёты")))
 	mux.HandleFunc("GET /admin/points", ownerOnly(h.stubPage("points", "Склад и точки")))
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.stubPage("staff", "Сотрудники")))
+
+	// Task 2 (Товары): list, create/edit form, import — see products.go.
+	// GET /admin/products/new and .../import are registered before the
+	// {id} wildcard routes below, but Go 1.22's ServeMux already prefers a
+	// literal segment over "{id}" at the same position regardless of
+	// registration order, so this ordering is for readability only.
+	mux.HandleFunc("GET /admin/products", ownerOrManager(h.productsListPage))
+	mux.HandleFunc("GET /admin/products/new", ownerOrManager(h.productNewPage))
+	mux.HandleFunc("POST /admin/products", ownerOrManager(h.productCreate))
+	mux.HandleFunc("GET /admin/products/{id}", ownerOrManager(h.productEditPage))
+	mux.HandleFunc("POST /admin/products/{id}", ownerOrManager(h.productUpdate))
+	mux.HandleFunc("POST /admin/products/{id}/toggle-active", ownerOrManager(h.productToggleActive))
+	// Удалить (per the design's canDelete) is owner-only, unlike every
+	// other product write above — see productDelete's doc comment for why
+	// it maps to the same soft-delete as "Деактивировать" under the hood.
+	mux.HandleFunc("POST /admin/products/{id}/delete", ownerOnly(h.productDelete))
+
+	// GET /admin/products/import renders the upload page; the actual
+	// import POST already exists at this exact path/method
+	// (httpapi.RegisterAdminImportRoutes, wired in cmd/server/main.go) —
+	// see productImportPage's doc comment for why the page's own JS calls
+	// that endpoint directly instead of this package registering a second
+	// handler for the same pattern (net/http.ServeMux would panic on the
+	// duplicate registration).
+	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.productImportPage))
 
 	mux.Handle("GET /admin/static/", http.StripPrefix("/admin/static/", http.FileServer(http.Dir("admin/static"))))
 

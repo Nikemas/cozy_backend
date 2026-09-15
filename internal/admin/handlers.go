@@ -3,6 +3,10 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/media"
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -13,6 +17,16 @@ import (
 type handlers struct {
 	staffSvc *staff.Service
 	render   *Renderer
+
+	// Task 2 (products: list/form/import) — see products.go.
+	categories *catalog.CategoryRepo
+	products   *catalog.ProductRepo
+	variants   *catalog.VariantRepo
+	images     *catalog.ImageRepo
+	stock      *catalog.StockRepo
+	points     *points.PointsRepo
+	media      *media.Client
+	cfg        *config.Config
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a

@@ -79,7 +79,7 @@ func run() error {
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
 	registerAPIRoutes(mux, db, authSvc)
-	if err := registerAdminRoutes(mux, db, mediaClient); err != nil {
+	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
 	}
 	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
@@ -144,7 +144,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
 // /admin/api/* (Wave 3) and, as of Wave 4 Task 1, the html/template admin
 // panel itself under /admin/* — behind a staff session, RBAC-gated per
 // internal/staff.
-func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client) error {
+func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client, cfg *config.Config) error {
 	staffSvc := staff.NewService(db)
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc)
@@ -153,7 +153,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminReportsRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminImportRoutes(mux, db, staffSvc)
-	return admin.RegisterRoutes(mux, db, staffSvc)
+	return admin.RegisterRoutes(mux, db, staffSvc, mediaClient, cfg)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.

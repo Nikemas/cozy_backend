@@ -1,7 +1,172 @@
-{{/* products.gohtml — stub for Task 2 (Товары: список/форма/импорт,
-     Cozy Admin.dc.html lines 116-404). Foundation only wires the route +
-     layout; Task 2 replaces this file's content, not the routing. */}}
+{{/* products.gohtml — Wave 4 Task 2 (Товары: список, Cozy Admin.dc.html
+     lines 116-252). PageData.Data is a *admin.ProductsPageData built by
+     productsListPage (products.go). Guarded with {{with .Data}} so the
+     Foundation-owned render_exec_test.go smoke test (which renders this
+     screen without setting .Data at all) still executes cleanly — it just
+     renders no content, which is fine for that generic shell test. */}}
 {{define "content"}}
-<h1>Товары</h1>
-<p>скоро</p>
+{{with .Data}}
+<div class="admin-products">
+  <div class="admin-products__toolbar">
+    <div class="admin-chipbar">
+      {{range .CategoryChips}}
+      <a href="{{.URL}}" class="admin-chip-filter{{if .Active}} active{{end}}">{{.Label}}</a>
+      {{end}}
+    </div>
+    {{if .CanEdit}}
+    <div class="admin-products__actions">
+      <a href="{{.ImportURL}}" class="admin-btn admin-btn--secondary">Импорт</a>
+      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary">+ Добавить товар</a>
+    </div>
+    {{end}}
+  </div>
+
+  {{if .ShowSubs}}
+  <div class="admin-chipbar admin-chipbar--sub">
+    <span class="admin-chipbar__label">Подкатегория</span>
+    {{range .SubChips}}
+    <a href="{{.URL}}" class="admin-chip-filter admin-chip-filter--sm{{if .Active}} active{{end}}">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="admin-card">
+    {{if .Empty}}
+    <div class="admin-empty">
+      <div class="admin-empty__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      </div>
+      <div class="admin-empty__title">Ничего не нашлось</div>
+      <div class="admin-empty__text">Попробуйте другое название или категорию</div>
+      {{if .CanEdit}}
+      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary" style="margin-top:8px">+ Добавить товар</a>
+      {{end}}
+    </div>
+    {{else}}
+
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th class="admin-table__photo-col">Фото</th>
+            <th>Название</th>
+            <th>Категория</th>
+            <th class="admin-table__num-col">Цена</th>
+            <th>Вариаций</th>
+            <th>Остаток</th>
+            <th>Статус</th>
+            <th class="admin-table__menu-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Products}}
+          <tr>
+            <td>
+              {{if .HasPhoto}}
+              <div class="admin-thumb" style="background-image:url('{{.PhotoURL}}')"></div>
+              {{else}}
+              <div class="admin-thumb admin-thumb--empty"></div>
+              {{end}}
+            </td>
+            <td>
+              <a href="{{.EditURL}}" class="admin-table__name">{{.Name}}</a>
+              <div class="admin-table__brand">{{.Brand}}</div>
+            </td>
+            <td class="admin-table__muted">{{.CategoryPath}}</td>
+            <td class="admin-table__num">{{.PriceText}}</td>
+            <td class="admin-table__muted">{{.VariantsLabel}}</td>
+            <td><span class="admin-chip" style="color:{{.StockFG}};background:{{.StockBG}}">{{.StockLabel}}</span></td>
+            <td class="admin-table__muted">{{.StatusLabel}}</td>
+            <td class="admin-table__menu-col">
+              {{if $.Data.CanEdit}}
+              <div class="admin-rowmenu">
+                <button type="button" class="admin-rowmenu__trigger" onclick="toggleRowMenu(event, this)" aria-label="Действия">⋯</button>
+                <div class="admin-rowmenu__panel">
+                  <a href="{{.EditURL}}" class="admin-rowmenu__item">Редактировать</a>
+                  <form method="post" action="{{.ToggleActiveURL}}" class="admin-rowmenu__form">
+                    <button type="submit" class="admin-rowmenu__item">{{.DeactivateLabel}}</button>
+                  </form>
+                  {{if $.Data.CanDelete}}
+                  <button type="button" class="admin-rowmenu__item admin-rowmenu__item--danger"
+                    onclick="closeAllRowMenus(); openConfirmModal('Удалить товар?', '«{{.Name}}» будет удалён и перестанет отображаться в каталоге.', '{{.DeleteURL}}')">Удалить</button>
+                  {{end}}
+                </div>
+              </div>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="admin-cards">
+      {{range .Products}}
+      <a href="{{.EditURL}}" class="admin-cardrow">
+        {{if .HasPhoto}}
+        <div class="admin-thumb admin-thumb--card" style="background-image:url('{{.PhotoURL}}')"></div>
+        {{else}}
+        <div class="admin-thumb admin-thumb--card admin-thumb--empty"></div>
+        {{end}}
+        <div class="admin-cardrow__body">
+          <div class="admin-table__name">{{.Name}}</div>
+          <div class="admin-cardrow__meta">{{.CategoryPath}} · {{.VariantsLabel}}</div>
+          <div class="admin-cardrow__row">
+            <span class="admin-cardrow__price">{{.PriceText}}</span>
+            <span class="admin-chip" style="color:{{.StockFG}};background:{{.StockBG}}">{{.StockLabel}}</span>
+            <span class="admin-table__muted">{{.StatusLabel}}</span>
+          </div>
+        </div>
+      </a>
+      {{end}}
+      <div class="admin-cards__count">{{.CountLabel}}</div>
+    </div>
+
+    <div class="admin-table-footer">
+      <div class="admin-table__muted">{{.CountLabel}}</div>
+      <form method="get" action="/admin/products" class="admin-pagesize">
+        {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
+        <span class="admin-table__muted">Строк на странице</span>
+        <select name="page_size" onchange="this.form.submit()" class="admin-pagesize__select">
+          <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
+          <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
+        </select>
+      </form>
+    </div>
+    {{end}}
+  </div>
+</div>
+
+<script>
+// Row "⋯" menu: only one open at a time, closed by clicking anywhere else
+// or pressing Escape. Kept local to this screen (not layout.gohtml) since
+// only the products table uses it.
+function closeAllRowMenus() {
+  document.querySelectorAll('.admin-rowmenu.open').forEach(function (el) { el.classList.remove('open'); });
+}
+function toggleRowMenu(evt, btn) {
+  evt.stopPropagation();
+  var menu = btn.closest('.admin-rowmenu');
+  var wasOpen = menu.classList.contains('open');
+  closeAllRowMenus();
+  if (!wasOpen) { menu.classList.add('open'); }
+}
+document.addEventListener('click', closeAllRowMenus);
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAllRowMenus(); });
+
+// The shared header (_header.gohtml) renders a bare <input name="q">, no
+// <form> — this screen wires Enter-to-search itself rather than the
+// header partial gaining a <form> every screen would inherit.
+(function () {
+  var input = document.querySelector('.admin-header__search input');
+  if (!input) return;
+  input.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var url = new URL('/admin/products', window.location.origin);
+    if (input.value.trim()) url.searchParams.set('q', input.value.trim());
+    window.location.href = url.toString();
+  });
+})();
+</script>
+{{end}}
 {{end}}

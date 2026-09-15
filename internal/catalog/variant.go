@@ -9,6 +9,40 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
+// CountByProductIDs returns the number of variants per product, keyed by
+// product_id — products with zero variants are simply absent from the map.
+// Used by the admin products list (internal/admin) to show a "N вариаций"
+// column without an N+1 query per row, mirroring the batch-by-IDs shape of
+// ImageRepo.PrimaryForProducts.
+func (r *VariantRepo) CountByProductIDs(ctx context.Context, productIDs []string) (map[string]int, error) {
+	if len(productIDs) == 0 {
+		return map[string]int{}, nil
+	}
+
+	const q = `
+		SELECT product_id, COUNT(*)
+		FROM product_variants
+		WHERE product_id = ANY($1)
+		GROUP BY product_id`
+
+	rows, err := r.db.QueryContext(ctx, q, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[string]int, len(productIDs))
+	for rows.Next() {
+		var productID string
+		var count int
+		if err := rows.Scan(&productID, &count); err != nil {
+			return nil, err
+		}
+		out[productID] = count
+	}
+	return out, rows.Err()
+}
+
 // Variant mirrors the `product_variants` table.
 type Variant struct {
 	ID            string   `json:"id"`
