@@ -36,6 +36,18 @@ POST /api/v1/auth/refresh       { "refresh_token": "..." }
 
 Нужен `NIKITA_API_KEY` в `.env` (Личный кабинет Nikita → вкладка «СЕРВИС OTP»). Rate-limit на номер — не чаще раза в 60 сек, максимум 5 запросов в час (см. `internal/auth/service.go`), чтобы стоимость SMS не стала вектором злоупотребления.
 
+## Docker / CI-CD
+
+Продовый образ — `docker/Dockerfile` (multi-stage: builder на `golang:1.26-alpine`, рантайм на `gcr.io/distroless/static-debian12`). Собрать локально:
+
+```bash
+docker build -f docker/Dockerfile -t cozy_backend .
+```
+
+(Это отдельный файл от `docker/docker-compose.yml`, который только для локальной разработки — postgres + minio.)
+
+CI (`.github/workflows/ci.yml`) на каждый push/PR гоняет `gofmt -l .`, `go vet ./...`, `go test ./...` и `golangci-lint`. Деплой (`.github/workflows/deploy.yml`) — пока шаблон: собирает и пушит образ в GHCR и деплоит по SSH (`docker compose pull && up -d`), но реального VPS ещё нет — см. комментарий в начале файла, какие секреты репозитория нужно завести, когда он появится.
+
 ## Статус
 
 Готово: каркас (конфиг, роутер, `apperr`, подключение к Postgres), миграции всех таблиц из §3 ТЗ + `otp_codes`/`refresh_tokens`, вход покупателя по OTP (Nikita SMSPro) с JWT access/refresh.

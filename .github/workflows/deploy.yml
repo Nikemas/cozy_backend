@@ -1,0 +1,90 @@
+# ---------------------------------------------------------------------------
+# Deploy — TEMPLATE, not a live pipeline.
+#
+# There is no VPS for this project yet, so this workflow cannot run
+# end-to-end today. It is committed now as scaffolding for §11 of the spec
+# ("Деплой и инфраструктура") so it's ready to switch on once the server
+# exists. Until then, expect this job to fail at the SSH step (or be left
+# un-triggered) — that's expected, not a bug.
+#
+# Repo secrets that must be created (Settings -> Secrets and variables ->
+# Actions) before this workflow can actually deploy anything:
+#
+#   DEPLOY_HOST      - VPS hostname or IP to SSH into
+#   DEPLOY_USER      - SSH user on the VPS (e.g. "deploy")
+#   DEPLOY_SSH_KEY   - private key for DEPLOY_USER (PEM), matching public
+#                      key must already be in that user's
+#                      ~/.ssh/authorized_keys on the VPS
+#   DEPLOY_SSH_PORT  - SSH port (optional; the step below defaults to 22)
+#   DEPLOY_PATH      - absolute path on the VPS of the docker-compose
+#                      project to redeploy (e.g. /opt/cozy)
+#
+# Assumptions this template makes (adjust when the real VPS is ready):
+#   - Images are pushed to GHCR (ghcr.io/<owner>/<repo>) using the
+#     built-in GITHUB_TOKEN — no extra registry secret needed from this
+#     side. If the VPS pulls a private package, it needs its own
+#     `docker login ghcr.io` credentials set up out-of-band (not managed
+#     by this workflow).
+#   - A docker-compose.yml already lives at DEPLOY_PATH on the VPS,
+#     referencing this image, and reads its own runtime env vars
+#     (DATABASE_URL, JWT_SECRET, etc. — see .env.example) from a .env file
+#     or systemd unit already present there. This workflow does not
+#     create or manage that file.
+# ---------------------------------------------------------------------------
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    name: Deploy over SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: docker compose pull && up -d on the VPS
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
