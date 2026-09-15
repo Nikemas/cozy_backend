@@ -193,6 +193,32 @@
 
 ---
 
+## Wave 3: Admin-панель — backend JSON API (см. `tasks/plan.md` → «Wave 3»)
+
+Пользователь явно попросил начать реализацию админки с бека. HTML/HTMX-слой (`internal/admin`) — не в этой волне, см. Wave 4 ниже.
+
+- [ ] **Task G** — Admin Points of Sale API (`/admin/api/points`, CRUD, только owner). [детали](plan.md#task-g-admin-points-of-sale-api)
+- [ ] **Task H** — Admin Staff API (`/admin/api/staff`, CRUD, только owner, инвариант «последний owner»). [детали](plan.md#task-h-admin-staff-api)
+- [ ] **Task I** — Admin Orders API (`/admin/api/orders`, список/детали/смена статуса, RBAC по точке для point_staff). [детали](plan.md#task-i-admin-orders-api)
+- [ ] **Task J** — Admin Reports API (`/admin/api/reports/sales`, JSON + Excel-экспорт через excelize). [детали](plan.md#task-j-admin-reports-api)
+- [ ] **Task K** — Импорт товаров (`POST /admin/products/import`, CSV/Excel, построчный отчёт об ошибках). [детали](plan.md#task-k-импорт-товаров)
+
+Задачи независимы по коду (см. Architecture Decisions в plan.md) — можно запускать параллельно в отдельных git worktree, как Task A/B/C в Wave 1. Единственная точка соприкосновения — `go.mod`/`go.sum` у Task J и Task K (оба тянут `excelize`) и по одной строке в `cmd/server/main.go` (`registerAdminRoutes`) у каждой задачи, кроме Task H.
+
+### Checkpoint: после Task G–K
+
+- [ ] Все 5 веток смержены в `main`
+- [ ] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто
+- [ ] `go.mod`/`go.sum` — одна версия `excelize`, `go mod tidy` прогнан
+- [ ] `openapi.yaml` дополнен новыми путями (отдельная маленькая задача по аналогии с Task F)
+- [ ] Ревью с пользователем перед Wave 4
+
+## Wave 4 (не начата): internal/admin — HTML/HTMX-слой
+
+Страница логина, layout+сайдбар с ролевой видимостью, экраны Товары/Заказы/Отчёты/Точки/Сотрудники/Импорт поверх API из Wave 3. Стартует после чек-пойнта Wave 3 — см. Open Questions в `plan.md`.
+
+---
+
 ## Task H: Customer-facing orders + cart JSON API (§6 ТЗ, мобильное приложение) — DONE
 
 **Description:** `/api/v1/{orders,cart}` — JSON REST для залогиненного покупателя (Flutter mobile), поверх уже готового домена `internal/orders` (`Service.{CreateOrder,ListOrders,GetOrder}`, `CartRepo.{List,Add,UpdateQty,Remove}` — реализованы и покрыты тестами параллельной задачей, домен не менялся) и только что добавленной JWT-мидлвари `auth.Service.RequireCustomer`. Корзина монтируется в этом же файле/функции, т.к. она customer-scoped JSON того же вида, что и заказы, и по доккомменту `orders.CartItem` явно designed для переиспользования web+mobile.
@@ -221,3 +247,58 @@
 - `cmd/server/main.go` — одна строка `httpapi.RegisterOrderRoutes(mux, db, authSvc)` внутри `registerAPIRoutes`
 
 **Deviations:** нет отклонений от постановки. Единственное самостоятельное решение — добавить `auth.NewContextWithCustomerID` (в задании не упоминался): без него хендлер-тесты в другом пакете не могли положить customerID в приватный ключ контекста `auth`-пакета, а гонять их через настоящий `RequireCustomer`+подписанный JWT было бы избыточно (эта мидлварь уже покрыта своими тестами в `internal/auth/middleware_test.go`) — паттерн 1-в-1 повторяет уже существующий `staff.NewContextWithStaff`.
+
+---
+
+## Task G: Customer JSON API — favorites, addresses, device tokens (§6 ТЗ) — DONE
+
+**Description:** JSON REST API под `/api/v1/*` для залогиненного покупателя (Flutter-приложение): избранное, адреса доставки и регистрация FCM device token. Доменная логика избранного и адресов уже существовала (`internal/storefront/{favorites,addresses}.go`, сделано параллельной сессией для сайта) — эта задача только оборачивает её JSON-хендлерами поверх новой `auth.Service.RequireCustomer` мидлвари. Device tokens не имели репозитория вообще (таблица `device_tokens` существовала с миграции 000014, но никто её не читал/писал) — репозиторий сделан в рамках этой задачи.
+
+**Acceptance criteria:**
+- [x] `GET /api/v1/favorites` — список избранных товаров (полные объекты `catalog.Product`, не голые id — см. Design decisions)
+- [x] `POST /api/v1/favorites/{productId}` — добавить в избранное, идемпотентно (204)
+- [x] `DELETE /api/v1/favorites/{productId}` — убрать из избранного, идемпотентно (204)
+- [x] `GET /api/v1/addresses` — список адресов покупателя
+- [x] `POST /api/v1/addresses` — создать адрес
+- [x] `PUT /api/v1/addresses/{id}` — обновить адрес
+- [x] `DELETE /api/v1/addresses/{id}` — удалить адрес
+- [x] Все адресные операции скоуплены по `customerID` через сам `AddressRepo` (никогда не доверяем одному только id из URL) — покрыто тестом (`TestUpdateAddressHandlerPropagatesNotFound`)
+- [x] `internal/storefront/devices.go` — новый `DeviceTokenRepo.Register(ctx, customerID, fcmToken, platform)`, upsert по `fcm_token` (UNIQUE): при переносе токена на другого покупателя (переустановка приложения / смена аккаунта на устройстве) `customer_id` перезаписывается на нового владельца, а не падает конфликтом — иначе токен молча остался бы привязан к предыдущему покупателю и пуши бы утекали не туда
+- [x] Валидация `platform` (`ios`/`android`, иначе `apperr.BadRequest`) — чистая функция, покрыта юнит-тестом без БД
+- [x] `POST /api/v1/devices` — тело `{fcm_token, platform}`
+- [x] Все роуты этой задачи — за `authSvc.RequireCustomer(...)`, анонимного доступа нет нигде
+- [x] Единая точка регистрации — `httpapi.RegisterCustomerRoutes(mux, db, authSvc)` (внутри вызывает по одному `register*Routes` на домен: favorites/addresses/devices — разбито для читаемости файлов, но наружу торчит один exported вход)
+- [x] Тесты в стиле `admin_catalog_test.go` (фейковые репозитории через интерфейсы `favoriteLister`/`favoriteWriter`/`favoriteProductGetter`/`addressStore`/`deviceTokenRegisterer`, без живой БД) и в стиле `addresses_test.go` (чистая логика `validPlatform` в `internal/storefront/devices_test.go`)
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...` — чисто
+- [x] `go vet ./...` — чисто
+- [x] `go test ./...` — чисто, все пакеты `ok`
+- [x] `golangci-lint run ./...` — **1 предсуществующее** замечание (`internal/i18n/i18n.go:83`, `f.Close` не проверен, errcheck) — тот же файл параллельного потока `internal/web`/`internal/i18n`, который по инструкции этой задачи трогать нельзя; не создано и не изменено этой задачей (подтверждено: файл отсутствует в `git status` после всех правок). `golangci-lint run ./internal/httpapi/... ./internal/storefront/... ./internal/auth/... ./cmd/...` — **0 issues**
+- [ ] Нет локального Postgres на этой машине — SQL в `DeviceTokenRepo.Register` (`INSERT ... ON CONFLICT (fcm_token) DO UPDATE`) не прогнан против живой БД, только вычитан построчно; `favorites.go`/`addresses.go` домены уже были покрыты этим предупреждением в Task 4 (см. выше)
+
+**Dependencies:** `internal/auth.RequireCustomer` (только что добавлена в `main`), `internal/storefront.{FavoriteRepo,AddressRepo}` (домены Task 4), `internal/catalog.ProductRepo` (Task B)
+
+**Files touched:**
+- `internal/storefront/devices.go` (новый) — `DeviceTokenRepo`, `PlatformIOS`/`PlatformAndroid`, `validPlatform`
+- `internal/storefront/devices_test.go` (новый) — тест на `validPlatform` + что невалидная платформа отсекается до обращения к `r.db` (nil `*sql.DB` не паникует)
+- `internal/httpapi/favorites.go` (новый) — `registerFavoritesRoutes` + хендлеры GET/POST/DELETE
+- `internal/httpapi/favorites_test.go` (новый)
+- `internal/httpapi/addresses.go` (новый) — `registerAddressesRoutes` + хендлеры + `addressResponse` DTO (см. Design decisions)
+- `internal/httpapi/addresses_test.go` (новый)
+- `internal/httpapi/devices.go` (новый) — `registerDevicesRoutes` + хендлер
+- `internal/httpapi/devices_test.go` (новый)
+- `internal/httpapi/customer.go` (новый) — единственная экспортируемая точка входа `RegisterCustomerRoutes(mux, db, authSvc)`
+- `internal/auth/middleware.go` — добавлен `NewContextWithCustomerID(ctx, customerID) context.Context`, симметрично `staff.NewContextWithStaff` из Task D — нужен тестам `internal/httpapi`, чтобы вызывать customer-scoped хендлеры без реального JWT (`customerIDKey` не экспортирован)
+- `cmd/server/main.go` — одна строка `httpapi.RegisterCustomerRoutes(mux, db, authSvc)` внутри `registerAPIRoutes`
+
+**Design decisions:**
+- **Избранное отдаёт полные `catalog.Product`, а не голые id.** Экран избранного во Flutter должен отрисовать карточки товара (имя/цена/фото), так что голые id заставили бы приложение делать второй раунд-трип. Плата — цикл `ProductRepo.GetByID` по каждому id (N+1-ish): batch-метода `GetByIDs([]string)` в `internal/catalog` пока нет. При текущих объёмах избранного (десятки, не тысячи товаров у одного покупателя) это приемлемо; если списки вырастут, стоит добавить batch-запрос в `catalog.ProductRepo`. Товар, который с тех пор стал неактивным/удалённым, молча пропускается в ответе (та же семантика, что и в `internal/web`'s `loadFavoriteCards`), а не роняет весь запрос.
+- **`addressResponse` — отдельный DTO с `json`-тегами**, а не прямая отдача `storefront.Address`. У `storefront.Address` нет своих json-тегов (он существовал только для рендеринга через `html/template` в `internal/web`, где имена полей Go читаются напрямую), так что прямая сериализация дала бы `PascalCase`-ключи (`ID`, `AddressText`, ...) вместо `snake_case`, которым пользуется остальной `/api/v1/*` (см. `catalog.Product`). Решено завести handler-локальный DTO с явными тегами вместо добавления json-тегов в общий доменный тип `internal/storefront` (который правит параллельная сессия) — меньше риск конфликта при мерже и чище разделение "домен / HTTP-представление".
+- **Device token upsert перезаписывает `customer_id`, а не конфликтует.** Формулировка задачи это явно требует: один и тот же физический токен FCM может "переехать" к другому покупателю (переустановка приложения, смена аккаунта на устройстве), и застрявший на старом покупателе токен тихо ломает пуши для нового владельца устройства — поэтому `ON CONFLICT (fcm_token) DO UPDATE SET customer_id = ..., platform = ...`, без каких-либо дополнительных проверок владения.
+- **204 No Content** для `POST/DELETE /api/v1/favorites/{productId}` и `POST /api/v1/devices` — тела ответа нет и не нужно, симметрично `DELETE`-хендлерам в `admin_catalog.go`.
+- **Один exported вход, три internal register-функции** — `RegisterCustomerRoutes` в `internal/httpapi/customer.go` вызывает по одной непубличной `register{Favorites,Addresses,Devices}Routes` на файл; снаружи пакета торчит только один вызов для `cmd/server/main.go`, как просили в задаче.
+- **`cmd/server/main.go` подключён этой же задачей** (одна строка в `registerAPIRoutes`, рядом с уже существующими `RegisterAuthRoutes`/`RegisterCatalogRoutes`) — конфликт с параллельным потоком заказов маловероятен: это независимая строка в маленькой функции, а не структурная правка.
+
+**Deviations:** нет отклонений от acceptance criteria брифа. Добавлен один небольшой экспорт (`auth.NewContextWithCustomerID`), не описанный явно в брифе, но по прямой аналогии с уже принятым в кодовой базе паттерном (`staff.NewContextWithStaff`, Task D) — нужен исключительно для тестируемости хендлеров без живого JWT/БД. Примечание: Task H независимо добавила ту же функцию в параллельной ветке — при мерже обеих задач в `main` осталась одна копия (идентичны по поведению, отличались только комментарием).
