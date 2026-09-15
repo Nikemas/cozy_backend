@@ -15,6 +15,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -33,11 +34,14 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	}
 
 	h := &handlers{
-		db:        db,
-		cfg:       cfg,
-		auth:      authSvc,
-		customers: storefront.NewCustomerRepo(db),
-		render:    renderer,
+		db:           db,
+		cfg:          cfg,
+		auth:         authSvc,
+		customers:    storefront.NewCustomerRepo(db),
+		carts:        orders.NewCartRepo(db),
+		orderService: orders.NewService(db),
+		bundle:       bundle,
+		render:       renderer,
 	}
 
 	withSession := WithSession([]byte(cfg.JWTSecret))
@@ -47,6 +51,11 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /catalog/{slug}", withSession(apperr.Wrap(h.shop)))
 	mux.Handle("GET /product/{slug}", withSession(apperr.Wrap(h.product)))
 	mux.Handle("GET /cart", withSession(apperr.Wrap(h.cart)))
+	mux.Handle("POST /cart/items", withSession(apperr.Wrap(h.cartAddItem)))
+	mux.Handle("POST /cart/items/{variantID}/increment", withSession(apperr.Wrap(h.cartIncrement)))
+	mux.Handle("POST /cart/items/{variantID}/decrement", withSession(apperr.Wrap(h.cartDecrement)))
+	mux.Handle("GET /checkout", withSession(apperr.Wrap(h.checkoutForm)))
+	mux.Handle("POST /checkout", withSession(apperr.Wrap(h.checkoutSubmit)))
 	mux.Handle("GET /favorites", withSession(apperr.Wrap(h.favorites)))
 	mux.Handle("GET /profile", withSession(apperr.Wrap(h.profile)))
 	mux.Handle("GET /orders", withSession(apperr.Wrap(h.orders)))

@@ -3,6 +3,7 @@ module github.com/Nikemas/cozy_backend
 go 1.26.4
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.11.0
 	golang.org/x/crypto v0.57.0

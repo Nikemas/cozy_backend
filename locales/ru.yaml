@@ -39,6 +39,7 @@ screen.orders.title: Заказы
 screen.branches.title: Филиалы
 screen.lang.title: Язык
 screen.done.title: Заказ оформлен
+screen.checkout.title: Оформление заказа
 
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Получить код
@@ -50,3 +51,23 @@ lang.ru: Русский
 lang.ky: Кыргызча
 
 toast.added_to_cart: Добавлено в корзину
+
+cart.empty: Ваша корзина пуста
+cart.go_to_catalog: В каталог
+cart.summary: Итог заказа
+cart.items_total: Товары
+cart.delivery: Доставка
+cart.total: Итого
+cart.checkout: Оформить заказ
+cart.increase: Увеличить количество
+cart.decrease: Уменьшить количество
+
+checkout.delivery: Доставка
+checkout.pickup: Самовывоз
+checkout.no_addresses: У вас пока нет сохранённых адресов — можно выбрать самовывоз.
+checkout.no_points: Нет доступных точек самовывоза.
+checkout.unavailable: Способы получения заказа временно недоступны.
+checkout.place_order: Оформить заказ
+
+done.total: Итого
+done.delivery_window: Курьер свяжется для уточнения времени доставки

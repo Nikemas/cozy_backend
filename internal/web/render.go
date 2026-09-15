@@ -23,6 +23,10 @@ var screenPages = map[string]string{
 	"branches": "branches.gohtml",
 	"lang":     "lang.gohtml",
 	"done":     "done.gohtml",
+	// "checkout" isn't one of COZY_WEB_DESIGN.md's original 9 screens — it's
+	// a new screen Task 3 adds per web-plan Task 3 (delivery-address-or-
+	// pickup-point selection, not covered 1:1 by the design canvas).
+	"checkout": "checkout.gohtml",
 }
 
 // layoutPartials are parsed alongside every page: the shared chrome from
@@ -105,4 +109,24 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return t.ExecuteTemplate(w, "layout", data)
+}
+
+// RenderPartial executes one named sub-template from screen's own file
+// (e.g. a `{{define "cart_page"}}` block inside cart.gohtml) directly,
+// without the layout/header/footer wrapper. Used by HTMX endpoints that
+// swap one fragment of an already-loaded page — the cart stepper's
+// increment/decrement calls, for example — instead of doing a full page
+// reload.
+func (rr *Renderer) RenderPartial(w http.ResponseWriter, screen, name string, data PageData) error {
+	byScreen, ok := rr.tmpl[data.Lang]
+	if !ok {
+		byScreen = rr.tmpl[i18n.DefaultLang]
+	}
+	t, ok := byScreen[screen]
+	if !ok {
+		return fmt.Errorf("web: no template registered for screen %q", screen)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return t.ExecuteTemplate(w, name, data)
 }

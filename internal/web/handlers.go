@@ -10,17 +10,21 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 const langCookieName = "cozy_lang"
 
 type handlers struct {
-	db        *sql.DB
-	cfg       *config.Config
-	auth      *auth.Service
-	customers *storefront.CustomerRepo
-	render    *Renderer
+	db           *sql.DB
+	cfg          *config.Config
+	auth         *auth.Service
+	customers    *storefront.CustomerRepo
+	carts        *orders.CartRepo
+	orderService *orders.Service
+	bundle       *i18n.Bundle
+	render       *Renderer
 }
 
 // ProfileData backs profile.gohtml's unauthenticated login form. Step is
@@ -32,11 +36,6 @@ type handlers struct {
 type ProfileData struct {
 	Step  string
 	Phone string
-}
-
-// DoneData backs done.gohtml.
-type DoneData struct {
-	OrderNumber string
 }
 
 // resolveLang reads the language cookie Foundation's /lang screen writes,
@@ -80,6 +79,19 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 		}
 		data.MaskedPhone = maskPhone(customer.Phone)
 	}
+
+	// CartCount backs the header badge — Task 3 owns internal/orders, so
+	// it's the one wiring this up now that CartRepo.List has a real body;
+	// FavCount/OrdersCount stay at 0 until Tasks 4/5 do the same for their
+	// own repos.
+	if items, err := h.carts.List(r.Context(), customerID); err != nil {
+		slog.Warn("web: failed to load cart count for header badge", "customer_id", customerID, "err", err)
+	} else {
+		for _, it := range items {
+			data.CartCount += it.Qty
+		}
+	}
+
 	return data
 }
 
@@ -91,9 +103,8 @@ func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "product", h.base(r, "product"))
 }
 
-func (h *handlers) cart(w http.ResponseWriter, r *http.Request) error {
-	return h.render.Render(w, "cart", h.base(r, "cart"))
-}
+// cart, checkout and done handlers live in cart_handlers.go /
+// checkout_handlers.go (Task 3 — Cart + Checkout + Done).
 
 func (h *handlers) favorites(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "fav", h.base(r, "fav"))
@@ -141,12 +152,6 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	})
 	http.Redirect(w, r, "/lang", http.StatusSeeOther)
 	return nil
-}
-
-func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
-	data := h.base(r, "done")
-	data.Data = DoneData{OrderNumber: r.PathValue("orderNumber")}
-	return h.render.Render(w, "done", data)
 }
 
 // loginRequestOTP re-uses internal/auth's OTP service directly — no
