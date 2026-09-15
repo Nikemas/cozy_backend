@@ -83,6 +83,7 @@ toast.no_variants: Товар временно недоступен
 toast.cart_soon: Корзина скоро заработает
 toast.address_saved: Адрес сохранён
 toast.address_deleted: Адрес удалён
+toast.coming_soon: Скоро добавим
 
 order.status.placed: Оформлен
 order.status.confirmed: Подтверждён
@@ -101,3 +102,20 @@ branches.title: Филиалы
 branches.you_are_here: Вы здесь
 branches.route: Маршрут
 branches.empty: Пока нет доступных точек продаж
+
+# Task 2 (Catalog: shop + product) keys.
+shop.banner.eyebrow: Новая коллекция
+shop.banner.title: Скидки до 30% на кроссовки
+shop.results_word: товаров
+shop.empty: Ничего не найдено
+shop.prev: Назад
+shop.next: Дальше
+
+product.size: Размер
+product.color: Цвет
+product.delivery.courier: Доставка по Бишкеку — 200 сом, 1 день
+product.delivery.pickup: Забрать в филиале — бесплатно
+product.delivery.return: Обмен и возврат 14 дней
+product.unavailable: Этого размера/цвета сейчас нет в наличии
+product.add_to_cart: В корзину
+product.buy_now: Заказать сразу

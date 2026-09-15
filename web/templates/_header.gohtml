@@ -10,9 +10,15 @@
       <a href="/branches" class="nav__link{{if eq .Screen "branches"}} nav__link--active{{end}}">{{t "nav.branches"}}</a>
     </nav>
 
-    <form class="search" method="get" action="/">
+    <form class="search" method="get"
+          action="{{if eq .Screen "shop"}}{{.Data.BasePath}}{{else}}/{{end}}"
+          {{if eq .Screen "shop"}}
+          hx-get="{{.Data.BasePath}}" hx-trigger="input changed delay:400ms, search"
+          hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+          hx-include="#shop-price-max"
+          {{end}}>
       <i class="ti ti-search"></i>
-      <input type="search" name="q" placeholder="{{t "search.placeholder"}}">
+      <input type="search" id="shop-q" name="q" value="{{.SearchQuery}}" placeholder="{{t "search.placeholder"}}">
     </form>
 
     <div class="header__actions">

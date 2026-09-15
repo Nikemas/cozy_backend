@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// (productSlugUUID/ProductPath/ResolveProductID below extend Foundation's
+// Slugify with product-specific helpers — Task 2.)
+
 // cyrillicToLatin is a fixed transliteration table (RU + a few KY-only
 // letters) — good enough for the handful of demo rows Foundation ships
 // with. Task 2 is free to swap it for a proper transliteration library
@@ -34,4 +37,33 @@ func Slugify(name string) string {
 		b.WriteRune(r)
 	}
 	return strings.Trim(slugNonAlnum.ReplaceAllString(b.String(), "-"), "-")
+}
+
+// productSlugUUID matches the UUID prefix ProductPath embeds at the front
+// of a /product/:slug path value. Products have no persisted slug column
+// (unlike categories, which do — see catalog.CategoryRepo.ResolveID), so
+// the URL encodes the id itself plus a purely cosmetic, SEO-friendly
+// suffix built from the product's name.
+var productSlugUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+
+// ProductPath builds the canonical /product/:slug URL for a product.
+//
+// Example: ProductPath("a1b2...-uuid", "Кроссовки Nike Air") ==
+// "/product/a1b2...-uuid-krossovki-nike-air"
+func ProductPath(id, name string) string {
+	if s := Slugify(name); s != "" {
+		return "/product/" + id + "-" + s
+	}
+	return "/product/" + id
+}
+
+// ResolveProductID extracts the product UUID from a /product/:slug path
+// value produced by ProductPath. The cosmetic suffix (if any) is ignored.
+// Returns ok=false if slug doesn't start with a UUID.
+func ResolveProductID(slug string) (id string, ok bool) {
+	m := productSlugUUID.FindString(slug)
+	if m == "" {
+		return "", false
+	}
+	return m, true
 }

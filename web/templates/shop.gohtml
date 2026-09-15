@@ -1,7 +1,95 @@
+{{/* shop screen (COZY_WEB_DESIGN.md §3.1) — Task 2.
+     "_shop_results" is a separate named block (not just a div in
+     "content") so every HTMX filter/search/pagination control can target
+     it with hx-select="#shop-results" and get back just this fragment
+     from the very same full-page response a plain browser request would
+     render — see internal/web/catalog_view.go's doc comment. */}}
 {{define "content"}}
-<div class="screen-placeholder">
-  <h1>{{t "screen.shop.title"}}</h1>
-  <p class="muted">{{t "common.soon"}}</p>
-  <!-- TODO(catalog): product grid + filters/search via HTMX partial-swap (Task 2) -->
+{{$d := .Data}}
+<div>
+  {{if $d.ShowBanner}}
+  <div class="shop-banner">
+    <div>
+      <div class="shop-banner__eyebrow">{{t "shop.banner.eyebrow"}}</div>
+      <div class="shop-banner__title">{{t "shop.banner.title"}}</div>
+    </div>
+    <svg width="130" height="86" viewBox="0 0 100 60" aria-hidden="true">
+      <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
+      <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </div>
+  {{end}}
+
+  {{template "_shop_results" .}}
+</div>
+{{end}}
+
+{{define "_shop_results"}}
+{{$d := .Data}}
+<div id="shop-results">
+  <div class="shop-toolbar">
+    <div class="shop-chips">
+      {{range $d.Categories}}
+      <a class="chip chip--tab{{if .Active}} chip--tab--active{{end}}"
+         href="{{.Href}}"
+         hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+         hx-include="#shop-q, #shop-price-max">{{.Label}}</a>
+      {{end}}
+    </div>
+    <div class="shop-count">{{$d.Total}} {{t "shop.results_word"}}</div>
+  </div>
+
+  {{if $d.NoResults}}
+  <div class="shop-empty">
+    <i class="ti ti-mood-empty"></i>
+    <div>{{t "shop.empty"}}</div>
+  </div>
+  {{else}}
+  <div class="shop-grid">
+    {{range $d.Products}}
+    <div class="product-card">
+      <!-- TODO(favorites): wire the heart toggle once
+           internal/storefront.Favorites exists (Task 4) — decorative
+           only for now, per web-plan's task boundaries. -->
+      <button class="product-card__fav" type="button" aria-label="{{t "nav.favorites"}}" title="{{t "common.soon"}}">
+        <i class="ti ti-heart"></i>
+      </button>
+      <a class="product-card__link" href="{{.DetailURL}}">
+        <div class="product-card__thumb">
+          {{if .HasPhoto}}
+          <img src="{{.PhotoURL}}" alt="{{.Name}}">
+          {{else}}
+          <svg width="120" height="72" viewBox="0 0 100 60" aria-hidden="true">
+            <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
+            <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          {{end}}
+        </div>
+        {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
+        <div class="product-card__name">{{.Name}}</div>
+        <div class="product-card__price">{{.PriceText}}</div>
+      </a>
+    </div>
+    {{end}}
+  </div>
+
+  {{if or $d.HasPrev $d.HasNext}}
+  <div class="shop-pager">
+    {{if $d.HasPrev}}
+    <a class="shop-pager__link" href="{{$d.PrevHref}}"
+       hx-get="{{$d.PrevHref}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true">
+      <i class="ti ti-chevron-left"></i> {{t "shop.prev"}}
+    </a>
+    {{end}}
+    <span class="shop-pager__page">{{$d.Page}} / {{$d.TotalPages}}</span>
+    {{if $d.HasNext}}
+    <a class="shop-pager__link" href="{{$d.NextHref}}"
+       hx-get="{{$d.NextHref}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true">
+      {{t "shop.next"}} <i class="ti ti-chevron-right"></i>
+    </a>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
 </div>
 {{end}}

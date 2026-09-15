@@ -42,12 +42,16 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		branchRepo:   storefront.NewBranchRepo(db),
 		addressRepo:  storefront.NewAddressRepo(db),
 		favoriteRepo: storefront.NewFavoriteRepo(db),
-		products:     catalog.NewProductRepo(db),
-		variants:     catalog.NewVariantRepo(db),
-		cartRepo:     orders.NewCartRepo(db),
-		ordersSvc:    orders.NewService(db),
 		render:       renderer,
 		bundle:       bundle,
+
+		categories: catalog.NewCategoryRepo(db),
+		products:   catalog.NewProductRepo(db),
+		variants:   catalog.NewVariantRepo(db),
+		stock:      catalog.NewStockRepo(db),
+
+		cartRepo:  orders.NewCartRepo(db),
+		ordersSvc: orders.NewService(db),
 	}
 
 	withSession := WithSession([]byte(cfg.JWTSecret))
@@ -56,6 +60,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /{$}", withSession(apperr.Wrap(h.shop)))
 	mux.Handle("GET /catalog/{slug}", withSession(apperr.Wrap(h.shop)))
 	mux.Handle("GET /product/{slug}", withSession(apperr.Wrap(h.product)))
+	mux.Handle("POST /product/{slug}/cart", withSession(apperr.Wrap(h.productAddToCart)))
+	mux.Handle("POST /product/{slug}/buy", withSession(apperr.Wrap(h.productBuyNow)))
 	mux.Handle("GET /cart", withSession(apperr.Wrap(h.cart)))
 	mux.Handle("GET /favorites", withSession(apperr.Wrap(h.favorites)))
 	mux.Handle("GET /profile", withSession(apperr.Wrap(h.profile)))
