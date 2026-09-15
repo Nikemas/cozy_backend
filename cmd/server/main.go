@@ -19,6 +19,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
 )
@@ -143,6 +144,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc)
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
+	points.RegisterRoutes(mux, db, staffSvc)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
