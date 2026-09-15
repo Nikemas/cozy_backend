@@ -26,6 +26,38 @@ func NewImageRepo(db *sql.DB) *ImageRepo {
 	return &ImageRepo{db: db}
 }
 
+// PrimaryForProducts returns each product's first image (lowest
+// sort_order), keyed by product_id — products with no image are simply
+// absent from the map. Used by the storefront (internal/web) to render
+// grid thumbnails without an N+1 query per product.
+func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string) (map[string]ProductImage, error) {
+	if len(productIDs) == 0 {
+		return map[string]ProductImage{}, nil
+	}
+
+	const q = `
+		SELECT DISTINCT ON (product_id) id, product_id, object_key, sort_order
+		FROM product_images
+		WHERE product_id = ANY($1)
+		ORDER BY product_id, sort_order`
+
+	rows, err := r.db.QueryContext(ctx, q, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[string]ProductImage, len(productIDs))
+	for rows.Next() {
+		var pi ProductImage
+		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder); err != nil {
+			return nil, err
+		}
+		out[pi.ProductID] = pi
+	}
+	return out, rows.Err()
+}
+
 // ImageInput carries the writable fields of one product image.
 type ImageInput struct {
 	ObjectKey string

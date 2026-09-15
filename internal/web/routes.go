@@ -49,6 +49,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		products:   catalog.NewProductRepo(db),
 		variants:   catalog.NewVariantRepo(db),
 		stock:      catalog.NewStockRepo(db),
+		images:     catalog.NewImageRepo(db),
 
 		cartRepo:  orders.NewCartRepo(db),
 		ordersSvc: orders.NewService(db),

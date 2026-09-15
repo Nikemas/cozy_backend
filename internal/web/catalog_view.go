@@ -93,10 +93,9 @@ type ProductCard struct {
 	PriceText string
 	DetailURL string
 
-	// HasPhoto/PhotoURL are always false/"" until internal/media exists —
-	// kept as real fields (rather than skipping the branch entirely) so
-	// the template is already correct once product photos land.
-	// TODO(media): wire PhotoURL from MinIO presigned URLs.
+	// HasPhoto/PhotoURL back the grid thumbnail — false/"" for a product
+	// with no row in product_images, in which case the template falls
+	// back to the SVG placeholder.
 	HasPhoto bool
 	PhotoURL string
 }
@@ -162,16 +161,30 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		return nil, err
 	}
 
+	ids := make([]string, len(products))
+	for i, p := range products {
+		ids[i] = p.ID
+	}
+	images, err := h.images.PrimaryForProducts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
 	cards := make([]ProductCard, 0, len(products))
 	for _, p := range products {
 		name := pickName(p.NameRu, p.NameKy, lang)
-		cards = append(cards, ProductCard{
+		card := ProductCard{
 			ID:        p.ID,
 			Name:      name,
 			Brand:     stringOr(p.Brand, ""),
 			PriceText: formatMoney(p.BasePrice),
 			DetailURL: ProductPath(p.ID, p.NameRu),
-		})
+		}
+		if img, ok := images[p.ID]; ok {
+			card.HasPhoto = true
+			card.PhotoURL = h.photoURL(img.ObjectKey)
+		}
+		cards = append(cards, card)
 	}
 
 	chips := make([]CategoryChip, 0, len(tree)+1)
@@ -244,7 +257,7 @@ type ProductData struct {
 	Brand     string
 	PriceText string
 
-	HasPhoto bool // TODO(media): see ProductCard.
+	HasPhoto bool // see ProductCard.HasPhoto
 	PhotoURL string
 
 	Sizes  []SizeOption
@@ -369,10 +382,21 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		}
 	}
 
+	hasPhoto := false
+	photoURL := ""
+	if images, err := h.images.PrimaryForProducts(ctx, []string{product.ID}); err != nil {
+		return nil, err
+	} else if img, ok := images[product.ID]; ok {
+		hasPhoto = true
+		photoURL = h.photoURL(img.ObjectKey)
+	}
+
 	return &ProductData{
 		Name:              name,
 		Brand:             stringOr(product.Brand, ""),
 		PriceText:         formatMoney(price),
+		HasPhoto:          hasPhoto,
+		PhotoURL:          photoURL,
 		Sizes:             sizeOpts,
 		Colors:            colorOpts,
 		SelectedSize:      selectedSize,
@@ -449,4 +473,21 @@ func formatMoney(v float64) string {
 		out = "-" + out
 	}
 	return out + " сом"
+}
+
+// photoURL builds a direct (non-presigned) URL to objectKey in the
+// cozy-media bucket. The bucket is set to public-read at setup time —
+// one of the two options Task E's own notes call out ("presigned GET URL
+// (или публичная политика бакета за Caddy/nginx кэшем — решить по
+// месту)") — so the storefront doesn't need a media.Client dependency
+// just to render <img> tags. cfg.MinIOEndpoint is the server's view of
+// MinIO; in this local dev setup client and server share the same host,
+// so that's also reachable from the browser. A real deployment behind a
+// CDN/reverse proxy would swap this for a public asset domain.
+func (h *handlers) photoURL(objectKey string) string {
+	scheme := "http"
+	if h.cfg.MinIOUseSSL {
+		scheme = "https"
+	}
+	return scheme + "://" + h.cfg.MinIOEndpoint + "/" + h.cfg.MinIOBucket + "/" + objectKey
 }

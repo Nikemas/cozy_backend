@@ -37,6 +37,7 @@ type handlers struct {
 	products   *catalog.ProductRepo
 	variants   *catalog.VariantRepo
 	stock      *catalog.StockRepo
+	images     *catalog.ImageRepo
 
 	// Orders domain — Task 3's real implementation now. Named cartRepo
 	// (not cart) to avoid colliding with the /cart screen handler below.
