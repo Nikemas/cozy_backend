@@ -102,6 +102,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 	sms := notify.NewNikitaClient(cfg.NikitaAPIKey)
 	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
 	httpapi.RegisterAuthRoutes(mux, authSvc)
+	httpapi.RegisterCatalogRoutes(mux, db)
 }
 
 // registerAdminRoutes mounts /admin/* — html/template pages behind a staff
