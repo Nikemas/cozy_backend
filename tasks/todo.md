@@ -252,9 +252,9 @@
 - [x] Task L, M, N, O, P — все смержены в `main` (`b14e94d`, `5a6274d`, `fb888eb`, `552406c`, и Task P только что)
 - [x] `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .` — чисто на `main` после мерджа L/M/N (проверено на `e8c1cfe`); перепроверить ещё раз после Task P
 - [x] `httpapi.RegisterAdminReportsRoutes(...)` подключён в `registerAdminRoutes` при мердже Task N (`fb888eb`) — Task O оставила её неподключённой намеренно (см. её Deviations), `/admin/api/reports/sales*` был мёртвым кодом до этого коммита
-- [ ] `httpapi.RegisterAdminImportRoutes(...)` — Task P тоже оставила неподключённой намеренно, подключить при мердже
-- [ ] `go.mod`/`go.sum` — одна версия `excelize` после мерджа Task P, прогнать `go mod tidy`
-- [ ] `openapi.yaml` дополнен новыми путями (отдельная маленькая задача по аналогии с Task F) — после мерджа Task P
+- [x] `httpapi.RegisterAdminImportRoutes(...)` — Task P оставила её неподключённой намеренно, подключена при мердже Task P (`2ef594f`)
+- [x] `go.mod`/`go.sum` — одна версия `excelize`, `go mod tidy` прогнан (Task P сама уже подтянула правильную версию, конфликта не было)
+- [x] `openapi.yaml` дополнен всеми путями Wave 3 (points/staff CRUD/orders/reports/import) плюс ранее не задокументированными Task G/H (favorites/addresses/devices/orders/cart для мобильного приложения) — 38 путей всего, провалидировано `openapi_spec_validator` — `OK`
 - [ ] Ревью с пользователем перед Wave 4
 
 ## Wave 4 (не начата): internal/admin — HTML/HTMX-слой

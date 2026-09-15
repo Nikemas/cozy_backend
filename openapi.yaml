@@ -8,12 +8,19 @@ info:
     разработчика.md`.
 
     This file documents only endpoints that actually exist in the code today.
-    Per §6/§13 of the ТЗ, still to be added in later waves: `/api/v1/favorites`,
-    `/api/v1/addresses`, `/api/v1/orders`, `/api/v1/payments/bakai/webhook`,
-    `/api/v1/devices`, and `/admin/api/{orders,reports,points,staff}` — extend
-    this spec as each lands, don't let it drift from the real route table
-    (`internal/httpapi`, `internal/staff`, `internal/media`).
-  version: "0.3.0"
+    Per §6/§13 of the ТЗ, the only endpoint still missing is
+    `/api/v1/payments/bakai/webhook` (online payment is deliberately deferred —
+    the site/app currently only place `cash_on_delivery` orders) — extend this
+    spec once that lands, don't let it drift from the real route table
+    (`internal/httpapi`, `internal/staff`, `internal/points`, `internal/media`).
+
+    Two known, deliberate inconsistencies worth knowing about rather than
+    "fixing" in this document: `orders.Order`/`orders.OrderItem`/
+    `orders.CartItem` (`internal/orders`) have no `json` tags, so they
+    serialize as Go's default `PascalCase` field names — unlike every other
+    schema in this file, which uses `snake_case`. Flagged as a follow-up, not
+    silently patched over here.
+  version: "0.4.0"
 
 servers:
   - url: http://localhost:8080
@@ -24,12 +31,22 @@ tags:
     description: Customer login via SMS OTP (Nikita SMSPro) — see §5 ТЗ.
   - name: Catalog
     description: Public, unauthenticated read-only catalog.
+  - name: Customer
+    description: Mobile/JSON API for a logged-in customer (favorites, addresses, devices, orders, cart) — JWT bearer, see §6 ТЗ.
   - name: Admin — Staff
-    description: Staff login/logout (server-side session cookie).
+    description: Staff login/logout (server-side session cookie) and staff-account CRUD (owner only).
   - name: Admin — Catalog
     description: Write side of the catalog, RBAC-gated (owner/manager, stock also point_staff).
   - name: Admin — Media
     description: Presigned MinIO uploads for product photos.
+  - name: Admin — Points
+    description: Points-of-sale CRUD, owner only.
+  - name: Admin — Orders
+    description: Order management (list/detail/status), point-scoped for point_staff.
+  - name: Admin — Reports
+    description: Sales reports, JSON + Excel export, owner/manager only.
+  - name: Admin — Import
+    description: Bulk product import from CSV/Excel.
   - name: System
     description: Liveness/readiness probes.
 
@@ -204,6 +221,232 @@ paths:
           description: "`product_not_found` — missing or inactive (identical response either way)."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
+  # -------------------------------------------------------- Customer API ---
+  /api/v1/favorites:
+    get:
+      tags: [Customer]
+      summary: List favorited products
+      description: |
+        Returns full `Product` objects (not bare IDs) — the mobile favorites
+        screen needs to render cards directly. A product that's since gone
+        inactive/deleted is silently skipped rather than failing the request.
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "200":
+          description: Favorited products.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { items: { type: array, items: { $ref: "#/components/schemas/Product" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/favorites/{productId}:
+    post:
+      tags: [Customer]
+      summary: Add a product to favorites
+      description: Idempotent — favoriting an already-favorited product succeeds again.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: productId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Added (or already present). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Customer]
+      summary: Remove a product from favorites
+      description: Idempotent — removing a product that was never favorited also succeeds.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: productId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Removed (or already absent). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/addresses:
+    get:
+      tags: [Customer]
+      summary: List the customer's saved delivery addresses
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "200":
+          description: Default address first, then newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { items: { type: array, items: { $ref: "#/components/schemas/Address" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Customer]
+      summary: Create a delivery address
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AddressInput" } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "400":
+          description: "`invalid_address` — blank `address_text`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/addresses/{id}:
+    put:
+      tags: [Customer]
+      summary: Update a delivery address
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AddressInput" } } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`address_not_found` — missing, or belongs to a different customer (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    delete:
+      tags: [Customer]
+      summary: Delete a delivery address
+      description: Blocked (`409 address_in_use`) if the address is referenced by a past order.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`address_not_found` — missing, or belongs to a different customer (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/devices:
+    post:
+      tags: [Customer]
+      summary: Register an FCM push-notification device token
+      description: |
+        Upsert by `fcm_token` (globally unique): if the token was previously
+        registered to a different customer (app reinstall, account switch on
+        the same device), ownership moves to the current customer rather
+        than erroring.
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fcm_token, platform]
+              properties:
+                fcm_token: { type: string }
+                platform: { type: string, enum: [ios, android] }
+      responses:
+        "204": { description: Registered. }
+        "400":
+          description: Invalid `platform`.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/orders:
+    post:
+      tags: [Customer]
+      summary: Place an order
+      description: |
+        Server recomputes every line's price/product-name/size/color from the
+        current catalog inside the same transaction that locks and decrements
+        stock (`SELECT ... FOR UPDATE`, sorted variant-id lock order to avoid
+        cross-order deadlocks) — the client only supplies `variant_id`/
+        `quantity`. Exactly one of `address_id` (delivery) or
+        `pickup_point_id` (self-pickup) must be set; for delivery, the
+        fulfilling point of sale is chosen automatically (first active point
+        whose stock covers every line). Only `cash_on_delivery` orders are
+        created — online/Bakai payment isn't wired up yet.
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateRequest" } } }
+      responses:
+        "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "400":
+          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, or malformed body."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: "`address_not_found`, `pickup_point_not_found`, or `variant_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "409":
+          description: "`insufficient_stock` — not enough stock at the chosen/fulfilling point."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    get:
+      tags: [Customer]
+      summary: List the customer's own order history
+      description: Newest first, each with its `items` attached.
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "200":
+          description: Order history.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Order" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/orders/{id}:
+    get:
+      tags: [Customer]
+      summary: Get one of the customer's own orders
+      description: "`{id}` may be either the order's UUID or its human-readable `order_number` (`COZY-YYYYMMDD-NNN`) — both are accepted, scoped to the authenticated customer."
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Order detail., content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`order_not_found` — missing, or belongs to a different customer (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/cart:
+    get:
+      tags: [Customer]
+      summary: Get the customer's server-side cart
+      description: Persisted server-side (not localStorage) so it's shared between the website and the mobile app for the same logged-in customer.
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "200":
+          description: Cart lines.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CartItem" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/cart/{variantId}:
+    post:
+      tags: [Customer]
+      summary: Add a variant to the cart
+      description: Upsert — adding an already-present variant increments its quantity rather than erroring.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: variantId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [quantity], properties: { quantity: { type: integer, minimum: 1 } } } } }
+      responses:
+        "204": { description: Added. }
+        "400": { description: "`invalid_qty`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [Customer]
+      summary: Set a cart line's quantity
+      description: A quantity of zero or less removes the line instead of failing.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: variantId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [quantity], properties: { quantity: { type: integer } } } } }
+      responses:
+        "204": { description: "Updated (or removed, if quantity <= 0)." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: "`cart_item_not_found` (only possible via a quantity > 0 update to a line that doesn't exist).", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+    delete:
+      tags: [Customer]
+      summary: Remove a cart line
+      description: Removing a line that isn't there is a no-op, not an error.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: variantId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Removed (or already absent). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # --------------------------------------------------------- Admin/Staff ---
   /admin/api/login:
     post:
@@ -250,6 +493,64 @@ paths:
           content:
             application/json:
               schema: { type: object, properties: { status: { type: string, example: ok } } }
+
+  /admin/api/staff:
+    get:
+      tags: [Admin — Staff]
+      summary: List staff accounts
+      description: "`password_hash` is never included — there's no field on the response DTO to leak it through."
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: All staff accounts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { items: { type: array, items: { $ref: "#/components/schemas/StaffAccount" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin — Staff]
+      summary: Create a staff account
+      description: Password is bcrypt-hashed before storage. `point_id` is required for `point_staff`, forbidden for `owner`/`manager`.
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateStaffRequest" } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/StaffAccount" } } } }
+        "400":
+          description: "`invalid_phone`/`invalid_name`/`invalid_password`/`invalid_role`/`point_id_required`/`point_id_forbidden`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/api/staff/{id}:
+    put:
+      tags: [Admin — Staff]
+      summary: Update a staff account
+      description: |
+        `password` is a pointer on the wire: omit it to leave the password
+        unchanged, or supply a new one to rotate it (empty string rejected).
+        Blocked with `409 last_owner` if this update would demote or
+        deactivate the last active `owner` account.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateStaffRequest" } } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/StaffAccount" } } } }
+        "400":
+          description: "`invalid_name`/`invalid_password`/`invalid_role`/`point_id_required`/`point_id_forbidden`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`last_owner` — this change would leave the shop with no active owner."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   # ------------------------------------------------------- Admin/Catalog ---
   /admin/api/categories:
@@ -474,6 +775,226 @@ paths:
           description: MinIO presign call failed.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
+  # -------------------------------------------------------- Admin/Points ---
+  /admin/api/points:
+    get:
+      tags: [Admin — Points]
+      summary: List points of sale
+      description: Includes inactive points — unlike the (nonexistent) public catalog equivalent, the admin needs to see everything.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: All points of sale.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Point" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Admin — Points]
+      summary: Create a point of sale
+      description: Always created active — `is_active` isn't accepted on create, only on update.
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, address]
+              properties: { name: { type: string }, address: { type: string } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Point" } } } }
+        "400": { description: "`invalid_name`/`invalid_address`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/api/points/{id}:
+    put:
+      tags: [Admin — Points]
+      summary: Update a point of sale
+      description: Unlike create, `is_active` is required here — this is how a point gets deactivated/reactivated.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, address, is_active]
+              properties: { name: { type: string }, address: { type: string }, is_active: { type: boolean } }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Point" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin — Points]
+      summary: Delete a point of sale
+      description: Blocked (`409 point_in_use`) if referenced by staff, stock, or orders — deactivate via update instead.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # -------------------------------------------------------- Admin/Orders ---
+  /admin/api/orders:
+    get:
+      tags: [Admin — Orders]
+      summary: List orders
+      description: |
+        `owner`/`manager` see every order. `point_staff` sees only orders at
+        their own point (`point_id` silently forced to their own, overriding
+        any `point_id` query param) — and, notably, an order that has no
+        `point_id` yet (not yet assigned to a fulfilling point) is invisible
+        to `point_staff`, visible only to `owner`/`manager`.
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] } }
+        - { name: point_id, in: query, description: "Ignored for `point_staff` (see description).", schema: { type: string, format: uuid } }
+        - { name: from, in: query, description: "RFC3339 or `YYYY-MM-DD`.", schema: { type: string } }
+        - { name: to, in: query, description: "RFC3339 or `YYYY-MM-DD`.", schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        "200":
+          description: Paginated order list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Order" } }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total: { type: integer }
+        "400": { description: "`invalid_status`/`invalid_from`/`invalid_to`/`invalid_page`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/api/orders/{id}:
+    get:
+      tags: [Admin — Orders]
+      summary: Get one order (admin view)
+      description: "`{id}` may be the UUID or `order_number`. `point_staff` gets `403` for an order at a different point, or with no point assigned yet."
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Order detail., content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "`forbidden` — `point_staff` targeting an order outside their point."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/orders/{id}/status:
+    put:
+      tags: [Admin — Orders]
+      summary: Change an order's status
+      description: Same point-scoping as `GET /admin/api/orders/{id}`. Only valid `order_status` transitions are accepted.
+      security: [{ staffSessionCookie: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties: { status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] } }
+      responses:
+        "200": { description: Updated order., content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "400":
+          description: "`invalid_status_transition`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "`forbidden` — `point_staff` targeting an order outside their point."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ------------------------------------------------------- Admin/Reports ---
+  /admin/api/reports/sales:
+    get:
+      tags: [Admin — Reports]
+      summary: Sales report (JSON)
+      description: |
+        Cancelled orders are fully excluded from every number in the report.
+        `day`/`point` group at the order level; `product` groups at the
+        line-item level (one order spanning several products counts once per
+        product, but its `order_count` still dedupes by order id). An empty
+        range or no matching orders returns a valid report with zero rows,
+        not an error.
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-01" }
+        - { name: to, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-15" }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+      responses:
+        "200": { description: Aggregated report., content: { application/json: { schema: { $ref: "#/components/schemas/SalesReportResponse" } } } }
+        "400": { description: "`from`/`to` malformed, `from > to`, or invalid `group_by`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/api/reports/sales.xlsx:
+    get:
+      tags: [Admin — Reports]
+      summary: Sales report (Excel export)
+      description: Same params and data as `GET /admin/api/reports/sales`, rendered as a downloadable `.xlsx` workbook.
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+      responses:
+        "200":
+          description: "`.xlsx` workbook, `Content-Disposition: attachment; filename=\"sales_report.xlsx\"`."
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { description: "Same as the JSON variant.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # -------------------------------------------------------- Admin/Import ---
+  /admin/products/import:
+    post:
+      tags: [Admin — Import]
+      summary: Bulk product import from CSV or Excel
+      description: |
+        Deliberately **not** under `/admin/api/` — matches §8 of the ТЗ
+        exactly. Format is detected from the filename extension and/or
+        `Content-Type` and rejected with 400 before any parsing is attempted.
+        A syntactically broken file (unparseable CSV/XLSX) fails the whole
+        request with 400; a per-row validation problem (missing field, bad
+        price, unknown category, ...) does NOT abort the batch — it's
+        collected into `errors` and the next row is processed. A stock-upsert
+        failure for one of a row's optional `stock:<pointId>` columns is
+        recorded as a warning-style row error but still counts the row as
+        imported, since the product/variant itself was created successfully.
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ".csv or .xlsx, columns (by header name, case-insensitive): name_ru, name_ky, category (slug or UUID), price, optionally brand/description_ru/description_ky/size/color/sku/price_override/stock:<pointId>."
+      responses:
+        "200": { description: "Import finished (possibly with per-row errors — check `errors`, not just the HTTP status).", content: { application/json: { schema: { $ref: "#/components/schemas/ImportResult" } } } }
+        "400":
+          description: "`missing_file`, `unsupported_format`, or `invalid_multipart` — the whole file was rejected before any row was processed."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   # -------------------------------------------------------------- System ---
   /healthz:
     get:
@@ -506,9 +1027,8 @@ components:
       bearerFormat: JWT
       description: |
         Customer access token from `POST /api/v1/auth/otp/verify` or
-        `/api/v1/auth/refresh`. Not yet enforced on any endpoint in this
-        file — reserved for customer-scoped routes (favorites, addresses,
-        orders) as they're implemented.
+        `/api/v1/auth/refresh`. Required on every `Customer`-tagged endpoint
+        (favorites, addresses, devices, orders, cart).
 
   responses:
     Unauthorized:
@@ -664,3 +1184,149 @@ components:
             stock:
               type: array
               items: { $ref: "#/components/schemas/StockPoint" }
+
+    Address:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, nullable: true, example: "Дом" }
+        address_text: { type: string }
+        lat: { type: number, format: double, nullable: true }
+        lng: { type: number, format: double, nullable: true }
+        is_default: { type: boolean }
+
+    AddressInput:
+      type: object
+      required: [address_text]
+      properties:
+        label: { type: string, nullable: true }
+        address_text: { type: string }
+        lat: { type: number, format: double, nullable: true }
+        lng: { type: number, format: double, nullable: true }
+        is_default: { type: boolean, default: false }
+
+    # NOTE: Order/OrderItem/CartItem have no json tags in Go (internal/orders)
+    # and so serialize as PascalCase, unlike every other schema in this file.
+    # Documented as-is (see the top-level description) rather than papered
+    # over with a snake_case schema that wouldn't match the real response.
+    Order:
+      type: object
+      properties:
+        ID: { type: string, format: uuid }
+        OrderNumber: { type: string, example: "COZY-20260915-001" }
+        CustomerID: { type: string, format: uuid }
+        AddressID: { type: string, format: uuid, nullable: true }
+        PointID: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
+        Status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
+        PaymentMethod: { type: string, enum: [online, cash_on_delivery], description: "Currently always `cash_on_delivery` — online/Bakai payment isn't wired up yet." }
+        TotalAmount: { type: number, format: double }
+        Comment: { type: string, nullable: true }
+        Items: { type: array, items: { $ref: "#/components/schemas/OrderItem" } }
+        CreatedAt: { type: string, format: date-time }
+        UpdatedAt: { type: string, format: date-time }
+
+    OrderItem:
+      type: object
+      description: A price/size/color snapshot taken at checkout time — independent of later catalog edits.
+      properties:
+        ID: { type: string, format: uuid }
+        OrderID: { type: string, format: uuid }
+        VariantID: { type: string, format: uuid }
+        ProductNameSnapshot: { type: string }
+        SizeSnapshot: { type: string }
+        ColorSnapshot: { type: string }
+        Quantity: { type: integer }
+        Price: { type: number, format: double }
+
+    OrderCreateRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [variant_id, quantity]
+            properties:
+              variant_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+        address_id: { type: string, format: uuid, nullable: true, description: "Delivery. Exactly one of address_id/pickup_point_id must be set." }
+        pickup_point_id: { type: string, format: uuid, nullable: true, description: "Self-pickup. Exactly one of address_id/pickup_point_id must be set." }
+
+    CartItem:
+      type: object
+      description: One line of a customer's server-side cart (see the top-level note on PascalCase here too).
+      properties:
+        CustomerID: { type: string, format: uuid }
+        VariantID: { type: string, format: uuid }
+        Qty: { type: integer }
+        CreatedAt: { type: string, format: date-time }
+
+    Point:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        address: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    StaffAccount:
+      type: object
+      description: "`password_hash` is never included — this is a response-only DTO."
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [owner, manager, point_staff] }
+        point_id: { type: string, format: uuid, nullable: true, description: "Set for `point_staff`, absent for owner/manager." }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    CreateStaffRequest:
+      type: object
+      required: [phone, password, name, role]
+      properties:
+        phone: { type: string }
+        password: { type: string, format: password }
+        name: { type: string }
+        role: { type: string, enum: [owner, manager, point_staff] }
+        point_id: { type: string, format: uuid, nullable: true, description: "Required for point_staff, forbidden otherwise." }
+
+    UpdateStaffRequest:
+      type: object
+      required: [name, role, is_active]
+      properties:
+        name: { type: string }
+        role: { type: string, enum: [owner, manager, point_staff] }
+        point_id: { type: string, format: uuid, nullable: true }
+        is_active: { type: boolean }
+        password: { type: string, format: password, nullable: true, description: "Omit to leave unchanged; empty string is rejected." }
+
+    SalesReportResponse:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        group_by: { type: string, enum: [day, product, point] }
+        rows: { type: array, items: { $ref: "#/components/schemas/SalesRow" } }
+
+    SalesRow:
+      type: object
+      properties:
+        key: { type: string, description: "Date, product name, or point name, depending on group_by." }
+        order_count: { type: integer }
+        item_count: { type: integer }
+        revenue: { type: number, format: double }
+
+    RowError:
+      type: object
+      properties:
+        row: { type: integer, description: "1-based, counting the header as row 1 — matches what an admin sees opening the file in a spreadsheet app." }
+        message: { type: string }
+
+    ImportResult:
+      type: object
+      properties:
+        imported: { type: integer }
+        errors: { type: array, items: { $ref: "#/components/schemas/RowError" } }
