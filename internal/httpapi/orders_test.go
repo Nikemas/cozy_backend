@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,8 +11,14 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
+
+// errUnexpected is a plain, non-apperr error used to test that
+// listCartHandler propagates unexpected errors instead of treating them as
+// a dangling reference to skip.
+var errUnexpected = errors.New("unexpected db error")
 
 // --- fakes ---
 
@@ -90,6 +98,63 @@ func (f *fakeCartService) Remove(_ context.Context, customerID, variantID string
 	f.removeCalled = true
 	f.lastCustomerID, f.lastVariantID = customerID, variantID
 	return f.opErr
+}
+
+// fakeCartVariantGetter is an in-memory cartVariantGetter for listCartHandler
+// tests: variants keyed by id, missing/errID entries model a dangling or
+// broken lookup.
+type fakeCartVariantGetter struct {
+	variants map[string]catalog.Variant
+	errByID  map[string]error // takes precedence over "not found" for id
+}
+
+func (f *fakeCartVariantGetter) GetByID(_ context.Context, id string) (*catalog.Variant, error) {
+	if err, ok := f.errByID[id]; ok {
+		return nil, err
+	}
+	if v, ok := f.variants[id]; ok {
+		return &v, nil
+	}
+	return nil, apperr.NotFound("variant_not_found", "вариация не найдена")
+}
+
+// fakeCartProductGetter is an in-memory cartProductGetter for listCartHandler
+// tests.
+type fakeCartProductGetter struct {
+	products map[string]catalog.Product
+	errByID  map[string]error
+}
+
+func (f *fakeCartProductGetter) GetByIDAny(_ context.Context, id string) (*catalog.Product, error) {
+	if err, ok := f.errByID[id]; ok {
+		return nil, err
+	}
+	if p, ok := f.products[id]; ok {
+		return &p, nil
+	}
+	return nil, apperr.NotFound("product_not_found", "товар не найден")
+}
+
+// fakeCartImageGetter is an in-memory cartImageGetter for listCartHandler
+// tests. Records every call's productIDs argument so tests can assert
+// PrimaryForProducts is called once with the full, de-duplicated list
+// rather than once per cart line.
+type fakeCartImageGetter struct {
+	images      map[string]catalog.ProductImage
+	calls       int
+	lastCallIDs []string
+}
+
+func (f *fakeCartImageGetter) PrimaryForProducts(_ context.Context, productIDs []string) (map[string]catalog.ProductImage, error) {
+	f.calls++
+	f.lastCallIDs = productIDs
+	out := make(map[string]catalog.ProductImage, len(productIDs))
+	for _, id := range productIDs {
+		if img, ok := f.images[id]; ok {
+			out[id] = img
+		}
+	}
+	return out, nil
 }
 
 // newCustomerRequest builds a request carrying an authenticated customer ID
@@ -278,9 +343,34 @@ func TestGetOrderHandlerPropagatesNotFound(t *testing.T) {
 
 // --- cart ---
 
+// cartHandlerFakes bundles the four fakes listCartHandler depends on, with
+// convenience zero-value maps so a test only has to populate what it needs.
+type cartHandlerFakes struct {
+	cart     *fakeCartService
+	variants *fakeCartVariantGetter
+	products *fakeCartProductGetter
+	images   *fakeCartImageGetter
+}
+
+func newCartHandlerFakes() *cartHandlerFakes {
+	return &cartHandlerFakes{
+		cart:     &fakeCartService{},
+		variants: &fakeCartVariantGetter{variants: map[string]catalog.Variant{}, errByID: map[string]error{}},
+		products: &fakeCartProductGetter{products: map[string]catalog.Product{}, errByID: map[string]error{}},
+		images:   &fakeCartImageGetter{images: map[string]catalog.ProductImage{}},
+	}
+}
+
+func (f *cartHandlerFakes) handler() http.Handler {
+	return apperr.Wrap(listCartHandler(f.cart, f.variants, f.products, f.images))
+}
+
 func TestListCartHandlerScopesToCustomer(t *testing.T) {
-	fake := &fakeCartService{listResult: []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 2}}}
-	handler := apperr.Wrap(listCartHandler(fake))
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 2}}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "42", Color: "black"}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", NameKy: "Кроссовкалар", BasePrice: 3000}
+	handler := f.handler()
 
 	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
 	rec := httptest.NewRecorder()
@@ -290,8 +380,225 @@ func TestListCartHandlerScopesToCustomer(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
-	if !fake.listCalled || fake.lastCustomerID != "cust-1" {
-		t.Fatalf("expected List called with cust-1, got called=%v customerID=%q", fake.listCalled, fake.lastCustomerID)
+	if !f.cart.listCalled || f.cart.lastCustomerID != "cust-1" {
+		t.Fatalf("expected List called with cust-1, got called=%v customerID=%q", f.cart.listCalled, f.cart.lastCustomerID)
+	}
+}
+
+func TestListCartHandlerUnauthenticatedWithoutContext(t *testing.T) {
+	f := newCartHandlerFakes()
+	handler := f.handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cart", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401: %s", rec.Code, rec.Body.String())
+	}
+	if f.cart.listCalled {
+		t.Fatal("expected List NOT to be called without an authenticated customer")
+	}
+}
+
+// TestListCartHandlerEnrichesLine checks the happy path: one full cart line
+// enriched with variant size/color, product name/base_price and its
+// primary image's object_key.
+func TestListCartHandlerEnrichesLine(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 2}}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "42", Color: "black"}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", NameKy: "Кроссовкалар", BasePrice: 3000}
+	f.images.images["prod-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/prod-1.jpg"}
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+
+	var lines []cartLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &lines); err != nil {
+		t.Fatalf("unmarshal response: %v (%s)", err, rec.Body.String())
+	}
+	if len(lines) != 1 {
+		t.Fatalf("len(lines) = %d, want 1: %+v", len(lines), lines)
+	}
+	got := lines[0]
+	want := cartLineResponse{
+		VariantID: "var-1", Quantity: 2, ProductID: "prod-1",
+		ProductName: "Кроссовки", ProductNameKy: "Кроссовкалар",
+		Size: "42", Color: "black", Price: 3000,
+	}
+	if got.VariantID != want.VariantID || got.Quantity != want.Quantity || got.ProductID != want.ProductID ||
+		got.ProductName != want.ProductName || got.ProductNameKy != want.ProductNameKy ||
+		got.Size != want.Size || got.Color != want.Color || got.Price != want.Price {
+		t.Errorf("line = %+v, want %+v (object_key aside)", got, want)
+	}
+	if got.ObjectKey == nil || *got.ObjectKey != "products/prod-1.jpg" {
+		t.Errorf("object_key = %v, want products/prod-1.jpg", got.ObjectKey)
+	}
+}
+
+// TestListCartHandlerUsesPriceOverride checks that a variant's
+// price_override wins over the product's base_price, mirroring
+// loadVariantSnapshots in internal/orders/order.go.
+func TestListCartHandlerUsesPriceOverride(t *testing.T) {
+	f := newCartHandlerFakes()
+	override := 2500.0
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 1}}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "42", Color: "black", PriceOverride: &override}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", NameKy: "Кроссовкалар", BasePrice: 3000}
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	var lines []cartLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &lines); err != nil {
+		t.Fatalf("unmarshal response: %v (%s)", err, rec.Body.String())
+	}
+	if len(lines) != 1 || lines[0].Price != 2500 {
+		t.Fatalf("lines = %+v, want single line with price 2500", lines)
+	}
+}
+
+// TestListCartHandlerSkipsDanglingVariant checks that a cart line whose
+// variant has been hard-deleted since being added is silently skipped, not
+// a whole-request failure — see the doc comment on listCartHandler.
+func TestListCartHandlerSkipsDanglingVariant(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{
+		{CustomerID: "cust-1", VariantID: "var-gone", Qty: 1},
+		{CustomerID: "cust-1", VariantID: "var-1", Qty: 2},
+	}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "42", Color: "black"}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", NameKy: "Кроссовкалар", BasePrice: 3000}
+	// var-gone has no entry in f.variants.variants, so fakeCartVariantGetter
+	// returns apperr.NotFound for it, as VariantRepo.GetByID would for a
+	// hard-deleted variant.
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (dangling line skipped, not a failure): %s", rec.Code, rec.Body.String())
+	}
+	var lines []cartLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &lines); err != nil {
+		t.Fatalf("unmarshal response: %v (%s)", err, rec.Body.String())
+	}
+	if len(lines) != 1 || lines[0].VariantID != "var-1" {
+		t.Fatalf("lines = %+v, want only the var-1 line to survive", lines)
+	}
+}
+
+// TestListCartHandlerSkipsDanglingProduct is the same skip behavior, but
+// for a variant whose product row is gone (e.g. products.GetByIDAny
+// returns NotFound) rather than the variant itself.
+func TestListCartHandlerSkipsDanglingProduct(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 1}}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-gone", Size: "42", Color: "black"}
+	// prod-gone has no entry in f.products.products.
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	var lines []cartLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &lines); err != nil {
+		t.Fatalf("unmarshal response: %v (%s)", err, rec.Body.String())
+	}
+	if len(lines) != 0 {
+		t.Fatalf("lines = %+v, want empty (only line's product is dangling)", lines)
+	}
+}
+
+// TestListCartHandlerPropagatesUnexpectedVariantError checks that a
+// non-NotFound error from the variant lookup fails the whole request
+// instead of being swallowed as "skip" — unlike listFavoritesHandler, which
+// treats any lookup error as skip.
+func TestListCartHandlerPropagatesUnexpectedVariantError(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 1}}
+	f.variants.errByID["var-1"] = apperr.Internal(errUnexpected)
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestListCartHandlerEmptyCartReturnsEmptyArray checks the response body is
+// `[]`, not `null`, for a customer with no cart lines — matters to any
+// client that does a straight JSON-array decode without a null check.
+func TestListCartHandlerEmptyCartReturnsEmptyArray(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{}
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "[]" {
+		t.Errorf("body = %q, want []", got)
+	}
+}
+
+// TestListCartHandlerBatchesImageLookup checks PrimaryForProducts is called
+// exactly once with the full, de-duplicated set of product IDs in the
+// cart — not once per line, even when two lines share a product (two
+// variants of the same shoe).
+func TestListCartHandlerBatchesImageLookup(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{
+		{CustomerID: "cust-1", VariantID: "var-1", Qty: 1},
+		{CustomerID: "cust-1", VariantID: "var-2", Qty: 1},
+	}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "41", Color: "black"}
+	f.variants.variants["var-2"] = catalog.Variant{ID: "var-2", ProductID: "prod-1", Size: "42", Color: "black"}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", NameKy: "Кроссовкалар", BasePrice: 3000}
+	handler := f.handler()
+
+	req := newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", "")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if f.images.calls != 1 {
+		t.Fatalf("PrimaryForProducts called %d times, want 1", f.images.calls)
+	}
+	if len(f.images.lastCallIDs) != 1 || f.images.lastCallIDs[0] != "prod-1" {
+		t.Errorf("PrimaryForProducts called with %v, want [prod-1] (de-duplicated)", f.images.lastCallIDs)
 	}
 }
 

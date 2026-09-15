@@ -581,3 +581,40 @@
 - `internal/web/handlers.go` — `loginVerifyOTP` уже делал отдельный `GetByID` сразу после `VerifyOTP` (для проверки `needsName`), эта логика не тронута — просто добавлен `_` под новый возврат вместо повторного использования, чтобы не расширять scope этой задачи правкой соседнего потока.
 
 **Deviations:** нет отклонений от acceptance criteria брифа.
+
+---
+
+## Task Q: Обогащение `GET /api/v1/cart` данными товара — DONE
+
+**Description:** Пробел, найденный при интеграционном тестировании мобильного приложения (не часть исходных Wave-планов, отсюда буква Q, а не продолжение нумерации Wave 3 — следующая свободная после зарезервированной Task P). `GET /api/v1/cart` (Task H) отдавал только голый `orders.CartItem` (`customer_id`, `variant_id`, `qty`, `created_at`) — экран корзины не может отрисовать карточку товара (имя/фото/цена/размер/цвет) без N дополнительных `GET /api/v1/products/{id}` на клиенте. Это чисто чтение — `POST /api/v1/orders` (создание заказа) не тронут: он как принимал `variant_id`+`quantity`, так и принимает, пересчитывая цену/имя/размер/цвет на сервере в `orders.Service.CreateOrder` (см. `loadVariantSnapshots`).
+
+**Acceptance criteria:**
+- [x] Каждая строка `GET /api/v1/cart` теперь содержит: `variant_id`, `quantity`, `product_id`, `product_name` (`name_ru`) + бонусом `product_name_ky`, `size`, `color`, `price` (эффективная цена), `object_key` (nullable, для главного фото)
+- [x] Эффективная цена — `variant.PriceOverride`, если задан, иначе `product.BasePrice` — та же логика, что уже в `internal/orders/order.go`'s `loadVariantSnapshots` (order-creation), не изобретена заново
+- [x] Обогащение батчится: `variants.GetByID`/`products.GetByIDAny` — по одному вызову на строку корзины (batch-метода для этих двух в `internal/catalog` нет, тот же компромисс, что уже принят в Task G для избранного), но `ImageRepo.PrimaryForProducts` — **один** вызов на весь список уникальных `product_id`, не на каждую строку
+- [x] Товар ищется через `ProductRepo.GetByIDAny`, не `GetByID` — деактивированный после добавления в корзину товар всё равно должен отображаться в уже существующей корзине (отклонить его — забота чекаута, не этого read-эндпоинта)
+- [x] Строка с "битой" ссылкой (вариация или товар физически удалены — вариации можно жёстко удалить, если по ним не было заказов, см. `VariantRepo.Delete`) — пропускается молча, весь запрос не падает
+- [x] Пустая корзина — `[]`, не `null`
+- [x] `POST /api/v1/orders` не тронут вообще
+
+**Verification:**
+- [x] `gofmt -l .` — чисто
+- [x] `go build ./...`, `go vet ./...` — чисто
+- [x] `go test ./...` — чисто, все пакеты `ok` (добавлено 10 новых тестов в `internal/httpapi/orders_test.go`: happy path обогащения, price override, пропуск битой вариации, пропуск битого товара, распространение неожиданной (не 404) ошибки как отказ запроса, пустая корзина → `[]`, батчинг `PrimaryForProducts` — ровно один вызов с де-дублированным списком id, плюс сохранённый прежний тест на скоуп по customerID и новый на 401 без аутентификации)
+- [x] `golangci-lint run ./internal/httpapi/...` — 0 issues; `golangci-lint run ./...` на весь репозиторий — то же единственное предсуществующее замечание, что и в Task G/H (`internal/i18n/i18n.go:83`, errcheck на `f.Close`), не создано и не изменено этой задачей (`git diff --stat` подтверждает: тронуты только `internal/httpapi/orders.go` и `internal/httpapi/orders_test.go`)
+- [ ] Manual: нет живого Postgres на этой машине — SQL в `VariantRepo.GetByID`/`ProductRepo.GetByIDAny`/`ImageRepo.PrimaryForProducts` не новый (уже покрыт тестами Task B/E), только вычитан построчно на предмет корректного вызова
+
+**Dependencies:** `internal/orders.CartRepo` (Task H, не менялся), `internal/catalog.{VariantRepo,ProductRepo,ImageRepo}` (Task B/E, не менялись)
+
+**Files touched:**
+- `internal/httpapi/orders.go` — `listCartHandler` получил три новых параметра (`cartVariantGetter`/`cartProductGetter`/`cartImageGetter` — маленькие интерфейсы поверх `*catalog.{VariantRepo,ProductRepo,ImageRepo}`, тот же приём, что `orderService`/`cartService` в этом же файле); новый `cartLineResponse` DTO; новый `isNotFoundErr` хелпер; `RegisterOrderRoutes` теперь строит и пробрасывает `catalog.{NewVariantRepo,NewProductRepo,NewImageRepo}`. По ходу поправлен устаревший doc-комментарий `RegisterOrderRoutes` (утверждал, что функция ещё не подключена в `main.go` — на самом деле уже подключена, судя по `cmd/server/main.go`)
+- `internal/httpapi/orders_test.go` — три новых фейка (`fakeCartVariantGetter`/`fakeCartProductGetter`/`fakeCartImageGetter`, с суффиксом `Cart`, чтобы не конфликтовать с одноимённым `fakeProductGetter` из `favorites_test.go`), `cartHandlerFakes`-хелпер для сборки всех четырёх зависимостей `listCartHandler` разом, 10 новых тестов на корзину
+
+**Design decisions:**
+- **`quantity`, не `qty`, в JSON-ответе.** `orders.CartItem.Qty` — имя Go-поля домена, но остальные тела `/api/v1/*`, где встречается количество (`orderItemRequest`, `cartQtyRequest`), уже используют `quantity` — выбрана консистентность с остальным API, а не с именем внутреннего доменного поля.
+- **`product_name` = `name_ru`, плюс `product_name_ky` бонусом.** В `/api/v1/*` нет механизма языкового согласования вообще (см. заметку в `openapi.yaml`), так что выбора между ru/ky в духе Accept-Language нет; раз это дёшево, отдаю оба поля, как `catalog.Product` сам их отдаёт (`name_ru`/`name_ky`) — не пришлось выдумывать новую конвенцию.
+- **`object_key`, не `image_url`.** В кодовой базе нет URL-билдера, доступного из `internal/httpapi` — `photoURL` в `internal/web/catalog_view.go` приватный метод хендлеров веб-пакета с своей конфигурацией MinIO-бакета, а весь остальной `/api/v1/*`/`/admin/api/*` (presign-upload в `internal/media/routes.go`, `admin_catalog.go`'s image-ответы, `openapi.yaml`'s схема `ProductImage`) уже отдаёт сырой `object_key`, оставляя сборку полного URL клиенту. Следование уже принятой конвенции, а не изобретение новой ради этой одной задачи.
+- **Пропуск (skip), не отказ (fail), для битой ссылки** — по прямому указанию в задании, консистентно с `listFavoritesHandler` (Task G) для того же паттерна "устаревшая ссылка на то, что пользователь когда-то выбрал". Но в отличие от `listFavoritesHandler` (который пропускает строку при *любой* ошибке `ProductRepo.GetByID`, включая непредвиденные), здесь пропуск срабатывает только на `apperr.NotFound` (`isNotFoundErr`) — настоящая ошибка БД не должна тихо превращаться в "товар не найден"; это уточнение, а не отклонение от паттерна `favorites.go` по существу (оба скипают именно "объект пропал"), просто чуть строже. Покрыто отдельным тестом (`TestListCartHandlerPropagatesUnexpectedVariantError`).
+- **Батч только для `PrimaryForProducts`, не для `variants.GetByID`/`products.GetByIDAny`.** Задание явно требует батчить только вызов картинок; для вариаций/товаров в `internal/catalog` просто нет batch-метода (`GetByIDs([]string)`) — тот же, уже принятый в Task G, компромисс между корректностью сейчас и добавлением нового API в чужой пакет (`internal/catalog`) ради этой задачи.
+
+**Deviations:** нет отклонений от постановки задания.
