@@ -46,13 +46,15 @@ COPY --from=builder /out/server /app/server
 # read this directory at startup today.
 COPY --from=builder /src/migrations /app/migrations
 
-# web/, admin/, locales/ are intentionally NOT copied: as of this Dockerfile
-# there is nothing tracked in this branch under those paths, and
-# cmd/server/main.go's registerWebRoutes/registerAdminRoutes are stubs that
-# don't read from disk (no go:embed directives anywhere in the module
-# either). Once site/admin templates or locale files land and are read from
-# disk at runtime, add matching COPY lines here (or switch to go:embed, in
-# which case no COPY is needed at all).
+# internal/web and internal/admin's renderers (render.go in each package)
+# call html/template.ParseFiles against these directories by relative path
+# at startup (NewRenderer, no go:embed) — WORKDIR is /app, so these must
+# land at exactly web/, admin/, locales/ under it to match the paths the
+# code expects. Without these, the server fails at boot the moment
+# registerWebRoutes/registerAdminRoutes call NewRenderer().
+COPY --from=builder /src/web /app/web
+COPY --from=builder /src/admin /app/admin
+COPY --from=builder /src/locales /app/locales
 
 # Documents intent only — EXPOSE can't reference the HTTP_ADDR env var.
 # Default (see internal/config/config.go) is :8080; override HTTP_ADDR at
