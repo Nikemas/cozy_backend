@@ -1,40 +1,28 @@
 # ---------------------------------------------------------------------------
-# Deploy — TEMPLATE, not a live pipeline.
+# Deploy — every push to main that passes tests is rolled out to the
+# staging VPS (cozy.erpsystemsales.com, see README "Staging-сервер").
 #
-# There is no VPS for this project yet, so this workflow cannot run
-# end-to-end today. It is committed now as scaffolding for §11 of the spec
-# ("Деплой и инфраструктура") so it's ready to switch on once the server
-# exists. Until then, expect this job to fail at the SSH step (or be left
-# un-triggered) — that's expected, not a bug.
+# How it works: the job SSHes into the server and runs scripts/deploy.sh
+# from the repo checkout there (/opt/cozy). That script fast-forwards the
+# checkout, rebuilds the backend image from source with docker compose,
+# restarts Caddy if its config changed, and waits for /readyz. No container
+# registry is involved — the image is built on the VPS, so the server needs
+# nothing beyond git + docker + its own .env.
 #
-# Repo secrets that must be created (Settings -> Secrets and variables ->
-# Actions) before this workflow can actually deploy anything:
+# Repo secrets (Settings -> Secrets and variables -> Actions):
 #
-#   DEPLOY_HOST      - VPS hostname or IP to SSH into
-#   DEPLOY_USER      - SSH user on the VPS (e.g. "deploy")
-#   DEPLOY_SSH_KEY   - private key for DEPLOY_USER (PEM), matching public
-#                      key must already be in that user's
-#                      ~/.ssh/authorized_keys on the VPS
-#   DEPLOY_SSH_PORT  - SSH port (optional; the step below defaults to 22)
-#   DEPLOY_PATH      - absolute path on the VPS of the docker-compose
-#                      project to redeploy (e.g. /opt/cozy)
+#   DEPLOY_HOST      - VPS hostname or IP (95.215.244.199)
+#   DEPLOY_USER      - SSH user on the VPS (root)
+#   DEPLOY_SSH_KEY   - PRIVATE key of a dedicated deploy keypair (ed25519,
+#                      PEM/OpenSSH text). Its public half must be in that
+#                      user's ~/.ssh/authorized_keys on the VPS. Use a
+#                      separate key generated just for GitHub — never the
+#                      one on a developer laptop.
+#   DEPLOY_PATH      - repo checkout on the VPS (/opt/cozy)
+#   DEPLOY_SSH_PORT  - optional, defaults to 22
 #
-# Assumptions this template makes (adjust when the real VPS is ready):
-#   - Images are pushed to GHCR (ghcr.io/<owner>/<repo>) using the
-#     built-in GITHUB_TOKEN — no extra registry secret needed from this
-#     side. If the VPS pulls a private package, it needs its own
-#     `docker login ghcr.io` credentials set up out-of-band (not managed
-#     by this workflow).
-#   - A docker-compose.yml already lives at DEPLOY_PATH on the VPS,
-#     referencing this image, and reads its own runtime env vars
-#     (DATABASE_URL, JWT_SECRET, etc. — see .env.example) from a .env file
-#     or systemd unit already present there. This workflow does not
-#     create or manage that file.
-#
-# Third-party actions below are pinned to exact version tags (e.g.
-# @v7.4.0), not commit SHAs — see the same note in ci.yml. Same reasoning
-# applies here: actions/*, docker/*, appleboy/ssh-action are established,
-# widely-depended-on actions, and tags keep bumps easy for a small shop.
+# Third-party actions are pinned to exact version tags (not SHAs) — same
+# reasoning as in ci.yml.
 # ---------------------------------------------------------------------------
 name: Deploy
 
@@ -42,69 +30,68 @@ on:
   push:
     branches:
       - main
+  # Manual re-run from the Actions tab (e.g. after fixing a secret) without
+  # pushing an empty commit.
+  workflow_dispatch:
 
-# No blanket write access at the workflow level: each job below declares
-# only the GITHUB_TOKEN scope it actually needs (least privilege).
+# Only one deploy at a time; a newer push cancels a queued (not running)
+# older one so the server always ends up on the latest main.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
-
 jobs:
-  build-and-push:
-    name: Build & push image
+  test:
+    name: vet & test before deploy
     runs-on: ubuntu-latest
-    # Needs to push the built image to GHCR with the built-in token.
-    permissions:
-      contents: read
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v4.6.0
+      - name: Set up Go
+        uses: actions/setup-go@v6.5.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
+          cache: true
 
-      - name: Build and push image
-        uses: docker/build-push-action@v7.4.0
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:latest
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
 
   deploy:
-    name: Deploy over SSH
-    needs: build-and-push
+    name: Deploy to staging over SSH
+    needs: test
     runs-on: ubuntu-latest
-    # This job never checks out code or calls the GitHub API (it only
-    # opens an SSH session to the VPS), so it needs no GITHUB_TOKEN scope
-    # at all.
+    # Opens an SSH session only; needs no GITHUB_TOKEN scope at all.
     permissions: {}
+    environment:
+      name: staging
+      url: https://cozy.erpsystemsales.com
     steps:
-      - name: docker compose pull && up -d on the VPS
+      - name: Run scripts/deploy.sh on the VPS
         uses: appleboy/ssh-action@v1.2.5
         env:
-          # Forwarded to the remote shell via `envs:` below instead of
-          # being interpolated straight into the `script:` text, so the
-          # secret value isn't baked into the literal script string.
+          # Forwarded via `envs:` rather than interpolated into `script:`,
+          # so the value is not baked into the literal script text.
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_SSH_PORT }}
+          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
           envs: DEPLOY_PATH
+          command_timeout: 15m
           script: |
             set -e
             cd "$DEPLOY_PATH"
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
+            # Pull the script itself first so a deploy that changes
+            # scripts/deploy.sh runs the NEW version, not the one already
+            # on disk.
+            git fetch -q origin main
+            git checkout -q origin/main -- scripts/deploy.sh
+            bash scripts/deploy.sh

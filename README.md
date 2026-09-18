@@ -46,7 +46,7 @@ docker build -f docker/Dockerfile -t cozy_backend .
 
 (Это отдельный файл от `docker/docker-compose.yml`, который только для локальной разработки — postgres + minio.)
 
-CI (`.github/workflows/ci.yml`) на каждый push/PR гоняет `gofmt -l .`, `go vet ./...`, `go test ./...` и `golangci-lint`. Деплой (`.github/workflows/deploy.yml`) — пока шаблон: собирает и пушит образ в GHCR и деплоит по SSH (`docker compose pull && up -d`), но реального VPS ещё нет — см. комментарий в начале файла, какие секреты репозитория нужно завести, когда он появится.
+CI (`.github/workflows/ci.yml`) на каждый push/PR гоняет `gofmt -l .`, `go vet ./...`, `go test ./...` и `golangci-lint`. Деплой (`.github/workflows/deploy.yml`) — на каждый push в `main` после тестов по SSH запускает `scripts/deploy.sh` на staging-VPS (сборка образа прямо на сервере, без registry). Подробнее — раздел «Staging-сервер → Деплой».
 
 ## Staging-сервер
 
@@ -58,6 +58,16 @@ VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` +
 | `https://media.cozy.erpsystemsales.com` | MinIO S3 API (presigned-ссылки на фото) | `minio:9000` |
 
 Сертификаты Let's Encrypt Caddy получает сам. В серверном `.env` обязательно `MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com` и `MINIO_PUBLIC_USE_SSL=true`, иначе загрузка фото в админке ломается. Порт 9000 наружу не публикуется. Когда появится `cozy.kg` — раскомментировать его блок в `Caddyfile`, staging-хост оставить.
+
+### Деплой
+
+Автоматически: каждый push в `main` → `.github/workflows/deploy.yml` прогоняет `go vet`/`go test`, затем по SSH запускает на сервере `scripts/deploy.sh` (fast-forward до `origin/main`, `docker compose up -d --build`, рестарт Caddy при изменении `Caddyfile`, ожидание `/readyz`). Нужные секреты репозитория — в шапке `deploy.yml`. Статус — вкладка Actions, environment `staging`.
+
+Вручную (то же самое, что делает CI):
+
+```bash
+ssh -i ~/.ssh/cozy_vps root@95.215.244.199 'bash /opt/cozy/scripts/deploy.sh'
+```
 
 ## API-документация
 
