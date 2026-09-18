@@ -1,27 +1,30 @@
-# TEST PHASE: no domain pointed at this server yet, so we serve over the
-# raw IP with a self-signed cert (Let's Encrypt can't issue for a bare IP).
-# Browsers will show a certificate warning — expected, click through for
-# testing. Staff admin-panel sessions set a `Secure` cookie, so plain HTTP
-# won't work at all here; this is the minimum needed for login to function.
+# Client's domain (confirmed 2026-09-17): cozy.kg, DNS-managed on
+# Cloudflare, A-record already pointed at this VPS. Caddy gets a real
+# Let's Encrypt cert for it automatically — no self-signed warning.
 #
-# Once the client's domain DNS A-record points at this server, replace the
-# site address below with the real domain(s), e.g.:
+# Cloudflare note: the zone is proxied (orange cloud), so browsers hit
+# Cloudflare's edge, not this box, directly. The ACME HTTP-01 challenge
+# still reaches Caddy fine (Cloudflare passes /.well-known/acme-challenge/
+# through), but Cloudflare's own SSL/TLS mode (dashboard -> SSL/TLS)
+# matters for the Cloudflare<->origin leg: "Full" or "Full (strict)" is
+# correct here now that Caddy presents a real cert; "Flexible" talks plain
+# HTTP to the origin and can loop with Caddy's HTTP->HTTPS redirect.
 #
-#   cozy.kg, www.cozy.kg {
-#       reverse_proxy backend:8080
-#   }
-#
-# and Caddy will automatically obtain a real Let's Encrypt certificate —
-# no self-signed warning, no other changes needed. Update the DEPLOY_HOST
-# GitHub secret to match once that happens.
+# The bare-IP block below is kept as a fallback (e.g. if Cloudflare/DNS
+# ever misbehaves) — harmless to keep alongside the domain block, Caddy
+# routes by SNI and this only serves connections that name the IP itself.
 
 {
 	# Clients connecting to a bare IP (no domain) typically send no SNI at
 	# all in the TLS ClientHello — without this, Caddy can't pick which
 	# certificate to present and the handshake fails with a TLS "internal
-	# error" alert. Remove this global block once the real domain is in
-	# place below (SNI-based selection works normally with a hostname).
+	# error" alert. Only affects the bare-IP fallback block below; SNI-based
+	# selection for cozy.kg works normally regardless.
 	default_sni 95.215.244.199
+}
+
+cozy.kg, www.cozy.kg {
+	reverse_proxy backend:8080
 }
 
 95.215.244.199 {
