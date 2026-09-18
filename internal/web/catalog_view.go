@@ -480,14 +480,9 @@ func formatMoney(v float64) string {
 // one of the two options Task E's own notes call out ("presigned GET URL
 // (или публичная политика бакета за Caddy/nginx кэшем — решить по
 // месту)") — so the storefront doesn't need a media.Client dependency
-// just to render <img> tags. cfg.MinIOEndpoint is the server's view of
-// MinIO; in this local dev setup client and server share the same host,
-// so that's also reachable from the browser. A real deployment behind a
-// CDN/reverse proxy would swap this for a public asset domain.
+// just to render <img> tags. The URL is built on cfg.MinIOPublicEndpoint
+// (the browser-facing host, e.g. media.cozy.erpsystemsales.com behind
+// Caddy), see config.PublicObjectURL.
 func (h *handlers) photoURL(objectKey string) string {
-	scheme := "http"
-	if h.cfg.MinIOUseSSL {
-		scheme = "https"
-	}
-	return scheme + "://" + h.cfg.MinIOEndpoint + "/" + h.cfg.MinIOBucket + "/" + objectKey
+	return h.cfg.PublicObjectURL(objectKey)
 }

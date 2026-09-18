@@ -86,3 +86,28 @@ func getEnv(key, fallback string) string {
 	}
 	return fallback
 }
+
+// PublicObjectURL builds the direct (non-presigned) URL a BROWSER or the
+// mobile app can fetch objectKey from in the media bucket. It must use the
+// public MinIO host (MINIO_PUBLIC_ENDPOINT — in prod a Caddy-fronted HTTPS
+// domain), never MinIOEndpoint, which in Docker is the compose-internal
+// "minio:9000" that nothing outside the backend container can resolve.
+// Falls back to MinIOEndpoint when no public endpoint is configured (local
+// dev, tests). Empty objectKey (no photo) returns "".
+//
+// The bucket is made anonymous-read by media.Client.EnsureBucket, which is
+// what lets a plain GET on this URL succeed without a signature.
+func (c *Config) PublicObjectURL(objectKey string) string {
+	if objectKey == "" {
+		return ""
+	}
+	endpoint, useSSL := c.MinIOPublicEndpoint, c.MinIOPublicUseSSL
+	if endpoint == "" {
+		endpoint, useSSL = c.MinIOEndpoint, c.MinIOUseSSL
+	}
+	scheme := "http"
+	if useSSL {
+		scheme = "https"
+	}
+	return scheme + "://" + endpoint + "/" + c.MinIOBucket + "/" + objectKey
+}

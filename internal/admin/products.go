@@ -54,14 +54,7 @@ func (h *handlers) productsShellData(screen, title string, st *staff.Staff) Page
 // public storefront, so admin thumbnails and product-page photos resolve
 // to the same public-read bucket URL.
 func (h *handlers) photoURL(objectKey string) string {
-	if objectKey == "" {
-		return ""
-	}
-	scheme := "http"
-	if h.cfg.MinIOUseSSL {
-		scheme = "https"
-	}
-	return scheme + "://" + h.cfg.MinIOEndpoint + "/" + h.cfg.MinIOBucket + "/" + objectKey
+	return h.cfg.PublicObjectURL(objectKey)
 }
 
 // renderInternalErr is the fallback for an unexpected (non-apperr, e.g. a

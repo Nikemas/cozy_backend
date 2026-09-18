@@ -68,19 +68,37 @@ func (c *Client) EnsureBucket(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if exists {
-		return nil
+	if !exists {
+		err = c.sdk.MakeBucket(ctx, c.bucket, minio.MakeBucketOptions{})
+		if err != nil {
+			resp := minio.ToErrorResponse(err)
+			if resp.Code != "BucketAlreadyOwnedByYou" && resp.Code != "BucketAlreadyExists" {
+				return err
+			}
+		}
 	}
+	return c.sdk.SetBucketPolicy(ctx, c.bucket, anonymousReadPolicy(c.bucket))
+}
 
-	err = c.sdk.MakeBucket(ctx, c.bucket, minio.MakeBucketOptions{})
-	if err == nil {
-		return nil
-	}
-
-	if resp := minio.ToErrorResponse(err); resp.Code == "BucketAlreadyOwnedByYou" || resp.Code == "BucketAlreadyExists" {
-		return nil
-	}
-	return err
+// anonymousReadPolicy is the bucket policy that lets anyone GET objects
+// (but not list, write or delete) in bucket. Product photos are served to
+// browsers and the mobile app as plain, unsigned URLs
+// (config.PublicObjectURL), so the bucket must be world-readable; writes
+// still go only through presigned PUTs issued by the admin panel. Applied
+// on every startup (idempotent) so a bucket created by hand or by an
+// older version of the code gets the policy too.
+func anonymousReadPolicy(bucket string) string {
+	return `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"AWS": ["*"]},
+      "Action": ["s3:GetObject"],
+      "Resource": ["arn:aws:s3:::` + bucket + `/*"]
+    }
+  ]
+}`
 }
 
 // PresignPut returns a presigned URL the caller can PUT the object's bytes

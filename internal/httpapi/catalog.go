@@ -140,14 +140,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 // resolves to the same public-read bucket URL the site and admin panel do.
 // Empty objectKey (no photo) returns "".
 func photoURL(cfg *config.Config, objectKey string) string {
-	if objectKey == "" {
-		return ""
-	}
-	scheme := "http"
-	if cfg.MinIOUseSSL {
-		scheme = "https"
-	}
-	return scheme + "://" + cfg.MinIOEndpoint + "/" + cfg.MinIOBucket + "/" + objectKey
+	return cfg.PublicObjectURL(objectKey)
 }
 
 // productOut is catalog.Product plus its primary photo URL (empty string
