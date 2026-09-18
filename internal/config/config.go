@@ -22,6 +22,15 @@ type Config struct {
 	MinIOBucket    string
 	MinIOUseSSL    bool
 
+	// MinIOPublicEndpoint/MinIOPublicUseSSL are the host the *browser* uses
+	// to PUT/GET a presigned URL, which can differ from MinIOEndpoint (the
+	// host the backend itself uses to reach MinIO, e.g. a Docker-internal
+	// hostname like "minio:9000" that only resolves inside the compose
+	// network). Both default to the internal values, which is correct for
+	// local dev where backend and browser share "localhost".
+	MinIOPublicEndpoint string
+	MinIOPublicUseSSL   bool
+
 	BakaiWebhookToken string
 
 	NikitaAPIKey string
@@ -51,6 +60,9 @@ func Load() (*Config, error) {
 		MinIOSecretKey: os.Getenv("MINIO_SECRET_KEY"),
 		MinIOBucket:    getEnv("MINIO_BUCKET", "cozy-media"),
 		MinIOUseSSL:    getEnv("MINIO_USE_SSL", "false") == "true",
+
+		MinIOPublicEndpoint: getEnv("MINIO_PUBLIC_ENDPOINT", getEnv("MINIO_ENDPOINT", "localhost:9000")),
+		MinIOPublicUseSSL:   getEnv("MINIO_PUBLIC_USE_SSL", getEnv("MINIO_USE_SSL", "false")) == "true",
 
 		BakaiWebhookToken: os.Getenv("BAKAI_WEBHOOK_TOKEN"),
 

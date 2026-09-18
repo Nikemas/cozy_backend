@@ -15,6 +15,12 @@ services:
     env_file: ../.env
     environment:
       DATABASE_URL: postgres://cozy:${POSTGRES_PASSWORD}@postgres:5432/cozy?sslmode=disable
+      # Internal Docker hostname — only the backend container needs to
+      # resolve this. The admin's BROWSER instead needs MINIO_PUBLIC_ENDPOINT
+      # (set in the server's .env to the VPS's public domain/IP + port 9000,
+      # e.g. "cozy.example.com:9000") — without it, presigned photo-upload
+      # URLs point at "minio:9000", which the browser can't resolve, and
+      # every upload in the admin panel fails.
       MINIO_ENDPOINT: minio:9000
     depends_on:
       - postgres

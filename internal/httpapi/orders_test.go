@@ -12,6 +12,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
@@ -362,7 +363,8 @@ func newCartHandlerFakes() *cartHandlerFakes {
 }
 
 func (f *cartHandlerFakes) handler() http.Handler {
-	return apperr.Wrap(listCartHandler(f.cart, f.variants, f.products, f.images))
+	cfg := &config.Config{MinIOEndpoint: "minio.local", MinIOBucket: "cozy-media"}
+	return apperr.Wrap(listCartHandler(f.cart, f.variants, f.products, f.images, cfg))
 }
 
 func TestListCartHandlerScopesToCustomer(t *testing.T) {
@@ -438,10 +440,11 @@ func TestListCartHandlerEnrichesLine(t *testing.T) {
 	if got.VariantID != want.VariantID || got.Quantity != want.Quantity || got.ProductID != want.ProductID ||
 		got.ProductName != want.ProductName || got.ProductNameKy != want.ProductNameKy ||
 		got.Size != want.Size || got.Color != want.Color || got.Price != want.Price {
-		t.Errorf("line = %+v, want %+v (object_key aside)", got, want)
+		t.Errorf("line = %+v, want %+v (photo_url aside)", got, want)
 	}
-	if got.ObjectKey == nil || *got.ObjectKey != "products/prod-1.jpg" {
-		t.Errorf("object_key = %v, want products/prod-1.jpg", got.ObjectKey)
+	const wantPhotoURL = "http://minio.local/cozy-media/products/prod-1.jpg"
+	if got.PhotoURL == nil || *got.PhotoURL != wantPhotoURL {
+		t.Errorf("photo_url = %v, want %s", got.PhotoURL, wantPhotoURL)
 	}
 }
 

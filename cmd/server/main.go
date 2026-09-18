@@ -78,7 +78,7 @@ func run() error {
 
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
-	registerAPIRoutes(mux, db, authSvc)
+	registerAPIRoutes(mux, db, authSvc, cfg)
 	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
 	}
@@ -133,11 +133,11 @@ func registerHealthRoutes(mux *http.ServeMux, db *sql.DB) {
 // registerAPIRoutes mounts /api/v1/* — JSON REST for the Flutter app and
 // HTMX/AJAX calls from the site. Handlers land here as each domain package
 // (auth, catalog, orders, ...) is implemented.
-func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
+func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config) {
 	httpapi.RegisterAuthRoutes(mux, authSvc)
-	httpapi.RegisterCatalogRoutes(mux, db)
+	httpapi.RegisterCatalogRoutes(mux, db, cfg)
 	httpapi.RegisterPublicPointsRoutes(mux, db)
-	httpapi.RegisterOrderRoutes(mux, db, authSvc)
+	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg)
 	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
 }
 

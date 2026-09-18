@@ -13,13 +13,6 @@ info:
     the site/app currently only place `cash_on_delivery` orders) — extend this
     spec once that lands, don't let it drift from the real route table
     (`internal/httpapi`, `internal/staff`, `internal/points`, `internal/media`).
-
-    Two known, deliberate inconsistencies worth knowing about rather than
-    "fixing" in this document: `orders.Order`/`orders.OrderItem`/
-    `orders.CartItem` (`internal/orders`) have no `json` tags, so they
-    serialize as Go's default `PascalCase` field names — unlike every other
-    schema in this file, which uses `snake_case`. Flagged as a follow-up, not
-    silently patched over here.
   version: "0.4.0"
 
 servers:
@@ -406,8 +399,8 @@ paths:
       security: [{ customerBearerAuth: [] }]
       responses:
         "200":
-          description: Cart lines.
-          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CartItem" } } } }
+          description: Cart lines, enriched with the variant/product details needed to render a cart screen from this one response.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CartLine" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/v1/cart/{variantId}:
@@ -1157,12 +1150,21 @@ components:
         point_id: { type: string, format: uuid }
         quantity: { type: integer }
 
+    ProductListItem:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          properties:
+            photo_url:
+              type: string
+              description: "Primary (lowest sort_order) photo, or \"\" if the product has none."
+
     ProductListResponse:
       type: object
       properties:
         items:
           type: array
-          items: { $ref: "#/components/schemas/Product" }
+          items: { $ref: "#/components/schemas/ProductListItem" }
         page: { type: integer }
         page_size: { type: integer }
         total: { type: integer }
@@ -1172,9 +1174,18 @@ components:
         - $ref: "#/components/schemas/Product"
         - type: object
           properties:
+            images:
+              type: array
+              items: { $ref: "#/components/schemas/ProductPhoto" }
             variants:
               type: array
               items: { $ref: "#/components/schemas/VariantDetail" }
+
+    ProductPhoto:
+      type: object
+      properties:
+        url: { type: string }
+        sort_order: { type: integer }
 
     VariantDetail:
       allOf:
@@ -1205,38 +1216,34 @@ components:
         lng: { type: number, format: double, nullable: true }
         is_default: { type: boolean, default: false }
 
-    # NOTE: Order/OrderItem/CartItem have no json tags in Go (internal/orders)
-    # and so serialize as PascalCase, unlike every other schema in this file.
-    # Documented as-is (see the top-level description) rather than papered
-    # over with a snake_case schema that wouldn't match the real response.
     Order:
       type: object
       properties:
-        ID: { type: string, format: uuid }
-        OrderNumber: { type: string, example: "COZY-20260915-001" }
-        CustomerID: { type: string, format: uuid }
-        AddressID: { type: string, format: uuid, nullable: true }
-        PointID: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
-        Status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
-        PaymentMethod: { type: string, enum: [online, cash_on_delivery], description: "Currently always `cash_on_delivery` — online/Bakai payment isn't wired up yet." }
-        TotalAmount: { type: number, format: double }
-        Comment: { type: string, nullable: true }
-        Items: { type: array, items: { $ref: "#/components/schemas/OrderItem" } }
-        CreatedAt: { type: string, format: date-time }
-        UpdatedAt: { type: string, format: date-time }
+        id: { type: string, format: uuid }
+        order_number: { type: string, example: "COZY-20260915-001" }
+        customer_id: { type: string, format: uuid }
+        address_id: { type: string, format: uuid, nullable: true }
+        point_id: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
+        status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
+        payment_method: { type: string, enum: [online, cash_on_delivery], description: "Currently always `cash_on_delivery` — online/Bakai payment isn't wired up yet." }
+        total_amount: { type: number, format: double }
+        comment: { type: string, nullable: true }
+        items: { type: array, items: { $ref: "#/components/schemas/OrderItem" } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     OrderItem:
       type: object
       description: A price/size/color snapshot taken at checkout time — independent of later catalog edits.
       properties:
-        ID: { type: string, format: uuid }
-        OrderID: { type: string, format: uuid }
-        VariantID: { type: string, format: uuid }
-        ProductNameSnapshot: { type: string }
-        SizeSnapshot: { type: string }
-        ColorSnapshot: { type: string }
-        Quantity: { type: integer }
-        Price: { type: number, format: double }
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        variant_id: { type: string, format: uuid }
+        product_name_snapshot: { type: string }
+        size_snapshot: { type: string }
+        color_snapshot: { type: string }
+        quantity: { type: integer }
+        price: { type: number, format: double }
 
     OrderCreateRequest:
       type: object
@@ -1255,12 +1262,26 @@ components:
 
     CartItem:
       type: object
-      description: One line of a customer's server-side cart (see the top-level note on PascalCase here too).
+      description: "Raw shape of a `cart_items` row — not what GET /api/v1/cart returns (see CartLine); this is the underlying storage record."
       properties:
-        CustomerID: { type: string, format: uuid }
-        VariantID: { type: string, format: uuid }
-        Qty: { type: integer }
-        CreatedAt: { type: string, format: date-time }
+        customer_id: { type: string, format: uuid }
+        variant_id: { type: string, format: uuid }
+        qty: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    CartLine:
+      type: object
+      description: One line of a customer's server-side cart, enriched with the current variant/product/primary-photo data (GET /api/v1/cart).
+      properties:
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer }
+        product_id: { type: string, format: uuid }
+        product_name: { type: string }
+        product_name_ky: { type: string }
+        size: { type: string }
+        color: { type: string }
+        price: { type: number, format: double, description: "variant.price_override if set, else the product's base_price." }
+        photo_url: { type: string, nullable: true, description: "Primary photo URL, or null if the product has none." }
 
     Point:
       type: object

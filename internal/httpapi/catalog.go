@@ -8,16 +8,22 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
 )
 
 // RegisterCatalogRoutes mounts the public, read-only catalog endpoints
 // under /api/v1/*. There is no auth/RBAC here on purpose — write endpoints
-// (admin CRUD) are a later wave gated by staff RBAC.
-func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB) {
+// (admin CRUD) are a later wave gated by staff RBAC. cfg is needed only to
+// build photo URLs (internal/web's catalog_view.go photoURL and
+// internal/admin's products.go photoURL do the same MinIO endpoint+bucket
+// construction) — without it the app had no way to show product photos at
+// all, since object_key alone isn't a fetchable URL client-side.
+func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 	categories := catalog.NewCategoryRepo(db)
 	products := catalog.NewProductRepo(db)
 	variants := catalog.NewVariantRepo(db)
 	stock := catalog.NewStockRepo(db)
+	images := catalog.NewImageRepo(db)
 
 	mux.Handle("GET /api/v1/categories", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		tree, err := categories.Tree(r.Context())
@@ -46,8 +52,26 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB) {
 			return err
 		}
 
+		productIDs := make([]string, len(items))
+		for i, p := range items {
+			productIDs[i] = p.ID
+		}
+		primaryImages, err := images.PrimaryForProducts(r.Context(), productIDs)
+		if err != nil {
+			return err
+		}
+
+		out := make([]productOut, len(items))
+		for i, p := range items {
+			po := productOut{Product: p}
+			if img, ok := primaryImages[p.ID]; ok {
+				po.PhotoURL = photoURL(cfg, img.ObjectKey)
+			}
+			out[i] = po
+		}
+
 		return writeJSON(w, http.StatusOK, productListResponse{
-			Items:    items,
+			Items:    out,
 			Page:     filter.Page,
 			PageSize: filter.PageSize,
 			Total:    total,
@@ -85,7 +109,16 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB) {
 			})
 		}
 
-		resp := productDetailResponse{Product: *product, Variants: make([]variantDetail, 0, len(productVariants))}
+		productImages, err := images.ListByProduct(r.Context(), product.ID)
+		if err != nil {
+			return err
+		}
+		imageOuts := make([]imageOut, len(productImages))
+		for i, img := range productImages {
+			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), SortOrder: img.SortOrder}
+		}
+
+		resp := productDetailResponse{Product: *product, Images: imageOuts, Variants: make([]variantDetail, 0, len(productVariants))}
 		for _, v := range productVariants {
 			stockForVariant := stockByVariant[v.ID]
 			if stockForVariant == nil {
@@ -101,15 +134,45 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB) {
 	}))
 }
 
+// photoURL builds a direct (non-presigned) URL to objectKey in the
+// cozy-media bucket — the same scheme+endpoint+bucket construction
+// internal/web's and internal/admin's own photoURL helpers use, so the app
+// resolves to the same public-read bucket URL the site and admin panel do.
+// Empty objectKey (no photo) returns "".
+func photoURL(cfg *config.Config, objectKey string) string {
+	if objectKey == "" {
+		return ""
+	}
+	scheme := "http"
+	if cfg.MinIOUseSSL {
+		scheme = "https"
+	}
+	return scheme + "://" + cfg.MinIOEndpoint + "/" + cfg.MinIOBucket + "/" + objectKey
+}
+
+// productOut is catalog.Product plus its primary photo URL (empty string
+// if the product has none) — used by the list endpoint, which only ever
+// shows one thumbnail per product.
+type productOut struct {
+	catalog.Product
+	PhotoURL string `json:"photo_url"`
+}
+
+type imageOut struct {
+	URL       string `json:"url"`
+	SortOrder int    `json:"sort_order"`
+}
+
 type productListResponse struct {
-	Items    []catalog.Product `json:"items"`
-	Page     int               `json:"page"`
-	PageSize int               `json:"page_size"`
-	Total    int               `json:"total"`
+	Items    []productOut `json:"items"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+	Total    int          `json:"total"`
 }
 
 type productDetailResponse struct {
 	catalog.Product
+	Images   []imageOut      `json:"images"`
 	Variants []variantDetail `json:"variants"`
 }
 

@@ -54,8 +54,8 @@ func TestBuildBranchesDataEmpty(t *testing.T) {
 
 func TestBuildBranchesDataAssignsSequentialPinsAndMarksFirstCard(t *testing.T) {
 	branches := []storefront.Branch{
-		{ID: "1", Name: "Kozi Bishkek Park", Address: "ул. Ибраимова, 115"},
-		{ID: "2", Name: "Kozi Vefa Center", Address: "просп. Чуй, 219"},
+		{ID: "1", Name: "Cozy Bishkek Park", Address: "ул. Ибраимова, 115"},
+		{ID: "2", Name: "Cozy Vefa Center", Address: "просп. Чуй, 219"},
 	}
 	data := buildBranchesData(branches)
 

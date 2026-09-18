@@ -38,31 +38,31 @@ const (
 
 // Order mirrors one row of orders (+ its order_items).
 type Order struct {
-	ID            string
-	OrderNumber   string // "COZY-YYYYMMDD-NNN"
-	CustomerID    string
-	AddressID     *string
-	PointID       *string
-	Status        OrderStatus
-	PaymentMethod PaymentMethod
-	TotalAmount   float64
-	Comment       *string
-	Items         []OrderItem
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            string        `json:"id"`
+	OrderNumber   string        `json:"order_number"` // "COZY-YYYYMMDD-NNN"
+	CustomerID    string        `json:"customer_id"`
+	AddressID     *string       `json:"address_id,omitempty"`
+	PointID       *string       `json:"point_id,omitempty"`
+	Status        OrderStatus   `json:"status"`
+	PaymentMethod PaymentMethod `json:"payment_method"`
+	TotalAmount   float64       `json:"total_amount"`
+	Comment       *string       `json:"comment,omitempty"`
+	Items         []OrderItem   `json:"items"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
 }
 
 // OrderItem mirrors one row of order_items — a price/size/color snapshot
 // taken at checkout time, independent of later catalog edits.
 type OrderItem struct {
-	ID                  string
-	OrderID             string
-	VariantID           string
-	ProductNameSnapshot string
-	SizeSnapshot        string
-	ColorSnapshot       string
-	Quantity            int
-	Price               float64
+	ID                  string  `json:"id"`
+	OrderID             string  `json:"order_id"`
+	VariantID           string  `json:"variant_id"`
+	ProductNameSnapshot string  `json:"product_name_snapshot"`
+	SizeSnapshot        string  `json:"size_snapshot"`
+	ColorSnapshot       string  `json:"color_snapshot"`
+	Quantity            int     `json:"quantity"`
+	Price               float64 `json:"price"`
 }
 
 // OrderItemInput is what CreateOrder needs per line. Only VariantID/Qty

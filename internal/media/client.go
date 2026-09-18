@@ -14,25 +14,48 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/config"
 )
 
-// Client wraps a MinIO SDK client scoped to the single bucket cozy_backend
+// Client wraps MinIO SDK clients scoped to the single bucket cozy_backend
 // uses for media.
 type Client struct {
-	sdk    *minio.Client
+	sdk    *minio.Client // internal: bucket management (reaches MinIO directly)
+	public *minio.Client // public: signs URLs the browser will PUT/GET
 	bucket string
 }
 
 // NewClient builds a Client from the MinIO settings in cfg. It only
-// constructs the SDK client locally and does not talk to the network —
+// constructs the SDK clients locally and does not talk to the network —
 // call EnsureBucket to verify/create the bucket.
+//
+// Two SDK clients are built because signing and reaching MinIO can need
+// different hosts: sdk talks to cfg.MinIOEndpoint (e.g. a Docker-internal
+// "minio:9000" reachable from the backend), while public signs URLs against
+// cfg.MinIOPublicEndpoint (e.g. the server's public domain), since those
+// URLs are handed to the browser, which cannot resolve the internal host.
+// Presigning is a local computation (no network call), so building public
+// here is safe even though nothing ever connects to it directly.
 func NewClient(cfg *config.Config) (*Client, error) {
+	creds := credentials.NewStaticV4(cfg.MinIOAccessKey, cfg.MinIOSecretKey, "")
+
 	sdk, err := minio.New(cfg.MinIOEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.MinIOAccessKey, cfg.MinIOSecretKey, ""),
+		Creds:  creds,
 		Secure: cfg.MinIOUseSSL,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Client{sdk: sdk, bucket: cfg.MinIOBucket}, nil
+
+	public := sdk
+	if cfg.MinIOPublicEndpoint != cfg.MinIOEndpoint || cfg.MinIOPublicUseSSL != cfg.MinIOUseSSL {
+		public, err = minio.New(cfg.MinIOPublicEndpoint, &minio.Options{
+			Creds:  creds,
+			Secure: cfg.MinIOPublicUseSSL,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Client{sdk: sdk, public: public, bucket: cfg.MinIOBucket}, nil
 }
 
 // EnsureBucket makes sure the configured bucket exists, creating it if it
@@ -63,9 +86,10 @@ func (c *Client) EnsureBucket(ctx context.Context) error {
 // PresignPut returns a presigned URL the caller can PUT the object's bytes
 // to directly (no credentials of ours ever reach the client), valid for
 // ttl. objectKey should come from newObjectKey — this method itself does
-// not validate or generate it.
+// not validate or generate it. Signed against the public endpoint since the
+// browser is what dials this URL.
 func (c *Client) PresignPut(ctx context.Context, objectKey string, ttl time.Duration) (string, error) {
-	u, err := c.sdk.PresignedPutObject(ctx, c.bucket, objectKey, ttl)
+	u, err := c.public.PresignedPutObject(ctx, c.bucket, objectKey, ttl)
 	if err != nil {
 		return "", err
 	}
@@ -73,9 +97,10 @@ func (c *Client) PresignPut(ctx context.Context, objectKey string, ttl time.Dura
 }
 
 // PresignGet returns a presigned URL for reading/serving objectKey, valid
-// for ttl.
+// for ttl. Signed against the public endpoint since the browser is what
+// dials this URL.
 func (c *Client) PresignGet(ctx context.Context, objectKey string, ttl time.Duration) (string, error) {
-	u, err := c.sdk.PresignedGetObject(ctx, c.bucket, objectKey, ttl, nil)
+	u, err := c.public.PresignedGetObject(ctx, c.bucket, objectKey, ttl, nil)
 	if err != nil {
 		return "", err
 	}

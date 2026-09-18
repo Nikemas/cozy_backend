@@ -18,10 +18,10 @@ import (
 // between the web and mobile app for the same logged-in customer, per
 // web-plan Architecture Decisions.
 type CartItem struct {
-	CustomerID string
-	VariantID  string
-	Qty        int
-	CreatedAt  time.Time
+	CustomerID string    `json:"customer_id"`
+	VariantID  string    `json:"variant_id"`
+	Qty        int       `json:"qty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // CartRepo is the read/write contract for a customer's cart.

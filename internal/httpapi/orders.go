@@ -9,6 +9,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
@@ -63,7 +64,7 @@ type cartImageGetter interface {
 //
 // Called from cmd/server/main.go's registerAPIRoutes, alongside
 // httpapi.RegisterCatalogRoutes(...).
-func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
+func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config) {
 	ordersSvc := orders.NewService(db)
 	cartRepo := orders.NewCartRepo(db)
 	variants := catalog.NewVariantRepo(db)
@@ -76,7 +77,7 @@ func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) 
 	mux.Handle("GET /api/v1/orders", requireCustomer(apperr.Wrap(listOrdersHandler(ordersSvc))))
 	mux.Handle("GET /api/v1/orders/{id}", requireCustomer(apperr.Wrap(getOrderHandler(ordersSvc))))
 
-	mux.Handle("GET /api/v1/cart", requireCustomer(apperr.Wrap(listCartHandler(cartRepo, variants, products, images))))
+	mux.Handle("GET /api/v1/cart", requireCustomer(apperr.Wrap(listCartHandler(cartRepo, variants, products, images, cfg))))
 	mux.Handle("POST /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(addCartItemHandler(cartRepo))))
 	mux.Handle("PUT /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(updateCartItemHandler(cartRepo))))
 	mux.Handle("DELETE /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(removeCartItemHandler(cartRepo))))
@@ -199,7 +200,7 @@ type cartLineResponse struct {
 	Size          string  `json:"size"`
 	Color         string  `json:"color"`
 	Price         float64 `json:"price"`
-	ObjectKey     *string `json:"object_key"`
+	PhotoURL      *string `json:"photo_url"`
 }
 
 // listCartHandler serves GET /api/v1/cart. It enriches each raw
@@ -220,7 +221,7 @@ type cartLineResponse struct {
 // "skip"), this only skips on apperr.NotFound and propagates everything
 // else — a transient DB error has no business being silently swallowed
 // into "this product doesn't exist".
-func listCartHandler(repo cartService, variants cartVariantGetter, products cartProductGetter, images cartImageGetter) apperr.HandlerFunc {
+func listCartHandler(repo cartService, variants cartVariantGetter, products cartProductGetter, images cartImageGetter, cfg *config.Config) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
 		if !ok {
@@ -285,10 +286,10 @@ func listCartHandler(repo cartService, variants cartVariantGetter, products cart
 				price = *l.variant.PriceOverride
 			}
 
-			var objectKey *string
+			var photoURLPtr *string
 			if img, ok := primaryImages[l.product.ID]; ok {
-				key := img.ObjectKey
-				objectKey = &key
+				url := photoURL(cfg, img.ObjectKey)
+				photoURLPtr = &url
 			}
 
 			resp = append(resp, cartLineResponse{
@@ -300,7 +301,7 @@ func listCartHandler(repo cartService, variants cartVariantGetter, products cart
 				Size:          l.variant.Size,
 				Color:         l.variant.Color,
 				Price:         price,
-				ObjectKey:     objectKey,
+				PhotoURL:      photoURLPtr,
 			})
 		}
 
