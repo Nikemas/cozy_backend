@@ -269,6 +269,35 @@ func safeOffset(page, pageSize int) int {
 	return (page - 1) * pageSize
 }
 
+// DistinctBrands returns every distinct, non-empty brand already used by a
+// product (active or not — a deactivated product's brand is still worth
+// reusing), alphabetically sorted. Used by the admin product form's brand
+// autocomplete (internal/admin/products.go) so staff can reuse an existing
+// brand's exact spelling instead of retyping it and risking "Nike"/"nike"
+// duplicates.
+func (r *ProductRepo) DistinctBrands(ctx context.Context) ([]string, error) {
+	const q = `
+		SELECT DISTINCT brand FROM products
+		WHERE brand IS NOT NULL AND brand <> ''
+		ORDER BY brand`
+
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	brands := []string{}
+	for rows.Next() {
+		var b string
+		if err := rows.Scan(&b); err != nil {
+			return nil, err
+		}
+		brands = append(brands, b)
+	}
+	return brands, rows.Err()
+}
+
 // GetByID returns a single active product. Returns apperr.NotFound if it
 // doesn't exist or is inactive — an inactive product looks the same as a
 // missing one to public read endpoints.

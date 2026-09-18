@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"math"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -114,6 +115,8 @@ type ProductFormData struct {
 
 	Categories     []CategoryOptionVM
 	CategoriesJSON template.JS // Categories, marshaled for the form's category/subcategory-select JS
+
+	Brands []string // datalist options for the brand field — see buildBrandOptions
 
 	Images   []ImageRowVM
 	Variants []VariantRowVM
@@ -353,6 +356,33 @@ func categoryOptionsJSON(options []CategoryOptionVM) template.JS {
 		return template.JS("[]")
 	}
 	return template.JS(b)
+}
+
+// defaultBrandOptions seeds the brand field's datalist before any product
+// has ever been saved with a brand (a fresh install's ProductRepo.
+// DistinctBrands returns nothing yet) — the common shoe brands staff are
+// most likely to type first.
+var defaultBrandOptions = []string{"Nike", "Adidas", "Puma", "New Balance", "Reebok", "Asics", "Converse", "Vans"}
+
+// buildBrandOptions merges defaultBrandOptions with the brands already used
+// by a real product (ProductRepo.DistinctBrands), so the datalist offers
+// both the common starting set and whatever staff have actually typed
+// before — deduped case-insensitively (keeping whichever spelling was seen
+// first) so "Nike" typed on an early product doesn't sit next to a
+// redundant default "Nike", and sorted for a stable, scannable dropdown.
+func buildBrandOptions(existing []string) []string {
+	seen := make(map[string]bool, len(defaultBrandOptions)+len(existing))
+	out := make([]string, 0, len(defaultBrandOptions)+len(existing))
+	for _, b := range append(append([]string{}, defaultBrandOptions...), existing...) {
+		key := strings.ToLower(strings.TrimSpace(b))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, b)
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
+	return out
 }
 
 // resolveTopAndSubIDs finds which top-level category (and, if categoryID

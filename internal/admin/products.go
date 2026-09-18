@@ -251,10 +251,17 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	brands, err := h.products.DistinctBrands(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+
 	options := buildCategoryOptions(tree)
 	data := ProductFormData{
 		Categories:     options,
 		CategoriesJSON: categoryOptionsJSON(options),
+		Brands:         buildBrandOptions(brands),
 		CanDelete:      st.Role == staff.RoleOwner,
 	}
 	h.renderProductForm(w, st, "Новый товар", data)
@@ -303,6 +310,12 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	brands, err := h.products.DistinctBrands(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+
 	topID, subID := resolveTopAndSubIDs(tree, product.CategoryID)
 
 	variantRows := make([]VariantRowVM, len(variants))
@@ -332,6 +345,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		DescriptionKy:  stringOrEmpty(product.DescriptionKy),
 		Categories:     options,
 		CategoriesJSON: categoryOptionsJSON(options),
+		Brands:         buildBrandOptions(brands),
 		Images:         imageRows,
 		Variants:       variantRows,
 		CanDelete:      st.Role == staff.RoleOwner,
@@ -437,6 +451,11 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		h.renderInternalErr(w, err)
 		return
 	}
+	brands, err := h.products.DistinctBrands(r.Context())
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
 
 	categoryID := r.FormValue("category_id")
 	topID, subID := resolveTopAndSubIDs(tree, categoryID)
@@ -482,6 +501,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		DescriptionKy:  r.FormValue("description_ky"),
 		Categories:     formOptions,
 		CategoriesJSON: categoryOptionsJSON(formOptions),
+		Brands:         buildBrandOptions(brands),
 		Images:         imageRows,
 		Variants:       variantRows,
 		CanDelete:      st.Role == staff.RoleOwner,

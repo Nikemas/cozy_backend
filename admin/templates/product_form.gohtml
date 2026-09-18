@@ -29,7 +29,10 @@
 
       <div class="admin-form-row3">
         <div class="admin-field">
-          <label>Категория</label>
+          <div class="admin-field__labelrow">
+            <label>Категория</label>
+            <button type="button" class="admin-linkbtn" onclick="openCategoryModal()">+ Новая</button>
+          </div>
           <select id="pf-category" onchange="pfOnCategoryChange()">
             {{range .Categories}}
             <option value="{{.ID}}" data-slug="{{.Slug}}"{{if eq .ID $.Data.TopCategoryID}} selected{{end}}>{{.Name}}</option>
@@ -39,19 +42,22 @@
         <div class="admin-field">
           <div class="admin-field__labelrow">
             <label>Подкатегория</label>
-            <button type="button" class="admin-linkbtn" onclick="pfNewSubcategory()">+ Новая</button>
+            <button type="button" class="admin-linkbtn" onclick="openSubcategoryModal()">+ Новая</button>
           </div>
           <select id="pf-subcategory" onchange="pfOnSubcategoryChange()">
             <option value="">Без подкатегории</option>
           </select>
         </div>
         <div class="admin-field">
-          <label>Бренд</label>
-          <input type="text" name="brand" list="pf-brand-list" value="{{.Brand}}" placeholder="Nike">
+          <div class="admin-field__labelrow">
+            <label>Бренд</label>
+            <button type="button" class="admin-linkbtn" onclick="openBrandModal()">+ Новая</button>
+          </div>
+          <input type="text" name="brand" id="pf-brand" list="pf-brand-list" value="{{.Brand}}" placeholder="Nike">
           <datalist id="pf-brand-list">
-            <option value="Nike"><option value="Adidas"><option value="Puma">
-            <option value="New Balance"><option value="Reebok"><option value="Asics">
-            <option value="Converse"><option value="Vans">
+            {{range .Brands}}
+            <option value="{{.}}">
+            {{end}}
           </datalist>
         </div>
       </div>
@@ -131,6 +137,60 @@
   {{end}}
 </div>
 
+{{/* Category/subcategory/brand "+ Новая" modals — same admin-modal
+     component staff/points already use (admin.css's generic confirm
+     modal, reused with a form body instead of confirm text), styled after
+     the design canvas's subModal block (Cozy Admin.dc.html ~747-770).
+     Replaces the earlier window.prompt()-chain UI with real fields. */}}
+<div id="pf-category-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md">
+    <div class="admin-modal__title">Новая категория</div>
+    <div class="admin-field" style="margin-top:18px">
+      <label for="pf-newcat-name">Название категории</label>
+      <input type="text" id="pf-newcat-name" placeholder="Сандалии" onkeydown="if(event.key==='Enter')pfSaveCategory()">
+    </div>
+    <div class="admin-form-error" id="pf-newcat-error" hidden></div>
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryModal()">Отмена</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveCategory()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<div id="pf-subcategory-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md">
+    <div class="admin-modal__title">Новая подкатегория</div>
+    <div class="admin-modal__text">Например «Классика» или «Спортивные» внутри выбранной категории.</div>
+    <div class="admin-field" style="margin-top:14px">
+      <label for="pf-newsub-parent">Категория</label>
+      <select id="pf-newsub-parent"></select>
+    </div>
+    <div class="admin-field">
+      <label for="pf-newsub-name">Название подкатегории</label>
+      <input type="text" id="pf-newsub-name" placeholder="Классика" onkeydown="if(event.key==='Enter')pfSaveSubcategory()">
+    </div>
+    <div class="admin-form-error" id="pf-newsub-error" hidden></div>
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeSubcategoryModal()">Отмена</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveSubcategory()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<div id="pf-brand-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md">
+    <div class="admin-modal__title">Новый бренд</div>
+    <div class="admin-field" style="margin-top:18px">
+      <label for="pf-newbrand-name">Название бренда</label>
+      <input type="text" id="pf-newbrand-name" placeholder="New Balance" onkeydown="if(event.key==='Enter')pfSaveBrand()">
+    </div>
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeBrandModal()">Отмена</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveBrand()">Добавить</button>
+    </div>
+  </div>
+</div>
+
 <script id="pf-category-tree" type="application/json">{{.CategoriesJSON}}</script>
 
 <script>
@@ -185,18 +245,86 @@
   populateSubcategories(initialTop || (tree[0] && tree[0].ID) || '', initialSub || '');
   if (!initialCategoryID) { document.getElementById('pf-category-id').value = document.getElementById('pf-category').value; }
 
-  window.pfNewSubcategory = function () {
-    var topSel = document.getElementById('pf-category');
-    var topID = topSel.value;
-    if (!topID) { alert('Сначала выберите категорию'); return; }
-    var nameRu = prompt('Название подкатегории (рус.)');
-    if (!nameRu) return;
-    var nameKy = prompt('Название подкатегории (кырг.)', nameRu) || nameRu;
-    var slug = prompt('Slug (латиницей, например "classic")', nameRu.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-    if (!slug) return;
+  // --- Cyrillic (incl. Kyrgyz ң/ө/ү) -> Latin slug, so a category typed
+  // in Russian/Kyrgyz still gets a real URL-safe slug instead of empty
+  // dashes (categories.slug is a required, unique column — see
+  // catalog.CategoryInput.validate). ---
+  var CYR_TO_LAT = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i',
+    к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f',
+    х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+    ң: 'ng', ө: 'o', ү: 'u',
+  };
+  function slugify(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var ch = s[i].toLowerCase();
+      out += CYR_TO_LAT.hasOwnProperty(ch) ? CYR_TO_LAT[ch] : ch;
+    }
+    return out.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // --- "+ Новая категория" modal ---
+  window.openCategoryModal = function () {
+    document.getElementById('pf-newcat-name').value = '';
+    document.getElementById('pf-newcat-error').hidden = true;
+    document.getElementById('pf-category-modal').style.display = 'flex';
+    document.getElementById('pf-newcat-name').focus();
+  };
+  window.closeCategoryModal = function () { document.getElementById('pf-category-modal').style.display = 'none'; };
+
+  window.pfSaveCategory = function () {
+    var nameRu = document.getElementById('pf-newcat-name').value.trim();
+    var errEl = document.getElementById('pf-newcat-error');
+    if (!nameRu) { errEl.textContent = 'Введите название'; errEl.hidden = false; return; }
+
     fetch('/admin/api/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent_id: topID, name_ru: nameRu, name_ky: nameKy, slug: slug, sort_order: 0 })
+      body: JSON.stringify({ parent_id: null, name_ru: nameRu, name_ky: nameRu, slug: slugify(nameRu), sort_order: 0 })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('save failed');
+      return r.json();
+    }).then(function (cat) {
+      tree.push({ ID: cat.id, Name: cat.name_ru, Slug: cat.slug, Children: [] });
+      var topSel = document.getElementById('pf-category');
+      var opt = document.createElement('option');
+      opt.value = cat.id; opt.textContent = cat.name_ru; opt.dataset.slug = cat.slug;
+      topSel.appendChild(opt);
+      topSel.value = cat.id;
+      populateSubcategories(cat.id, '');
+      document.getElementById('pf-category-id').value = cat.id;
+      closeCategoryModal();
+    }).catch(function () { errEl.textContent = 'Не удалось создать категорию'; errEl.hidden = false; });
+  };
+
+  // --- "+ Новая подкатегория" modal ---
+  window.openSubcategoryModal = function () {
+    var parentSel = document.getElementById('pf-newsub-parent');
+    var currentTop = document.getElementById('pf-category').value;
+    parentSel.innerHTML = '';
+    tree.forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.value = c.ID; opt.textContent = c.Name;
+      if (c.ID === currentTop) opt.selected = true;
+      parentSel.appendChild(opt);
+    });
+    if (!tree.length) { openCategoryModal(); return; } // nothing to nest under yet
+    document.getElementById('pf-newsub-name').value = '';
+    document.getElementById('pf-newsub-error').hidden = true;
+    document.getElementById('pf-subcategory-modal').style.display = 'flex';
+    document.getElementById('pf-newsub-name').focus();
+  };
+  window.closeSubcategoryModal = function () { document.getElementById('pf-subcategory-modal').style.display = 'none'; };
+
+  window.pfSaveSubcategory = function () {
+    var topID = document.getElementById('pf-newsub-parent').value;
+    var nameRu = document.getElementById('pf-newsub-name').value.trim();
+    var errEl = document.getElementById('pf-newsub-error');
+    if (!nameRu) { errEl.textContent = 'Введите название'; errEl.hidden = false; return; }
+
+    fetch('/admin/api/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id: topID, name_ru: nameRu, name_ky: nameRu, slug: slugify(nameRu), sort_order: 0 })
     }).then(function (r) {
       if (!r.ok) throw new Error('save failed');
       return r.json();
@@ -204,9 +332,29 @@
       var top = null;
       for (var i = 0; i < tree.length; i++) { if (tree[i].ID === topID) top = tree[i]; }
       if (top) { top.Children = top.Children || []; top.Children.push({ ID: cat.id, Name: cat.name_ru, Slug: cat.slug }); }
+      document.getElementById('pf-category').value = topID;
       populateSubcategories(topID, cat.id);
       document.getElementById('pf-category-id').value = cat.id;
-    }).catch(function () { alert('Не удалось создать подкатегорию'); });
+      closeSubcategoryModal();
+    }).catch(function () { errEl.textContent = 'Не удалось создать подкатегорию'; errEl.hidden = false; });
+  };
+
+  // --- "+ Новая" brand modal — brand is a free-text column on products,
+  // not its own table (see catalog.ProductInput.Brand), so there's
+  // nothing to POST: this just fills the Бренд field the same way
+  // picking a datalist suggestion would. ---
+  window.openBrandModal = function () {
+    document.getElementById('pf-newbrand-name').value = '';
+    document.getElementById('pf-brand-modal').style.display = 'flex';
+    document.getElementById('pf-newbrand-name').focus();
+  };
+  window.closeBrandModal = function () { document.getElementById('pf-brand-modal').style.display = 'none'; };
+
+  window.pfSaveBrand = function () {
+    var name = document.getElementById('pf-newbrand-name').value.trim();
+    if (!name) return;
+    document.getElementById('pf-brand').value = name;
+    closeBrandModal();
   };
 
   // --- variants ---

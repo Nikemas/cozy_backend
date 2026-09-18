@@ -357,3 +357,41 @@ func TestCategoryOptionsJSONRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildBrandOptionsDedupesCaseInsensitively(t *testing.T) {
+	got := buildBrandOptions([]string{"Reebok", "nike", "Salomon"})
+
+	want := map[string]bool{"Nike": true, "Reebok": true, "Salomon": true, "Adidas": true}
+	if len(got) != len(defaultBrandOptions)+1 { // +1 for "Salomon", the only genuinely new brand
+		t.Fatalf("buildBrandOptions returned %d entries, want %d: %v", len(got), len(defaultBrandOptions)+1, got)
+	}
+	for _, b := range got {
+		if !want[b] && b != "Puma" && b != "New Balance" && b != "Asics" && b != "Converse" && b != "Vans" {
+			t.Errorf("unexpected brand %q in result: %v", b, got)
+		}
+	}
+	// "nike" (existing, lowercase) must not sit alongside the default "Nike".
+	count := 0
+	for _, b := range got {
+		if strings.EqualFold(b, "nike") {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("buildBrandOptions kept %d case-variants of \"nike\", want 1: %v", count, got)
+	}
+}
+
+func TestBuildBrandOptionsSorted(t *testing.T) {
+	got := buildBrandOptions([]string{"Salomon", "  "})
+	for i := 1; i < len(got); i++ {
+		if strings.ToLower(got[i-1]) > strings.ToLower(got[i]) {
+			t.Errorf("buildBrandOptions not sorted: %v", got)
+		}
+	}
+	for _, b := range got {
+		if strings.TrimSpace(b) == "" {
+			t.Errorf("buildBrandOptions kept a blank entry: %v", got)
+		}
+	}
+}
