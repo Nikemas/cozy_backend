@@ -39,6 +39,10 @@ func Conflict(code, message string) *AppError {
 	return New(http.StatusConflict, code, message)
 }
 
+// Internal wraps err as a 500 AppError. err.Error() may contain SQL
+// fragments, driver internals, or other details that must not leak to
+// unauthenticated API callers, so the client-facing Message is generic;
+// middleware.Wrap logs the original err separately.
 func Internal(err error) *AppError {
-	return &AppError{Status: http.StatusInternalServerError, Code: "internal_error", Message: err.Error()}
+	return &AppError{Status: http.StatusInternalServerError, Code: "internal_error", Message: "internal server error"}
 }
