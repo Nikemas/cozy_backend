@@ -1,32 +1,62 @@
-# Client's domain (confirmed 2026-09-17): cozy.kg, DNS-managed on
-# Cloudflare, A-record already pointed at this VPS. Caddy gets a real
-# Let's Encrypt cert for it automatically — no self-signed warning.
+# Hostnames served by this VPS (95.215.244.199).
 #
-# Cloudflare note: the zone is proxied (orange cloud), so browsers hit
-# Cloudflare's edge, not this box, directly. The ACME HTTP-01 challenge
-# still reaches Caddy fine (Cloudflare passes /.well-known/acme-challenge/
-# through), but Cloudflare's own SSL/TLS mode (dashboard -> SSL/TLS)
-# matters for the Cloudflare<->origin leg: "Full" or "Full (strict)" is
-# correct here now that Caddy presents a real cert; "Flexible" talks plain
-# HTTP to the origin and can loop with Caddy's HTTP->HTTPS redirect.
+# STAGING (active now): cozy.erpsystemsales.com — a subdomain of our own
+# erpsystemsales.com zone (DNS on Cloudflare), used while the client has not
+# yet handed over cozy.kg. Caddy obtains a real Let's Encrypt cert for it, so
+# the site, the admin panel (Secure cookies) and the mobile app (iOS ATS
+# rejects self-signed certs) all work without warnings. Keep this host after
+# cozy.kg goes live — it doubles as a permanent staging environment.
 #
-# The bare-IP block below is kept as a fallback (e.g. if Cloudflare/DNS
-# ever misbehaves) — harmless to keep alongside the domain block, Caddy
-# routes by SNI and this only serves connections that name the IP itself.
+# MEDIA: media.cozy.erpsystemsales.com fronts MinIO (port 9000 inside the
+# compose network) so presigned photo URLs are HTTPS on the same cert
+# scheme — a plain http://host:9000 URL would be blocked as mixed content on
+# an HTTPS page. The backend must sign URLs for exactly this host:
+# MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com, MINIO_PUBLIC_USE_SSL=true
+# in the server's .env. reverse_proxy passes the browser's Host header
+# through unchanged, which is what MinIO's SigV4 check needs.
+#
+# Cloudflare DNS records to create (both "DNS only" / grey cloud is the
+# simplest — no Cloudflare SSL-mode or upload-size limits to think about):
+#   A  cozy        -> 95.215.244.199
+#   A  media.cozy  -> 95.215.244.199
+# If you do proxy them (orange cloud), set the zone's SSL/TLS mode to
+# "Full (strict)"; "Flexible" talks plain HTTP to the origin and loops with
+# Caddy's HTTP->HTTPS redirect.
+#
+# PRODUCTION (pending): cozy.kg block is commented out until the client
+# actually points its DNS here — an unreachable hostname makes Caddy retry
+# ACME issuance forever and spam the logs. To enable: uncomment the block,
+# nothing else changes.
+#
+# The bare-IP block is kept as a fallback (self-signed cert, browser
+# warning expected). Caddy routes by SNI, so it only serves connections
+# that name the IP itself.
 
 {
 	# Clients connecting to a bare IP (no domain) typically send no SNI at
 	# all in the TLS ClientHello — without this, Caddy can't pick which
 	# certificate to present and the handshake fails with a TLS "internal
 	# error" alert. Only affects the bare-IP fallback block below; SNI-based
-	# selection for cozy.kg works normally regardless.
+	# selection for real hostnames works normally regardless.
 	default_sni 95.215.244.199
 }
 
-cozy.kg, www.cozy.kg {
+# --- staging: site + API + admin ------------------------------------------
+cozy.erpsystemsales.com {
 	reverse_proxy backend:8080
 }
 
+# --- staging: media (MinIO S3 API, presigned PUT/GET from the browser) -----
+media.cozy.erpsystemsales.com {
+	reverse_proxy minio:9000
+}
+
+# --- production: enable once the client's DNS points at this VPS ----------
+# cozy.kg, www.cozy.kg {
+# 	reverse_proxy backend:8080
+# }
+
+# --- bare-IP fallback -------------------------------------------------------
 95.215.244.199 {
 	tls internal
 	reverse_proxy backend:8080

@@ -17,10 +17,11 @@ services:
       DATABASE_URL: postgres://cozy:${POSTGRES_PASSWORD}@postgres:5432/cozy?sslmode=disable
       # Internal Docker hostname — only the backend container needs to
       # resolve this. The admin's BROWSER instead needs MINIO_PUBLIC_ENDPOINT
-      # (set in the server's .env to the VPS's public domain/IP + port 9000,
-      # e.g. "cozy.example.com:9000") — without it, presigned photo-upload
-      # URLs point at "minio:9000", which the browser can't resolve, and
-      # every upload in the admin panel fails.
+      # (set in the server's .env to the Caddy-fronted media host, i.e.
+      # MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com and
+      # MINIO_PUBLIC_USE_SSL=true) — without it, presigned photo-upload URLs
+      # point at "minio:9000", which the browser can't resolve, and every
+      # upload in the admin panel fails.
       MINIO_ENDPOINT: minio:9000
     depends_on:
       - postgres
@@ -49,12 +50,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
-    # Exposed directly (not proxied through Caddy) so presigned PUT/GET URLs
-    # work without extra subdomain/path routing — fine for the test phase.
-    # Move behind Caddy on its own subdomain + TLS before real production
-    # traffic (see README note).
-    ports:
-      - "9000:9000"
+    # Not published on the host: the browser reaches MinIO only through Caddy
+    # at media.cozy.erpsystemsales.com (see docker/Caddyfile), which
+    # terminates TLS. Port 9000 stays reachable inside the compose network
+    # for the backend (MINIO_ENDPOINT=minio:9000) and for Caddy.
+    expose:
+      - "9000"
 
   caddy:
     image: caddy:2-alpine
@@ -68,6 +69,7 @@ services:
       - caddy_config:/config
     depends_on:
       - backend
+      - minio
 
 volumes:
   postgres_data:

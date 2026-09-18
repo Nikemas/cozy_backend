@@ -48,6 +48,17 @@ docker build -f docker/Dockerfile -t cozy_backend .
 
 CI (`.github/workflows/ci.yml`) на каждый push/PR гоняет `gofmt -l .`, `go vet ./...`, `go test ./...` и `golangci-lint`. Деплой (`.github/workflows/deploy.yml`) — пока шаблон: собирает и пушит образ в GHCR и деплоит по SSH (`docker compose pull && up -d`), но реального VPS ещё нет — см. комментарий в начале файла, какие секреты репозитория нужно завести, когда он появится.
 
+## Staging-сервер
+
+VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` + `docker/Caddyfile`. Пока заказчик не передал `cozy.kg`, сервер живёт на нашем поддомене (DNS — Cloudflare, зона `erpsystemsales.com`):
+
+| Хост | Что | Куда проксирует |
+|------|-----|-----------------|
+| `https://cozy.erpsystemsales.com` | сайт, `/admin`, `/api/v1/*` | `backend:8080` |
+| `https://media.cozy.erpsystemsales.com` | MinIO S3 API (presigned-ссылки на фото) | `minio:9000` |
+
+Сертификаты Let's Encrypt Caddy получает сам. В серверном `.env` обязательно `MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com` и `MINIO_PUBLIC_USE_SSL=true`, иначе загрузка фото в админке ломается. Порт 9000 наружу не публикуется. Когда появится `cozy.kg` — раскомментировать его блок в `Caddyfile`, staging-хост оставить.
+
 ## API-документация
 
 Полная OpenAPI 3.0-спецификация всех реализованных эндпоинтов — [`openapi.yaml`](openapi.yaml) (§6 ТЗ). Открыть в любом Swagger UI/Redoc или сгенерировать клиент для Flutter. Обновлять по мере добавления новых эндпоинтов — файл описывает только то, что реально есть в коде.
