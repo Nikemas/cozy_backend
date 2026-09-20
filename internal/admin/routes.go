@@ -75,6 +75,15 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("POST /admin/orders/{id}/status", ownerOrManager(h.orderStatusUpdate))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
 
+	// Категории: list + add/edit modals + delete, same RBAC as products —
+	// see categories_page.go. The JSON API at /admin/api/categories
+	// (internal/httpapi/admin_catalog.go) already existed; this is the HTML
+	// screen to drive it without a raw HTTP client.
+	mux.HandleFunc("GET /admin/categories", ownerOrManager(h.categoriesPage))
+	mux.HandleFunc("POST /admin/categories", ownerOrManager(h.categoriesCreate))
+	mux.HandleFunc("POST /admin/categories/{id}", ownerOrManager(h.categoriesUpdate))
+	mux.HandleFunc("POST /admin/categories/{id}/delete", ownerOrManager(h.categoriesDelete))
+
 	// Task 5: points of sale + staff — both owner-only, list + add-modal +
 	// toggle-active. See internal/admin/points_page.go/staff_page.go.
 	mux.HandleFunc("GET /admin/points", ownerOnly(h.pointsPage))

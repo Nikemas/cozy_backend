@@ -39,6 +39,10 @@ func Conflict(code, message string) *AppError {
 	return New(http.StatusConflict, code, message)
 }
 
+func TooManyRequests(code, message string) *AppError {
+	return New(http.StatusTooManyRequests, code, message)
+}
+
 // Internal wraps err as a 500 AppError. err.Error() may contain SQL
 // fragments, driver internals, or other details that must not leak to
 // unauthenticated API callers, so the client-facing Message is generic;

@@ -59,6 +59,8 @@ type Service struct {
 	staff    staffGetter
 	sessions sessionStore
 	admin    staffAdmin
+
+	loginLimiter loginRateLimiter
 }
 
 func NewService(db *sql.DB) *Service {
@@ -77,7 +79,17 @@ func NewService(db *sql.DB) *Service {
 // same way — apperr.Unauthorized, and a bcrypt compare always runs — so a
 // login attempt can't be used to enumerate valid phone numbers or find
 // disabled accounts, whether by response content or by timing.
+//
+// Attempts are throttled per phone number (see loginRateLimiter) before
+// any of that: once the budget for a phone is used up within the window,
+// Login rejects with apperr.TooManyRequests without touching the database
+// or running bcrypt, so brute-forcing one account's password can't be
+// sped up by parallelizing requests.
 func (s *Service) Login(ctx context.Context, phone, password string) (sessionToken string, err error) {
+	if !s.loginLimiter.allow(phone) {
+		return "", apperr.TooManyRequests("too_many_attempts", "слишком много попыток входа, попробуйте позже")
+	}
+
 	st, err := s.staff.GetByPhone(ctx, phone)
 	if err != nil {
 		return "", err
@@ -94,6 +106,8 @@ func (s *Service) Login(ctx context.Context, phone, password string) (sessionTok
 	if st == nil || !st.IsActive || cmpErr != nil {
 		return "", invalidCredentials()
 	}
+
+	s.loginLimiter.reset(phone)
 
 	raw, tokenHash, err := newSessionToken()
 	if err != nil {

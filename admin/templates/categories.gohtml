@@ -1,0 +1,149 @@
+{{/* categories.gohtml — "Категории" screen (GET /admin/categories).
+     Owner/manager, same RBAC as products. .Data is admin.categoriesPageData
+     (internal/admin/categories_page.go). Drives the JSON admin API's
+     categories endpoints (internal/httpapi/admin_catalog.go) through plain
+     HTML forms, mirroring points.gohtml/staff.gohtml's list+modal pattern —
+     the one addition here is a second (edit) modal, since a category
+     (unlike a point or staff account) has no single "toggle" action: name,
+     slug, parent and sort order can all change. */}}
+{{define "content"}}
+{{$pdata := .Data}}
+<div class="admin-screen-narrow">
+  <div class="admin-list-toolbar admin-list-toolbar--end">
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openCategoryCreateModal()">+ Добавить категорию</button>
+  </div>
+
+  {{with $pdata}}
+  {{if .Error}}<div class="admin-form-error">{{.Error}}</div>{{end}}
+
+  <div class="admin-row-list">
+    {{if not .Rows}}
+      <div class="admin-row-list__empty">Пока нет категорий</div>
+    {{end}}
+    {{range .Rows}}
+    <div class="admin-row">
+      <div class="admin-row__info" style="padding-left:{{.IndentPx}}px">
+        <div class="admin-row__title">{{.NameRu}}</div>
+        <div class="admin-row__subtitle">{{.Slug}} · {{.NameKy}}</div>
+      </div>
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+        onclick="openCategoryEditModal({
+          id: {{.ID}}, parentId: {{.ParentID}}, nameRu: {{.NameRu}},
+          nameKy: {{.NameKy}}, slug: {{.Slug}}, sortOrder: {{.SortOrder}}
+        })">Редактировать</button>
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+        onclick="openConfirmModal('Удалить категорию?', '«{{.NameRu}}» будет удалена. Если на неё ссылаются товары или подкатегории, удаление будет отклонено.', '/admin/categories/{{.ID}}/delete')">Удалить</button>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="admin-row-list"><div class="admin-row-list__empty">Пока нет категорий</div></div>
+  {{end}}
+</div>
+
+{{/* Create modal. */}}
+<div id="admin-category-create-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md">
+    <div class="admin-modal__title">Новая категория</div>
+    <form method="post" action="/admin/categories">
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="cat-create-name-ru">Название (рус.)</label>
+          <input id="cat-create-name-ru" name="name_ru" placeholder="Кроссовки" required>
+        </div>
+        <div class="admin-field">
+          <label for="cat-create-name-ky">Название (кырг.)</label>
+          <input id="cat-create-name-ky" name="name_ky" placeholder="Кроссовкалар" required>
+        </div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="cat-create-slug">Slug</label>
+          <input id="cat-create-slug" name="slug" placeholder="krossovki" required>
+        </div>
+        <div class="admin-field">
+          <label for="cat-create-sort">Порядок</label>
+          <input id="cat-create-sort" name="sort_order" type="number" min="0" value="0">
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="cat-create-parent">Родительская категория</label>
+        <select id="cat-create-parent" name="parent_id">
+          <option value="">— нет (корневая) —</option>
+          {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+        </select>
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryCreateModal()">Отмена</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{/* Edit modal — one shared form whose action and field values are set by
+     openCategoryEditModal() from the clicked row's data, since html/template
+     has no per-row named modal to render here (there could be dozens of
+     categories). */}}
+<div id="admin-category-edit-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md">
+    <div class="admin-modal__title">Редактировать категорию</div>
+    <form method="post" id="admin-category-edit-form">
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="cat-edit-name-ru">Название (рус.)</label>
+          <input id="cat-edit-name-ru" name="name_ru" required>
+        </div>
+        <div class="admin-field">
+          <label for="cat-edit-name-ky">Название (кырг.)</label>
+          <input id="cat-edit-name-ky" name="name_ky" required>
+        </div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="cat-edit-slug">Slug</label>
+          <input id="cat-edit-slug" name="slug" required>
+        </div>
+        <div class="admin-field">
+          <label for="cat-edit-sort">Порядок</label>
+          <input id="cat-edit-sort" name="sort_order" type="number" min="0">
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="cat-edit-parent">Родительская категория</label>
+        <select id="cat-edit-parent" name="parent_id">
+          <option value="">— нет (корневая) —</option>
+          {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+        </select>
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryEditModal()">Отмена</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openCategoryCreateModal() { document.getElementById('admin-category-create-modal').style.display = 'flex'; }
+function closeCategoryCreateModal() { document.getElementById('admin-category-create-modal').style.display = 'none'; }
+
+function openCategoryEditModal(cat) {
+  document.getElementById('admin-category-edit-form').action = '/admin/categories/' + cat.id;
+  document.getElementById('cat-edit-name-ru').value = cat.nameRu;
+  document.getElementById('cat-edit-name-ky').value = cat.nameKy;
+  document.getElementById('cat-edit-slug').value = cat.slug;
+  document.getElementById('cat-edit-sort').value = cat.sortOrder;
+  var parentSelect = document.getElementById('cat-edit-parent');
+  // Excluded so a category can't be reparented under itself — the option
+  // simply isn't there to pick, on top of the server-side check in
+  // catalog.CategoryRepo.Update.
+  for (var i = 0; i < parentSelect.options.length; i++) {
+    parentSelect.options[i].disabled = parentSelect.options[i].value === cat.id;
+  }
+  parentSelect.value = cat.parentId || '';
+  document.getElementById('admin-category-edit-modal').style.display = 'flex';
+}
+function closeCategoryEditModal() { document.getElementById('admin-category-edit-modal').style.display = 'none'; }
+</script>
+{{end}}

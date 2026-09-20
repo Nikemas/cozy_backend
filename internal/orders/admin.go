@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // AdminPageSize is the fixed page size for GET /admin/api/orders — this
@@ -177,42 +178,38 @@ func validStatusTransition(from, to OrderStatus) bool {
 // isn't allowed. Point-based RBAC is enforced by the caller, same as
 // AdminGetOrder.
 func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newStatus OrderStatus) (*Order, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }() // no-op once Commit succeeds
-
-	const selectQ = `
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
-		FROM orders
-		WHERE id::text = $1 OR order_number = $1
-		FOR UPDATE`
-
 	var o Order
-	row := tx.QueryRowContext(ctx, selectQ, idOrNumber)
-	if err := scanOrderRow(row, &o); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, apperr.NotFound("order_not_found", "заказ не найден")
+	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		const selectQ = `
+			SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
+			FROM orders
+			WHERE id::text = $1 OR order_number = $1
+			FOR UPDATE`
+
+		row := tx.QueryRowContext(ctx, selectQ, idOrNumber)
+		if err := scanOrderRow(row, &o); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return apperr.NotFound("order_not_found", "заказ не найден")
+			}
+			return err
 		}
-		return nil, err
-	}
 
-	if !validStatusTransition(o.Status, newStatus) {
-		return nil, apperr.BadRequest("invalid_status_transition",
-			fmt.Sprintf("нельзя перевести заказ из статуса %q в %q", o.Status, newStatus))
-	}
+		if !validStatusTransition(o.Status, newStatus) {
+			return apperr.BadRequest("invalid_status_transition",
+				fmt.Sprintf("нельзя перевести заказ из статуса %q в %q", o.Status, newStatus))
+		}
 
-	const updateQ = `
-		UPDATE orders SET status = $1, updated_at = now()
-		WHERE id = $2
-		RETURNING updated_at`
-	if err := tx.QueryRowContext(ctx, updateQ, newStatus, o.ID).Scan(&o.UpdatedAt); err != nil {
-		return nil, err
-	}
-	o.Status = newStatus
-
-	if err := tx.Commit(); err != nil {
+		const updateQ = `
+			UPDATE orders SET status = $1, updated_at = now()
+			WHERE id = $2
+			RETURNING updated_at`
+		if err := tx.QueryRowContext(ctx, updateQ, newStatus, o.ID).Scan(&o.UpdatedAt); err != nil {
+			return err
+		}
+		o.Status = newStatus
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 

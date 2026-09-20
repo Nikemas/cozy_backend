@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // StaffCreateInput carries the writable fields for creating a new staff
@@ -87,64 +88,58 @@ func (r *Repo) Create(ctx context.Context, in StaffCreateInput) (*Staff, error) 
 // other active owners, and the write itself — runs inside one transaction
 // to close the race window between "check" and "write": without it, two
 // concurrent requests could each see (an now-stale) "another active owner
-// exists" and both succeed, leaving zero. Mirrors the local-transaction
-// pattern in internal/catalog/image.go's ImageRepo.ReplaceForProduct —
-// there's no shared withTx helper in this codebase yet.
+// exists" and both succeed, leaving zero.
 func (r *Repo) Update(ctx context.Context, id string, in StaffUpdateInput) (*Staff, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	const getQ = `
-		SELECT id, phone, password_hash, name, role, point_id, is_active, created_at
-		FROM staff
-		WHERE id = $1
-		FOR UPDATE`
-
-	var current Staff
-	err = tx.QueryRowContext(ctx, getQ, id).
-		Scan(&current.ID, &current.Phone, &current.PasswordHash, &current.Name, &current.Role,
-			&current.PointID, &current.IsActive, &current.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperr.NotFound("staff_not_found", "сотрудник не найден")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	losesOwnerStatus := current.Role == RoleOwner && current.IsActive && (in.Role != RoleOwner || !in.IsActive)
-	if losesOwnerStatus {
-		others, err := countOtherActiveOwners(ctx, tx, id)
-		if err != nil {
-			return nil, err
-		}
-		if others == 0 {
-			return nil, apperr.Conflict("last_owner", "нельзя понизить или деактивировать последнего владельца")
-		}
-	}
-
-	passwordHash := current.PasswordHash
-	if in.PasswordHash != nil {
-		passwordHash = *in.PasswordHash
-	}
-
-	const updateQ = `
-		UPDATE staff
-		SET name = $2, role = $3, point_id = $4, is_active = $5, password_hash = $6
-		WHERE id = $1
-		RETURNING id, phone, password_hash, name, role, point_id, is_active, created_at`
-
 	var updated Staff
-	err = tx.QueryRowContext(ctx, updateQ, id, in.Name, in.Role, in.PointID, in.IsActive, passwordHash).
-		Scan(&updated.ID, &updated.Phone, &updated.PasswordHash, &updated.Name, &updated.Role,
-			&updated.PointID, &updated.IsActive, &updated.CreatedAt)
-	if err != nil {
-		return nil, translateStaffWriteErr(err)
-	}
+	err := dbtx.WithTx(ctx, r.db, func(tx *sql.Tx) error {
+		const getQ = `
+			SELECT id, phone, password_hash, name, role, point_id, is_active, created_at
+			FROM staff
+			WHERE id = $1
+			FOR UPDATE`
 
-	if err := tx.Commit(); err != nil {
+		var current Staff
+		err := tx.QueryRowContext(ctx, getQ, id).
+			Scan(&current.ID, &current.Phone, &current.PasswordHash, &current.Name, &current.Role,
+				&current.PointID, &current.IsActive, &current.CreatedAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return apperr.NotFound("staff_not_found", "сотрудник не найден")
+		}
+		if err != nil {
+			return err
+		}
+
+		losesOwnerStatus := current.Role == RoleOwner && current.IsActive && (in.Role != RoleOwner || !in.IsActive)
+		if losesOwnerStatus {
+			others, err := countOtherActiveOwners(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			if others == 0 {
+				return apperr.Conflict("last_owner", "нельзя понизить или деактивировать последнего владельца")
+			}
+		}
+
+		passwordHash := current.PasswordHash
+		if in.PasswordHash != nil {
+			passwordHash = *in.PasswordHash
+		}
+
+		const updateQ = `
+			UPDATE staff
+			SET name = $2, role = $3, point_id = $4, is_active = $5, password_hash = $6
+			WHERE id = $1
+			RETURNING id, phone, password_hash, name, role, point_id, is_active, created_at`
+
+		err = tx.QueryRowContext(ctx, updateQ, id, in.Name, in.Role, in.PointID, in.IsActive, passwordHash).
+			Scan(&updated.ID, &updated.Phone, &updated.PasswordHash, &updated.Name, &updated.Role,
+				&updated.PointID, &updated.IsActive, &updated.CreatedAt)
+		if err != nil {
+			return translateStaffWriteErr(err)
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &updated, nil

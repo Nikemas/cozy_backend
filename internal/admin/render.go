@@ -36,6 +36,7 @@ var screenPages = map[string]string{
 	"reports":        "reports.gohtml",
 	"points":         "points.gohtml",
 	"staff":          "staff.gohtml",
+	"categories":     "categories.gohtml",
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell
@@ -64,7 +65,7 @@ type NavItem struct {
 // Screens wire their own content through Data; everything else backs the
 // shared layout/sidebar/header/toast/modal state.
 type PageData struct {
-	Screen      string // "login", "no_access", "orders", "order_detail", "products", "reports", "points", "staff"
+	Screen      string // "login", "no_access", "orders", "order_detail", "products", "reports", "points", "staff", "categories"
 	PageTitle   string
 	ShowSidebar bool // false only for "login"/"no_access", which have no chrome
 	ShowBack    bool

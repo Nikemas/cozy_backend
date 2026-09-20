@@ -12,11 +12,12 @@ import (
 // ~959-965) — see nav.go's navDefs below for which icon belongs to which
 // screen.
 const (
-	ordersIconPath   = "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12"
-	productsIconPath = "M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01"
-	reportsIconPath  = "M18 20V10 M12 20V4 M6 20v-4"
-	pointsIconPath   = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"
-	staffIconPath    = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
+	ordersIconPath     = "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12"
+	productsIconPath   = "M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01"
+	categoriesIconPath = "M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z"
+	reportsIconPath    = "M18 20V10 M12 20V4 M6 20v-4"
+	pointsIconPath     = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"
+	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
 )
 
 // noAccessPath is where a staff member whose role can see none of the
@@ -41,6 +42,7 @@ type navDef struct {
 var navDefs = []navDef{
 	{"orders", "Заказы", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"products", "Товары", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"categories", "Категории", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"reports", "Отчёты", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"points", "Склад и точки", pointsIconPath, []staff.Role{staff.RoleOwner}},
 	{"staff", "Сотрудники", staffIconPath, []staff.Role{staff.RoleOwner}},

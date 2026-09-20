@@ -17,6 +17,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/csrf"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
@@ -88,7 +89,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           mux,
+		Handler:           csrf.Protect(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

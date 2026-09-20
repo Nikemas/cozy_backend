@@ -87,6 +87,7 @@ func TestRenderShellScreensExecute(t *testing.T) {
 		title  string
 	}{
 		{"products", "Товары"},
+		{"categories", "Категории"},
 		{"reports", "Отчёты"},
 		{"points", "Склад и точки"},
 		{"staff", "Сотрудники"},

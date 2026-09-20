@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // OrderStatus mirrors the order_status enum (migration
@@ -118,119 +119,116 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 		return nil, err
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }() // no-op once Commit succeeds
-
-	if addressID != nil {
-		if err := verifyAddressOwnership(ctx, tx, customerID, *addressID); err != nil {
-			return nil, err
+	var order Order
+	err = dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if addressID != nil {
+			if err := verifyAddressOwnership(ctx, tx, customerID, *addressID); err != nil {
+				return err
+			}
 		}
-	}
 
-	fulfillmentPointID := ""
-	if pickupPointID != nil {
-		active, err := pointIsActive(ctx, tx, *pickupPointID)
+		fulfillmentPointID := ""
+		if pickupPointID != nil {
+			active, err := pointIsActive(ctx, tx, *pickupPointID)
+			if err != nil {
+				return err
+			}
+			if !active {
+				return apperr.NotFound("pickup_point_not_found", "точка самовывоза не найдена")
+			}
+			fulfillmentPointID = *pickupPointID
+		}
+
+		snapshots, err := loadVariantSnapshots(ctx, tx, variantIDs)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if !active {
-			return nil, apperr.NotFound("pickup_point_not_found", "точка самовывоза не найдена")
+		for _, id := range variantIDs {
+			if _, ok := snapshots[id]; !ok {
+				return apperr.NotFound("variant_not_found", "товар недоступен")
+			}
 		}
-		fulfillmentPointID = *pickupPointID
-	}
 
-	snapshots, err := loadVariantSnapshots(ctx, tx, variantIDs)
-	if err != nil {
-		return nil, err
-	}
-	for _, id := range variantIDs {
-		if _, ok := snapshots[id]; !ok {
-			return nil, apperr.NotFound("variant_not_found", "товар недоступен")
+		if fulfillmentPointID == "" {
+			fulfillmentPointID, err = pickFulfillmentPoint(ctx, tx, variantIDs, qtyByVariant)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	if fulfillmentPointID == "" {
-		fulfillmentPointID, err = pickFulfillmentPoint(ctx, tx, variantIDs, qtyByVariant)
+		if err := lockAndDecrementStock(ctx, tx, fulfillmentPointID, variantIDs, qtyByVariant); err != nil {
+			return err
+		}
+
+		orderNumber, err := nextOrderNumber(ctx, tx, time.Now())
 		if err != nil {
-			return nil, err
+			return err
 		}
-	}
 
-	if err := lockAndDecrementStock(ctx, tx, fulfillmentPointID, variantIDs, qtyByVariant); err != nil {
-		return nil, err
-	}
+		order = Order{
+			OrderNumber:   orderNumber,
+			CustomerID:    customerID,
+			AddressID:     addressID,
+			Status:        StatusPlaced,
+			PaymentMethod: PaymentCashOnDelivery,
+		}
+		if pickupPointID != nil {
+			order.PointID = pickupPointID
+		} else {
+			// Delivery order: point_id isn't the customer's choice here, it's
+			// which warehouse fulfilled it — recorded alongside address_id, not
+			// instead of it (see migration 000019's comment on why the two
+			// columns aren't a strict either/or at the DB level).
+			fp := fulfillmentPointID
+			order.PointID = &fp
+		}
 
-	orderNumber, err := nextOrderNumber(ctx, tx, time.Now())
-	if err != nil {
-		return nil, err
-	}
+		orderItems := make([]OrderItem, 0, len(variantIDs))
+		var total float64
+		for _, variantID := range variantIDs {
+			snap := snapshots[variantID]
+			qty := qtyByVariant[variantID]
+			total += snap.Price * float64(qty)
+			orderItems = append(orderItems, OrderItem{
+				VariantID:           variantID,
+				ProductNameSnapshot: snap.ProductName,
+				SizeSnapshot:        snap.Size,
+				ColorSnapshot:       snap.Color,
+				Quantity:            qty,
+				Price:               snap.Price,
+			})
+		}
+		order.TotalAmount = math.Round(total*100) / 100
 
-	order := Order{
-		OrderNumber:   orderNumber,
-		CustomerID:    customerID,
-		AddressID:     addressID,
-		Status:        StatusPlaced,
-		PaymentMethod: PaymentCashOnDelivery,
-	}
-	if pickupPointID != nil {
-		order.PointID = pickupPointID
-	} else {
-		// Delivery order: point_id isn't the customer's choice here, it's
-		// which warehouse fulfilled it — recorded alongside address_id, not
-		// instead of it (see migration 000019's comment on why the two
-		// columns aren't a strict either/or at the DB level).
-		fp := fulfillmentPointID
-		order.PointID = &fp
-	}
-
-	orderItems := make([]OrderItem, 0, len(variantIDs))
-	var total float64
-	for _, variantID := range variantIDs {
-		snap := snapshots[variantID]
-		qty := qtyByVariant[variantID]
-		total += snap.Price * float64(qty)
-		orderItems = append(orderItems, OrderItem{
-			VariantID:           variantID,
-			ProductNameSnapshot: snap.ProductName,
-			SizeSnapshot:        snap.Size,
-			ColorSnapshot:       snap.Color,
-			Quantity:            qty,
-			Price:               snap.Price,
-		})
-	}
-	order.TotalAmount = math.Round(total*100) / 100
-
-	const insertOrderQ = `
-		INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, total_amount)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, created_at, updated_at`
-	err = tx.QueryRowContext(ctx, insertOrderQ,
-		order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.TotalAmount,
-	).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	const insertItemQ = `
-		INSERT INTO order_items (order_id, variant_id, product_name_snapshot, size_snapshot, color_snapshot, quantity, price)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id`
-	for i := range orderItems {
-		orderItems[i].OrderID = order.ID
-		err := tx.QueryRowContext(ctx, insertItemQ,
-			order.ID, orderItems[i].VariantID, orderItems[i].ProductNameSnapshot,
-			orderItems[i].SizeSnapshot, orderItems[i].ColorSnapshot, orderItems[i].Quantity, orderItems[i].Price,
-		).Scan(&orderItems[i].ID)
+		const insertOrderQ = `
+			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, total_amount)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, created_at, updated_at`
+		err = tx.QueryRowContext(ctx, insertOrderQ,
+			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.TotalAmount,
+		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	}
-	order.Items = orderItems
 
-	if err := tx.Commit(); err != nil {
+		const insertItemQ = `
+			INSERT INTO order_items (order_id, variant_id, product_name_snapshot, size_snapshot, color_snapshot, quantity, price)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id`
+		for i := range orderItems {
+			orderItems[i].OrderID = order.ID
+			err := tx.QueryRowContext(ctx, insertItemQ,
+				order.ID, orderItems[i].VariantID, orderItems[i].ProductNameSnapshot,
+				orderItems[i].SizeSnapshot, orderItems[i].ColorSnapshot, orderItems[i].Quantity, orderItems[i].Price,
+			).Scan(&orderItems[i].ID)
+			if err != nil {
+				return err
+			}
+		}
+		order.Items = orderItems
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &order, nil

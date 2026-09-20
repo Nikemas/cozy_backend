@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // pgForeignKeyViolation is the Postgres SQLSTATE for a foreign-key
@@ -131,31 +132,23 @@ func (r *AddressRepo) Create(ctx context.Context, customerID string, in AddressI
 		return nil, err
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if in.IsDefault {
-		if _, err := tx.ExecContext(ctx, `UPDATE customer_addresses SET is_default = false WHERE customer_id = $1`, customerID); err != nil {
-			return nil, err
-		}
-	}
-
-	const q = `
-		INSERT INTO customer_addresses (customer_id, label, address_text, lat, lng, is_default)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, customer_id, label, address_text, lat, lng, is_default`
-
 	var a Address
-	err = tx.QueryRowContext(ctx, q, customerID, in.Label, in.AddressText, in.Lat, in.Lng, in.IsDefault).
-		Scan(&a.ID, &a.CustomerID, &a.Label, &a.AddressText, &a.Lat, &a.Lng, &a.IsDefault)
-	if err != nil {
-		return nil, err
-	}
+	err := dbtx.WithTx(ctx, r.db, func(tx *sql.Tx) error {
+		if in.IsDefault {
+			if _, err := tx.ExecContext(ctx, `UPDATE customer_addresses SET is_default = false WHERE customer_id = $1`, customerID); err != nil {
+				return err
+			}
+		}
 
-	if err := tx.Commit(); err != nil {
+		const q = `
+			INSERT INTO customer_addresses (customer_id, label, address_text, lat, lng, is_default)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id, customer_id, label, address_text, lat, lng, is_default`
+
+		return tx.QueryRowContext(ctx, q, customerID, in.Label, in.AddressText, in.Lat, in.Lng, in.IsDefault).
+			Scan(&a.ID, &a.CustomerID, &a.Label, &a.AddressText, &a.Lat, &a.Lng, &a.IsDefault)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &a, nil
@@ -168,35 +161,28 @@ func (r *AddressRepo) Update(ctx context.Context, customerID, id string, in Addr
 		return nil, err
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if in.IsDefault {
-		if _, err := tx.ExecContext(ctx, `UPDATE customer_addresses SET is_default = false WHERE customer_id = $1 AND id <> $2`, customerID, id); err != nil {
-			return nil, err
-		}
-	}
-
-	const q = `
-		UPDATE customer_addresses
-		SET label = $3, address_text = $4, lat = $5, lng = $6, is_default = $7
-		WHERE id = $1 AND customer_id = $2
-		RETURNING id, customer_id, label, address_text, lat, lng, is_default`
-
 	var a Address
-	err = tx.QueryRowContext(ctx, q, id, customerID, in.Label, in.AddressText, in.Lat, in.Lng, in.IsDefault).
-		Scan(&a.ID, &a.CustomerID, &a.Label, &a.AddressText, &a.Lat, &a.Lng, &a.IsDefault)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperr.NotFound("address_not_found", "адрес не найден")
-	}
-	if err != nil {
-		return nil, err
-	}
+	err := dbtx.WithTx(ctx, r.db, func(tx *sql.Tx) error {
+		if in.IsDefault {
+			if _, err := tx.ExecContext(ctx, `UPDATE customer_addresses SET is_default = false WHERE customer_id = $1 AND id <> $2`, customerID, id); err != nil {
+				return err
+			}
+		}
 
-	if err := tx.Commit(); err != nil {
+		const q = `
+			UPDATE customer_addresses
+			SET label = $3, address_text = $4, lat = $5, lng = $6, is_default = $7
+			WHERE id = $1 AND customer_id = $2
+			RETURNING id, customer_id, label, address_text, lat, lng, is_default`
+
+		err := tx.QueryRowContext(ctx, q, id, customerID, in.Label, in.AddressText, in.Lat, in.Lng, in.IsDefault).
+			Scan(&a.ID, &a.CustomerID, &a.Label, &a.AddressText, &a.Lat, &a.Lng, &a.IsDefault)
+		if errors.Is(err, sql.ErrNoRows) {
+			return apperr.NotFound("address_not_found", "адрес не найден")
+		}
+		return err
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &a, nil

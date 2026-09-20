@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // ProductImage mirrors a row of the `product_images` table. object_key
@@ -105,36 +106,32 @@ func (r *ImageRepo) ReplaceForProduct(ctx context.Context, productID string, ima
 		}
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, `DELETE FROM product_images WHERE product_id = $1`, productID); err != nil {
-		return nil, err
-	}
-
 	result := make([]ProductImage, 0, len(images))
-	for _, img := range images {
-		const q = `
-			INSERT INTO product_images (product_id, object_key, sort_order)
-			VALUES ($1, $2, $3)
-			RETURNING id, product_id, object_key, sort_order`
-
-		var pi ProductImage
-		err := tx.QueryRowContext(ctx, q, productID, img.ObjectKey, img.SortOrder).
-			Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder)
-		if pgErrCode(err) == pgForeignKeyViolation {
-			return nil, apperr.NotFound("product_not_found", "товар не найден")
+	err := dbtx.WithTx(ctx, r.db, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM product_images WHERE product_id = $1`, productID); err != nil {
+			return err
 		}
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, pi)
-	}
 
-	if err := tx.Commit(); err != nil {
+		for _, img := range images {
+			const q = `
+				INSERT INTO product_images (product_id, object_key, sort_order)
+				VALUES ($1, $2, $3)
+				RETURNING id, product_id, object_key, sort_order`
+
+			var pi ProductImage
+			err := tx.QueryRowContext(ctx, q, productID, img.ObjectKey, img.SortOrder).
+				Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder)
+			if pgErrCode(err) == pgForeignKeyViolation {
+				return apperr.NotFound("product_not_found", "товар не найден")
+			}
+			if err != nil {
+				return err
+			}
+			result = append(result, pi)
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return result, nil
