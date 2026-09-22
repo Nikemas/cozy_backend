@@ -784,6 +784,10 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-variant-remove { width: 28px; height: 28px; border: none; background: transparent; color: var(--admin-muted); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .admin-variant-remove:hover { background: var(--admin-danger-tint); color: var(--admin-danger); }
 
+.admin-variant-photo-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px dashed var(--admin-border); border-radius: var(--admin-radius-chip); background: var(--admin-surface); color: var(--admin-muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.admin-variant-photo-btn:hover { border-color: var(--admin-primary); color: var(--admin-primary); }
+.admin-variant-photo-btn.has-photos { border-style: solid; border-color: var(--admin-primary); color: var(--admin-primary); background: var(--admin-primary-tint); }
+
 .admin-form-sticky {
   position: sticky;
   bottom: 0;

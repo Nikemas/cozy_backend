@@ -255,6 +255,7 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		Categories:     options,
 		CategoriesJSON: categoryOptionsJSON(options),
 		Brands:         buildBrandOptions(brands),
+		ImagesJSON:     imageRowsJSON(nil),
 		CanDelete:      st.Role == staff.RoleOwner,
 	}
 	h.renderProductForm(w, st, "Новый товар", data)
@@ -320,7 +321,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	imageRows := make([]ImageRowVM, len(images))
 	for i, img := range images {
-		imageRows[i] = ImageRowVM{ObjectKey: img.ObjectKey, URL: h.photoURL(img.ObjectKey)}
+		imageRows[i] = ImageRowVM{ObjectKey: img.ObjectKey, URL: h.photoURL(img.ObjectKey), Color: stringOrEmpty(img.Color)}
 	}
 
 	options := buildCategoryOptions(tree)
@@ -340,6 +341,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		CategoriesJSON: categoryOptionsJSON(options),
 		Brands:         buildBrandOptions(brands),
 		Images:         imageRows,
+		ImagesJSON:     imageRowsJSON(imageRows),
 		Variants:       variantRows,
 		CanDelete:      st.Role == staff.RoleOwner,
 	}
@@ -470,13 +472,14 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 	}
 
 	keys := r.Form["image_object_key"]
+	imageColors := r.Form["image_color"]
 	imageRows := make([]ImageRowVM, 0, len(keys))
-	for _, k := range keys {
+	for i, k := range keys {
 		k = strings.TrimSpace(k)
 		if k == "" {
 			continue
 		}
-		imageRows = append(imageRows, ImageRowVM{ObjectKey: k, URL: h.photoURL(k)})
+		imageRows = append(imageRows, ImageRowVM{ObjectKey: k, URL: h.photoURL(k), Color: strings.TrimSpace(formAt(imageColors, i))})
 	}
 
 	formOptions := buildCategoryOptions(tree)
@@ -496,6 +499,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		CategoriesJSON: categoryOptionsJSON(formOptions),
 		Brands:         buildBrandOptions(brands),
 		Images:         imageRows,
+		ImagesJSON:     imageRowsJSON(imageRows),
 		Variants:       variantRows,
 		CanDelete:      st.Role == staff.RoleOwner,
 		Err:            errMsg,
@@ -601,18 +605,21 @@ func (h *handlers) resolveDefaultPointID(ctx context.Context) (id string, ok boo
 }
 
 // saveImages replaces productID's full photo set from the submitted
-// image_object_key[] array (sort order = submission order) — object keys
-// come from the form's own presigned-upload JS (see product_form.gohtml),
-// never typed in directly.
+// image_object_key[]/image_color[] parallel arrays (sort order = submission
+// order) — object keys come from the form's own presigned-upload JS (see
+// product_form.gohtml), never typed in directly. image_color[i] is "" for a
+// general product photo, or the color text a photo was uploaded against in
+// the Вариации table's per-color photo picker.
 func (h *handlers) saveImages(ctx context.Context, productID string, r *http.Request) error {
 	keys := r.Form["image_object_key"]
+	colors := r.Form["image_color"]
 	inputs := make([]catalog.ImageInput, 0, len(keys))
 	for i, k := range keys {
 		k = strings.TrimSpace(k)
 		if k == "" {
 			continue
 		}
-		inputs = append(inputs, catalog.ImageInput{ObjectKey: k, SortOrder: i})
+		inputs = append(inputs, catalog.ImageInput{ObjectKey: k, SortOrder: i, Color: nilIfEmpty(formAt(colors, i))})
 	}
 	_, err := h.images.ReplaceForProduct(ctx, productID, inputs)
 	return err

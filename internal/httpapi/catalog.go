@@ -115,7 +115,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		}
 		imageOuts := make([]imageOut, len(productImages))
 		for i, img := range productImages {
-			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), SortOrder: img.SortOrder}
+			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), SortOrder: img.SortOrder, Color: img.Color}
 		}
 
 		resp := productDetailResponse{Product: *product, Images: imageOuts, Variants: make([]variantDetail, 0, len(productVariants))}
@@ -151,9 +151,15 @@ type productOut struct {
 	PhotoURL string `json:"photo_url"`
 }
 
+// imageOut's Color is nil for a general product photo, or the exact
+// product_variants.color string the photo is tied to — the client filters
+// this list against the shopper's selected variant color (falling back to
+// the nil-color photos when that color has none of its own, per
+// catalog.ForColor) so picking "black" swaps in the black pair's photos.
 type imageOut struct {
-	URL       string `json:"url"`
-	SortOrder int    `json:"sort_order"`
+	URL       string  `json:"url"`
+	SortOrder int     `json:"sort_order"`
+	Color     *string `json:"color,omitempty"`
 }
 
 type productListResponse struct {

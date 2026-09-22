@@ -100,6 +100,7 @@
           <tr>
             <th>Размер</th>
             <th>Цвет</th>
+            <th>Фото цвета</th>
             <th>Кол-во (склад)</th>
             <th>Уровень</th>
             <th></th>
@@ -110,9 +111,13 @@
           <tr class="admin-variant-row">
             <td><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42"></td>
             <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="Белый"></td>
+            <td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
+              <span class="admin-variant-photo-count">0</span>
+            </button></td>
             <td><input type="number" min="0" name="variant_qty" value="{{.Qty}}" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>
             <td><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
-            <td><button type="button" class="admin-variant-remove" onclick="this.closest('tr').remove()" aria-label="Удалить вариацию">
+            <td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg>
             </button></td>
           </tr>
@@ -131,10 +136,27 @@
   </div>
 </form>
 
-<div id="pf-image-inputs">
-  {{range .Images}}
-  <input type="hidden" name="image_object_key" value="{{.ObjectKey}}" form="product-form">
-  {{end}}
+<div id="pf-image-inputs"></div>
+<script id="pf-initial-images" type="application/json">{{.ImagesJSON}}</script>
+
+{{/* Per-color photo picker: opened from a variant row's "Фото цвета"
+     button (pfOpenColorPhotos), scoped to that row's current color text —
+     two size rows with the same color share and edit the same photo set,
+     since staff only shoots one set of photos per color, not per size. */}}
+<div id="pf-colorphoto-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--lg">
+    <div class="admin-modal__title" id="pf-colorphoto-title">Фото цвета</div>
+    <div class="admin-modal__text">Эти фото покажутся покупателю, когда он выберет этот цвет в карточке товара.</div>
+    <div id="pf-colorphoto-grid" class="admin-photo-grid" style="margin-top:14px"></div>
+    <button type="button" class="admin-photo-add" onclick="pfPickColorPhoto()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"></path></svg>
+      <span>Добавить фото</span>
+    </button>
+    <input type="file" id="pf-colorphoto-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="pfColorFileChosen(event)">
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--primary" onclick="closeColorPhotoModal()">Готово</button>
+    </div>
+  </div>
 </div>
 
 {{/* Category/subcategory/brand "+ Новая" modals — same admin-modal
@@ -369,35 +391,115 @@
     badge.style.color = fg;
     badge.style.background = bg;
   };
+  var PHOTO_ROW_TEMPLATE =
+    '<td><input type="hidden" name="variant_id" value=""><input type="text" name="variant_size" class="admin-variant-input" placeholder="42"></td>' +
+    '<td><input type="text" name="variant_color" class="admin-variant-input" placeholder="Белый"></td>' +
+    '<td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button></td>' +
+    '<td><input type="number" min="0" name="variant_qty" value="0" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>' +
+    '<td><span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span></td>' +
+    '<td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></td>';
+
   window.pfAddVariant = function () {
     var tbody = document.getElementById('pf-variant-rows');
     var tr = document.createElement('tr');
     tr.className = 'admin-variant-row';
-    tr.innerHTML =
-      '<td><input type="hidden" name="variant_id" value=""><input type="text" name="variant_size" class="admin-variant-input" placeholder="42"></td>' +
-      '<td><input type="text" name="variant_color" class="admin-variant-input" placeholder="Белый"></td>' +
-      '<td><input type="number" min="0" name="variant_qty" value="0" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>' +
-      '<td><span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span></td>' +
-      '<td><button type="button" class="admin-variant-remove" onclick="this.closest(\'tr\').remove()" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></td>';
+    tr.innerHTML = PHOTO_ROW_TEMPLATE;
     tbody.appendChild(tr);
   };
 
+  window.pfRemoveVariantRow = function (btn) {
+    btn.closest('tr').remove();
+    pfPruneOrphanColorPhotos();
+    syncHiddenInputs();
+    pfRefreshPhotoBadges();
+  };
+
   // --- photos: presigned upload straight to MinIO, then a hidden
-  // image_object_key input records the key for the form submit. Preview
-  // uses a local blob URL — no need to know the public bucket URL
-  // client-side before the product is actually saved. ---
+  // image_object_key/image_color pair of inputs records each photo for the
+  // form submit. `photos` is the single source of truth (both the general
+  // grid and every per-color modal read/write it) — color === '' is a
+  // general product photo, any other value ties the photo to that exact
+  // variant color text (see catalog.ImageRepo.ForColor server-side).
+  // Preview uses a local blob URL for a fresh upload, or the already-
+  // resolved bucket URL for a photo the product already had — no need to
+  // know the public bucket URL client-side before a new upload is saved.
   var MAX_SLOTS = 6;
   var slotsEl = document.getElementById('pf-photo-slots');
   var inputsEl = document.getElementById('pf-image-inputs');
+  var currentModalColor = '';
+
+  var photos = [];
+  try {
+    var initialImages = JSON.parse(document.getElementById('pf-initial-images').textContent || '[]');
+    photos = initialImages.map(function (img) {
+      return { objectKey: img.ObjectKey, color: img.Color || '', url: img.URL };
+    });
+  } catch (e) { photos = []; }
+
+  function syncHiddenInputs() {
+    inputsEl.innerHTML = '';
+    photos.forEach(function (p) {
+      var keyInput = document.createElement('input');
+      keyInput.type = 'hidden';
+      keyInput.name = 'image_object_key';
+      keyInput.value = p.objectKey;
+      keyInput.setAttribute('form', 'product-form');
+      inputsEl.appendChild(keyInput);
+
+      var colorInput = document.createElement('input');
+      colorInput.type = 'hidden';
+      colorInput.name = 'image_color';
+      colorInput.value = p.color || '';
+      colorInput.setAttribute('form', 'product-form');
+      inputsEl.appendChild(colorInput);
+    });
+  }
+
+  // pfPruneOrphanColorPhotos drops color-tagged photos whose color no
+  // longer matches any variant row still on the form — e.g. the row was
+  // deleted, or its color text was retyped to something else — so a
+  // removed/renamed color's photos don't keep being submitted and stored
+  // against a color no variant actually has.
+  function pfPruneOrphanColorPhotos() {
+    var liveColors = {};
+    document.querySelectorAll('input[name="variant_color"]').forEach(function (input) {
+      var c = (input.value || '').trim();
+      if (c) liveColors[c] = true;
+    });
+    photos = photos.filter(function (p) { return !p.color || liveColors[p.color]; });
+  }
+
+  function pfRefreshPhotoBadges() {
+    document.querySelectorAll('.admin-variant-row').forEach(function (row) {
+      var colorInput = row.querySelector('input[name="variant_color"]');
+      var color = colorInput ? (colorInput.value || '').trim() : '';
+      var count = color ? photos.filter(function (p) { return p.color === color; }).length : 0;
+      var countEl = row.querySelector('.admin-variant-photo-count');
+      if (countEl) countEl.textContent = count;
+      var btn = row.querySelector('.admin-variant-photo-btn');
+      if (btn) btn.classList.toggle('has-photos', count > 0);
+    });
+  }
+
+  // Delegated listener (rather than one per row) so it keeps working for
+  // rows pfAddVariant creates after page load.
+  document.getElementById('pf-variant-rows').addEventListener('input', function (evt) {
+    if (evt.target && evt.target.name === 'variant_color') { pfRefreshPhotoBadges(); }
+  });
+
+  document.getElementById('product-form').addEventListener('submit', function () {
+    pfPruneOrphanColorPhotos();
+    syncHiddenInputs();
+  });
 
   function renderSlots() {
     slotsEl.innerHTML = '';
-    var hiddenInputs = inputsEl.querySelectorAll('input[name="image_object_key"]');
-    hiddenInputs.forEach(function (input, i) {
+    var general = photos.filter(function (p) { return !p.color; });
+    general.forEach(function (p, i) {
       var slot = document.createElement('div');
       slot.className = 'admin-photo-slot';
       var img = document.createElement('img');
-      img.src = input.dataset.previewUrl || input.value;
+      img.src = p.url;
       slot.appendChild(img);
       if (i === 0) {
         var main = document.createElement('span');
@@ -409,26 +511,27 @@
       rm.type = 'button';
       rm.className = 'admin-photo-slot__remove';
       rm.innerHTML = '&times;';
-      rm.onclick = function () { input.remove(); renderSlots(); };
+      rm.onclick = function () {
+        photos = photos.filter(function (x) { return x !== p; });
+        renderSlots();
+        syncHiddenInputs();
+      };
       slot.appendChild(rm);
       slotsEl.appendChild(slot);
     });
   }
   renderSlots();
+  syncHiddenInputs();
+  pfRefreshPhotoBadges();
 
   window.pfPickPhoto = function () {
-    var count = inputsEl.querySelectorAll('input[name="image_object_key"]').length;
+    var count = photos.filter(function (p) { return !p.color; }).length;
     if (count >= MAX_SLOTS) { alert('Максимум ' + MAX_SLOTS + ' фото'); return; }
     document.getElementById('pf-file-input').click();
   };
 
-  window.pfFileChosen = function (evt) {
-    var file = evt.target.files[0];
-    evt.target.value = '';
-    if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
-
-    fetch('/admin/api/media/presign-upload', {
+  function uploadPhoto(file) {
+    return fetch('/admin/api/media/presign-upload', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content_type: file.type })
     }).then(function (r) {
@@ -437,15 +540,78 @@
     }).then(function (presign) {
       return fetch(presign.upload_url, { method: 'PUT', body: file }).then(function (putRes) {
         if (!putRes.ok) throw new Error('upload failed');
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'image_object_key';
-        input.setAttribute('form', 'product-form');
-        input.value = presign.object_key;
-        input.dataset.previewUrl = URL.createObjectURL(file);
-        inputsEl.appendChild(input);
-        renderSlots();
+        return { objectKey: presign.object_key, url: URL.createObjectURL(file) };
       });
+    });
+  }
+
+  window.pfFileChosen = function (evt) {
+    var file = evt.target.files[0];
+    evt.target.value = '';
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
+    uploadPhoto(file).then(function (uploaded) {
+      photos.push({ objectKey: uploaded.objectKey, color: '', url: uploaded.url });
+      renderSlots();
+      syncHiddenInputs();
+    }).catch(function () { alert('Не удалось загрузить фото'); });
+  };
+
+  // --- per-color photo modal, opened from a variant row's "Фото цвета"
+  // button ---
+  function renderColorModalGrid() {
+    var grid = document.getElementById('pf-colorphoto-grid');
+    grid.innerHTML = '';
+    photos.filter(function (p) { return p.color === currentModalColor; }).forEach(function (p) {
+      var slot = document.createElement('div');
+      slot.className = 'admin-photo-slot';
+      var img = document.createElement('img');
+      img.src = p.url;
+      slot.appendChild(img);
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'admin-photo-slot__remove';
+      rm.innerHTML = '&times;';
+      rm.onclick = function () {
+        photos = photos.filter(function (x) { return x !== p; });
+        renderColorModalGrid();
+        syncHiddenInputs();
+        pfRefreshPhotoBadges();
+      };
+      slot.appendChild(rm);
+      grid.appendChild(slot);
+    });
+  }
+
+  window.pfOpenColorPhotos = function (btnEl) {
+    var row = btnEl.closest('tr');
+    var colorInput = row.querySelector('input[name="variant_color"]');
+    var color = (colorInput.value || '').trim();
+    if (!color) { alert('Сначала укажите цвет вариации'); return; }
+    currentModalColor = color;
+    document.getElementById('pf-colorphoto-title').textContent = 'Фото цвета «' + color + '»';
+    renderColorModalGrid();
+    document.getElementById('pf-colorphoto-modal').style.display = 'flex';
+  };
+  window.closeColorPhotoModal = function () {
+    document.getElementById('pf-colorphoto-modal').style.display = 'none';
+    syncHiddenInputs();
+    pfRefreshPhotoBadges();
+  };
+
+  window.pfPickColorPhoto = function () {
+    document.getElementById('pf-colorphoto-file-input').click();
+  };
+
+  window.pfColorFileChosen = function (evt) {
+    var file = evt.target.files[0];
+    evt.target.value = '';
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
+    uploadPhoto(file).then(function (uploaded) {
+      photos.push({ objectKey: uploaded.objectKey, color: currentModalColor, url: uploaded.url });
+      renderColorModalGrid();
+      syncHiddenInputs();
     }).catch(function () { alert('Не удалось загрузить фото'); });
   };
 })();

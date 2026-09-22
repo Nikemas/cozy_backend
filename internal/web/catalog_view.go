@@ -384,11 +384,11 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 
 	hasPhoto := false
 	photoURL := ""
-	if images, err := h.images.PrimaryForProducts(ctx, []string{product.ID}); err != nil {
+	if productImages, err := h.images.ListByProduct(ctx, product.ID); err != nil {
 		return nil, err
-	} else if img, ok := images[product.ID]; ok {
+	} else if matched := catalog.ForColor(productImages, selectedColor); len(matched) > 0 {
 		hasPhoto = true
-		photoURL = h.photoURL(img.ObjectKey)
+		photoURL = h.photoURL(matched[0].ObjectKey)
 	}
 
 	return &ProductData{

@@ -285,8 +285,9 @@ func deleteVariantHandler(variants *catalog.VariantRepo) apperr.HandlerFunc {
 // --- images ---
 
 type imageRequest struct {
-	ObjectKey string `json:"object_key"`
-	SortOrder int    `json:"sort_order"`
+	ObjectKey string  `json:"object_key"`
+	SortOrder int     `json:"sort_order"`
+	Color     *string `json:"color,omitempty"`
 }
 
 // replaceImagesHandler writes {object_key, sort_order} rows into
@@ -307,7 +308,7 @@ func replaceImagesHandler(products *catalog.ProductRepo, images *catalog.ImageRe
 
 		inputs := make([]catalog.ImageInput, len(req))
 		for i, it := range req {
-			inputs[i] = catalog.ImageInput{ObjectKey: it.ObjectKey, SortOrder: it.SortOrder}
+			inputs[i] = catalog.ImageInput{ObjectKey: it.ObjectKey, SortOrder: it.SortOrder, Color: it.Color}
 		}
 
 		result, err := images.ReplaceForProduct(r.Context(), productID, inputs)

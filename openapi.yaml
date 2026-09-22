@@ -1128,6 +1128,10 @@ components:
         product_id: { type: string, format: uuid }
         object_key: { type: string }
         sort_order: { type: integer }
+        color:
+          type: string
+          nullable: true
+          description: "Null for a general product photo, or a product_variants.color string tying this photo to that specific color."
 
     ImageInput:
       type: object
@@ -1135,6 +1139,10 @@ components:
       properties:
         object_key: { type: string }
         sort_order: { type: integer, default: 0 }
+        color:
+          type: string
+          nullable: true
+          description: "Omit/null for a general product photo, or set to the exact variant color this photo belongs to."
 
     StockEntry:
       type: object
@@ -1186,6 +1194,10 @@ components:
       properties:
         url: { type: string }
         sort_order: { type: integer }
+        color:
+          type: string
+          nullable: true
+          description: "Null for a general product photo. When set, the client should prefer photos whose color matches the shopper's selected variant color, falling back to the null-color photos if that color has none."
 
     VariantDetail:
       allOf:

@@ -91,9 +91,13 @@ type VariantRowVM struct {
 	BadgeBG  string
 }
 
+// ImageRowVM is one photo slot. Color is "" for a general product photo, or
+// a product_variants.color string (matched against the Вариации table's
+// own color inputs) tying the photo to that specific color.
 type ImageRowVM struct {
 	ObjectKey string
 	URL       string
+	Color     string
 }
 
 // ProductFormData backs product_form.gohtml (screen "product_form").
@@ -118,8 +122,9 @@ type ProductFormData struct {
 
 	Brands []string // datalist options for the brand field — see buildBrandOptions
 
-	Images   []ImageRowVM
-	Variants []VariantRowVM
+	Images     []ImageRowVM
+	ImagesJSON template.JS // Images, marshaled for the form's photo-slot/per-color-photo JS
+	Variants   []VariantRowVM
 
 	CanDelete bool
 	Err       string
@@ -352,6 +357,17 @@ func buildCategoryOptions(tree []*catalog.Category) []CategoryOptionVM {
 // json.Marshal's signature always allows for it).
 func categoryOptionsJSON(options []CategoryOptionVM) template.JS {
 	b, err := json.Marshal(options)
+	if err != nil {
+		return template.JS("[]")
+	}
+	return template.JS(b)
+}
+
+// imageRowsJSON marshals a product's photo rows for the form's photo JS,
+// mirroring categoryOptionsJSON — falls back to "[]" rather than failing
+// the whole page render on a (practically impossible) marshal error.
+func imageRowsJSON(images []ImageRowVM) template.JS {
+	b, err := json.Marshal(images)
 	if err != nil {
 		return template.JS("[]")
 	}

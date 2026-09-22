@@ -11,12 +11,16 @@ import (
 
 // ProductImage mirrors a row of the `product_images` table. object_key
 // points at a file in MinIO — this package never talks to MinIO itself, it
-// only stores the key a separate upload flow hands back.
+// only stores the key a separate upload flow hands back. Color is nil for a
+// general product photo and set to a product_variants.color string for a
+// photo tied to that specific color (e.g. the black pair's own photos vs
+// the white pair's) — see ForProductAndColor.
 type ProductImage struct {
-	ID        string `json:"id"`
-	ProductID string `json:"product_id"`
-	ObjectKey string `json:"object_key"`
-	SortOrder int    `json:"sort_order"`
+	ID        string  `json:"id"`
+	ProductID string  `json:"product_id"`
+	ObjectKey string  `json:"object_key"`
+	SortOrder int     `json:"sort_order"`
+	Color     *string `json:"color,omitempty"`
 }
 
 type ImageRepo struct {
@@ -27,20 +31,21 @@ func NewImageRepo(db *sql.DB) *ImageRepo {
 	return &ImageRepo{db: db}
 }
 
-// PrimaryForProducts returns each product's first image (lowest
-// sort_order), keyed by product_id — products with no image are simply
-// absent from the map. Used by the storefront (internal/web) to render
-// grid thumbnails without an N+1 query per product.
+// PrimaryForProducts returns each product's first image (a general photo,
+// i.e. color IS NULL, if any exist; otherwise whichever color-tagged photo
+// has the lowest sort_order), keyed by product_id — products with no image
+// are simply absent from the map. Used by the storefront (internal/web) to
+// render grid thumbnails without an N+1 query per product.
 func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string) (map[string]ProductImage, error) {
 	if len(productIDs) == 0 {
 		return map[string]ProductImage{}, nil
 	}
 
 	const q = `
-		SELECT DISTINCT ON (product_id) id, product_id, object_key, sort_order
+		SELECT DISTINCT ON (product_id) id, product_id, object_key, sort_order, color
 		FROM product_images
 		WHERE product_id = ANY($1)
-		ORDER BY product_id, sort_order`
+		ORDER BY product_id, (color IS NOT NULL), sort_order`
 
 	rows, err := r.db.QueryContext(ctx, q, productIDs)
 	if err != nil {
@@ -51,7 +56,7 @@ func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string)
 	out := make(map[string]ProductImage, len(productIDs))
 	for rows.Next() {
 		var pi ProductImage
-		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder); err != nil {
+		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder, &pi.Color); err != nil {
 			return nil, err
 		}
 		out[pi.ProductID] = pi
@@ -59,16 +64,20 @@ func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string)
 	return out, rows.Err()
 }
 
-// ListByProduct returns every image of productID, ordered by sort_order —
-// unlike PrimaryForProducts (batch, one image per product, for storefront
-// grid thumbnails), this is the single-product, full-list read the admin
-// product edit form (internal/admin) needs to repopulate its photo slots.
+// ListByProduct returns every image of productID — general (color IS NULL)
+// photos first, then color-tagged ones grouped by color, each group
+// internally ordered by sort_order. Unlike PrimaryForProducts (batch, one
+// image per product, for storefront grid thumbnails), this is the
+// single-product, full-list read the admin product edit form
+// (internal/admin) needs to repopulate its photo slots, and the public
+// product detail endpoint (internal/httpapi) needs to let a client pick the
+// photos matching the color the shopper selected.
 func (r *ImageRepo) ListByProduct(ctx context.Context, productID string) ([]ProductImage, error) {
 	const q = `
-		SELECT id, product_id, object_key, sort_order
+		SELECT id, product_id, object_key, sort_order, color
 		FROM product_images
 		WHERE product_id = $1
-		ORDER BY sort_order`
+		ORDER BY color NULLS FIRST, sort_order`
 
 	rows, err := r.db.QueryContext(ctx, q, productID)
 	if err != nil {
@@ -79,7 +88,7 @@ func (r *ImageRepo) ListByProduct(ctx context.Context, productID string) ([]Prod
 	images := []ProductImage{}
 	for rows.Next() {
 		var pi ProductImage
-		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder); err != nil {
+		if err := rows.Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder, &pi.Color); err != nil {
 			return nil, err
 		}
 		images = append(images, pi)
@@ -87,10 +96,38 @@ func (r *ImageRepo) ListByProduct(ctx context.Context, productID string) ([]Prod
 	return images, rows.Err()
 }
 
-// ImageInput carries the writable fields of one product image.
+// ForColor filters images (as returned by ListByProduct) down to the photos
+// tagged with color. If none match, it falls back to the general (color ==
+// nil) photos, and if there are none of those either, returns images
+// unfiltered — so a product that was never given per-color photos still
+// shows something instead of an empty gallery.
+func ForColor(images []ProductImage, color string) []ProductImage {
+	var tagged, general []ProductImage
+	for _, img := range images {
+		switch {
+		case img.Color != nil && *img.Color == color:
+			tagged = append(tagged, img)
+		case img.Color == nil:
+			general = append(general, img)
+		}
+	}
+	switch {
+	case len(tagged) > 0:
+		return tagged
+	case len(general) > 0:
+		return general
+	default:
+		return images
+	}
+}
+
+// ImageInput carries the writable fields of one product image. Color is
+// nil for a general product photo, or a product_variants.color string to
+// tie the photo to that specific color.
 type ImageInput struct {
 	ObjectKey string
 	SortOrder int
+	Color     *string
 }
 
 // ReplaceForProduct replaces the full set of images for productID with
@@ -114,13 +151,13 @@ func (r *ImageRepo) ReplaceForProduct(ctx context.Context, productID string, ima
 
 		for _, img := range images {
 			const q = `
-				INSERT INTO product_images (product_id, object_key, sort_order)
-				VALUES ($1, $2, $3)
-				RETURNING id, product_id, object_key, sort_order`
+				INSERT INTO product_images (product_id, object_key, sort_order, color)
+				VALUES ($1, $2, $3, $4)
+				RETURNING id, product_id, object_key, sort_order, color`
 
 			var pi ProductImage
-			err := tx.QueryRowContext(ctx, q, productID, img.ObjectKey, img.SortOrder).
-				Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder)
+			err := tx.QueryRowContext(ctx, q, productID, img.ObjectKey, img.SortOrder, img.Color).
+				Scan(&pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder, &pi.Color)
 			if pgErrCode(err) == pgForeignKeyViolation {
 				return apperr.NotFound("product_not_found", "товар не найден")
 			}
