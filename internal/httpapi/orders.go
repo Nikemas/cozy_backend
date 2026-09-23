@@ -201,6 +201,7 @@ type cartLineResponse struct {
 	Color         string  `json:"color"`
 	Price         float64 `json:"price"`
 	PhotoURL      *string `json:"photo_url"`
+	ThumbURL      *string `json:"thumb_url"`
 }
 
 // listCartHandler serves GET /api/v1/cart. It enriches each raw
@@ -286,10 +287,10 @@ func listCartHandler(repo cartService, variants cartVariantGetter, products cart
 				price = *l.variant.PriceOverride
 			}
 
-			var photoURLPtr *string
+			var photoURLPtr, thumbURLPtr *string
 			if img, ok := primaryImages[l.product.ID]; ok {
-				url := photoURL(cfg, img.ObjectKey)
-				photoURLPtr = &url
+				url, thumb := photoURL(cfg, img.ObjectKey), thumbURL(cfg, img.ObjectKey)
+				photoURLPtr, thumbURLPtr = &url, &thumb
 			}
 
 			resp = append(resp, cartLineResponse{
@@ -302,6 +303,7 @@ func listCartHandler(repo cartService, variants cartVariantGetter, products cart
 				Color:         l.variant.Color,
 				Price:         price,
 				PhotoURL:      photoURLPtr,
+				ThumbURL:      thumbURLPtr,
 			})
 		}
 

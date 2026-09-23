@@ -79,7 +79,7 @@
 
     <div class="admin-card admin-card--pad">
       <div class="admin-card__title">Фотографии</div>
-      <div class="admin-card__hint">Первое фото — главное. Загрузка идёт напрямую в хранилище.</div>
+      <div class="admin-card__hint">Первое фото — главное. JPEG, PNG или WEBP до 10 МБ, меньшая сторона от 600 px — фото автоматически приводится к белому квадрату.</div>
       <div id="pf-photo-slots" class="admin-photo-grid"></div>
       <button type="button" class="admin-photo-add" onclick="pfPickPhoto()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"></path></svg>
@@ -414,15 +414,16 @@
     pfRefreshPhotoBadges();
   };
 
-  // --- photos: presigned upload straight to MinIO, then a hidden
-  // image_object_key/image_color pair of inputs records each photo for the
-  // form submit. `photos` is the single source of truth (both the general
+  // --- photos: uploaded to POST /admin/api/media/upload, which
+  // normalizes them server-side (white 1:1 square, full + thumb variants)
+  // and returns the object key; a hidden image_object_key/image_color pair
+  // of inputs then records each photo for the form submit. `photos` is the single source of truth (both the general
   // grid and every per-color modal read/write it) — color === '' is a
   // general product photo, any other value ties the photo to that exact
   // variant color text (see catalog.ImageRepo.ForColor server-side).
-  // Preview uses a local blob URL for a fresh upload, or the already-
-  // resolved bucket URL for a photo the product already had — no need to
-  // know the public bucket URL client-side before a new upload is saved.
+  // Preview shows the normalized thumb the server returns (thumb_url) —
+  // i.e. exactly what the shop will show, white background included —
+  // or the server-resolved thumb URL for a photo the product already had.
   var MAX_SLOTS = 6;
   var slotsEl = document.getElementById('pf-photo-slots');
   var inputsEl = document.getElementById('pf-image-inputs');
@@ -530,31 +531,43 @@
     document.getElementById('pf-file-input').click();
   };
 
+  var MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+  // uploadPhoto sends the file as multipart/form-data (field "file"). The
+  // server decides whether it is a usable image (real format, size,
+  // resolution); its 400 message is Russian and meant for the user, so
+  // it's surfaced as is. Anything else (network, 5xx, expired session)
+  // gets the generic message. The error's .message is what alert() shows.
   function uploadPhoto(file) {
-    return fetch('/admin/api/media/presign-upload', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_type: file.type })
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return Promise.reject(new Error('Файл больше 10 МБ'));
+    }
+    var body = new FormData();
+    body.append('file', file);
+    return fetch('/admin/api/media/upload', { method: 'POST', body: body }).catch(function () {
+      throw new Error('Не удалось загрузить фото: нет связи с сервером');
     }).then(function (r) {
-      if (!r.ok) throw new Error('presign failed');
-      return r.json();
-    }).then(function (presign) {
-      return fetch(presign.upload_url, { method: 'PUT', body: file }).then(function (putRes) {
-        if (!putRes.ok) throw new Error('upload failed');
-        return { objectKey: presign.object_key, url: URL.createObjectURL(file) };
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.status === 400 && data.message) throw new Error(data.message);
+        if (!r.ok || !data.object_key) throw new Error('Не удалось загрузить фото');
+        return { objectKey: data.object_key, url: data.thumb_url };
       });
     });
+  }
+
+  function uploadFailed(err) {
+    alert((err && err.message) || 'Не удалось загрузить фото');
   }
 
   window.pfFileChosen = function (evt) {
     var file = evt.target.files[0];
     evt.target.value = '';
     if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
     uploadPhoto(file).then(function (uploaded) {
       photos.push({ objectKey: uploaded.objectKey, color: '', url: uploaded.url });
       renderSlots();
       syncHiddenInputs();
-    }).catch(function () { alert('Не удалось загрузить фото'); });
+    }).catch(uploadFailed);
   };
 
   // --- per-color photo modal, opened from a variant row's "Фото цвета"
@@ -607,12 +620,11 @@
     var file = evt.target.files[0];
     evt.target.value = '';
     if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { alert('Поддерживаются JPEG, PNG, WEBP'); return; }
     uploadPhoto(file).then(function (uploaded) {
       photos.push({ objectKey: uploaded.objectKey, color: currentModalColor, url: uploaded.url });
       renderColorModalGrid();
       syncHiddenInputs();
-    }).catch(function () { alert('Не удалось загрузить фото'); });
+    }).catch(uploadFailed);
   };
 })();
 </script>

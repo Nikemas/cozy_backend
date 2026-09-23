@@ -3,80 +3,42 @@ package media
 import (
 	"strings"
 	"testing"
-
-	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
-func TestExtensionForContentTypeAcceptsImageTypes(t *testing.T) {
+func TestNewVariantKeysShareAUniquePrefix(t *testing.T) {
+	full1, thumb1 := newVariantKeys()
+	full2, _ := newVariantKeys()
+
+	if full1 == full2 {
+		t.Fatalf("newVariantKeys returned the same key twice: %q", full1)
+	}
+	if !strings.HasPrefix(full1, "products/") || !strings.HasSuffix(full1, "/full.jpg") {
+		t.Errorf("full key = %q, want products/<uuid>/full.jpg", full1)
+	}
+	if thumb1 != strings.TrimSuffix(full1, "/full.jpg")+"/thumb.jpg" {
+		t.Errorf("thumb key %q doesn't share the full key's prefix (%q)", thumb1, full1)
+	}
+	if got := ThumbKey(full1); got != thumb1 {
+		t.Errorf("ThumbKey(%q) = %q, want %q", full1, got, thumb1)
+	}
+}
+
+func TestThumbKey(t *testing.T) {
 	cases := map[string]string{
-		"image/jpeg": ".jpg",
-		"image/png":  ".png",
-		"image/webp": ".webp",
+		"products/abc/full.jpg": "products/abc/thumb.jpg",
+		// Legacy single-file keys are served unchanged.
+		"products/abc.jpg":  "products/abc.jpg",
+		"products/abc.png":  "products/abc.png",
+		"products/abc.webp": "products/abc.webp",
+		// Only the exact "/full.jpg" suffix counts.
+		"products/full.jpg":         "products/thumb.jpg",
+		"products/abcfull.jpg":      "products/abcfull.jpg",
+		"products/abc/full.jpg.bak": "products/abc/full.jpg.bak",
+		"":                          "",
 	}
-	for contentType, wantExt := range cases {
-		ext, err := extensionForContentType(contentType)
-		if err != nil {
-			t.Errorf("extensionForContentType(%q): unexpected error: %v", contentType, err)
-			continue
+	for in, want := range cases {
+		if got := ThumbKey(in); got != want {
+			t.Errorf("ThumbKey(%q) = %q, want %q", in, got, want)
 		}
-		if ext != wantExt {
-			t.Errorf("extensionForContentType(%q) = %q, want %q", contentType, ext, wantExt)
-		}
-	}
-}
-
-func TestExtensionForContentTypeRejectsNonImageTypes(t *testing.T) {
-	cases := []string{
-		"text/html",
-		"application/zip",
-		"application/pdf",
-		"image/svg+xml", // scriptable, deliberately not on the allow-list
-		"",
-		"IMAGE/JPEG", // case must match exactly, no normalization assumed
-	}
-	for _, contentType := range cases {
-		_, err := extensionForContentType(contentType)
-		if err == nil {
-			t.Errorf("extensionForContentType(%q): expected an error, got nil", contentType)
-			continue
-		}
-		var appErr *apperr.AppError
-		if ae, ok := err.(*apperr.AppError); ok {
-			appErr = ae
-		}
-		if appErr == nil {
-			t.Errorf("extensionForContentType(%q): expected *apperr.AppError, got %T", contentType, err)
-			continue
-		}
-		if appErr.Status != 400 {
-			t.Errorf("extensionForContentType(%q): expected 400 status, got %d", contentType, appErr.Status)
-		}
-	}
-}
-
-func TestNewObjectKeyIsUniqueAndUsesRightExtension(t *testing.T) {
-	key1, err := newObjectKey("image/png")
-	if err != nil {
-		t.Fatalf("newObjectKey: unexpected error: %v", err)
-	}
-	key2, err := newObjectKey("image/png")
-	if err != nil {
-		t.Fatalf("newObjectKey: unexpected error: %v", err)
-	}
-
-	if key1 == key2 {
-		t.Fatalf("newObjectKey returned the same key twice: %q", key1)
-	}
-	if !strings.HasPrefix(key1, "products/") {
-		t.Errorf("newObjectKey(%q) = %q, want products/ prefix", "image/png", key1)
-	}
-	if !strings.HasSuffix(key1, ".png") {
-		t.Errorf("newObjectKey(%q) = %q, want .png suffix", "image/png", key1)
-	}
-}
-
-func TestNewObjectKeyRejectsBadContentType(t *testing.T) {
-	if _, err := newObjectKey("application/octet-stream"); err == nil {
-		t.Fatal("newObjectKey: expected an error for a non-image content type")
 	}
 }

@@ -19,9 +19,10 @@ services:
       # resolve this. The admin's BROWSER instead needs MINIO_PUBLIC_ENDPOINT
       # (set in the server's .env to the Caddy-fronted media host, i.e.
       # MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com and
-      # MINIO_PUBLIC_USE_SSL=true) — without it, presigned photo-upload URLs
-      # point at "minio:9000", which the browser can't resolve, and every
-      # upload in the admin panel fails.
+      # MINIO_PUBLIC_USE_SSL=true) — without it, photo URLs point at
+      # "minio:9000", which the browser can't resolve, and no product photo
+      # loads (uploads themselves go through the backend, POST
+      # /admin/api/media/upload, over MINIO_ENDPOINT).
       MINIO_ENDPOINT: minio:9000
     # Firebase service-account key for push (FCM_CREDENTIALS_FILE=
     # /secrets/firebase-service-account.json in .env). The directory is

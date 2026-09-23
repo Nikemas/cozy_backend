@@ -20,12 +20,12 @@ import (
 // for anything beyond Foundation's stub screens.
 //
 // db backs each screen's own repos/services as Tasks 2-5 land — see
-// handlers.go's handlers struct for the full set. mediaClient and cfg
-// back Task 2's product photo upload (presigned MinIO PUT + a direct,
-// non-presigned GET URL built the same way internal/web's
-// handlers.photoURL already does) — reusing the single *media.Client
-// cmd/server/main.go already constructs for media.RegisterRoutes, not a
-// second instance.
+// handlers.go's handlers struct for the full set. cfg builds the direct,
+// non-presigned photo URLs (the same way internal/web's handlers.photoURL
+// does); the photo upload itself is media.RegisterRoutes' POST
+// /admin/api/media/upload, called from the product form's JS. mediaClient
+// is the single *media.Client cmd/server/main.go already constructs for
+// media.RegisterRoutes, not a second instance.
 func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config) error {
 	renderer, err := NewRenderer()
 	if err != nil {

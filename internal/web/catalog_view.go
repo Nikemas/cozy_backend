@@ -24,6 +24,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/media"
 )
 
 // shopPageSize mirrors catalog.DefaultPageSize — kept as its own constant
@@ -182,7 +183,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		}
 		if img, ok := images[p.ID]; ok {
 			card.HasPhoto = true
-			card.PhotoURL = h.photoURL(img.ObjectKey)
+			card.PhotoURL = h.photoURL(media.ThumbKey(img.ObjectKey))
 		}
 		cards = append(cards, card)
 	}
@@ -483,6 +484,9 @@ func formatMoney(v float64) string {
 // just to render <img> tags. The URL is built on cfg.MinIOPublicEndpoint
 // (the browser-facing host, e.g. media.cozy.erpsystemsales.com behind
 // Caddy), see config.PublicObjectURL.
+//
+// objectKey is served as given: grid cards pass media.ThumbKey(key) for
+// the 400px variant, the product page passes the stored (full) key.
 func (h *handlers) photoURL(objectKey string) string {
 	return h.cfg.PublicObjectURL(objectKey)
 }

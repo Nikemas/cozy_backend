@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -48,13 +49,15 @@ func (h *handlers) productsShellData(screen, title string, st *staff.Staff) Page
 	}
 }
 
-// photoURL builds a direct (non-presigned) URL to objectKey in the
-// cozy-media bucket — the exact same scheme+endpoint+bucket construction
-// internal/web's handlers.photoURL (catalog_view.go) already uses for the
-// public storefront, so admin thumbnails and product-page photos resolve
-// to the same public-read bucket URL.
-func (h *handlers) photoURL(objectKey string) string {
-	return h.cfg.PublicObjectURL(objectKey)
+// thumbURL builds a direct (non-presigned) URL to the 400px thumb variant
+// of a product photo in the cozy-media bucket — the same
+// scheme+endpoint+bucket construction internal/web's handlers.photoURL
+// (catalog_view.go) uses for the public storefront. Every photo the admin
+// panel shows (products list, form photo slots) is a small preview, so
+// the thumb is always the right size; media.ThumbKey returns legacy keys
+// unchanged, so those keep resolving to their single original file.
+func (h *handlers) thumbURL(objectKey string) string {
+	return h.cfg.PublicObjectURL(media.ThumbKey(objectKey))
 }
 
 // renderInternalErr is the fallback for an unexpected (non-apperr, e.g. a
@@ -205,7 +208,7 @@ func (h *handlers) buildProductRow(p catalog.Product, tree []*catalog.Category, 
 		StockBG:         bg,
 		StatusLabel:     statusLabel(p.IsActive),
 		HasPhoto:        hasPhoto,
-		PhotoURL:        h.photoURL(img.ObjectKey),
+		PhotoURL:        h.thumbURL(img.ObjectKey),
 		EditURL:         "/admin/products/" + p.ID,
 		ToggleActiveURL: "/admin/products/" + p.ID + "/toggle-active",
 		DeactivateLabel: deactivateLabel(p.IsActive),
@@ -321,7 +324,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	imageRows := make([]ImageRowVM, len(images))
 	for i, img := range images {
-		imageRows[i] = ImageRowVM{ObjectKey: img.ObjectKey, URL: h.photoURL(img.ObjectKey), Color: stringOrEmpty(img.Color)}
+		imageRows[i] = ImageRowVM{ObjectKey: img.ObjectKey, URL: h.thumbURL(img.ObjectKey), Color: stringOrEmpty(img.Color)}
 	}
 
 	options := buildCategoryOptions(tree)
@@ -479,7 +482,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		if k == "" {
 			continue
 		}
-		imageRows = append(imageRows, ImageRowVM{ObjectKey: k, URL: h.photoURL(k), Color: strings.TrimSpace(formAt(imageColors, i))})
+		imageRows = append(imageRows, ImageRowVM{ObjectKey: k, URL: h.thumbURL(k), Color: strings.TrimSpace(formAt(imageColors, i))})
 	}
 
 	formOptions := buildCategoryOptions(tree)
@@ -606,8 +609,9 @@ func (h *handlers) resolveDefaultPointID(ctx context.Context) (id string, ok boo
 
 // saveImages replaces productID's full photo set from the submitted
 // image_object_key[]/image_color[] parallel arrays (sort order = submission
-// order) — object keys come from the form's own presigned-upload JS (see
-// product_form.gohtml), never typed in directly. image_color[i] is "" for a
+// order) — object keys come from the form's own upload JS (POST
+// /admin/api/media/upload, see product_form.gohtml), never typed in
+// directly. image_color[i] is "" for a
 // general product photo, or the color text a photo was uploaded against in
 // the Вариации table's per-color photo picker.
 func (h *handlers) saveImages(ctx context.Context, productID string, r *http.Request) error {

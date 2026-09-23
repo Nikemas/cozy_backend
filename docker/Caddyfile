@@ -8,9 +8,9 @@
 # cozy.kg goes live — it doubles as a permanent staging environment.
 #
 # MEDIA: media.cozy.erpsystemsales.com fronts MinIO (port 9000 inside the
-# compose network) so presigned photo URLs are HTTPS on the same cert
+# compose network) so public photo URLs are HTTPS on the same cert
 # scheme — a plain http://host:9000 URL would be blocked as mixed content on
-# an HTTPS page. The backend must sign URLs for exactly this host:
+# an HTTPS page. The backend must build URLs for exactly this host:
 # MINIO_PUBLIC_ENDPOINT=media.cozy.erpsystemsales.com, MINIO_PUBLIC_USE_SSL=true
 # in the server's .env. reverse_proxy passes the browser's Host header
 # through unchanged, which is what MinIO's SigV4 check needs.
@@ -46,7 +46,7 @@ cozy.erpsystemsales.com {
 	reverse_proxy backend:8080
 }
 
-# --- staging: media (MinIO S3 API, presigned PUT/GET from the browser) -----
+# --- staging: media (MinIO S3 API, public photo GETs from browser/app) -----
 media.cozy.erpsystemsales.com {
 	reverse_proxy minio:9000
 }

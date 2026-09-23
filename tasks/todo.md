@@ -1,6 +1,6 @@
 # cozy_backend — todo
 
-См. `tasks/plan.md` для контекста и порядка. Не начато: **Task R** (нормализация изображений товаров, Wave 5 в `plan.md`) — заведена 2026-09-23. Готово: шаги 1–3 ТЗ (каркас, миграции, OTP-вход покупателя), и весь этот файл (шаги 4, 5, 16 — смержены в `main`).
+См. `tasks/plan.md` для контекста и порядка. **Task R** (нормализация изображений товаров, Wave 5 в `plan.md`) — заведена и сделана 2026-09-23, кроме ручной проверки на живом MinIO (см. раздел в конце файла). Готово: шаги 1–3 ТЗ (каркас, миграции, OTP-вход покупателя), и весь этот файл (шаги 4, 5, 16 — смержены в `main`).
 
 ## Task A: Staff auth & RBAC (шаг 4 ТЗ) — DONE
 
@@ -652,3 +652,52 @@
 **Follow-ups:**
 - Язык покупателя: нужна миграция `ALTER TABLE customers ADD COLUMN lang TEXT NOT NULL DEFAULT 'ru' CHECK (lang IN ('ru','ky'))`, способ его задать (профиль или заголовок при регистрации устройства) и `notifications.Config.Language`. В этой задаче не делалось, потому что миграции запрещены
 - Push при создании заказа покупателю не шлётся (он только что сам оформил заказ). Push про оплату появится вместе с Bakai
+
+## Task R: Серверная нормализация фото товаров (Wave 5, см. `plan.md`) — DONE (кроме manual)
+
+**Description:** `POST /admin/api/media/presign-upload` (presigned PUT прямо в MinIO, файл мимо бэкенда) заменён на `POST /admin/api/media/upload` (multipart): сервер сам декодирует файл, применяет EXIF-ориентацию, вписывает его в белый квадрат с полями 8% и кладёт в MinIO два JPEG-варианта — `products/<uuid>/full.jpg` (1200) и `products/<uuid>/thumb.jpg` (400).
+
+**Acceptance criteria:**
+- [x] `POST /admin/api/media/upload` — multipart, поле `file`, owner/manager через `staffSvc.RequireRole`; ответ `{"object_key": "products/<uuid>/full.jpg", "url": …, "thumb_url": …}` (`url`/`thumb_url` — аддитивно, для превью нормализованного результата в форме)
+- [x] Лимит 10 МБ: `http.MaxBytesReader` (10 МБ + 64 КБ на multipart-обвязку) + отдельная проверка размера самого файла → `400 file_too_large`, не 500/OOM; тело читается потоком через `MultipartReader`, без temp-файлов
+- [x] Формат — только по декодированию (`image.DecodeConfig`), `Content-Type` части игнорируется; JPEG/PNG/WebP (WebP — `golang.org/x/image/webp`), остальное → `400 unsupported_image` «файл не является изображением JPEG, PNG или WEBP»
+- [x] Меньшая сторона < 600 px → `400 image_too_small` с объяснением требования; дополнительно > 50 Мп → `400 image_too_large` (защита от decompression bomb, проверяется по заголовку до выделения памяти)
+- [x] EXIF-ориентация (все 8 значений) применяется до ресайза; свой минимальный парсер (`internal/media/exif.go`: JPEG APP1, WebP `EXIF`, PNG `eXIf` → TIFF IFD0 → тег 0x0112), без cgo и новых модулей; метаданные в результат не попадают (stdlib-энкодер JPEG их не пишет)
+- [x] Квадрат 1:1, contain с полями 8%, белый фон (прозрачность композится на белый через `draw.Over`), `full` 1200, `thumb` 400 (даунскейл из `full`), JPEG q85, ресемплинг `draw.CatmullRom`
+- [x] Оба варианта заливаются в MinIO (`Client.PutObject`, `Cache-Control: immutable`); при ошибке заливки thumb — full удаляется (`Client.RemoveObject`, с `context.WithoutCancel`)
+- [x] `presign-upload` и `Client.PresignPut` удалены (больше нигде не нужны), `openapi.yaml` обновлён (новый эндпоинт, соглашение full/thumb, `thumb_url` в схемах, версия 0.5.0)
+- [x] Легаси-ключи `products/<uuid>.<ext>` отдаются как есть: единственный хелпер `media.ThumbKey` меняет только суффикс `/full.jpg` → `/thumb.jpg`, остальное возвращает без изменений; правило задокументировано в `objectkey.go` и в `openapi.yaml`
+
+**Verification:**
+- [x] `gofmt -l .`, `go build ./...`, `go vet ./...`, `go test ./...` (+ `-race` для `internal/media`), `golangci-lint run ./...` — чисто, 0 issues
+- [x] Юнит-тесты на `normalizeImage` на сгенерированных изображениях: широкое, высокое, квадрат, ровно 600 px, прозрачный PNG → белый, EXIF-поворот (6 в BE/LE, 3; без EXIF — не повёрнуто), вывод без метаданных, слишком маленькое, не-изображения (пусто/текст/SVG/GIF/битый PNG/JPEG-магия+мусор), decompression bomb; отдельно `applyOrientation` для всех 8 значений, парсер EXIF для JPEG/PNG/WebP + устойчивость к обрезанному/битому входу (без паник)
+- [x] Тесты хендлера с in-memory `objectStore`: успех (2 объекта, оба JPEG нужного размера, URL-ы), тело > лимита → 400 `file_too_large`, файл на 1 байт больше 10 МБ → 400, не multipart / нет поля `file` / не картинка / маленькое → 400, падение заливки thumb → full удалён, падение заливки full → ничего не записано
+- [x] Синтаксис JS формы товара проверен `node --check` (шаблонные вставки заменены заглушками)
+- [ ] Manual: загрузить через curl/админку 3–4 реальных фото обуви с разным фоном, скачать `thumb`, проверить глазами, что встают в ряд одинаково — нет локального Postgres/MinIO, не прогнано (сделать на staging). Реальный `PutObject`/`RemoveObject` против MinIO не выполнялся
+- [ ] Manual: форма товара в админке (выбор файла → превью thumb → сохранение) в браузере не прогонялась — нужна БД
+- [ ] Позитивный тест на WebP-вход отсутствует: в Go нет WebP-энкодера, чтобы сгенерировать файл в тесте; декодер — `golang.org/x/image/webp`, покрыт только путь «формат зарегистрирован/распознан» и парсер EXIF-чанка WebP
+
+**Dependencies:** Task E (MinIO-клиент), Wave 4 Task 2 (форма товара — переключена на новый эндпоинт)
+
+**Files touched:**
+- `internal/media/normalize.go` (+ `normalize_test.go`) — новая чистая функция `normalizeImage`, `applyOrientation`, `fitOnWhiteSquare`
+- `internal/media/exif.go` — минимальный парсер EXIF Orientation
+- `internal/media/objectkey.go` (+ тест) — `newVariantKeys`, экспортируемый `ThumbKey`; удалены `newObjectKey`/`extensionForContentType` (валидация по заявленному `content_type` больше не нужна)
+- `internal/media/routes.go` (+ `routes_test.go`) — `uploadHandler` поверх интерфейса `objectStore`, `storeVariants`; `RegisterRoutes` теперь принимает `cfg` (для URL в ответе)
+- `internal/media/client.go` — `PutObject`/`RemoveObject` вместо `PresignPut`
+- `cmd/server/main.go` — передача `cfg` в `media.RegisterRoutes`
+- `admin/templates/product_form.gohtml` — `uploadPhoto` шлёт `FormData` на `/admin/api/media/upload`, превью — `thumb_url`, русское сообщение сервера (400) показывается как есть; клиентская проверка `file.type` убрана (решает сервер), оставлена проверка 10 МБ; подсказка под фото описывает требования
+- `internal/admin/products.go`, `routes.go` — `photoURL` → `thumbURL` (список товаров и слоты фото в форме — это превью), комментарии
+- `internal/web/catalog_view.go` — карточки сетки витрины берут `media.ThumbKey(...)`, страница товара — full
+- `internal/httpapi/catalog.go`, `orders.go` (+ тест) — аддитивное поле `thumb_url` в списке товаров, в `images[]` карточки товара и в строках корзины
+- `openapi.yaml`, `go.mod` (`golang.org/x/image` из indirect в direct), комментарии в `docker/Caddyfile`, `docker/docker-compose.prod.yml`, `.env.example` (presigned → публичные URL)
+
+**Design decisions:**
+- **Хелпер `ThumbKey` живёт в `internal/media`**, а не в `config`: раскладка ключей — забота `media` (там же `newVariantKeys`), а `config` не может импортировать `media` (цикл). Все места, строящие URL превью, зовут `cfg.PublicObjectURL(media.ThumbKey(key))`.
+- **`thumb` даунскейлится из готового `full`**, а не из исходника: геометрия (поля) пропорциональна, а мультимегапиксельный исходник ресемплится один раз.
+- **Ошибки MinIO** возвращаются как обёрнутые `error`, а не `apperr.Internal(err)`: `apperr.Wrap` всё равно отдаёт клиенту 500 `internal_error`, но так в лог попадает исходная причина.
+
+**Deviations:**
+- План утверждал, что `presign-upload` «ещё никем не вызывается» — на момент выполнения форма товара (Wave 4 Task 2) уже им пользовалась; она переключена на новый эндпоинт в этой же задаче.
+- Сверх плана: `url`/`thumb_url` в ответе загрузки, `thumb_url` в `/api/v1/products`, `/api/v1/products/{id}` (`images[]`) и `/api/v1/cart` (всё аддитивно); лимит 50 Мп; удалён `Client.PresignPut`.
+- Мобилка (`cozy_mobile`) не тронута — ей достаточно читать новые `thumb_url`, отдельная задача по плану.

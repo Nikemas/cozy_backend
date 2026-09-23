@@ -446,6 +446,37 @@ func TestListCartHandlerEnrichesLine(t *testing.T) {
 	if got.PhotoURL == nil || *got.PhotoURL != wantPhotoURL {
 		t.Errorf("photo_url = %v, want %s", got.PhotoURL, wantPhotoURL)
 	}
+	// A legacy single-file key has no thumb variant: thumb_url == photo_url.
+	if got.ThumbURL == nil || *got.ThumbURL != wantPhotoURL {
+		t.Errorf("thumb_url = %v, want %s", got.ThumbURL, wantPhotoURL)
+	}
+}
+
+// TestListCartHandlerThumbURLForNormalizedPhoto checks that a photo stored
+// by POST /admin/api/media/upload (…/full.jpg) gets its …/thumb.jpg
+// variant as thumb_url, while photo_url stays the full one.
+func TestListCartHandlerThumbURLForNormalizedPhoto(t *testing.T) {
+	f := newCartHandlerFakes()
+	f.cart.listResult = []orders.CartItem{{CustomerID: "cust-1", VariantID: "var-1", Qty: 1}}
+	f.variants.variants["var-1"] = catalog.Variant{ID: "var-1", ProductID: "prod-1", Size: "42", Color: "black"}
+	f.products.products["prod-1"] = catalog.Product{ID: "prod-1", NameRu: "Кроссовки", BasePrice: 3000}
+	f.images.images["prod-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/abc/full.jpg"}
+
+	rec := httptest.NewRecorder()
+	f.handler().ServeHTTP(rec, newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	var lines []cartLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &lines); err != nil || len(lines) != 1 {
+		t.Fatalf("unmarshal response: %v (%s)", err, rec.Body.String())
+	}
+	if got := lines[0].PhotoURL; got == nil || *got != "http://minio.local/cozy-media/products/abc/full.jpg" {
+		t.Errorf("photo_url = %v", got)
+	}
+	if got := lines[0].ThumbURL; got == nil || *got != "http://minio.local/cozy-media/products/abc/thumb.jpg" {
+		t.Errorf("thumb_url = %v", got)
+	}
 }
 
 // TestListCartHandlerUsesPriceOverride checks that a variant's
