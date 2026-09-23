@@ -27,6 +27,7 @@ type handlers struct {
 	// orders.go's adminOrdersService for exactly which *orders.Service
 	// methods are used.
 	ordersSvc adminOrdersService
+	orderMeta orderListMeta // batch item counts + phones for the list page
 	customers *storefront.CustomerRepo
 	addresses *storefront.AddressRepo
 

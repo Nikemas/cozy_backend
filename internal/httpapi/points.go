@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -27,7 +28,7 @@ type branchLister interface {
 func RegisterPublicPointsRoutes(mux *http.ServeMux, db *sql.DB) {
 	branches := storefront.NewBranchRepo(db)
 
-	mux.Handle("GET /api/v1/points", apperr.Wrap(listPointsHandler(branches)))
+	mux.Handle("GET /api/v1/points", httpmw.PublicCache(publicPointsMaxAge)(apperr.Wrap(listPointsHandler(branches))))
 }
 
 // pointResponse is the JSON shape of one point of sale in API responses.

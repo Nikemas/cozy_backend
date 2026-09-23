@@ -701,3 +701,48 @@
 - План утверждал, что `presign-upload` «ещё никем не вызывается» — на момент выполнения форма товара (Wave 4 Task 2) уже им пользовалась; она переключена на новый эндпоинт в этой же задаче.
 - Сверх плана: `url`/`thumb_url` в ответе загрузки, `thumb_url` в `/api/v1/products`, `/api/v1/products/{id}` (`images[]`) и `/api/v1/cart` (всё аддитивно); лимит 50 Мп; удалён `Client.PresignPut`.
 - Мобилка (`cozy_mobile`) не тронута — ей достаточно читать новые `thumb_url`, отдельная задача по плану.
+## Task U: observability + indexes + backups — DONE (кроме проверки на staging)
+
+**Description:** Production-readiness: наблюдаемость (request ID, access log, recovery, readiness с MinIO), аудит SQL на индексы и N+1, пул БД / HTTP-таймауты, кэш-заголовки, бэкапы. Домены других агентов (`internal/media`, `internal/orders`, `internal/notify`, order/payment части `openapi.yaml`) не тронуты.
+
+**Acceptance criteria:**
+- [x] `internal/reqid` — ID в context, `reqid.LogHandler` добавляет `request_id` к любому `slog.*Context`-вызову; `internal/httpmw.RequestID` принимает валидный входящий `X-Request-ID` (≤128, `[A-Za-z0-9._:-]`, иначе генерирует новый), кладёт в context и в ответ
+- [x] `apperr` JSON-ошибки содержат `request_id` (omitempty — старые тела без ID не изменились); `apperr.WriteError` экспортирован для middleware, логирование 5xx через `slog.ErrorContext`
+- [x] `httpmw.AccessLog` — method, path, status, duration, bytes, remote (XFF от Caddy); `/healthz`/`/readyz` не логируются; 5xx — уровень Error
+- [x] `httpmw.Recover` — паника → лог со стеком + `apperr` 500 `internal_error` с `request_id`, текст паники клиенту не уходит; `http.ErrAbortHandler` пробрасывается дальше
+- [x] Подключено в `cmd/server/main.go`: `RequestID → AccessLog → Recover → csrf.Protect → mux`; `LOG_FORMAT=json|text`
+- [x] `/healthz` (liveness) и `/readyz` вынесены в `internal/health`: пинг БД + `GET /minio/health/live` (внутренний `MINIO_ENDPOINT`), параллельно, таймаут 2 с на проверку, 503 + JSON по каждой проверке, текст ошибки только в лог
+- [x] Пул `sql.DB` (`DB_MAX_OPEN_CONNS`=25, `DB_MAX_IDLE_CONNS`=10, `DB_CONN_MAX_LIFETIME`=30m, `DB_CONN_MAX_IDLE_TIME`=5m) и таймауты `http.Server` (ReadHeader 5s / Read 60s / Write 60s / Idle 120s / Shutdown 10s) — конфигурируемые, невалидное значение → ошибка старта
+- [x] Миграция `000022_add_performance_indexes` (номер 000022 по заданию; 000021 занят `payments_online_card` из ветки Task S — в этой ветке его ещё нет, поэтому в `migrations/` пока разрыв 000020 → 000022)
+- [x] N+1: избранное (`/api/v1/favorites` и web `/favorites`) — один `ProductRepo.GetActiveByIDs` вместо `GetByID` на каждый товар; список заказов админки — два batch-запроса (`orderListMeta`) вместо `AdminGetOrder` + `CustomerRepo.GetByID` на каждую строку
+- [x] Кэш: `Cache-Control: public, max-age=60` на `GET /api/v1/categories` и `/api/v1/points`, `max-age=30` на `GET /api/v1/products[/{id}]` — только для 200 и GET/HEAD; `/static/*` и `/admin/static/*` — `max-age=600` + слабый `ETag` (size+mtime) → `304`
+- [x] Сжатие: в `Caddyfile` не было `encode` → добавлен `encode zstd gzip` в блоки backend (staging, bare-IP, закомментированный cozy.kg), а не Go-middleware
+- [x] `scripts/backup.sh` — `pg_dump -Fc` из compose-контейнера → `.partial` → проверка `pg_restore --list` → rename; ротация `KEEP_DAYS`; опционально `mc mirror` бакета через одноразовый контейнер `minio/mc` в сетевом namespace `minio` (секрет не попадает в argv); `flock` от параллельного запуска
+- [x] README: раздел «Эксплуатация» (request ID, access log, env-таблица пула/таймаутов, кэш), «Бэкапы» (cron-строка, восстановление Postgres и медиа); `.env.example` — закомментированные новые переменные
+
+**Index audit (всё SQL в `internal/**` против существующих PK/UNIQUE/INDEX):**
+- Добавлено: `order_items(order_id)` (у таблицы вообще не было индексов кроме PK — все загрузки позиций заказа и отчёты), `order_items(variant_id)` (FK без индекса → seq scan при удалении вариации), `orders(created_at DESC)` (список заказов админки, отчёты по периоду), `orders(address_id) WHERE NOT NULL` (FK-проверка при удалении адреса покупателем сканировала все заказы), `orders(order_number text_pattern_ops)` (`LIKE 'COZY-YYYYMMDD-%'` в `nextOrderNumber` при каждом чекауте: UNIQUE-индекс не работает для LIKE при en_US.utf8), `customer_addresses(customer_id)` (все запросы адресов), `products(created_at DESC) WHERE is_active` (публичный каталог без категории/sitemap сортировал весь каталог), `stock(point_id)` и `cart_items(variant_id)` (каскадные удаления)
+- Не добавлено (уже покрыто): `product_variants(product_id)` — ведущая колонка UNIQUE(product_id,size,color); `stock` по variant — PK; `favorites`/`cart_items` по customer — PK; `product_images(product_id[,color])` — 000020; сессии/refresh по `token_hash` — UNIQUE; `categories.slug` — UNIQUE; `payments(order_id)` — делает 000021
+- Не добавлено сознательно: композит `products(category_id, created_at) WHERE is_active` — на тестовых 5k товаров планировщик его не выбрал; `ILIKE '%q%'` поиск (нужен `pg_trgm`, отдельное решение); `device_tokens(customer_id)`, `categories(parent_id)`, `staff(point_id)` — крошечные таблицы / нет запросов по ним
+
+**Findings для владельцев других доменов (не исправлено — чужие пакеты):**
+- `internal/orders/admin.go` `AdminGetOrder`/`AdminUpdateStatus`: `WHERE id::text = $1 OR order_number = $1` — `id::text` не использует PK, подтверждено `EXPLAIN` → **Seq Scan on orders** на каждое открытие/смену статуса заказа. Фикс: если параметр парсится как UUID — `WHERE id = $1::uuid`, иначе `WHERE order_number = $1`.
+- `internal/httpapi/orders.go` `listCartHandler`: `variants.GetByID` + `products.GetByIDAny` на каждую строку корзины (N+1, принятый в Task Q компромисс). Теперь есть образец batch-метода (`ProductRepo.GetActiveByIDs`) — можно добавить `GetByIDsAny`/`VariantRepo.GetByIDs`.
+- `internal/orders/order.go` `nextOrderNumber`: `COUNT(*) ... LIKE` — после индекса это range scan, но сама схема «COUNT + 1» остаётся O(заказов за день).
+
+**Verification:**
+- [x] `gofmt -l .` — чисто; `go build ./...`, `go vet ./...` — чисто; `go test ./...` — все пакеты `ok`; `go test -race` для `httpmw`/`health`/`reqid` — ok
+- [x] `golangci-lint run ./...` — 0 issues
+- [x] Новые тесты: `internal/reqid` (context, валидация ID, log handler), `internal/httpmw` (request ID генерация/приём/замена, `request_id` в теле apperr, access log поля + skip health, recover → 500 JSON + лог + ErrAbortHandler, PublicCache только 200/GET, Static ETag → 304, 404 без кэша), `internal/health` (sqlmock ping ok/fail, httptest MinIO ok/503, таймаут зависшей проверки, утечки текста ошибки нет), `internal/config` (дефолты/override/невалидные значения), `internal/catalog` (sqlmock `GetActiveByIDs`), `internal/httpapi` (favorites: один batch-вызов, порядок, ошибка БД → 500; `/api/v1/categories` Cache-Control только на 200), `internal/admin` (sqlmock batch-запросы, список заказов — ровно 1+1 вызов, дедуп покупателей, деградация при ошибке)
+- [x] Миграции на локальном throwaway Postgres 16 (Homebrew, не docker): все up 000001–000020 + 000021 из ветки Task S + 000022 → down 000022 → up → повторный up (IF NOT EXISTS) — ок; `EXPLAIN` на 50k заказов / 100k позиций / 5k товаров подтвердил использование `idx_order_items_order`, `idx_orders_created_at`, `idx_orders_number_prefix`, `idx_customer_addresses_customer`, `idx_products_active_created`, `idx_orders_address`
+- [x] Smoke: собранный `cmd/server` против того же Postgres — `/readyz` 503 `{"db":"ok","minio":"error"}` при недоступном MinIO, `X-Request-ID` принят/сгенерирован, `request_id` в 404-теле и JSON-логах, `Cache-Control` на категориях, `ETag` + `304` на `/static/css/site.css`
+- [x] `scripts/backup.sh`: `bash -n`; прогон с подменённым `docker` (`DOCKER=` shim → локальный pg_dump) — дамп создан, `pg_restore --list` прошёл, старый дамп (mtime > 14 дней) удалён, посторонний файл не тронут, mc получил `MC_HOST_cozy` через env без секрета в argv, невалидный `KEEP_DAYS` → exit 1; дамп восстановлен `pg_restore` в чистую базу
+- [ ] Manual (staging): реальный `docker compose exec` pg_dump/`mc mirror` на VPS, cron-строка, `caddy validate` для нового `encode` (caddy/docker на этой машине нет), `/readyz` через Caddy после деплоя
+- [ ] shellcheck не установлен — скрипт не прогнан через него
+
+**Operational notes:**
+- `/readyz` теперь падает (503), если недоступен MinIO → `scripts/deploy.sh` посчитает деплой неуспешным при лежащем MinIO. Это намеренно (readiness = все зависимости), но стартап сервера по-прежнему не блокируется MinIO.
+- Миграция 000022 при мерже раньше 000021: golang-migrate не применит «пропущенную» 000021 после 000022 — ветку Task S (000021) нужно влить и накатить до или вместе с этой.
+- `HTTP_WRITE_TIMEOUT=60s` — ограничивает и самые долгие ответы (экспорт/отчёты); если появятся длинные выгрузки — поднять env-переменной.
+
+**Files touched:** `cmd/server/main.go`, `internal/{reqid,httpmw,health}/*` (новые), `internal/apperr/middleware.go`, `internal/config/config.go`(+test), `internal/catalog/product.go` (+`product_batch_test.go`), `internal/httpapi/{catalog.go,points.go,favorites.go,favorites_test.go,catalog_cache_test.go}`, `internal/web/{routes.go,favorites_handlers.go}`, `internal/admin/{handlers.go,routes.go,orders.go,orders_list_meta.go,orders_list_meta_test.go}`, `migrations/000022_add_performance_indexes.{up,down}.sql`, `docker/Caddyfile`, `scripts/backup.sh`, `README.md`, `.env.example`, `tasks/todo.md`

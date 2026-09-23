@@ -42,7 +42,14 @@
 }
 
 # --- staging: site + API + admin ------------------------------------------
+#
+# encode: gzip/zstd-compress HTML, JSON, CSS, JS, SVG and XML responses from
+# the backend (Caddy's default content-type list skips already-compressed
+# images). Done here rather than in Go so the backend stays simple and
+# compression is handled by the TLS terminator. Not on the media block:
+# product photos are JPEG/PNG/WebP and gain nothing.
 cozy.erpsystemsales.com {
+	encode zstd gzip
 	reverse_proxy backend:8080
 }
 
@@ -53,11 +60,13 @@ media.cozy.erpsystemsales.com {
 
 # --- production: enable once the client's DNS points at this VPS ----------
 # cozy.kg, www.cozy.kg {
+# 	encode zstd gzip
 # 	reverse_proxy backend:8080
 # }
 
 # --- bare-IP fallback -------------------------------------------------------
 95.215.244.199 {
 	tls internal
+	encode zstd gzip
 	reverse_proxy backend:8080
 }

@@ -14,15 +14,17 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/Nikemas/cozy_backend/internal/admin"
-	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/csrf"
+	"github.com/Nikemas/cozy_backend/internal/health"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
+	"github.com/Nikemas/cozy_backend/internal/reqid"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
 )
@@ -40,11 +42,17 @@ func run() error {
 		return err
 	}
 
+	setupLogger(cfg.LogFormat)
+
 	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(cfg.DB.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.DB.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.DB.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(cfg.DB.ConnMaxIdleTime)
 
 	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -84,7 +92,10 @@ func run() error {
 	orders.SetDefaultNotifier(notifier)
 
 	mux := http.NewServeMux()
-	registerHealthRoutes(mux, db)
+	health.Register(mux, 2*time.Second,
+		health.DBCheck(db),
+		health.MinIOCheck(nil, cfg.MinIOEndpoint, cfg.MinIOUseSSL),
+	)
 	registerAPIRoutes(mux, db, authSvc, cfg)
 	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
@@ -93,10 +104,18 @@ func run() error {
 		return err
 	}
 
+	// Outermost first: every request gets an ID, then is access-logged
+	// (after Recover has turned any panic into a 500 it can log), then
+	// hits the existing CSRF guard and the router.
+	handler := httpmw.Chain(csrf.Protect(mux), httpmw.RequestID, httpmw.AccessLog, httpmw.Recover)
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           csrf.Protect(mux),
-		ReadHeaderTimeout: 5 * time.Second,
+		Handler:           handler,
+		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout,
+		ReadTimeout:       cfg.HTTP.ReadTimeout,
+		WriteTimeout:      cfg.HTTP.WriteTimeout,
+		IdleTimeout:       cfg.HTTP.IdleTimeout,
 	}
 
 	errCh := make(chan error, 1)
@@ -117,7 +136,7 @@ func run() error {
 		return err
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTP.ShutdownTimeout)
 	defer cancel()
 	err = srv.Shutdown(shutdownCtx)
 	// Let in-flight push/Telegram jobs for just-committed orders finish.
@@ -127,19 +146,15 @@ func run() error {
 	return err
 }
 
-// registerHealthRoutes wires liveness/readiness checks used by the deploy
-// pipeline and load balancer.
-func registerHealthRoutes(mux *http.ServeMux, db *sql.DB) {
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	mux.Handle("GET /readyz", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
-		if err := db.PingContext(r.Context()); err != nil {
-			return apperr.New(http.StatusServiceUnavailable, "db_unavailable", "database unreachable")
-		}
-		w.WriteHeader(http.StatusOK)
-		return nil
-	}))
+// setupLogger installs the process-wide slog logger: text (default) or
+// JSON lines, wrapped so any *Context log call made while serving a
+// request carries that request's request_id (see internal/reqid).
+func setupLogger(format string) {
+	var h slog.Handler = slog.NewTextHandler(os.Stdout, nil)
+	if format == "json" {
+		h = slog.NewJSONHandler(os.Stdout, nil)
+	}
+	slog.SetDefault(slog.New(reqid.NewLogHandler(h)))
 }
 
 // registerAPIRoutes mounts /api/v1/* — JSON REST for the Flutter app and

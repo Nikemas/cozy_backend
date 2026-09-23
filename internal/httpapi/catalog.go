@@ -5,11 +5,22 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/media"
+)
+
+// Client cache lifetimes for the public read endpoints (see
+// httpmw.PublicCache). Kept short: there is no cache invalidation, so this
+// is the worst-case staleness a shopper can see after an admin edit.
+const (
+	publicCategoryMaxAge = 60 * time.Second
+	publicProductMaxAge  = 30 * time.Second
+	publicPointsMaxAge   = 60 * time.Second
 )
 
 // RegisterCatalogRoutes mounts the public, read-only catalog endpoints
@@ -26,15 +37,22 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 	stock := catalog.NewStockRepo(db)
 	images := catalog.NewImageRepo(db)
 
-	mux.Handle("GET /api/v1/categories", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+	// These responses are identical for every caller (no auth, nothing
+	// per-customer), so clients may reuse them briefly. Products carry
+	// stock numbers, hence the shorter window; the category tree only
+	// changes when staff edit it.
+	categoryCache := httpmw.PublicCache(publicCategoryMaxAge)
+	productCache := httpmw.PublicCache(publicProductMaxAge)
+
+	mux.Handle("GET /api/v1/categories", categoryCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		tree, err := categories.Tree(r.Context())
 		if err != nil {
 			return err
 		}
 		return writeJSON(w, http.StatusOK, tree)
-	}))
+	})))
 
-	mux.Handle("GET /api/v1/products", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+	mux.Handle("GET /api/v1/products", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		filter, categoryParam, err := parseListFilter(r.URL.Query())
 		if err != nil {
 			return err
@@ -78,9 +96,9 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 			PageSize: filter.PageSize,
 			Total:    total,
 		})
-	}))
+	})))
 
-	mux.Handle("GET /api/v1/products/{id}", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+	mux.Handle("GET /api/v1/products/{id}", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		id := r.PathValue("id")
 
 		product, err := products.GetByID(r.Context(), id)
@@ -133,7 +151,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		}
 
 		return writeJSON(w, http.StatusOK, resp)
-	}))
+	})))
 }
 
 // photoURL builds a direct (non-presigned) URL to objectKey in the

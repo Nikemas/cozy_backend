@@ -18,7 +18,28 @@ make migrate-up    # накатывает миграции из migrations/
 make run           # запускает сервер на :8080
 ```
 
-Проверка: `curl localhost:8080/healthz` (liveness) и `curl localhost:8080/readyz` (проверяет доступность БД).
+Проверка: `curl localhost:8080/healthz` (liveness) и `curl localhost:8080/readyz` (readiness: пинг Postgres + `GET /minio/health/live` у MinIO, таймаут 2 с на проверку; 503 с JSON `{"status":"unavailable","checks":{"db":"ok","minio":"error"}}`, если что-то недоступно).
+
+## Эксплуатация: логи, лимиты, кэш
+
+- **Request ID.** Каждый запрос получает `X-Request-ID` (берётся из входящего заголовка, если он корректный, иначе генерируется) — он возвращается в ответе, попадает в каждую строку лога (`request_id=…`) и в JSON-тело ошибок `apperr` (`"request_id"`). Пользователь присылает скрин ошибки → ищем по ID в `docker compose logs backend`.
+- **Access log.** Одна строка на запрос: method, path, status, duration, bytes, remote (кроме `/healthz`, `/readyz`). `LOG_FORMAT=json` — JSON-строки вместо текста.
+- **Паники** в хендлерах перехватываются: в лог — стек, клиенту — обычный `500 internal_error` с `request_id`.
+- **Пул БД и таймауты HTTP** настраиваются через env (значения по умолчанию подходят для staging/прода):
+
+| Переменная | По умолчанию | Что |
+|---|---|---|
+| `DB_MAX_OPEN_CONNS` | 25 | максимум соединений к Postgres (у Postgres по умолчанию `max_connections=100`) |
+| `DB_MAX_IDLE_CONNS` | 10 | простаивающих соединений в пуле |
+| `DB_CONN_MAX_LIFETIME` | 30m | пересоздавать соединение не реже |
+| `DB_CONN_MAX_IDLE_TIME` | 5m | закрывать простаивающее соединение через |
+| `HTTP_READ_HEADER_TIMEOUT` | 5s | защита от slowloris |
+| `HTTP_READ_TIMEOUT` | 60s | чтение всего запроса (в т.ч. загрузка .xlsx импорта) |
+| `HTTP_WRITE_TIMEOUT` | 60s | запись ответа |
+| `HTTP_IDLE_TIMEOUT` | 120s | keep-alive |
+| `HTTP_SHUTDOWN_TIMEOUT` | 10s | graceful shutdown при деплое |
+
+- **Кэширование.** `GET /api/v1/categories`, `/api/v1/points` — `Cache-Control: public, max-age=60`, `GET /api/v1/products[/{id}]` — `max-age=30` (только ответы 200; ошибки не кэшируются). `/static/*` и `/admin/static/*` — `max-age=600` + `ETag` (повторный запрос → `304`). URL статики без хеша, поэтому max-age короткий. Сжатие gzip/zstd делает Caddy (`encode` в `docker/Caddyfile`), не Go.
 
 ## Структура
 
@@ -85,6 +106,49 @@ VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` +
 
 ```bash
 ssh -i ~/.ssh/cozy_vps root@95.215.244.199 'bash /opt/cozy/scripts/deploy.sh'
+```
+
+### Бэкапы
+
+`scripts/backup.sh` (на сервере, из `/opt/cozy`):
+
+1. `pg_dump -Fc` базы `cozy` из контейнера `postgres` → `$BACKUP_DIR/postgres/cozy_YYYYMMDD_HHMMSS.dump` (сначала `.partial`, проверка `pg_restore --list`, потом переименование — битый дамп никогда не выглядит как хороший);
+2. удаляет дампы старше `KEEP_DAYS` дней (только после успешного шага 1);
+3. при `MINIO_MIRROR=1` — `mc mirror` бакета медиа в `$BACKUP_DIR/minio/<bucket>/` (инкрементально; удалённые в MinIO файлы в зеркале остаются). `mc` запускается одноразовым контейнером `quay.io/minio/mc` в сетевом namespace контейнера `minio`, ставить `mc` на хост не нужно. Ключи берутся из `.env`; `MINIO_SECRET_KEY` не должен содержать `/`, `@`, `:`.
+
+Переменные: `BACKUP_DIR` (по умолчанию `/var/backups/cozy`), `KEEP_DAYS` (14), `MINIO_MIRROR` (0), `MINIO_BUCKET` (из `.env`), `MC_IMAGE`. Ненулевой код выхода при любой ошибке.
+
+Cron (root, каждую ночь в 03:30 по времени сервера; лог — в файл):
+
+```cron
+30 3 * * * MINIO_MIRROR=1 KEEP_DAYS=14 /opt/cozy/scripts/backup.sh >> /var/log/cozy-backup.log 2>&1
+```
+
+Бэкап на том же диске, что и база, не переживёт потерю VPS — дополнительно копируйте `$BACKUP_DIR` на другую машину (`rsync`/`rclone` отдельным cron-заданием).
+
+**Восстановление Postgres** (перезаписывает текущие данные — сначала сделайте свежий дамп):
+
+```bash
+cd /opt/cozy
+C="docker compose -f docker/docker-compose.prod.yml --env-file .env"
+$C stop backend                                   # никто не пишет в базу
+$C exec -T postgres dropdb -U cozy cozy
+$C exec -T postgres createdb -U cozy cozy
+$C exec -T postgres pg_restore -U cozy -d cozy --no-owner --no-acl --exit-on-error \
+  < /var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump
+$C start backend
+curl -fsS https://cozy.erpsystemsales.com/readyz
+```
+
+Дамп включает таблицу `schema_migrations` golang-migrate, так что после восстановления `migrate up` докатит только миграции новее дампа. Проверить дамп без восстановления: `pg_restore --list <файл>`; восстановить в отдельную базу для проверки — `createdb cozy_check` и тот же `pg_restore -d cozy_check`.
+
+**Восстановление медиа** (из зеркала обратно в бакет):
+
+```bash
+MINIO_ID=$($C ps -q minio)
+MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
+  docker run --rm --network container:$MINIO_ID -e MC_HOST_cozy -v /var/backups/cozy/minio:/backup \
+  quay.io/minio/mc mirror --overwrite /backup/cozy-media cozy/cozy-media
 ```
 
 ## API-документация

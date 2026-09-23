@@ -10,15 +10,23 @@ package web
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
+
+// staticMaxAge is how long browsers may reuse /static/* without
+// revalidating. Asset URLs aren't content-hashed, so this bounds how long
+// a deploy's CSS/logo change can take to show; after it, revalidation is
+// a cheap 304 via the ETag httpmw.Static sets.
+const staticMaxAge = 10 * time.Minute
 
 // RegisterRoutes mounts the storefront on mux. authSvc must be the same
 // *auth.Service instance registerAPIRoutes uses for /api/v1/auth/* — the
@@ -111,7 +119,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/static/robots.txt")
 	})
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", httpmw.Static("web/static", staticMaxAge)))
 
 	return nil
 }

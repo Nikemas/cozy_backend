@@ -3,9 +3,11 @@ package admin
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
@@ -40,6 +42,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		pointsRepo: points.NewPointsRepo(db),
 
 		ordersSvc: orders.NewService(db),
+		orderMeta: newOrderListMetaRepo(db),
 		customers: storefront.NewCustomerRepo(db),
 		addresses: storefront.NewAddressRepo(db),
 
@@ -118,7 +121,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// duplicate registration).
 	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.productImportPage))
 
-	mux.Handle("GET /admin/static/", http.StripPrefix("/admin/static/", http.FileServer(http.Dir("admin/static"))))
+	// Same caching policy as the storefront's /static/ (internal/web's
+	// staticMaxAge): short max-age + ETag, since URLs aren't hashed.
+	mux.Handle("GET /admin/static/", http.StripPrefix("/admin/static/", httpmw.Static("admin/static", 10*time.Minute)))
 
 	return nil
 }
