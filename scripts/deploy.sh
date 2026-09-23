@@ -36,6 +36,23 @@ new="$(git rev-parse HEAD)"
 echo "deploy: $old -> $new"
 git --no-pager log --oneline "$old..$new" || true
 
+# Migrations run before the new backend starts: if one fails, the deploy
+# stops here and the previous backend keeps serving against the old schema.
+# (2026-09-23: they used to be applied by hand; a deploy shipped code that
+# needed 000021 before anyone ran it and every /orders call returned 500.)
+"${COMPOSE[@]}" up -d postgres
+for i in $(seq 1 30); do
+  "${COMPOSE[@]}" exec -T postgres pg_isready -U cozy -d cozy >/dev/null 2>&1 && break
+  sleep 2
+done
+pg_container="$("${COMPOSE[@]}" ps -q postgres)"
+pg_password="$(sed -n 's/^POSTGRES_PASSWORD=//p' .env)"
+echo "deploy: applying migrations"
+docker run --rm --network "container:$pg_container" \
+  -v "$REPO_DIR/migrations:/migrations:ro" \
+  migrate/migrate:v4.18.3 -path=/migrations \
+  -database "postgres://cozy:${pg_password}@localhost:5432/cozy?sslmode=disable" up
+
 "${COMPOSE[@]}" up -d --build
 
 if [ "$old" != "$new" ] && git diff --name-only "$old" "$new" | grep -q '^docker/Caddyfile$'; then
