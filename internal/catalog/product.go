@@ -320,6 +320,39 @@ func (r *ProductRepo) GetByID(ctx context.Context, id string) (*Product, error) 
 	return &p, nil
 }
 
+// GetActiveByIDs is the batch form of GetByID: one query for every active
+// product among ids, keyed by id. Missing or inactive ids are simply
+// absent from the map (callers skip them, as they did per-id NotFound), so
+// a favorites list of N products costs one round-trip instead of N.
+func (r *ProductRepo) GetActiveByIDs(ctx context.Context, ids []string) (map[string]Product, error) {
+	out := make(map[string]Product, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+
+	const q = `
+		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
+		       brand, base_price, is_active, created_at, updated_at
+		FROM products
+		WHERE id = ANY($1) AND is_active = true`
+
+	rows, err := r.db.QueryContext(ctx, q, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var p Product
+		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
+			&p.Brand, &p.BasePrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out[p.ID] = p
+	}
+	return out, rows.Err()
+}
+
 // GetByIDAny returns a product by id regardless of is_active, for admin use
 // — unlike GetByID, a soft-deleted (is_active=false) product must still be
 // resolvable so it can be edited, reactivated, or have its variants/images

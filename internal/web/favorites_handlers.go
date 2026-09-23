@@ -42,19 +42,24 @@ func (h *handlers) favorites(w http.ResponseWriter, r *http.Request) error {
 
 // loadFavoriteCards resolves a customer's favorited product IDs
 // (internal/storefront, this task's own domain) into display-ready cards
-// via internal/catalog.ProductRepo.GetByID (Task 2's domain — read-only
-// here, per the plan's package ownership). A product that's since gone
-// inactive/deleted is skipped rather than 500ing the whole page.
+// via one internal/catalog.ProductRepo.GetActiveByIDs query (Task 2's
+// domain — read-only here, per the plan's package ownership; formerly one
+// GetByID per favorite). A product that's since gone inactive/deleted is
+// skipped rather than 500ing the whole page.
 func (h *handlers) loadFavoriteCards(ctx context.Context, customerID, lang string) ([]FavoriteCard, error) {
 	ids, err := h.favoriteRepo.ListProductIDs(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	byID, err := h.products.GetActiveByIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 
 	cards := make([]FavoriteCard, 0, len(ids))
 	for _, id := range ids {
-		p, err := h.products.GetByID(ctx, id)
-		if err != nil {
+		p, ok := byID[id]
+		if !ok {
 			continue
 		}
 		brand := ""

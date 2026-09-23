@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,18 +37,28 @@ func (f *fakeFavoriteRepo) Remove(_ context.Context, customerID, productID strin
 	return nil
 }
 
-// fakeProductGetter is an in-memory favoriteProductGetter, returning a
-// canned product for known IDs and apperr.NotFound otherwise — so tests can
-// exercise the "skip products that no longer resolve" behavior.
+// fakeProductGetter is an in-memory favoriteProductGetter, returning only
+// the known IDs (as GetActiveByIDs omits missing/inactive ones) — so tests
+// can exercise the "skip products that no longer resolve" behavior. calls
+// counts batch lookups, to pin the handler to a single query.
 type fakeProductGetter struct {
 	products map[string]*catalog.Product
+	err      error
+	calls    int
 }
 
-func (f *fakeProductGetter) GetByID(_ context.Context, id string) (*catalog.Product, error) {
-	if p, ok := f.products[id]; ok {
-		return p, nil
+func (f *fakeProductGetter) GetActiveByIDs(_ context.Context, ids []string) (map[string]catalog.Product, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
 	}
-	return nil, apperr.NotFound("product_not_found", "товар не найден")
+	out := map[string]catalog.Product{}
+	for _, id := range ids {
+		if p, ok := f.products[id]; ok {
+			out[id] = *p
+		}
+	}
+	return out, nil
 }
 
 func withCustomer(r *http.Request, customerID string) *http.Request {
@@ -75,6 +86,25 @@ func TestListFavoritesHandlerReturnsFullProducts(t *testing.T) {
 	}
 	if strings.Contains(body, `"gone"`) {
 		t.Errorf("body = %s, want the unresolvable id skipped entirely", body)
+	}
+	if strings.Index(body, `"id":"p1"`) > strings.Index(body, `"id":"p2"`) {
+		t.Errorf("body = %s, want favorites order (p1 before p2) preserved", body)
+	}
+	if products.calls != 1 {
+		t.Errorf("GetActiveByIDs called %d times, want exactly 1 (no N+1)", products.calls)
+	}
+}
+
+func TestListFavoritesHandlerPropagatesLookupError(t *testing.T) {
+	favorites := &fakeFavoriteRepo{ids: []string{"p1"}}
+	handler := apperr.Wrap(listFavoritesHandler(favorites, &fakeProductGetter{err: errors.New("db down")}))
+
+	req := withCustomer(httptest.NewRequest(http.MethodGet, "/api/v1/favorites", nil), "customer-1")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 on a real DB error (not a silently empty list)", rec.Code)
 	}
 }
 

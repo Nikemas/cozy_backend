@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -346,14 +347,12 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildOrdersListView turns AdminListOrders' result into OrdersListData.
-// It looks up each row's customer phone (memoized per request — repeat
-// customers on the same page don't re-query) and item count (via
-// AdminGetOrder, since AdminListOrders deliberately returns parent rows
-// only — see its doc comment); at AdminPageSize=50 rows/page this is an
-// accepted N+1 for a boutique-scale admin panel, not a hot customer-facing
-// path, matching this codebase's existing "не оптимизировать заранее"
-// stance (tasks/plan.md, Wave 3 risks table) rather than adding a new
-// batch-count query to internal/orders for this one screen.
+// AdminListOrders deliberately returns parent rows only (see its doc
+// comment), so each row's customer phone and item count come from
+// loadOrderListMeta — two batch queries for the whole page. (This used to
+// be a per-row AdminGetOrder + CustomerRepo.GetByID loop; AdminGetOrder's
+// `id::text = $1` lookup can't use the primary key, so at 50 rows/page
+// that was ~50 sequential scans of orders per page view.)
 func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order, total int, statusParam, rangeParam string, page int) OrdersListData {
 	chips := make([]StatusChipLink, 0, len(orderStatusFilters))
 	for _, f := range orderStatusFilters {
@@ -375,16 +374,16 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 		})
 	}
 
-	phoneCache := map[string]string{}
+	itemCounts, phones := h.loadOrderListMeta(ctx, list)
 	rows := make([]OrderRowView, 0, len(list))
 	for _, o := range list {
 		meta := orderStatusMetaFor(o.Status)
-		itemsCount := h.orderItemCount(ctx, o.ID)
+		itemsCount := itemCounts[o.ID]
 		rows = append(rows, OrderRowView{
 			URL:          "/admin/orders/" + o.ID,
 			Number:       o.OrderNumber,
 			DateLabel:    o.CreatedAt.Format("02.01.2006"),
-			Phone:        h.customerPhone(ctx, phoneCache, o.CustomerID),
+			Phone:        phones[o.CustomerID],
 			ItemsCount:   itemsCount,
 			ItemsLabel:   fmt.Sprintf("%d %s", itemsCount, pluralRu(itemsCount, "товар", "товара", "товаров")),
 			TotalLabel:   formatSom(o.TotalAmount),
@@ -407,30 +406,36 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 	}
 }
 
-// customerPhone resolves a customer's phone for display, memoized in
-// cache across the rows of one request. A lookup failure (deactivated
-// data, storage hiccup) degrades to an empty string rather than failing
-// the whole page — a missing phone on one row isn't worth a 500.
-func (h *handlers) customerPhone(ctx context.Context, cache map[string]string, customerID string) string {
-	if phone, ok := cache[customerID]; ok {
-		return phone
+// loadOrderListMeta batch-loads every row's item count and customer phone
+// (two queries per page, see orderListMeta). A lookup failure degrades to
+// 0 items / an empty phone for the page rather than failing it — the same
+// tolerance the former per-row lookups had — and is logged.
+func (h *handlers) loadOrderListMeta(ctx context.Context, list []orders.Order) (map[string]int, map[string]string) {
+	if h.orderMeta == nil || len(list) == 0 {
+		return map[string]int{}, map[string]string{}
 	}
-	phone := ""
-	if c, err := h.customers.GetByID(ctx, customerID); err == nil && c != nil {
-		phone = c.Phone
+	orderIDs := make([]string, 0, len(list))
+	customerIDs := make([]string, 0, len(list))
+	seenCustomer := make(map[string]bool, len(list))
+	for _, o := range list {
+		orderIDs = append(orderIDs, o.ID)
+		if !seenCustomer[o.CustomerID] {
+			seenCustomer[o.CustomerID] = true
+			customerIDs = append(customerIDs, o.CustomerID)
+		}
 	}
-	cache[customerID] = phone
-	return phone
-}
 
-// orderItemCount is the N+1 lookup buildOrdersListView's doc comment
-// explains — degrades to 0 on error rather than failing the row.
-func (h *handlers) orderItemCount(ctx context.Context, orderID string) int {
-	full, err := h.ordersSvc.AdminGetOrder(ctx, orderID)
-	if err != nil || full == nil {
-		return 0
+	counts, err := h.orderMeta.ItemCounts(ctx, orderIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "admin orders list: item counts lookup failed", "err", err)
+		counts = map[string]int{}
 	}
-	return len(full.Items)
+	phones, err := h.orderMeta.CustomerPhones(ctx, customerIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "admin orders list: customer phones lookup failed", "err", err)
+		phones = map[string]string{}
+	}
+	return counts, phones
 }
 
 // orderDetailPage handles GET /admin/orders/{id}: full order info, items +

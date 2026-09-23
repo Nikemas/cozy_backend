@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_cart_items_variant;
+DROP INDEX IF EXISTS idx_stock_point;
+DROP INDEX IF EXISTS idx_products_active_created;
+DROP INDEX IF EXISTS idx_customer_addresses_customer;
+DROP INDEX IF EXISTS idx_orders_number_prefix;
+DROP INDEX IF EXISTS idx_orders_address;
+DROP INDEX IF EXISTS idx_orders_created_at;
+DROP INDEX IF EXISTS idx_order_items_variant;
+DROP INDEX IF EXISTS idx_order_items_order;

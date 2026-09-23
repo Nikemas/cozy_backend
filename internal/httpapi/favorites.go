@@ -24,9 +24,9 @@ type favoriteWriter interface {
 }
 
 // favoriteProductGetter is the subset of *catalog.ProductRepo used to
-// resolve favorited product IDs into full product rows.
+// resolve favorited product IDs into full product rows in one query.
 type favoriteProductGetter interface {
-	GetByID(ctx context.Context, id string) (*catalog.Product, error)
+	GetActiveByIDs(ctx context.Context, ids []string) (map[string]catalog.Product, error)
 }
 
 // registerFavoritesRoutes mounts the customer favorites endpoints under
@@ -50,13 +50,12 @@ func registerFavoritesRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Servi
 // favorites list screen in the Flutter app needs to render product cards
 // (name/price/photo), so returning bare IDs would just force the app into
 // a second round-trip — either N GET /api/v1/products/{id} calls or a
-// batch endpoint that doesn't exist yet. Fetching full products here costs
-// an N+1-ish loop of ProductRepo.GetByID calls (there is no
-// GetByIDs([]string) batch method in internal/catalog today), which is
-// fine at favorites-list sizes but would be worth revisiting with a real
-// batch query if favorites lists grow large. A product that's since gone
+// batch endpoint that doesn't exist yet. Products are resolved with a
+// single ProductRepo.GetActiveByIDs query (formerly one GetByID per id),
+// keeping the favorites' newest-first order. A product that's since gone
 // inactive/deleted is skipped rather than failing the whole request —
-// same behavior as internal/web's loadFavoriteCards.
+// same behavior as internal/web's loadFavoriteCards. A genuine DB error
+// now fails the request instead of being silently swallowed per row.
 func listFavoritesHandler(favorites favoriteLister, products favoriteProductGetter) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
@@ -69,13 +68,15 @@ func listFavoritesHandler(favorites favoriteLister, products favoriteProductGett
 			return err
 		}
 
+		byID, err := products.GetActiveByIDs(r.Context(), ids)
+		if err != nil {
+			return err
+		}
 		items := make([]catalog.Product, 0, len(ids))
 		for _, id := range ids {
-			p, err := products.GetByID(r.Context(), id)
-			if err != nil {
-				continue
+			if p, ok := byID[id]; ok {
+				items = append(items, p)
 			}
-			items = append(items, *p)
 		}
 
 		return writeJSON(w, http.StatusOK, favoritesResponse{Items: items})
