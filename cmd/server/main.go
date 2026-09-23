@@ -149,7 +149,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client, cfg *config.Config) error {
 	staffSvc := staff.NewService(db)
 	staff.RegisterRoutes(mux, staffSvc)
-	media.RegisterRoutes(mux, mediaClient, staffSvc)
+	media.RegisterRoutes(mux, mediaClient, staffSvc, cfg)
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
 	points.RegisterRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)

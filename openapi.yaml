@@ -13,7 +13,7 @@ info:
     the site/app currently only place `cash_on_delivery` orders) — extend this
     spec once that lands, don't let it drift from the real route table
     (`internal/httpapi`, `internal/staff`, `internal/points`, `internal/media`).
-  version: "0.4.0"
+  version: "0.5.0"
 
 servers:
   - url: http://localhost:8080
@@ -31,7 +31,7 @@ tags:
   - name: Admin — Catalog
     description: Write side of the catalog, RBAC-gated (owner/manager, stock also point_staff).
   - name: Admin — Media
-    description: Presigned MinIO uploads for product photos.
+    description: Product photo upload (server-side normalization into full/thumb variants).
   - name: Admin — Points
     description: Points-of-sale CRUD, owner only.
   - name: Admin — Orders
@@ -677,9 +677,8 @@ paths:
       description: |
         Writes `{object_key, sort_order}` rows into `product_images` —
         replaces the full set for the product. Does not talk to MinIO; call
-        `POST /admin/api/media/presign-upload` first to get an `object_key`,
-        upload the file straight to MinIO with the returned URL, then call
-        this endpoint.
+        `POST /admin/api/media/upload` first for each photo to get its
+        `object_key`, then call this endpoint.
       security: [{ staffSessionCookie: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -728,44 +727,75 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   # --------------------------------------------------------- Admin/Media ---
-  /admin/api/media/presign-upload:
+  /admin/api/media/upload:
     post:
       tags: [Admin — Media]
-      summary: Get a presigned MinIO upload URL for a product photo
+      summary: Upload and normalize a product photo
       description: |
-        Generates the `object_key` server-side (the client can't choose a
-        path) and validates `content_type` against an allow-list
-        (`image/jpeg`, `image/png`, `image/webp`). The admin frontend uploads
-        the file directly to `upload_url` (no bytes pass through this
-        backend), then calls `PUT /admin/api/products/{id}/images` with the
-        returned `object_key`.
+        Accepts one image file, normalizes it server-side and stores the
+        result in MinIO; the returned `object_key` then goes into
+        `PUT /admin/api/products/{id}/images` (or the admin product form).
+
+        Processing:
+        - the real format is detected by decoding the file (the part's
+          `Content-Type` and file name are ignored) — JPEG, PNG and WebP
+          are accepted, anything else is `400 unsupported_image`;
+        - the shorter side must be at least 600 px (`400 image_too_small`);
+          at most 50 megapixels (`400 image_too_large`);
+        - EXIF orientation is applied, all metadata is stripped;
+        - the image is fitted (contain) into a white 1:1 square with ~8%
+          margins on every side; transparency becomes white;
+        - two JPEG variants (quality 85) are stored:
+          `products/<uuid>/full.jpg` (1200×1200) and
+          `products/<uuid>/thumb.jpg` (400×400). If storing the second one
+          fails, the first is deleted — no half-uploaded photos.
+
+        **Variant naming convention.** `product_images.object_key` (and
+        this response's `object_key`) is always the `full` key. The thumb
+        key is derived by replacing the `/full.jpg` suffix with
+        `/thumb.jpg`; a key that does not end in `/full.jpg` (legacy
+        uploads, `products/<uuid>.<ext>`) has no variants and is used as is
+        for both sizes. The API already applies this rule for you in
+        `thumb_url` fields (product list, product detail images, cart) —
+        clients should prefer `thumb_url` in grids/lists and `photo_url` /
+        `url` on the product screen, rather than rebuilding URLs themselves.
       security: [{ staffSessionCookie: [] }]
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              required: [content_type]
+              required: [file]
               properties:
-                content_type: { type: string, enum: [image/jpeg, image/png, image/webp] }
+                file:
+                  type: string
+                  format: binary
+                  description: The image, at most 10 MB.
       responses:
         "200":
-          description: Presigned upload URL (valid 10 minutes).
+          description: Stored.
           content:
             application/json:
               schema:
                 type: object
+                required: [object_key, url, thumb_url]
                 properties:
-                  upload_url: { type: string, format: uri }
-                  object_key: { type: string, example: "products/3fae1c9e-....jpg" }
+                  object_key: { type: string, example: "products/3fae1c9e-2b0d-4c1e-9d55-0e6f5c1a7b21/full.jpg" }
+                  url: { type: string, format: uri, description: "Public URL of the 1200×1200 variant." }
+                  thumb_url: { type: string, format: uri, description: "Public URL of the 400×400 variant — the normalized result, for a preview." }
         "400":
-          description: Unsupported/missing `content_type`.
+          description: |
+            Not multipart / no `file` part (`bad_request`, `file_required`),
+            file over 10 MB (`file_too_large`), not a JPEG/PNG/WebP
+            (`unsupported_image`), too small (`image_too_small`) or too large
+            (`image_too_large`) resolution. `message` is Russian and meant to
+            be shown to the admin as is.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500":
-          description: MinIO presign call failed.
+          description: MinIO upload failed.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   # -------------------------------------------------------- Admin/Points ---
@@ -1166,6 +1196,9 @@ components:
             photo_url:
               type: string
               description: "Primary (lowest sort_order) photo, or \"\" if the product has none."
+            thumb_url:
+              type: string
+              description: "400×400 variant of the primary photo (see POST /admin/api/media/upload for the naming rule) — use this in grids. Same as photo_url for legacy photos without variants; \"\" if the product has none."
 
     ProductListResponse:
       type: object
@@ -1192,7 +1225,8 @@ components:
     ProductPhoto:
       type: object
       properties:
-        url: { type: string }
+        url: { type: string, description: "Full-size (1200×1200) photo." }
+        thumb_url: { type: string, description: "400×400 variant, e.g. for a thumbnail strip. Same as url for legacy photos without variants." }
         sort_order: { type: integer }
         color:
           type: string
@@ -1294,6 +1328,7 @@ components:
         color: { type: string }
         price: { type: number, format: double, description: "variant.price_override if set, else the product's base_price." }
         photo_url: { type: string, nullable: true, description: "Primary photo URL, or null if the product has none." }
+        thumb_url: { type: string, nullable: true, description: "400×400 variant of the primary photo (same as photo_url for legacy photos), or null if the product has none." }
 
     Point:
       type: object

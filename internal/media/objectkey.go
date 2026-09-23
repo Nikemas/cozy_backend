@@ -1,45 +1,47 @@
 package media
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
-
-	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
 
-// allowedContentTypes maps a client-supplied image content type to the file
-// extension used for the object key generated for it. Only real image MIME
-// types are accepted — anything else (e.g. "text/html", "application/zip")
-// is rejected before it ever reaches MinIO.
-var allowedContentTypes = map[string]string{
-	"image/jpeg": ".jpg",
-	"image/png":  ".png",
-	"image/webp": ".webp",
+// Object key layout for product photos.
+//
+// Every photo uploaded through POST /admin/api/media/upload is stored as
+// two normalized variants under one server-generated prefix:
+//
+//	products/<uuid>/full.jpg   — 1200×1200, product screen
+//	products/<uuid>/thumb.jpg  —  400×400,  grids/lists
+//
+// product_images.object_key stores only the full key; the thumb key is
+// derived from it by ThumbKey. Keys uploaded before this layout existed
+// (products/<uuid>.<ext>, a single un-normalized file) stay valid and
+// ThumbKey returns them unchanged, so they keep being served as is.
+// The same rule is documented in openapi.yaml for the mobile app.
+const (
+	fullSuffix  = "/full.jpg"
+	thumbSuffix = "/thumb.jpg"
+)
+
+// newVariantKeys generates a fresh, server-controlled pair of object keys
+// for one upload. The caller never supplies (or influences) any part of
+// the key, so an upload can't be used to pick an arbitrary path, escape
+// the prefix, or overwrite an existing object.
+func newVariantKeys() (fullKey, thumbKey string) {
+	prefix := "products/" + uuid.NewString()
+	return prefix + fullSuffix, prefix + thumbSuffix
 }
 
-// extensionForContentType validates contentType against the allow-list of
-// image MIME types and returns the file extension to use for it. It is a
-// pure function so the validation/mapping logic can be unit tested without
-// a live MinIO server.
-func extensionForContentType(contentType string) (string, error) {
-	ext, ok := allowedContentTypes[contentType]
-	if !ok {
-		return "", apperr.BadRequest("unsupported_content_type", "неподдерживаемый тип файла: "+contentType)
+// ThumbKey returns the object key of the 400px thumb variant for a
+// product photo's (full) object key: "…/full.jpg" becomes "…/thumb.jpg".
+// Any other key — a legacy single-file upload, or "" for "no photo" — is
+// returned unchanged, so callers can use it unconditionally wherever a
+// grid/list thumbnail URL is built. This is the single place the
+// full→thumb naming rule lives on the Go side; do not inline it.
+func ThumbKey(objectKey string) string {
+	if base, ok := strings.CutSuffix(objectKey, fullSuffix); ok {
+		return base + thumbSuffix
 	}
-	return ext, nil
-}
-
-// newObjectKey generates a fresh, server-controlled MinIO object key for an
-// upload of the given content type: a random UUID plus the extension that
-// matches it, under a fixed "products/" prefix. The caller never supplies
-// (or influences) the key itself — only the content type, which is
-// validated first — so a presign request can't be used to pick an
-// arbitrary path, escape the prefix, or overwrite an existing object.
-func newObjectKey(contentType string) (string, error) {
-	ext, err := extensionForContentType(contentType)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("products/%s%s", uuid.NewString(), ext), nil
+	return objectKey
 }

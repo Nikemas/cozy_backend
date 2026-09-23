@@ -9,6 +9,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/media"
 )
 
 // RegisterCatalogRoutes mounts the public, read-only catalog endpoints
@@ -66,6 +67,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 			po := productOut{Product: p}
 			if img, ok := primaryImages[p.ID]; ok {
 				po.PhotoURL = photoURL(cfg, img.ObjectKey)
+				po.ThumbURL = thumbURL(cfg, img.ObjectKey)
 			}
 			out[i] = po
 		}
@@ -115,7 +117,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		}
 		imageOuts := make([]imageOut, len(productImages))
 		for i, img := range productImages {
-			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), SortOrder: img.SortOrder, Color: img.Color}
+			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), ThumbURL: thumbURL(cfg, img.ObjectKey), SortOrder: img.SortOrder, Color: img.Color}
 		}
 
 		resp := productDetailResponse{Product: *product, Images: imageOuts, Variants: make([]variantDetail, 0, len(productVariants))}
@@ -143,12 +145,21 @@ func photoURL(cfg *config.Config, objectKey string) string {
 	return cfg.PublicObjectURL(objectKey)
 }
 
-// productOut is catalog.Product plus its primary photo URL (empty string
-// if the product has none) — used by the list endpoint, which only ever
-// shows one thumbnail per product.
+// thumbURL is photoURL for the 400px thumb variant (media.ThumbKey) —
+// what grids/lists should load. For a legacy key with no variants it is
+// the same URL as photoURL, so clients can always prefer thumb_url.
+func thumbURL(cfg *config.Config, objectKey string) string {
+	return cfg.PublicObjectURL(media.ThumbKey(objectKey))
+}
+
+// productOut is catalog.Product plus its primary photo URLs (empty
+// strings if the product has none) — used by the list endpoint, which
+// only ever shows one thumbnail per product. ThumbURL was added alongside
+// PhotoURL (additive — older clients keep reading photo_url).
 type productOut struct {
 	catalog.Product
 	PhotoURL string `json:"photo_url"`
+	ThumbURL string `json:"thumb_url"`
 }
 
 // imageOut's Color is nil for a general product photo, or the exact
@@ -158,6 +169,7 @@ type productOut struct {
 // catalog.ForColor) so picking "black" swaps in the black pair's photos.
 type imageOut struct {
 	URL       string  `json:"url"`
+	ThumbURL  string  `json:"thumb_url"`
 	SortOrder int     `json:"sort_order"`
 	Color     *string `json:"color,omitempty"`
 }

@@ -1,10 +1,12 @@
 // Package media wraps MinIO (S3-compatible) object storage for product
 // photo upload/serving, per §10 of the technical spec: a dedicated
-// "cozy-media" bucket, presigned URLs for both the admin-panel upload and
-// serving images back out.
+// "cozy-media" bucket that the backend writes normalized product photos
+// into (normalize.go, routes.go) and that browsers and the mobile app read
+// from directly via plain public URLs (config.PublicObjectURL).
 package media
 
 import (
+	"bytes"
 	"context"
 	"time"
 
@@ -17,8 +19,8 @@ import (
 // Client wraps MinIO SDK clients scoped to the single bucket cozy_backend
 // uses for media.
 type Client struct {
-	sdk    *minio.Client // internal: bucket management (reaches MinIO directly)
-	public *minio.Client // public: signs URLs the browser will PUT/GET
+	sdk    *minio.Client // internal: bucket management + object writes (reaches MinIO directly)
+	public *minio.Client // public: signs URLs the browser will GET
 	bucket string
 }
 
@@ -84,7 +86,8 @@ func (c *Client) EnsureBucket(ctx context.Context) error {
 // (but not list, write or delete) in bucket. Product photos are served to
 // browsers and the mobile app as plain, unsigned URLs
 // (config.PublicObjectURL), so the bucket must be world-readable; writes
-// still go only through presigned PUTs issued by the admin panel. Applied
+// still go only through the backend's own credentials (Client.PutObject,
+// called by POST /admin/api/media/upload). Applied
 // on every startup (idempotent) so a bucket created by hand or by an
 // older version of the code gets the policy too.
 func anonymousReadPolicy(bucket string) string {
@@ -101,17 +104,23 @@ func anonymousReadPolicy(bucket string) string {
 }`
 }
 
-// PresignPut returns a presigned URL the caller can PUT the object's bytes
-// to directly (no credentials of ours ever reach the client), valid for
-// ttl. objectKey should come from newObjectKey — this method itself does
-// not validate or generate it. Signed against the public endpoint since the
-// browser is what dials this URL.
-func (c *Client) PresignPut(ctx context.Context, objectKey string, ttl time.Duration) (string, error) {
-	u, err := c.public.PresignedPutObject(ctx, c.bucket, objectKey, ttl)
-	if err != nil {
-		return "", err
-	}
-	return u.String(), nil
+// PutObject uploads data under objectKey with the given content type.
+// objectKey should come from newVariantKeys — this method itself does not
+// validate or generate it. Objects are written once under a fresh UUID
+// prefix and never modified afterwards, so they are marked immutable for
+// browser/proxy caches.
+func (c *Client) PutObject(ctx context.Context, objectKey string, data []byte, contentType string) error {
+	_, err := c.sdk.PutObject(ctx, c.bucket, objectKey, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
+		ContentType:  contentType,
+		CacheControl: "public, max-age=31536000, immutable",
+	})
+	return err
+}
+
+// RemoveObject deletes objectKey. Removing a key that doesn't exist is
+// not an error (S3 semantics).
+func (c *Client) RemoveObject(ctx context.Context, objectKey string) error {
+	return c.sdk.RemoveObject(ctx, c.bucket, objectKey, minio.RemoveObjectOptions{})
 }
 
 // PresignGet returns a presigned URL for reading/serving objectKey, valid
