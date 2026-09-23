@@ -4,7 +4,15 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
+)
+
+// Payment providers selectable via PAYMENTS_PROVIDER (see
+// internal/payments.NewProvider).
+const (
+	PaymentsProviderMock  = "mock"
+	PaymentsProviderBakai = "bakai"
 )
 
 type Config struct {
@@ -33,6 +41,13 @@ type Config struct {
 
 	BakaiWebhookToken string
 
+	// PaymentsProvider selects the online-payment gateway: "mock" (local
+	// checkout page that simulates the bank, default outside prod) or
+	// "bakai" (default when APP_ENV=prod; a stub until the bank grants API
+	// access, so online_card orders are refused with a clear error rather
+	// than being "paid" through a fake page on a live site).
+	PaymentsProvider string
+
 	NikitaAPIKey string
 
 	// SMSMockOTP switches the OTP provider to a local mock (any phone,
@@ -56,8 +71,10 @@ type Config struct {
 	TelegramChatID   string
 
 	// PublicBaseURL is the site's external origin (e.g.
-	// "https://cozy.erpsystemsales.com"), used for links in staff
-	// notifications. Empty omits the links.
+	// "https://cozy.erpsystemsales.com"), no trailing slash. Used for links
+	// in staff notifications (empty omits them) and for the absolute
+	// payment_url / return URLs of online payments (empty falls back to
+	// http://localhost<HTTP_ADDR> — fine for local dev only).
 	PublicBaseURL string
 
 	// Mobile app version gate served by GET /api/v1/app/config.
@@ -95,12 +112,20 @@ func Load() (*Config, error) {
 		FCMProjectID:       os.Getenv("FCM_PROJECT_ID"),
 		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramChatID:     os.Getenv("TELEGRAM_CHAT_ID"),
-		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
+		PublicBaseURL:      strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/"),
 
 		AppMinVersion:      getEnv("APP_MIN_VERSION", "1.0.0"),
 		AppLatestVersion:   getEnv("APP_LATEST_VERSION", "1.0.0"),
 		AppStoreURLIOS:     os.Getenv("APP_STORE_URL_IOS"),
 		AppStoreURLAndroid: os.Getenv("APP_STORE_URL_ANDROID"),
+	}
+
+	cfg.PaymentsProvider = defaultPaymentsProvider(cfg.Env)
+	if v := os.Getenv("PAYMENTS_PROVIDER"); v != "" {
+		cfg.PaymentsProvider = strings.ToLower(strings.TrimSpace(v))
+	}
+	if cfg.PaymentsProvider != PaymentsProviderMock && cfg.PaymentsProvider != PaymentsProviderBakai {
+		return nil, fmt.Errorf("PAYMENTS_PROVIDER must be %q or %q, got %q", PaymentsProviderMock, PaymentsProviderBakai, cfg.PaymentsProvider)
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -111,6 +136,28 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// defaultPaymentsProvider is mock everywhere except prod, where an unset
+// PAYMENTS_PROVIDER must not silently expose the mock "pay for free" page.
+func defaultPaymentsProvider(env string) string {
+	if env == "prod" {
+		return PaymentsProviderBakai
+	}
+	return PaymentsProviderMock
+}
+
+// PaymentsBaseURL is the origin for payment_url and bank return URLs:
+// PublicBaseURL, or http://localhost<port> when it isn't set.
+func (c *Config) PaymentsBaseURL() string {
+	if c.PublicBaseURL != "" {
+		return c.PublicBaseURL
+	}
+	port := c.HTTPAddr
+	if i := strings.LastIndex(port, ":"); i >= 0 {
+		port = port[i:]
+	}
+	return "http://localhost" + port
 }
 
 func getEnv(key, fallback string) string {

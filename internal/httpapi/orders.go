@@ -11,6 +11,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 )
 
 // orderService is the subset of *orders.Service the order handlers depend
@@ -20,6 +21,12 @@ type orderService interface {
 	CreateOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string) (*orders.Order, error)
 	ListOrders(ctx context.Context, customerID string) ([]orders.Order, error)
 	GetOrder(ctx context.Context, customerID, orderID string) (*orders.Order, error)
+}
+
+// onlineCheckout is the subset of *payments.Service createOrderHandler
+// needs for payment_method = online_card.
+type onlineCheckout interface {
+	PlaceOnlineOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string) (*orders.Order, string, error)
 }
 
 // cartService is the subset of *orders.CartRepo the cart handlers depend
@@ -64,8 +71,9 @@ type cartImageGetter interface {
 //
 // Called from cmd/server/main.go's registerAPIRoutes, alongside
 // httpapi.RegisterCatalogRoutes(...).
-func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config) {
-	ordersSvc := orders.NewService(db)
+//
+// paySvc handles payment_method = online_card; nil disables online orders.
+func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config, ordersSvc *orders.Service, paySvc *payments.Service) {
 	cartRepo := orders.NewCartRepo(db)
 	variants := catalog.NewVariantRepo(db)
 	products := catalog.NewProductRepo(db)
@@ -73,7 +81,11 @@ func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, 
 
 	requireCustomer := authSvc.RequireCustomer
 
-	mux.Handle("POST /api/v1/orders", requireCustomer(apperr.Wrap(createOrderHandler(ordersSvc))))
+	var checkout onlineCheckout
+	if paySvc != nil {
+		checkout = paySvc
+	}
+	mux.Handle("POST /api/v1/orders", requireCustomer(apperr.Wrap(createOrderHandler(ordersSvc, checkout))))
 	mux.Handle("GET /api/v1/orders", requireCustomer(apperr.Wrap(listOrdersHandler(ordersSvc))))
 	mux.Handle("GET /api/v1/orders/{id}", requireCustomer(apperr.Wrap(getOrderHandler(ordersSvc))))
 
@@ -102,6 +114,16 @@ type createOrderRequest struct {
 	Items         []orderItemRequest `json:"items"`
 	AddressID     *string            `json:"address_id"`
 	PickupPointID *string            `json:"pickup_point_id"`
+	// PaymentMethod is "cash_on_delivery" (default when omitted, the
+	// pre-Task-S behavior) or "online_card".
+	PaymentMethod string `json:"payment_method"`
+}
+
+// createOrderResponse is the order plus, for online_card, the URL the app
+// must open (WebView/browser) for the customer to pay.
+type createOrderResponse struct {
+	*orders.Order
+	PaymentURL string `json:"payment_url,omitempty"`
 }
 
 func (req createOrderRequest) toItems() []orders.OrderItemInput {
@@ -112,7 +134,7 @@ func (req createOrderRequest) toItems() []orders.OrderItemInput {
 	return items
 }
 
-func createOrderHandler(svc orderService) apperr.HandlerFunc {
+func createOrderHandler(svc orderService, checkout onlineCheckout) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
 		if !ok {
@@ -125,11 +147,25 @@ func createOrderHandler(svc orderService) apperr.HandlerFunc {
 			return err
 		}
 
-		order, err := svc.CreateOrder(r.Context(), customerID, req.toItems(), req.AddressID, req.PickupPointID)
-		if err != nil {
-			return err
+		switch orders.PaymentMethod(req.PaymentMethod) {
+		case "", orders.PaymentCashOnDelivery:
+			order, err := svc.CreateOrder(r.Context(), customerID, req.toItems(), req.AddressID, req.PickupPointID)
+			if err != nil {
+				return err
+			}
+			return writeJSON(w, http.StatusCreated, createOrderResponse{Order: order})
+		case orders.PaymentOnlineCard:
+			if checkout == nil {
+				return payments.ErrNotConfigured
+			}
+			order, paymentURL, err := checkout.PlaceOnlineOrder(r.Context(), customerID, req.toItems(), req.AddressID, req.PickupPointID)
+			if err != nil {
+				return err
+			}
+			return writeJSON(w, http.StatusCreated, createOrderResponse{Order: order, PaymentURL: paymentURL})
+		default:
+			return apperr.BadRequest("invalid_payment_method", "неизвестный способ оплаты")
 		}
-		return writeJSON(w, http.StatusCreated, order)
 	}
 }
 

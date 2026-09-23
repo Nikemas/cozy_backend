@@ -148,14 +148,30 @@ func orderStatusMetaFor(s orders.OrderStatus) orderStatusMeta {
 }
 
 // paymentLabel mirrors the design canvas's `o.paid ? 'Онлайн, оплачено' :
-// 'При получении'` — PaymentOnline is unused by the current checkout flow
-// (see internal/orders/order.go's PaymentMethod doc comment) but handled
-// here anyway so this doesn't silently mislabel it if that ever changes.
-func paymentLabel(pm orders.PaymentMethod) string {
-	if pm == orders.PaymentOnline {
-		return "Онлайн, оплачено"
+// 'При получении'`, extended with the other online payment states (Task S:
+// online_card orders carry orders.payment_status) so staff don't ship an
+// order that was never paid.
+func paymentLabel(pm orders.PaymentMethod, ps *orders.PaymentStatus) string {
+	if pm != orders.PaymentOnlineCard {
+		return "При получении"
 	}
-	return "При получении"
+	if ps == nil {
+		return "Онлайн"
+	}
+	switch *ps {
+	case orders.PaymentPaid:
+		return "Онлайн, оплачено"
+	case orders.PaymentPending:
+		return "Онлайн, ожидает оплаты"
+	case orders.PaymentFailed:
+		return "Онлайн, оплата не прошла"
+	case orders.PaymentCancelled:
+		return "Онлайн, оплата отменена"
+	case orders.PaymentRefunded:
+		return "Онлайн, возврат"
+	default:
+		return "Онлайн, " + string(*ps)
+	}
 }
 
 // formatSom renders amount as "7 900 сом" — duplicated from internal/web/
@@ -388,7 +404,7 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 			ItemsCount:   itemsCount,
 			ItemsLabel:   fmt.Sprintf("%d %s", itemsCount, pluralRu(itemsCount, "товар", "товара", "товаров")),
 			TotalLabel:   formatSom(o.TotalAmount),
-			PaymentLabel: paymentLabel(o.PaymentMethod),
+			PaymentLabel: paymentLabel(o.PaymentMethod, o.PaymentStatus),
 			StatusLabel:  meta.Label,
 			StatusClass:  meta.Class,
 		})
@@ -500,7 +516,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		StatusLabel:   meta.Label,
 		StatusClass:   meta.Class,
 		Phone:         phone,
-		PaymentLabel:  paymentLabel(o.PaymentMethod),
+		PaymentLabel:  paymentLabel(o.PaymentMethod, o.PaymentStatus),
 		AddressText:   addressText,
 		Comment:       comment,
 		Items:         items,

@@ -172,7 +172,7 @@ func newCustomerRequest(method, target, customerID, body string) *http.Request {
 
 func TestCreateOrderHandlerMapsItemsAndFulfillment(t *testing.T) {
 	fake := &fakeOrderService{createResult: &orders.Order{ID: "order-1", OrderNumber: "COZY-20260915-001"}}
-	handler := apperr.Wrap(createOrderHandler(fake))
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
 
 	body := `{"items":[{"variant_id":"var-1","quantity":2},{"variant_id":"var-2","quantity":1}],"address_id":"addr-1"}`
 	req := newCustomerRequest(http.MethodPost, "/api/v1/orders", "cust-1", body)
@@ -207,7 +207,7 @@ func TestCreateOrderHandlerMapsItemsAndFulfillment(t *testing.T) {
 // (see TestCreateOrderHandlerPropagatesServiceValidationError below).
 func TestCreateOrderHandlerPassesPickupThrough(t *testing.T) {
 	fake := &fakeOrderService{createResult: &orders.Order{ID: "order-1"}}
-	handler := apperr.Wrap(createOrderHandler(fake))
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
 
 	body := `{"items":[{"variant_id":"var-1","quantity":1}],"pickup_point_id":"point-1"}`
 	req := newCustomerRequest(http.MethodPost, "/api/v1/orders", "cust-1", body)
@@ -233,7 +233,7 @@ func TestCreateOrderHandlerPassesPickupThrough(t *testing.T) {
 // surface as-is.
 func TestCreateOrderHandlerPropagatesServiceValidationError(t *testing.T) {
 	fake := &fakeOrderService{createErr: apperr.BadRequest("invalid_fulfillment", "укажите ровно один способ получения")}
-	handler := apperr.Wrap(createOrderHandler(fake))
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
 
 	body := `{"items":[{"variant_id":"var-1","quantity":1}]}`
 	req := newCustomerRequest(http.MethodPost, "/api/v1/orders", "cust-1", body)
@@ -251,7 +251,7 @@ func TestCreateOrderHandlerPropagatesServiceValidationError(t *testing.T) {
 
 func TestCreateOrderHandlerRejectsMalformedBody(t *testing.T) {
 	fake := &fakeOrderService{}
-	handler := apperr.Wrap(createOrderHandler(fake))
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
 
 	req := newCustomerRequest(http.MethodPost, "/api/v1/orders", "cust-1", `not json`)
 	rec := httptest.NewRecorder()
@@ -268,7 +268,7 @@ func TestCreateOrderHandlerRejectsMalformedBody(t *testing.T) {
 
 func TestCreateOrderHandlerUnauthenticatedWithoutContext(t *testing.T) {
 	fake := &fakeOrderService{}
-	handler := apperr.Wrap(createOrderHandler(fake))
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", strings.NewReader(`{}`))
 	rec := httptest.NewRecorder()
