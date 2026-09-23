@@ -266,3 +266,15 @@ func TestCreateOrderUnknownVariantRollsBack(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestOrderKeyPredicate(t *testing.T) {
+	if got := orderKeyPredicate("3f1c9a2e-8b7d-4c1a-9e2f-0a1b2c3d4e5f", 2); got != "id = $2::uuid" {
+		t.Errorf("uuid: got %q", got)
+	}
+	if got := orderKeyPredicate("COZY-20260923-004", 1); got != "order_number = $1" {
+		t.Errorf("order number: got %q", got)
+	}
+	if got := orderKeyPredicate("", 1); got != "order_number = $1" {
+		t.Errorf("empty: got %q", got)
+	}
+}

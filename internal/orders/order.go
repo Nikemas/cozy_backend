@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
@@ -289,15 +291,28 @@ func (s *Service) ListOrders(ctx context.Context, customerID string) ([]Order, e
 	return list, nil
 }
 
+// orderKeyPredicate matches an order by UUID primary key or by
+// order_number, whichever idOrNumber looks like. The old combined
+// `id::text = $n OR order_number = $n` could use neither index and scanned
+// the whole orders table on every lookup. The result is concatenated into
+// SQL but is one of two fixed strings — idOrNumber itself stays a bound
+// parameter.
+func orderKeyPredicate(idOrNumber string, n int) string {
+	if uuid.Validate(idOrNumber) == nil {
+		return fmt.Sprintf("id = $%d::uuid", n)
+	}
+	return fmt.Sprintf("order_number = $%d", n)
+}
+
 // GetOrder returns one order, scoped to customerID so a customer can't
 // fetch someone else's order by guessing an ID. orderID may be either the
 // order's UUID primary key or its human-readable order_number (the
 // `/order/{orderNumber}/done` route only has the latter to work with).
 func (s *Service) GetOrder(ctx context.Context, customerID, orderID string) (*Order, error) {
-	const q = `
+	q := `
 		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 		FROM orders
-		WHERE customer_id = $1 AND (id::text = $2 OR order_number = $2)`
+		WHERE customer_id = $1 AND ` + orderKeyPredicate(orderID, 2)
 
 	var o Order
 	row := s.db.QueryRowContext(ctx, q, customerID, orderID)

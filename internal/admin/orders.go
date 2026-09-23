@@ -367,7 +367,7 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 // comment), so each row's customer phone and item count come from
 // loadOrderListMeta — two batch queries for the whole page. (This used to
 // be a per-row AdminGetOrder + CustomerRepo.GetByID loop; AdminGetOrder's
-// `id::text = $1` lookup can't use the primary key, so at 50 rows/page
+// lookup was then an `id::text = $1` scan, so at 50 rows/page
 // that was ~50 sequential scans of orders per page view.)
 func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order, total int, statusParam, rangeParam string, page int) OrdersListData {
 	chips := make([]StatusChipLink, 0, len(orderStatusFilters))

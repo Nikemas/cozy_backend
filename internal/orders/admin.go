@@ -122,10 +122,10 @@ func adminSafeOffset(page int) int {
 // enforced by the caller (internal/httpapi/admin_orders.go), not here,
 // since this method has no notion of the calling staff member.
 func (s *Service) AdminGetOrder(ctx context.Context, idOrNumber string) (*Order, error) {
-	const q = `
+	q := `
 		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 		FROM orders
-		WHERE id::text = $1 OR order_number = $1`
+		WHERE ` + orderKeyPredicate(idOrNumber, 1)
 
 	var o Order
 	row := s.db.QueryRowContext(ctx, q, idOrNumber)
@@ -181,10 +181,10 @@ func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newS
 	var o Order
 	var from OrderStatus
 	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		const selectQ = `
+		selectQ := `
 			SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 			FROM orders
-			WHERE id::text = $1 OR order_number = $1
+			WHERE ` + orderKeyPredicate(idOrNumber, 1) + `
 			FOR UPDATE`
 
 		row := tx.QueryRowContext(ctx, selectQ, idOrNumber)
