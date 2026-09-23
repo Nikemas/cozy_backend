@@ -618,3 +618,37 @@
 - **Батч только для `PrimaryForProducts`, не для `variants.GetByID`/`products.GetByIDAny`.** Задание явно требует батчить только вызов картинок; для вариаций/товаров в `internal/catalog` просто нет batch-метода (`GetByIDs([]string)`) — тот же, уже принятый в Task G, компромисс между корректностью сейчас и добавлением нового API в чужой пакет (`internal/catalog`) ради этой задачи.
 
 **Deviations:** нет отклонений от постановки задания.
+
+---
+
+## Task T: push + staff notifications — DONE (кроме живой проверки)
+
+**Description:** Push покупателю (FCM HTTP v1) при смене статуса заказа в админке, Telegram-уведомление персоналу о новом заказе, публичный `GET /api/v1/app/config` (дополнение от лида для мобильного приложения). Без настроек всё работает как no-op с записью в лог. Firebase-проекта пока нет.
+
+**Acceptance criteria:**
+- [x] `internal/push`: `FCMSender` (HTTP v1, OAuth2 JWT-bearer из service-account JSON, access-token кешируется и обновляется за минуту до истечения) и `NopSender`, если `FCM_CREDENTIALS_FILE` пуст. OAuth2 реализован на `golang-jwt` (уже есть в зависимостях), без `golang.org/x/oauth2`: модуля не было в кеше, а сети здесь нет
+- [x] Токены, которые FCM называет `UNREGISTERED`, `SENDER_ID_MISMATCH` или `INVALID_ARGUMENT` с текстом «registration token», удаляются из `device_tokens` (`storefront.DeviceTokenRepo.DeleteToken`). `INVALID_ARGUMENT` из-за payload, 429 и 5xx токен не удаляют
+- [x] Push о смене статуса: RU-тексты для `confirmed`/`courier_assigned`/`delivered`/`cancelled` (для самовывоза отдельные: «готов к выдаче» и «получен»), KY-тексты готовы. Язык покупателя не хранится (в `customers` нет колонки), поэтому `LanguageFunc` = nil и всегда уходит RU
+- [x] Контракт с мобилкой: `data = {"type":"order_status","order_id":"<uuid>","status":"<enum>"}` ровно с этими ключами, Android `channel_id = "orders"`, APNs `sound=default`
+- [x] Telegram (`notify.TelegramClient`, `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`, no-op если не заданы): номер, сумма, оплата, доставка с адресом или самовывоз с точкой, покупатель (имя и телефон), товары (не больше 25 строк), ссылка `PUBLIC_BASE_URL/admin/orders/{id}`. Всё HTML-экранировано. Бот-токен не попадает в ошибки и логи
+- [x] Хук в `internal/orders`: интерфейс `orders.Notifier`, вызывается только после успешного коммита в `CreateOrder` и `AdminUpdateStatus`. Паника notifier'а перехватывается. Правки в `order.go`/`admin.go` минимальные (поле, два вызова, `from`). Процессный дефолт `orders.SetDefaultNotifier` ставится в `main.go`, поэтому сигнатуры `Register*` в web/admin/httpapi не менялись
+- [x] Фон с ограничениями: не больше 16 задач одновременно (лишние отбрасываются с warn, вызывающий не блокируется), таймаут задачи 20 с, `Dispatcher.Shutdown` дожидается задач при остановке сервера
+- [x] `GET /api/v1/app/config` из `APP_MIN_VERSION`/`APP_LATEST_VERSION` (по умолчанию `1.0.0`) и `APP_STORE_URL_IOS`/`APP_STORE_URL_ANDROID` (по умолчанию `""`), `Cache-Control: public, max-age=300`. В `openapi.yaml` добавлен только новый path
+- [x] Битый или нечитаемый ключ FCM не валит старт: пишется `slog.Error`, дальше NopSender
+- [x] `.env.example`, README (раздел «Уведомления: push и Telegram»), `docker-compose.prod.yml` (`../secrets:/secrets:ro`), `.gitignore` (`/secrets/`)
+- [x] Миграций нет
+
+**Verification:**
+- [x] `gofmt -l .`: чисто
+- [x] `go build ./...`, `go vet ./...`: чисто
+- [x] `go test -race ./...`: все пакеты `ok`. Новые тесты: `internal/push` (httptest-фейк Google: подпись JWT-assertion проверяется публичным ключом, кеш и обновление токена, 6 случаев классификации ошибок FCM, валидация ключа); `internal/notify` (Telegram: запрос, ошибка API, токен не утекает в ошибку); `internal/notifications` (фейки: push на все устройства и удаление только мёртвого токена, точный data payload и channel, KY, самовывоз, нет push для `placed` и без устройств, текст для персонала с экранированием, lookup упал, но сообщение ушло, zero-config, лимит и неблокирование, таймаут, `formatSom`, SQL lookup через sqlmock); `internal/orders` (notifier вызывается после коммита, не вызывается при ошибке коммита и недопустимом переходе, передаётся `from`, паника не ломает заказ, дефолт или свой notifier); `internal/storefront` (SQL `TokensForCustomer`/`DeleteToken`); `internal/httpapi` (`/api/v1/app/config`)
+- [x] `golangci-lint run ./...`: 0 issues
+- [ ] Живой FCM: не проверено, Firebase-проекта нет. Формат запроса и ответа по документации FCM v1 / Google OAuth2, проверен только на httptest-фейке
+- [ ] Живой Telegram-бот: не проверено, токена нет
+- [ ] SQL `SQLOrderInfoLookup` и `TokensForCustomer` на живом Postgres: не проверено (только sqlmock)
+
+**Files touched:** `internal/orders/{notifier.go,notifier_test.go}` (новые), `internal/orders/order.go`, `internal/orders/admin.go` (хук), `internal/push/{push.go,fcm.go,fcm_test.go}` (новые), `internal/notify/{telegram.go,telegram_test.go}` (новые), `internal/notifications/{dispatcher.go,messages.go,lookup.go,dispatcher_test.go}` (новые), `internal/storefront/devices.go` и `devices_test.go`, `internal/httpapi/{app_config.go,app_config_test.go}` (новые), `internal/config/config.go`, `cmd/server/{main.go,notifications.go}`, `openapi.yaml`, `.env.example`, `.gitignore`, `docker/docker-compose.prod.yml`, `README.md`
+
+**Follow-ups:**
+- Язык покупателя: нужна миграция `ALTER TABLE customers ADD COLUMN lang TEXT NOT NULL DEFAULT 'ru' CHECK (lang IN ('ru','ky'))`, способ его задать (профиль или заголовок при регистрации устройства) и `notifications.Config.Language`. В этой задаче не делалось, потому что миграции запрещены
+- Push при создании заказа покупателю не шлётся (он только что сам оформил заказ). Push про оплату появится вместе с Bakai

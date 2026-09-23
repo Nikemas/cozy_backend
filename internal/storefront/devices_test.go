@@ -2,8 +2,41 @@ package storefront
 
 import (
 	"context"
+	"regexp"
 	"testing"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 )
+
+func TestTokensForCustomerAndDeleteToken(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	repo := NewDeviceTokenRepo(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT fcm_token FROM device_tokens WHERE customer_id = $1")).
+		WithArgs("cust-1").
+		WillReturnRows(sqlmock.NewRows([]string{"fcm_token"}).AddRow("tok-a").AddRow("tok-b"))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM device_tokens WHERE fcm_token = $1")).
+		WithArgs("tok-a").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	tokens, err := repo.TokensForCustomer(context.Background(), "cust-1")
+	if err != nil {
+		t.Fatalf("TokensForCustomer: %v", err)
+	}
+	if len(tokens) != 2 || tokens[0] != "tok-a" || tokens[1] != "tok-b" {
+		t.Errorf("tokens = %v", tokens)
+	}
+	if err := repo.DeleteToken(context.Background(), "tok-a"); err != nil {
+		t.Fatalf("DeleteToken: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
 
 // validPlatform is the only device-token logic that doesn't need a live
 // database — DeviceTokenRepo.Register is a thin SQL wrapper around it and

@@ -80,7 +80,8 @@ type OrderItemInput struct {
 // this same method, per web-plan Architecture Decisions), and listing/
 // fetching a customer's own orders.
 type Service struct {
-	db *sql.DB
+	db       *sql.DB
+	notifier Notifier // nil → process default, see notifier.go
 }
 
 func NewService(db *sql.DB) *Service {
@@ -231,6 +232,7 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 	if err != nil {
 		return nil, err
 	}
+	s.notifyCreated(order)
 	return &order, nil
 }
 

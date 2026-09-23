@@ -179,6 +179,7 @@ func validStatusTransition(from, to OrderStatus) bool {
 // AdminGetOrder.
 func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newStatus OrderStatus) (*Order, error) {
 	var o Order
+	var from OrderStatus
 	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		const selectQ = `
 			SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
@@ -206,6 +207,7 @@ func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newS
 		if err := tx.QueryRowContext(ctx, updateQ, newStatus, o.ID).Scan(&o.UpdatedAt); err != nil {
 			return err
 		}
+		from = o.Status
 		o.Status = newStatus
 		return nil
 	})
@@ -214,8 +216,12 @@ func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newS
 	}
 
 	list := []Order{o}
-	if err := s.attachItems(ctx, list); err != nil {
-		return nil, err
+	// The status change has committed; loading items is best-effort
+	// enrichment and must not hide that from the caller's notification.
+	itemsErr := s.attachItems(ctx, list)
+	s.notifyStatusChanged(list[0], from)
+	if itemsErr != nil {
+		return nil, itemsErr
 	}
 	return &list[0], nil
 }

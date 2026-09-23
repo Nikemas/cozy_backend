@@ -36,6 +36,24 @@ POST /api/v1/auth/refresh       { "refresh_token": "..." }
 
 Нужен `NIKITA_API_KEY` в `.env` (Личный кабинет Nikita → вкладка «СЕРВИС OTP»). Rate-limit на номер — не чаще раза в 60 сек, максимум 5 запросов в час (см. `internal/auth/service.go`), чтобы стоимость SMS не стала вектором злоупотребления.
 
+## Уведомления: push и Telegram
+
+После коммита заказа `internal/orders` вызывает `orders.Notifier` (реализация — `internal/notifications`), доставка идёт в фоне: не больше 16 задач одновременно, лишние события отбрасываются с предупреждением в логе, на одну задачу даётся 20 секунд. Ошибка доставки только логируется (slog) и никогда не ломает заказ или смену статуса.
+
+- **Push покупателю** — при смене статуса заказа в админке (`confirmed`, `courier_assigned`, `delivered`, `cancelled`). Отправляется через FCM HTTP v1 (`internal/push`) на все устройства покупателя из `device_tokens`. Токены, которые FCM называет `UNREGISTERED`, `SENDER_ID_MISMATCH` или недействительными, удаляются. Тексты на русском, кыргызский тоже готов, но язык покупателя пока нигде не хранится, поэтому всегда уходит русский. Payload для приложения:
+  `data = {"type":"order_status","order_id":"<uuid>","status":"<статус из БД>"}` плюс `notification.title/body`, Android channel `orders`.
+- **Telegram персоналу** — при новом заказе (сайт, «Заказать сразу», мобильное API). В сообщении номер, сумма, оплата, доставка с адресом или самовывоз с точкой, покупатель, товары и ссылка на `/admin/orders/{id}`.
+
+| Переменная | Зачем | Если пусто |
+|---|---|---|
+| `FCM_CREDENTIALS_FILE` | путь к JSON-ключу service account Firebase (на сервере — `/secrets/firebase-service-account.json`, папка `./secrets` рядом с репо монтируется read-only; файл должен быть читаем для контейнера, который работает от nonroot, т.е. `chmod 644`) | push только пишется в лог |
+| `FCM_PROJECT_ID` | переопределить `project_id` из ключа | берётся из ключа |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | бот от @BotFather и id группы персонала | сообщение только пишется в лог |
+| `PUBLIC_BASE_URL` | внешний адрес сайта для ссылки на заказ | ссылки в сообщении нет |
+| `APP_MIN_VERSION`, `APP_LATEST_VERSION`, `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID` | ответ `GET /api/v1/app/config` (минимальная и последняя версия приложения, ссылки на сторы) | `1.0.0` / `1.0.0` / `""` / `""` |
+
+Если ключ FCM задан, но не читается или битый, сервер всё равно стартует: в лог уходит `push: FCM misconfigured`, а push работает как no-op.
+
 ## Docker / CI-CD
 
 Продовый образ — `docker/Dockerfile` (multi-stage: builder на `golang:1.26-alpine`, рантайм на `gcr.io/distroless/static-debian12`). Собрать локально:

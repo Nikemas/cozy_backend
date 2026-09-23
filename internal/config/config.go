@@ -43,6 +43,28 @@ type Config struct {
 	// standing between "someone forgot to set APP_ENV in prod" and every
 	// login on the live site accepting code 0000.
 	SMSMockOTP bool
+
+	// FCMCredentialsFile is the path to a Firebase service-account JSON
+	// key; empty disables push (notifications are logged instead).
+	// FCMProjectID overrides the key file's project_id when set.
+	FCMCredentialsFile string
+	FCMProjectID       string
+
+	// TelegramBotToken/TelegramChatID route new-order alerts to the staff
+	// Telegram chat; either empty disables them (logged instead).
+	TelegramBotToken string
+	TelegramChatID   string
+
+	// PublicBaseURL is the site's external origin (e.g.
+	// "https://cozy.erpsystemsales.com"), used for links in staff
+	// notifications. Empty omits the links.
+	PublicBaseURL string
+
+	// Mobile app version gate served by GET /api/v1/app/config.
+	AppMinVersion      string
+	AppLatestVersion   string
+	AppStoreURLIOS     string
+	AppStoreURLAndroid string
 }
 
 func Load() (*Config, error) {
@@ -68,6 +90,17 @@ func Load() (*Config, error) {
 
 		NikitaAPIKey: os.Getenv("NIKITA_API_KEY"),
 		SMSMockOTP:   getEnv("SMS_MOCK_OTP", "false") == "true",
+
+		FCMCredentialsFile: os.Getenv("FCM_CREDENTIALS_FILE"),
+		FCMProjectID:       os.Getenv("FCM_PROJECT_ID"),
+		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramChatID:     os.Getenv("TELEGRAM_CHAT_ID"),
+		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
+
+		AppMinVersion:      getEnv("APP_MIN_VERSION", "1.0.0"),
+		AppLatestVersion:   getEnv("APP_LATEST_VERSION", "1.0.0"),
+		AppStoreURLIOS:     os.Getenv("APP_STORE_URL_IOS"),
+		AppStoreURLAndroid: os.Getenv("APP_STORE_URL_ANDROID"),
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -21,6 +21,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
@@ -77,6 +78,11 @@ func run() error {
 		slog.Warn("minio bucket check/create failed at startup; photo uploads will not work until this is resolved", "err", err)
 	}
 
+	// Must be installed before any orders.Service is constructed/used by
+	// the route registrations below.
+	notifier := buildNotifications(db, cfg)
+	orders.SetDefaultNotifier(notifier)
+
 	mux := http.NewServeMux()
 	registerHealthRoutes(mux, db)
 	registerAPIRoutes(mux, db, authSvc, cfg)
@@ -113,7 +119,12 @@ func run() error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	err = srv.Shutdown(shutdownCtx)
+	// Let in-flight push/Telegram jobs for just-committed orders finish.
+	if nerr := notifier.Shutdown(shutdownCtx); nerr != nil {
+		slog.Warn("notifications: shutdown timed out, some notifications may be lost", "err", nerr)
+	}
+	return err
 }
 
 // registerHealthRoutes wires liveness/readiness checks used by the deploy
@@ -140,6 +151,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 	httpapi.RegisterPublicPointsRoutes(mux, db)
 	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg)
 	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
+	httpapi.RegisterAppConfigRoutes(mux, cfg)
 }
 
 // registerAdminRoutes mounts /admin/* — both the JSON API under
