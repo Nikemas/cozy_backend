@@ -50,3 +50,32 @@ func (r *DeviceTokenRepo) Register(ctx context.Context, customerID, fcmToken, pl
 	_, err := r.db.ExecContext(ctx, q, customerID, fcmToken, platform)
 	return err
 }
+
+// TokensForCustomer returns every FCM token registered to customerID —
+// one per device the customer is logged in on.
+func (r *DeviceTokenRepo) TokensForCustomer(ctx context.Context, customerID string) ([]string, error) {
+	const q = `SELECT fcm_token FROM device_tokens WHERE customer_id = $1 ORDER BY created_at`
+	rows, err := r.db.QueryContext(ctx, q, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var tokens []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
+}
+
+// DeleteToken removes a token FCM reported as unregistered/invalid, so it
+// isn't retried on every future notification. Deleting a token that's
+// already gone is not an error.
+func (r *DeviceTokenRepo) DeleteToken(ctx context.Context, fcmToken string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM device_tokens WHERE fcm_token = $1`, fcmToken)
+	return err
+}

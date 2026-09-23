@@ -338,6 +338,30 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /api/v1/app/config:
+    get:
+      tags: [System]
+      summary: Mobile app version gate
+      description: |
+        Public, unauthenticated. The Flutter app reads it at startup: below
+        `min_version` → force update, below `latest_version` → suggest one.
+        Values come from env (`APP_MIN_VERSION`, `APP_LATEST_VERSION`,
+        default `1.0.0`; `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID`,
+        default empty string). Served with `Cache-Control: public, max-age=300`.
+      responses:
+        "200":
+          description: Current version policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [min_version, latest_version, store_url_ios, store_url_android]
+                properties:
+                  min_version: { type: string, example: "1.0.0" }
+                  latest_version: { type: string, example: "1.0.0" }
+                  store_url_ios: { type: string, example: "" }
+                  store_url_android: { type: string, example: "" }
+
   /api/v1/orders:
     post:
       tags: [Customer]
