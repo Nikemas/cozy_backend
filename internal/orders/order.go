@@ -26,14 +26,15 @@ const (
 	StatusCancelled       OrderStatus = "cancelled"
 )
 
-// PaymentMethod mirrors the payment_method enum. Bakai/online payment is
-// out of scope for this MVP web slice (see web-plan Architecture
-// Decisions) — the checkout flow only ever creates cash_on_delivery
-// orders for now.
+// PaymentMethod mirrors the payment_method enum (000010, with 'online'
+// renamed to 'online_card' by 000021). The site checkout still only
+// creates cash_on_delivery orders; online_card orders come from
+// POST /api/v1/orders via CreateOnlineOrder (see payment.go and
+// internal/payments).
 type PaymentMethod string
 
 const (
-	PaymentOnline         PaymentMethod = "online"
+	PaymentOnlineCard     PaymentMethod = "online_card"
 	PaymentCashOnDelivery PaymentMethod = "cash_on_delivery"
 )
 
@@ -46,11 +47,14 @@ type Order struct {
 	PointID       *string       `json:"point_id,omitempty"`
 	Status        OrderStatus   `json:"status"`
 	PaymentMethod PaymentMethod `json:"payment_method"`
-	TotalAmount   float64       `json:"total_amount"`
-	Comment       *string       `json:"comment,omitempty"`
-	Items         []OrderItem   `json:"items"`
-	CreatedAt     time.Time     `json:"created_at"`
-	UpdatedAt     time.Time     `json:"updated_at"`
+	// PaymentStatus is the current state of an online_card order's payment
+	// (orders.payment_status, migration 000021); nil for cash_on_delivery.
+	PaymentStatus *PaymentStatus `json:"payment_status,omitempty"`
+	TotalAmount   float64        `json:"total_amount"`
+	Comment       *string        `json:"comment,omitempty"`
+	Items         []OrderItem    `json:"items"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // OrderItem mirrors one row of order_items — a price/size/color snapshot
@@ -112,6 +116,15 @@ type variantSnapshot struct {
 // active point whose stock covers every line) since the client only
 // supplies an address, not a warehouse.
 func (s *Service) CreateOrder(ctx context.Context, customerID string, items []OrderItemInput, addressID, pickupPointID *string) (*Order, error) {
+	return s.createOrder(ctx, customerID, items, addressID, pickupPointID, PaymentCashOnDelivery, nil)
+}
+
+// createOrder is CreateOrder's body, parameterized by payment method.
+// afterInsert (may be nil) runs inside the same transaction once the order
+// and its items are inserted — CreateOnlineOrder uses it to insert the
+// pending payments row atomically with the order.
+func (s *Service) createOrder(ctx context.Context, customerID string, items []OrderItemInput, addressID, pickupPointID *string,
+	method PaymentMethod, afterInsert func(tx *sql.Tx, order *Order) error) (*Order, error) {
 	if err := validateFulfillment(addressID, pickupPointID); err != nil {
 		return nil, err
 	}
@@ -171,7 +184,11 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 			CustomerID:    customerID,
 			AddressID:     addressID,
 			Status:        StatusPlaced,
-			PaymentMethod: PaymentCashOnDelivery,
+			PaymentMethod: method,
+		}
+		if method == PaymentOnlineCard {
+			pending := PaymentPending
+			order.PaymentStatus = &pending
 		}
 		if pickupPointID != nil {
 			order.PointID = pickupPointID
@@ -202,11 +219,11 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 		order.TotalAmount = math.Round(total*100) / 100
 
 		const insertOrderQ = `
-			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, total_amount)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			RETURNING id, created_at, updated_at`
 		err = tx.QueryRowContext(ctx, insertOrderQ,
-			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.TotalAmount,
+			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.PaymentStatus, order.TotalAmount,
 		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return err
@@ -227,6 +244,9 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 			}
 		}
 		order.Items = orderItems
+		if afterInsert != nil {
+			return afterInsert(tx, &order)
+		}
 		return nil
 	})
 	if err != nil {
@@ -240,7 +260,7 @@ func (s *Service) CreateOrder(ctx context.Context, customerID string, items []Or
 // items attached.
 func (s *Service) ListOrders(ctx context.Context, customerID string) ([]Order, error) {
 	const q = `
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
+		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 		FROM orders
 		WHERE customer_id = $1
 		ORDER BY created_at DESC`
@@ -275,7 +295,7 @@ func (s *Service) ListOrders(ctx context.Context, customerID string) ([]Order, e
 // `/order/{orderNumber}/done` route only has the latter to work with).
 func (s *Service) GetOrder(ctx context.Context, customerID, orderID string) (*Order, error) {
 	const q = `
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
+		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 		FROM orders
 		WHERE customer_id = $1 AND (id::text = $2 OR order_number = $2)`
 
@@ -308,7 +328,7 @@ func scanOrder(rows *sql.Rows, o *Order) error {
 
 func scanOrderRow(row rowScanner, o *Order) error {
 	return row.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
-		&o.Status, &o.PaymentMethod, &o.TotalAmount, &o.Comment, &o.CreatedAt, &o.UpdatedAt)
+		&o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.TotalAmount, &o.Comment, &o.CreatedAt, &o.UpdatedAt)
 }
 
 // attachItems batch-loads order_items for every order in list and appends

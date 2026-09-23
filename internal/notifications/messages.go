@@ -131,8 +131,8 @@ func paymentLabel(m orders.PaymentMethod) string {
 	switch m {
 	case orders.PaymentCashOnDelivery:
 		return "наличными при получении"
-	case orders.PaymentOnline:
-		return "онлайн"
+	case orders.PaymentOnlineCard:
+		return "онлайн картой"
 	default:
 		return string(m)
 	}

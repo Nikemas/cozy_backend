@@ -31,7 +31,7 @@ func NewRepo(db *sql.DB) *Repo {
 // the day *after* the last day they want included.
 func (r *Repo) LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error) {
 	const q = `
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, total_amount, comment, created_at, updated_at
+		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
 		FROM orders
 		WHERE created_at >= $1 AND created_at < $2
 		ORDER BY created_at ASC`
@@ -46,7 +46,7 @@ func (r *Repo) LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Ord
 	for rows.Next() {
 		var o orders.Order
 		if err := rows.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
-			&o.Status, &o.PaymentMethod, &o.TotalAmount, &o.Comment, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			&o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.TotalAmount, &o.Comment, &o.CreatedAt, &o.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, o)

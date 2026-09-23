@@ -100,7 +100,7 @@ func TestCreateOrderSurvivesPanickingNotifier(t *testing.T) {
 	}
 }
 
-var orderColumns = []string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method", "total_amount", "comment", "created_at", "updated_at"}
+var orderColumns = []string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method", "payment_status", "total_amount", "comment", "created_at", "updated_at"}
 
 func TestAdminUpdateStatusNotifiesWithPreviousStatus(t *testing.T) {
 	svc, mock := newMockService(t)
@@ -110,7 +110,7 @@ func TestAdminUpdateStatusNotifiesWithPreviousStatus(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("FOR UPDATE")).WithArgs("COZY-20260923-001").
 		WillReturnRows(sqlmock.NewRows(orderColumns).AddRow("order-1", "COZY-20260923-001", "cust-1", "addr-1", "point-1",
-			"placed", "cash_on_delivery", 5000.0, nil, time.Now(), time.Now()))
+			"placed", "cash_on_delivery", nil, 5000.0, nil, time.Now(), time.Now()))
 	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET status")).
 		WillReturnRows(sqlmock.NewRows([]string{"updated_at"}).AddRow(time.Now()))
 	mock.ExpectCommit()
@@ -137,7 +137,7 @@ func TestAdminUpdateStatusInvalidTransitionDoesNotNotify(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("FOR UPDATE")).
 		WillReturnRows(sqlmock.NewRows(orderColumns).AddRow("order-1", "COZY-20260923-001", "cust-1", "addr-1", "point-1",
-			"delivered", "cash_on_delivery", 5000.0, nil, time.Now(), time.Now()))
+			"delivered", "cash_on_delivery", nil, 5000.0, nil, time.Now(), time.Now()))
 	mock.ExpectRollback()
 
 	if _, err := svc.AdminUpdateStatus(context.Background(), "order-1", StatusCancelled); err == nil {

@@ -7,13 +7,17 @@ info:
     (staff-only admin panel), per §6 of `docs/Cozy — Технический ТЗ для
     разработчика.md`.
 
-    This file documents only endpoints that actually exist in the code today.
-    Per §6/§13 of the ТЗ, the only endpoint still missing is
-    `/api/v1/payments/bakai/webhook` (online payment is deliberately deferred —
-    the site/app currently only place `cash_on_delivery` orders) — extend this
-    spec once that lands, don't let it drift from the real route table
-    (`internal/httpapi`, `internal/staff`, `internal/points`, `internal/media`).
-  version: "0.5.0"
+    This file documents only endpoints that actually exist in the code today —
+    don't let it drift from the real route table (`internal/httpapi`,
+    `internal/staff`, `internal/points`, `internal/media`).
+
+    Online card payment (`payment_method: online_card`) goes through
+    `internal/payments`. Until Bakai Bank grants API access the server runs
+    with `PAYMENTS_PROVIDER=mock` (default outside `APP_ENV=prod`): the
+    returned `payment_url` is a local test page that simulates the bank. With
+    `PAYMENTS_PROVIDER=bakai` (the prod default) online orders are refused with
+    `503 payments_not_configured` until the real integration lands.
+  version: "0.6.0"
 
 servers:
   - url: http://localhost:8080
@@ -26,6 +30,8 @@ tags:
     description: Public, unauthenticated read-only catalog.
   - name: Customer
     description: Mobile/JSON API for a logged-in customer (favorites, addresses, devices, orders, cart) — JWT bearer, see §6 ТЗ.
+  - name: Payments
+    description: Payment provider callbacks and the mock provider's test checkout page.
   - name: Admin — Staff
     description: Staff login/logout (server-side session cookie) and staff-account CRUD (owner only).
   - name: Admin — Catalog
@@ -374,21 +380,36 @@ paths:
         `quantity`. Exactly one of `address_id` (delivery) or
         `pickup_point_id` (self-pickup) must be set; for delivery, the
         fulfilling point of sale is chosen automatically (first active point
-        whose stock covers every line). Only `cash_on_delivery` orders are
-        created — online/Bakai payment isn't wired up yet.
+        whose stock covers every line).
+
+        `payment_method` (default `cash_on_delivery`):
+        - `cash_on_delivery` — as before; no `payment_status`/`payment_url`.
+        - `online_card` — stock is reserved the same way, a `pending` payment
+          is created in the same transaction, then a checkout session is
+          opened with the active provider. The response carries
+          `payment_url`: open it (WebView/browser) for the customer to pay;
+          afterwards poll `GET /api/v1/orders/{id}` for `payment_status`. If
+          the payment fails or is cancelled, the order is cancelled
+          automatically and its stock returned; place a new order to retry.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateRequest" } } }
       responses:
-        "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "400":
-          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, or malformed body."
+          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `invalid_payment_method`, or malformed body."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { description: "`address_not_found`, `pickup_point_not_found`, or `variant_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
         "409":
           description: "`insufficient_stock` — not enough stock at the chosen/fulfilling point."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: "`payment_create_failed` — `online_card` only: the provider couldn't open a checkout session; the order was cancelled and its stock returned."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: "`payments_not_configured` — `online_card` only: online payment isn't available (e.g. `PAYMENTS_PROVIDER=bakai` before the bank integration exists). No order is created."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
     get:
       tags: [Customer]
@@ -1042,6 +1063,96 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  # ------------------------------------------------------------ Payments ---
+  /api/v1/payments/{provider}/callback:
+    post:
+      tags: [Payments]
+      summary: Payment provider webhook
+      description: |
+        Called by the payment provider (not by the app). Authenticated by the
+        `X-Webhook-Token` header (shared secret `BAKAI_WEBHOOK_TOKEN`; a
+        header rather than `?token=` because Bakai may strip query strings —
+        ТЗ §10). `{provider}` must be the active provider (`mock` or `bakai`).
+
+        Idempotent: the payment row is locked `FOR UPDATE`; a repeated event
+        is a no-op (`applied: false`). A `paid` event must carry the exact
+        payment amount. `failed`/`cancelled` cancel the order and return its
+        stock (only while the order is still `placed`). Contradictory events
+        (e.g. `paid` after `failed`) are logged and ignored with `200` so the
+        provider stops retrying.
+
+        Body is provider-specific. For `mock`:
+        `{"external_id": "mock_…", "status": "paid|failed|cancelled", "amount": 4990.5}`.
+        For `bakai`: not implemented yet — authenticated calls get `503`.
+      security: [{ webhookToken: [] }]
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [mock, bakai] } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: Handled (or duplicate/ignored)., content: { application/json: { schema: { $ref: "#/components/schemas/PaymentCallbackResult" } } } }
+        "400":
+          description: "`invalid_callback` (unparseable body), `amount_mismatch`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401":
+          description: "`invalid_webhook_token`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "404":
+          description: "`payment_provider_not_found` (not the active provider) or `payment_not_found`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: "`payments_not_configured` (bakai stub)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/payments/bakai/webhook:
+    post:
+      tags: [Payments]
+      summary: Bakai webhook (ТЗ §6 path)
+      description: Alias of `POST /api/v1/payments/bakai/callback` — same handler and responses.
+      security: [{ webhookToken: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: Handled., content: { application/json: { schema: { $ref: "#/components/schemas/PaymentCallbackResult" } } } }
+        "401": { description: "`invalid_webhook_token`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "404": { description: "`payment_provider_not_found` — bakai isn't the active provider.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "503": { description: "`payments_not_configured`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+
+  /api/v1/payments/mock/checkout/{externalId}:
+    parameters:
+      - { name: externalId, in: path, required: true, schema: { type: string, example: "mock_3f2a…" } }
+    get:
+      tags: [Payments]
+      summary: Mock provider test checkout page (HTML)
+      description: |
+        Only registered while `PAYMENTS_PROVIDER=mock` (404 otherwise). This is
+        the `payment_url` of an `online_card` order: an HTML page with
+        "Оплатить" / "Отказ банка" / "Отменить оплату" buttons.
+      responses:
+        "200": { description: HTML page., content: { text/html: { schema: { type: string } } } }
+        "404": { description: "`payment_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+    post:
+      tags: [Payments]
+      summary: Simulate the bank's result (mock only)
+      description: |
+        Plays the bank: builds a signed mock callback for `result` and runs it
+        through the same code path as `POST /api/v1/payments/mock/callback`,
+        then renders the outcome with a link back to
+        `/order/{orderNumber}/done`. Scriptable:
+        `curl -X POST "$payment_url?result=paid"`.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema: { type: object, properties: { result: { type: string, enum: [paid, failed, cancelled] } } }
+      parameters:
+        - { name: result, in: query, required: false, schema: { type: string, enum: [paid, failed, cancelled] }, description: "Alternative to the form field." }
+      responses:
+        "200": { description: HTML result page., content: { text/html: { schema: { type: string } } } }
+        "400": { description: "`invalid_result`, `amount_mismatch`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+        "404": { description: "`payment_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
+
   # -------------------------------------------------------------- System ---
   /healthz:
     get:
@@ -1068,6 +1179,11 @@ components:
       in: cookie
       name: staff_session
       description: Server-side staff session, set by `POST /admin/api/login`.
+    webhookToken:
+      type: apiKey
+      in: header
+      name: X-Webhook-Token
+      description: Shared secret for payment provider callbacks (`BAKAI_WEBHOOK_TOKEN`).
     customerBearerAuth:
       type: http
       scheme: bearer
@@ -1295,7 +1411,11 @@ components:
         address_id: { type: string, format: uuid, nullable: true }
         point_id: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
         status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
-        payment_method: { type: string, enum: [online, cash_on_delivery], description: "Currently always `cash_on_delivery` — online/Bakai payment isn't wired up yet." }
+        payment_method: { type: string, enum: [online_card, cash_on_delivery] }
+        payment_status:
+          type: string
+          enum: [pending, paid, failed, cancelled, refunded]
+          description: "Only present for `online_card` orders (omitted for `cash_on_delivery`). `failed`/`cancelled` orders are auto-cancelled."
         total_amount: { type: number, format: double }
         comment: { type: string, nullable: true }
         items: { type: array, items: { $ref: "#/components/schemas/OrderItem" } }
@@ -1329,6 +1449,23 @@ components:
               quantity: { type: integer, minimum: 1 }
         address_id: { type: string, format: uuid, nullable: true, description: "Delivery. Exactly one of address_id/pickup_point_id must be set." }
         pickup_point_id: { type: string, format: uuid, nullable: true, description: "Self-pickup. Exactly one of address_id/pickup_point_id must be set." }
+        payment_method: { type: string, enum: [cash_on_delivery, online_card], default: cash_on_delivery }
+
+    OrderCreateResponse:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            payment_url: { type: string, format: uri, description: "`online_card` only: where to send the customer to pay." }
+
+    PaymentCallbackResult:
+      type: object
+      properties:
+        payment_id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, paid, failed, cancelled, refunded], description: Payment status after handling. }
+        applied: { type: boolean, description: "false for a duplicate or ignored event." }
+        order_cancelled: { type: boolean, description: "true when this event cancelled the order and returned its stock." }
 
     CartItem:
       type: object

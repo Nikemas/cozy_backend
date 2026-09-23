@@ -36,11 +36,21 @@ func TestOrderStatusMetaForFallsBackOnUnknownStatus(t *testing.T) {
 }
 
 func TestPaymentLabel(t *testing.T) {
-	if got := paymentLabel(orders.PaymentCashOnDelivery); got != "При получении" {
+	if got := paymentLabel(orders.PaymentCashOnDelivery, nil); got != "При получении" {
 		t.Errorf("paymentLabel(cash_on_delivery) = %q", got)
 	}
-	if got := paymentLabel(orders.PaymentOnline); got != "Онлайн, оплачено" {
-		t.Errorf("paymentLabel(online) = %q", got)
+	cases := map[orders.PaymentStatus]string{
+		orders.PaymentPaid:      "Онлайн, оплачено",
+		orders.PaymentPending:   "Онлайн, ожидает оплаты",
+		orders.PaymentFailed:    "Онлайн, оплата не прошла",
+		orders.PaymentCancelled: "Онлайн, оплата отменена",
+		orders.PaymentRefunded:  "Онлайн, возврат",
+	}
+	for st, want := range cases {
+		st := st
+		if got := paymentLabel(orders.PaymentOnlineCard, &st); got != want {
+			t.Errorf("paymentLabel(online_card, %s) = %q, want %q", st, got, want)
+		}
 	}
 }
 

@@ -67,3 +67,52 @@ func TestLoad_RejectsBadPoolAndTimeoutValues(t *testing.T) {
 		t.Fatal("Load: want error for unparseable HTTP_READ_TIMEOUT")
 	}
 }
+
+func TestLoadPaymentsProvider(t *testing.T) {
+	cases := []struct {
+		env, provider, want string
+		wantErr             bool
+	}{
+		{env: "dev", want: PaymentsProviderMock},
+		{env: "prod", want: PaymentsProviderBakai},
+		{env: "prod", provider: "mock", want: PaymentsProviderMock},
+		{env: "dev", provider: " Bakai ", want: PaymentsProviderBakai},
+		{env: "dev", provider: "stripe", wantErr: true},
+	}
+	for _, c := range cases {
+		t.Setenv("DATABASE_URL", "postgres://x")
+		t.Setenv("JWT_SECRET", "s")
+		t.Setenv("APP_ENV", c.env)
+		t.Setenv("PAYMENTS_PROVIDER", c.provider)
+		cfg, err := Load()
+		if c.wantErr {
+			if err == nil {
+				t.Errorf("%+v: want error", c)
+			}
+			continue
+		}
+		if err != nil || cfg.PaymentsProvider != c.want {
+			t.Errorf("%+v: got %+v, %v", c, cfg, err)
+		}
+	}
+}
+
+func TestLoadPublicBaseURLTrimsSlash(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("PUBLIC_BASE_URL", "https://cozy.kg/")
+	cfg, err := Load()
+	if err != nil || cfg.PublicBaseURL != "https://cozy.kg" {
+		t.Fatalf("cfg = %+v, err = %v", cfg, err)
+	}
+	if got := cfg.PaymentsBaseURL(); got != "https://cozy.kg" {
+		t.Errorf("PaymentsBaseURL = %q", got)
+	}
+}
+
+func TestPaymentsBaseURLFallsBackToLocalhost(t *testing.T) {
+	cfg := &Config{HTTPAddr: "127.0.0.1:9090"}
+	if got := cfg.PaymentsBaseURL(); got != "http://localhost:9090" {
+		t.Errorf("PaymentsBaseURL = %q", got)
+	}
+}

@@ -23,6 +23,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/reqid"
 	"github.com/Nikemas/cozy_backend/internal/staff"
@@ -91,12 +92,24 @@ func run() error {
 	notifier := buildNotifications(db, cfg)
 	orders.SetDefaultNotifier(notifier)
 
+	payProvider, err := payments.NewProvider(cfg)
+	if err != nil {
+		return err
+	}
+	if cfg.PaymentsProvider == config.PaymentsProviderMock {
+		if cfg.Env == "prod" {
+			slog.Warn("payments: PAYMENTS_PROVIDER=mock with APP_ENV=prod — anyone can mark online orders paid through the mock checkout page. Staging only; never on the live shop.")
+		} else {
+			slog.Info("payments: mock provider active — online_card orders are paid on a local test page", "checkout", cfg.PaymentsBaseURL()+payments.MockCheckoutPath+"{id}")
+		}
+	}
+
 	mux := http.NewServeMux()
 	health.Register(mux, 2*time.Second,
 		health.DBCheck(db),
 		health.MinIOCheck(nil, cfg.MinIOEndpoint, cfg.MinIOUseSSL),
 	)
-	registerAPIRoutes(mux, db, authSvc, cfg)
+	registerAPIRoutes(mux, db, authSvc, cfg, payProvider)
 	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
 	}
@@ -160,11 +173,15 @@ func setupLogger(format string) {
 // registerAPIRoutes mounts /api/v1/* — JSON REST for the Flutter app and
 // HTMX/AJAX calls from the site. Handlers land here as each domain package
 // (auth, catalog, orders, ...) is implemented.
-func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config) {
+func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config, payProvider payments.Provider) {
+	ordersSvc := orders.NewService(db)
+	paySvc := payments.NewService(db, payProvider, ordersSvc, cfg.PaymentsBaseURL())
+
 	httpapi.RegisterAuthRoutes(mux, authSvc)
 	httpapi.RegisterCatalogRoutes(mux, db, cfg)
 	httpapi.RegisterPublicPointsRoutes(mux, db)
-	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg)
+	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg, ordersSvc, paySvc)
+	httpapi.RegisterPaymentRoutes(mux, paySvc, cfg.PaymentsBaseURL())
 	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
 	httpapi.RegisterAppConfigRoutes(mux, cfg)
 }
