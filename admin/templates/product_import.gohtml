@@ -12,9 +12,9 @@
       <div class="admin-import__icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5"></path></svg>
       </div>
-      <div class="admin-import__title">Перетащите Excel или CSV файл сюда</div>
-      <div class="admin-table__muted">или</div>
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="document.getElementById('import-file-input').click()">Выберите файл</button>
+      <div class="admin-import__title">{{t "admin.import.drop"}}</div>
+      <div class="admin-table__muted">{{t "admin.import.or"}}</div>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="document.getElementById('import-file-input').click()">{{t "admin.import.choose"}}</button>
       <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none">
     </div>
   </div>
@@ -39,6 +39,7 @@
   var errorsTitle = document.getElementById('import-errors-title');
   var errorsList = document.getElementById('import-errors-list');
 
+  // Word forms come from the admin locale; in Kyrgyz all three are equal.
   function pluralRu(n, one, few, many) {
     var a = Math.abs(n) % 100, b = a % 10;
     if (a > 10 && a < 20) return many;
@@ -46,6 +47,15 @@
     if (b === 1) return one;
     return many;
   }
+  var L = {
+    failed: {{t "admin.import.failed"}},
+    imported: {{t "admin.import.imported"}},
+    skipped: {{t "admin.import.skipped"}},
+    row: {{t "admin.import.row"}},
+    runFailed: {{t "admin.import.run_failed"}},
+    product: [{{t "admin.plural.product.one"}}, {{t "admin.plural.product.few"}}, {{t "admin.plural.product.many"}}],
+    line: [{{t "admin.plural.row.one"}}, {{t "admin.plural.row.few"}}, {{t "admin.plural.row.many"}}]
+  };
 
   function runImport(file) {
     if (!file) return;
@@ -54,25 +64,25 @@
     dropzone.style.opacity = '0.6';
     fetch(importURL, { method: 'POST', body: form })
       .then(function (r) {
-        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || 'Ошибка импорта'); });
+        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || L.failed); });
         return r.json();
       })
       .then(function (res) {
         dropzone.style.opacity = '1';
         resultEl.hidden = false;
         var imported = res.imported || 0;
-        successEl.textContent = 'Импортировано: ' + imported + ' ' + pluralRu(imported, 'товар', 'товара', 'товаров');
+        successEl.textContent = L.imported + ': ' + imported + ' ' + pluralRu(imported, L.product[0], L.product[1], L.product[2]);
         var errs = res.errors || [];
         if (errs.length) {
           errorsCard.hidden = false;
-          errorsTitle.textContent = 'Пропущено с ошибками: ' + errs.length + ' ' + pluralRu(errs.length, 'строка', 'строки', 'строк');
+          errorsTitle.textContent = L.skipped + ': ' + errs.length + ' ' + pluralRu(errs.length, L.line[0], L.line[1], L.line[2]);
           errorsList.innerHTML = '';
           errs.forEach(function (e) {
             var row = document.createElement('div');
             row.className = 'admin-import__error-row';
             var rowNum = e.row || e.line || '?';
             var msg = e.message || e.error || String(e);
-            row.textContent = 'Строка ' + rowNum + ' — ' + msg;
+            row.textContent = L.row + ' ' + rowNum + ' — ' + msg;
             errorsList.appendChild(row);
           });
         } else {
@@ -81,7 +91,7 @@
       })
       .catch(function (err) {
         dropzone.style.opacity = '1';
-        alert(err.message || 'Не удалось выполнить импорт');
+        alert(err.message || L.runFailed);
       });
   }
 

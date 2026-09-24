@@ -13,7 +13,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -179,6 +178,7 @@ func stockPageURL(pointID, query string, page int, canChoose bool) string {
 // to their own point (whatever ?point= says); owner/manager get the
 // requested point if it exists, else the first active one.
 func (h *handlers) resolveStockPoint(ctx context.Context, st *staff.Staff, requested string) (data StockPageData, err error) {
+	t := trFromContext(ctx)
 	pts, err := h.pointsRepo.List(ctx)
 	if err != nil {
 		return data, err
@@ -187,7 +187,7 @@ func (h *handlers) resolveStockPoint(ctx context.Context, st *staff.Staff, reque
 
 	if !data.CanChoosePoint {
 		if st.PointID == nil {
-			data.NoPoint = "Вы не привязаны к точке продаж — обратитесь к владельцу."
+			data.NoPoint = t.T("admin.stock.no_point_assigned")
 			return data, nil
 		}
 		for _, p := range pts {
@@ -196,13 +196,13 @@ func (h *handlers) resolveStockPoint(ctx context.Context, st *staff.Staff, reque
 			}
 		}
 		if data.PointID == "" {
-			data.NoPoint = "Ваша точка продаж не найдена — обратитесь к владельцу."
+			data.NoPoint = t.T("admin.stock.own_point_missing")
 		}
 		return data, nil
 	}
 
 	if len(pts) == 0 {
-		data.NoPoint = "Точек продаж пока нет — создайте первую в разделе «Склад и точки»."
+		data.NoPoint = t.T("admin.stock.no_points")
 		return data, nil
 	}
 	chosen := ""
@@ -223,7 +223,7 @@ func (h *handlers) resolveStockPoint(ctx context.Context, st *staff.Staff, reque
 	for _, p := range pts {
 		name := p.Name
 		if !p.IsActive {
-			name += " (неактивна)"
+			name += " " + t.T("admin.common.inactive_suffix")
 		}
 		data.Points = append(data.Points, PointOptionVM{ID: p.ID, Name: name, Selected: p.ID == chosen})
 		if p.ID == chosen {
@@ -265,10 +265,10 @@ func (h *handlers) renderStockPage(w http.ResponseWriter, r *http.Request, reque
 			return
 		}
 		for _, row := range list {
-			data.Rows = append(data.Rows, buildStockPageRow(row, data.PointID, data.PointName, st.Role != staff.RolePointStaff, overlay))
+			data.Rows = append(data.Rows, buildStockPageRow(h.tr(r), row, data.PointID, data.PointName, st.Role != staff.RolePointStaff, overlay))
 		}
 		data.Empty = len(data.Rows) == 0
-		data.CountLabel = fmt.Sprintf("%d %s", total, pluralRu(total, "вариация", "вариации", "вариаций"))
+		data.CountLabel = h.tr(r).N(total, "admin.plural.variant")
 		data.HasPrev = page > 1
 		data.HasNext = total > page*stockPageSize
 		data.PrevURL = stockPageURL(data.PointID, query, page-1, data.CanChoosePoint)
@@ -278,15 +278,15 @@ func (h *handlers) renderStockPage(w http.ResponseWriter, r *http.Request, reque
 		data.Err = overlay.err
 	}
 
-	pageData := h.shellPageData("stock", "Остатки", st)
+	pageData := h.shellPageData("stock", "admin.nav.stock", st)
 	pageData.Toast = toast
 	pageData.Data = data
 	if err := h.render.Render(w, "stock", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
-func buildStockPageRow(row stockPageRow, pointID, pointName string, canEditProduct bool, overlay *stockOverlay) StockPageRowVM {
+func buildStockPageRow(t tr, row stockPageRow, pointID, pointName string, canEditProduct bool, overlay *stockOverlay) StockPageRowVM {
 	cell := StockCellVM{
 		PointID:   pointID,
 		PointName: pointName,
@@ -318,7 +318,7 @@ func buildStockPageRow(row stockPageRow, pointID, pointName string, canEditProdu
 		vm.EditURL = "/admin/products/" + row.ProductID
 	}
 	qty, _ := strconv.Atoi(cell.Value)
-	vm.BadgeLbl, vm.BadgeFG, vm.BadgeBG = stockChip(qty)
+	vm.BadgeLbl, vm.BadgeFG, vm.BadgeBG = stockChip(t, qty)
 	return vm
 }
 
@@ -330,7 +330,7 @@ func (h *handlers) stockSave(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(ctx)
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "не удалось прочитать форму", http.StatusBadRequest)
+		http.Error(w, h.tr(r).T("admin.err.form"), http.StatusBadRequest)
 		return
 	}
 	query := strings.TrimSpace(r.FormValue("q"))
@@ -359,7 +359,7 @@ func (h *handlers) stockSave(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cell.Invalid = true
 			overlay.cells[variantID] = cell
-			errs = appendUnique(errs, err.Error())
+			errs = appendUnique(errs, errText(h.tr(r), err))
 			continue
 		}
 		if pc.Changed {
@@ -369,7 +369,7 @@ func (h *handlers) stockSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(errs) > 0 {
-		overlay.err = "Некорректное количество: " + strings.Join(errs, "; ") + ". Ничего не сохранено."
+		overlay.err = h.tr(r).F("admin.stock.err_invalid_qty", strings.Join(errs, "; "))
 		h.renderStockPage(w, r, pointID, query, page, "", overlay)
 		return
 	}
@@ -380,19 +380,19 @@ func (h *handlers) stockSave(w http.ResponseWriter, r *http.Request) {
 			for _, c := range conflict.Cells {
 				overlay.conflicts[c.RowKey] = true
 			}
-			overlay.err = stockConflictMessage
+			overlay.err = h.tr(r).T(stockConflictMessage)
 			h.renderStockPage(w, r, pointID, query, page, "", overlay)
 			return
 		}
 		slog.ErrorContext(ctx, "admin stock save failed", "point_id", pointID, "err", err)
-		overlay.err = appErrMessage(err)
+		overlay.err = appErrMessage(h.tr(r), err)
 		h.renderStockPage(w, r, pointID, query, page, "", overlay)
 		return
 	}
 
-	toast := "Изменений нет"
+	toast := h.tr(r).T("admin.stock.no_changes")
 	if len(changes) > 0 {
-		toast = fmt.Sprintf("Сохранено: %d %s", len(changes), pluralRu(len(changes), "позиция", "позиции", "позиций"))
+		toast = h.tr(r).F("admin.stock.saved", h.tr(r).N(len(changes), "admin.plural.position"))
 	}
 	redirectWithToast(w, r, stockPageURL(pointID, query, page, data.CanChoosePoint), toast)
 }

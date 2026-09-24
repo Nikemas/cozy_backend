@@ -10,7 +10,6 @@ package admin
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"math"
 	"net/http"
 	"net/url"
@@ -103,14 +102,14 @@ func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]rep
 // ranges are used instead of hardcoded months.
 type reportPeriod struct {
 	key   string
-	label string
+	label string // locale key
 }
 
 var reportPeriods = []reportPeriod{
-	{"week", "Последние 7 дней"},
-	{"month", "Текущий месяц"},
-	{"prev_month", "Прошлый месяц"},
-	{"custom", "Произвольный период"},
+	{"week", "admin.range.last7"},
+	{"month", "admin.range.this_month"},
+	{"prev_month", "admin.range.prev_month"},
+	{"custom", "admin.range.custom"},
 }
 
 // maxCustomReportDays caps a custom range (one year) so a typo'd year
@@ -172,7 +171,7 @@ func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 		var err error
 		from, to, err = parseCustomReportRange(q.Get("from"), q.Get("to"))
 		if err != nil {
-			rangeErr = appErrMessage(err)
+			rangeErr = appErrMessage(h.tr(r), err)
 			period = defaultReportPeriod()
 		}
 	}
@@ -182,7 +181,7 @@ func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 
 	reportData, err := h.buildReportsData(r.Context(), period, from, to)
 	if err != nil {
-		http.Error(w, "не удалось построить отчёт", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.reports.build_failed"), http.StatusInternalServerError)
 		return
 	}
 	reportData.Custom = period == "custom"
@@ -190,10 +189,10 @@ func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 	reportData.To = to.Format("2006-01-02")
 	reportData.Err = rangeErr
 
-	data := h.shellPageData("reports", "Отчёты", st)
+	data := h.shellPageData("reports", "admin.nav.reports", st)
 	data.Data = reportData
 	if err := h.render.Render(w, "reports", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -248,15 +247,16 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		return ReportsData{}, err
 	}
 
+	t := trFromContext(ctx)
 	return ReportsData{
-		Periods:     reportPeriodOptions(period),
+		Periods:     reportPeriodOptions(t, period),
 		ExportURL:   reportExportURL(from, to),
-		Stats:       buildStatCards(dayRows),
+		Stats:       buildStatCards(t, dayRows),
 		ChartNote:   from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
 		Bars:        buildBars(dayRows, from, to),
-		TopProducts: buildTopProducts(productRows),
+		TopProducts: buildTopProducts(t, productRows),
 		TopBrands:   buildTopBrands(brandRows),
-		Categories:  buildCategoryBars(categoryRows),
+		Categories:  buildCategoryBars(t, categoryRows),
 	}, nil
 }
 
@@ -337,10 +337,10 @@ type BrandBar struct {
 
 // --- Builders (pure functions over reports.Row, unit-testable) ---
 
-func reportPeriodOptions(selected string) []PeriodOption {
+func reportPeriodOptions(t tr, selected string) []PeriodOption {
 	out := make([]PeriodOption, len(reportPeriods))
 	for i, p := range reportPeriods {
-		out[i] = PeriodOption{Value: p.key, Label: p.label, Selected: p.key == selected}
+		out[i] = PeriodOption{Value: p.key, Label: t.T(p.label), Selected: p.key == selected}
 	}
 	return out
 }
@@ -362,7 +362,7 @@ func reportExportURL(from, to time.Time) string {
 // buildStatCards derives the 4 stat-card numbers from the same day-grouped
 // rows the bar chart uses — no separate query needed (per the task brief's
 // "Data shaping notes").
-func buildStatCards(dayRows []reports.Row) []StatCard {
+func buildStatCards(t tr, dayRows []reports.Row) []StatCard {
 	var totalRevenue float64
 	var orderCount, itemCount int
 	for _, row := range dayRows {
@@ -376,10 +376,10 @@ func buildStatCards(dayRows []reports.Row) []StatCard {
 	}
 
 	return []StatCard{
-		{Label: "Выручка", Value: formatMoney(totalRevenue), Note: "за период"},
-		{Label: "Заказы", Value: strconv.Itoa(orderCount), Note: "за период"},
-		{Label: "Средний чек", Value: formatMoney(avgOrder), Note: "на заказ"},
-		{Label: "Продано товаров", Value: strconv.Itoa(itemCount) + " шт.", Note: "за период"},
+		{Label: t.T("admin.reports.revenue"), Value: formatMoney(totalRevenue), Note: t.T("admin.reports.for_period")},
+		{Label: t.T("admin.reports.orders"), Value: strconv.Itoa(orderCount), Note: t.T("admin.reports.for_period")},
+		{Label: t.T("admin.reports.avg_check"), Value: formatMoney(avgOrder), Note: t.T("admin.reports.per_order")},
+		{Label: t.T("admin.reports.items_sold"), Value: t.F("admin.reports.pcs", itemCount), Note: t.T("admin.reports.for_period")},
 	}
 }
 
@@ -426,7 +426,7 @@ const reportsTopLimit = 5
 // buildTopProducts re-ranks AggregateSales' product rows (which come back
 // key-sorted, i.e. alphabetical by product name) by units sold descending
 // — "Топ товаров" is a ranking, not an alphabetical list.
-func buildTopProducts(productRows []reports.Row) []RankedRow {
+func buildTopProducts(t tr, productRows []reports.Row) []RankedRow {
 	rows := append([]reports.Row(nil), productRows...)
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].ItemCount > rows[j].ItemCount })
 	if len(rows) > reportsTopLimit {
@@ -435,7 +435,7 @@ func buildTopProducts(productRows []reports.Row) []RankedRow {
 
 	out := make([]RankedRow, len(rows))
 	for i, row := range rows {
-		out[i] = RankedRow{Rank: i + 1, Name: row.Key, Qty: fmt.Sprintf("%d шт.", row.ItemCount)}
+		out[i] = RankedRow{Rank: i + 1, Name: row.Key, Qty: t.F("admin.reports.pcs", row.ItemCount)}
 	}
 	return out
 }
@@ -472,7 +472,7 @@ func buildTopBrands(brandRows []reports.Row) []BrandBar {
 // buildCategoryBars shapes reports.Repo.CategorySales' rows (already
 // revenue-sorted) — every category, not capped like the top-5 lists, since
 // a shoe shop has only a handful of top-level categories.
-func buildCategoryBars(rows []reports.Row) []CategoryBar {
+func buildCategoryBars(t tr, rows []reports.Row) []CategoryBar {
 	maxRevenue := 0.0
 	if len(rows) > 0 {
 		maxRevenue = rows[0].Revenue
@@ -486,8 +486,8 @@ func buildCategoryBars(rows []reports.Row) []CategoryBar {
 		out[i] = CategoryBar{
 			Name:     row.Key,
 			Sum:      formatMoney(row.Revenue),
-			Qty:      fmt.Sprintf("%d шт.", row.ItemCount),
-			Orders:   fmt.Sprintf("%d %s", row.OrderCount, pluralRu(row.OrderCount, "заказ", "заказа", "заказов")),
+			Qty:      t.F("admin.reports.pcs", row.ItemCount),
+			Orders:   t.N(row.OrderCount, "admin.plural.order"),
 			WidthPct: pct,
 		}
 	}

@@ -12,7 +12,7 @@ func TestBuildOrderHistoryData(t *testing.T) {
 	name := "Айгуль"
 	note := "не оплачен вовремя"
 	at := time.Date(2026, 9, 24, 10, 5, 0, 0, time.UTC)
-	d := buildOrderHistoryData(&orders.Order{
+	d := buildOrderHistoryData(ruTr, &orders.Order{
 		DeliveryFee:    200,
 		RefundRequired: true,
 		History: []orders.StatusChange{
@@ -33,7 +33,7 @@ func TestBuildOrderHistoryData(t *testing.T) {
 	if d.History[2].Actor != "система" || d.History[2].Note != note {
 		t.Errorf("row 2 = %+v", d.History[2])
 	}
-	if (buildOrderHistoryData(&orders.Order{})).DeliveryFeeLabel != "" {
+	if (buildOrderHistoryData(ruTr, &orders.Order{})).DeliveryFeeLabel != "" {
 		t.Error("pickup order must not show a delivery line")
 	}
 }

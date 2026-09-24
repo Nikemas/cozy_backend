@@ -94,18 +94,18 @@ func (h *handlers) renderCategoriesPage(w http.ResponseWriter, r *http.Request, 
 
 	tree, err := h.categories.Tree(r.Context())
 	if err != nil {
-		http.Error(w, "не удалось загрузить категории", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.categories.load_failed"), http.StatusInternalServerError)
 		return
 	}
 
-	data := h.shellPageData("categories", "Категории", st)
+	data := h.shellPageData("categories", "admin.nav.categories", st)
 	data.Data = categoriesPageData{
 		Rows:    flattenCategoryRows(tree, 0),
 		Parents: flattenCategoryParentOptions(tree, 0),
 		Error:   errMsg,
 	}
 	if err := h.render.Render(w, "categories", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -129,12 +129,12 @@ func categoryInputFromForm(r *http.Request) catalog.CategoryInput {
 // categoriesCreate handles POST /admin/categories — the add-modal form.
 func (h *handlers) categoriesCreate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderCategoriesPage(w, r, "не удалось прочитать форму")
+		h.renderCategoriesPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 
 	if _, err := h.categories.Create(r.Context(), categoryInputFromForm(r)); err != nil {
-		h.renderCategoriesPage(w, r, appErrMessage(err))
+		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -146,13 +146,13 @@ func (h *handlers) categoriesCreate(w http.ResponseWriter, r *http.Request) {
 // categories.gohtml).
 func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderCategoriesPage(w, r, "не удалось прочитать форму")
+		h.renderCategoriesPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 
 	id := r.PathValue("id")
 	if _, err := h.categories.Update(r.Context(), id, categoryInputFromForm(r)); err != nil {
-		h.renderCategoriesPage(w, r, appErrMessage(err))
+		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) categoriesDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.categories.Delete(r.Context(), id); err != nil {
-		h.renderCategoriesPage(w, r, appErrMessage(err))
+		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 

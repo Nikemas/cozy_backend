@@ -69,7 +69,7 @@ func (h *handlers) thumbURL(objectKey string) string {
 // (loginSubmit, stubPage) rather than introducing a new logging
 // convention just for this task.
 func (h *handlers) renderInternalErr(w http.ResponseWriter, err error) {
-	http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+	http.Error(w, trFromWriter(w).T("admin.err.internal"), http.StatusInternalServerError)
 }
 
 // redirectWithToast redirects to path with ?toast=<message> appended
@@ -157,7 +157,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 
 	rows := make([]ProductRowVM, len(products))
 	for i, p := range products {
-		rows[i] = h.buildProductRow(p, tree, images, variantCounts, stockTotals)
+		rows[i] = h.buildProductRow(h.tr(r), p, tree, images, variantCounts, stockTotals)
 	}
 
 	pageCount := (total + pageSize - 1) / pageSize
@@ -168,12 +168,12 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 	data := ProductsPageData{
 		CanEdit:       true, // route is already ownerOrManager-gated; see routes.go
 		CanDelete:     st.Role == staff.RoleOwner,
-		CategoryChips: buildCategoryChips(tree, activeTop, q),
+		CategoryChips: buildCategoryChips(h.tr(r), tree, activeTop, q),
 		ShowSubs:      activeTop != nil && len(activeTop.Children) > 0,
-		SubChips:      buildSubChips(activeTop, activeSub, q),
+		SubChips:      buildSubChips(h.tr(r), activeTop, activeSub, q),
 		Products:      rows,
 		Empty:         len(rows) == 0,
-		CountLabel:    countLabel(total),
+		CountLabel:    countLabel(h.tr(r), total),
 		Query:         q,
 		PageSize:      pageSize,
 		Page:          page,
@@ -182,22 +182,22 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		ImportURL:     "/admin/products/import",
 	}
 
-	pageData := h.productsShellData("products", "Товары", st)
+	pageData := h.productsShellData("products", "admin.nav.products", st)
 	pageData.ShowSearch = true
 	pageData.SearchQuery = q
 	pageData.Toast = query.Get("toast")
 	pageData.Data = data
 
 	if err := h.render.Render(w, "products", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
 // buildProductRow shapes one catalog.Product plus its batch-looked-up
 // image/variant-count/stock-total into the row the list template renders.
-func (h *handlers) buildProductRow(p catalog.Product, tree []*catalog.Category, images map[string]catalog.ProductImage, variantCounts, stockTotals map[string]int) ProductRowVM {
+func (h *handlers) buildProductRow(t tr, p catalog.Product, tree []*catalog.Category, images map[string]catalog.ProductImage, variantCounts, stockTotals map[string]int) ProductRowVM {
 	img, hasPhoto := images[p.ID]
-	stockLabel, fg, bg := stockChip(stockTotals[p.ID])
+	stockLabel, fg, bg := stockChip(t, stockTotals[p.ID])
 
 	return ProductRowVM{
 		ID:              p.ID,
@@ -205,16 +205,16 @@ func (h *handlers) buildProductRow(p catalog.Product, tree []*catalog.Category, 
 		Brand:           stringOrEmpty(p.Brand),
 		CategoryPath:    categoryPath(tree, p.CategoryID),
 		PriceText:       formatMoney(p.BasePrice),
-		VariantsLabel:   variantsLabel(variantCounts[p.ID]),
+		VariantsLabel:   variantsLabel(t, variantCounts[p.ID]),
 		StockLabel:      stockLabel,
 		StockFG:         fg,
 		StockBG:         bg,
-		StatusLabel:     statusLabel(p.IsActive),
+		StatusLabel:     statusLabel(t, p.IsActive),
 		HasPhoto:        hasPhoto,
 		PhotoURL:        h.thumbURL(img.ObjectKey),
 		EditURL:         "/admin/products/" + p.ID,
 		ToggleActiveURL: "/admin/products/" + p.ID + "/toggle-active",
-		DeactivateLabel: deactivateLabel(p.IsActive),
+		DeactivateLabel: deactivateLabel(t, p.IsActive),
 		DeleteURL:       "/admin/products/" + p.ID + "/delete",
 	}
 }
@@ -272,7 +272,7 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		StockPointsJSON: marshalJS(stockPoints),
 		CanDelete:       st.Role == staff.RoleOwner,
 	}
-	h.renderProductForm(w, st, "Новый товар", data)
+	h.renderProductForm(w, st, "admin.product.new_title", data)
 }
 
 // stockPoints returns every point of sale as a Вариации matrix column
@@ -299,7 +299,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.products.GetByIDAny(ctx, id)
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
+		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	topID, subID := resolveTopAndSubIDs(tree, product.CategoryID)
 
-	variantRows := buildVariantRows(variants, stockEntries, stockPoints)
+	variantRows := buildVariantRows(h.tr(r), variants, stockEntries, stockPoints)
 
 	imageRows := make([]ImageRowVM, len(images))
 	for i, img := range images {
@@ -373,7 +373,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data.StockPoints = stockPoints
 	data.StockPointsJSON = marshalJS(stockPoints)
-	h.renderProductForm(w, st, "Редактирование товара", data)
+	h.renderProductForm(w, st, "admin.product.edit_title", data)
 }
 
 func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, title string, data ProductFormData) {
@@ -381,7 +381,7 @@ func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, tit
 	pageData.ShowBack = true
 	pageData.Data = data
 	if err := h.render.Render(w, "product_form", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, trFromWriter(w).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -415,7 +415,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 	st, _ := staff.FromContext(ctx)
 
 	if err := r.ParseForm(); err != nil {
-		h.rerenderFormOnError(w, r, st, productID, "не удалось прочитать форму", nil)
+		h.rerenderFormOnError(w, r, st, productID, h.tr(r).T("admin.err.form"), nil)
 		return
 	}
 
@@ -423,7 +423,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 	if productID != "" {
 		current, err := h.products.GetByIDAny(ctx, productID)
 		if err != nil {
-			redirectWithToast(w, r, "/admin/products", appErrMessage(err))
+			redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
 			return
 		}
 		isActive = current.IsActive
@@ -435,7 +435,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 		return
 	}
 
-	parsed := parseProductForm(r.Form, productID, isActive, stockPoints)
+	parsed := parseProductForm(h.tr(r), r.Form, productID, isActive, stockPoints)
 	if len(parsed.Errs) > 0 {
 		h.rerenderFormOnError(w, r, st, productID, strings.Join(parsed.Errs, ". "), parsed.Rows)
 		return
@@ -444,19 +444,19 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 	if _, err := h.productStore.Save(ctx, parsed.Input); err != nil {
 		var conflict *stockConflictError
 		if errors.As(err, &conflict) {
-			markStockConflicts(parsed.Rows, conflict.Cells)
-			h.rerenderFormOnError(w, r, st, productID, stockConflictMessage, parsed.Rows)
+			markStockConflicts(h.tr(r), parsed.Rows, conflict.Cells)
+			h.rerenderFormOnError(w, r, st, productID, h.tr(r).T(stockConflictMessage), parsed.Rows)
 			return
 		}
 		var ae *apperr.AppError
 		if !errors.As(err, &ae) {
 			slog.ErrorContext(ctx, "admin product save failed", "product_id", productID, "err", err)
 		}
-		h.rerenderFormOnError(w, r, st, productID, appErrMessage(err), parsed.Rows)
+		h.rerenderFormOnError(w, r, st, productID, appErrMessage(h.tr(r), err), parsed.Rows)
 		return
 	}
 
-	redirectWithToast(w, r, "/admin/products", "Товар сохранён")
+	redirectWithToast(w, r, "/admin/products", h.tr(r).T("admin.product.toast_saved"))
 }
 
 // rerenderFormOnError redisplays the form with whatever the staff member
@@ -520,9 +520,9 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		CanDelete:       st.Role == staff.RoleOwner,
 		Err:             errMsg,
 	}
-	title := "Новый товар"
+	title := "admin.product.new_title"
 	if data.IsEdit {
-		title = "Редактирование товара"
+		title = "admin.product.edit_title"
 	}
 	h.renderProductForm(w, st, title, data)
 }
@@ -540,7 +540,7 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.products.GetByIDAny(ctx, id)
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
+		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -555,13 +555,13 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 		IsActive:      !product.IsActive,
 	})
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
+		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
 		return
 	}
 
-	toast := "Товар деактивирован"
+	toast := h.tr(r).T("admin.product.toast_deactivated")
 	if !product.IsActive {
-		toast = "Товар активирован"
+		toast = h.tr(r).T("admin.product.toast_activated")
 	}
 	redirectWithToast(w, r, "/admin/products", toast)
 }
@@ -583,10 +583,10 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) productDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.products.Delete(r.Context(), id); err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
+		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
 		return
 	}
-	redirectWithToast(w, r, "/admin/products", "Товар удалён")
+	redirectWithToast(w, r, "/admin/products", h.tr(r).T("admin.product.toast_deleted"))
 }
 
 // --- import screen ---
@@ -608,10 +608,10 @@ func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 	data := ImportPageData{ImportURL: "/admin/products/import"}
 
-	pageData := h.productsShellData("product_import", "Импорт товаров", st)
+	pageData := h.productsShellData("product_import", "admin.import.title", st)
 	pageData.ShowBack = true
 	pageData.Data = data
 	if err := h.render.Render(w, "product_import", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }

@@ -14,24 +14,24 @@
   <div class="admin-form-grid">
     <div class="admin-card admin-card--pad">
       <div class="admin-langtabs">
-        <button type="button" class="admin-langtabs__btn active" data-lang="ru" onclick="pfSetLang('ru')">Русский</button>
-        <button type="button" class="admin-langtabs__btn" data-lang="ky" onclick="pfSetLang('ky')">Кыргызча</button>
+        <button type="button" class="admin-langtabs__btn active" data-lang="ru" onclick="pfSetLang('ru')">{{t "admin.lang.ru_title"}}</button>
+        <button type="button" class="admin-langtabs__btn" data-lang="ky" onclick="pfSetLang('ky')">{{t "admin.lang.ky_title"}}</button>
       </div>
 
       <div class="admin-field admin-lang-field" data-lang="ru">
-        <label>Название (рус.)</label>
+        <label>{{t "admin.common.name_ru"}}</label>
         <input type="text" name="name_ru" value="{{.NameRu}}" placeholder="Nike Air Max 90" required>
       </div>
       <div class="admin-field admin-lang-field" data-lang="ky" hidden>
-        <label>Название (кырг.)</label>
+        <label>{{t "admin.common.name_ky"}}</label>
         <input type="text" name="name_ky" value="{{.NameKy}}" placeholder="Nike Air Max 90" required>
       </div>
 
       <div class="admin-form-row3">
         <div class="admin-field">
           <div class="admin-field__labelrow">
-            <label>Категория</label>
-            <button type="button" class="admin-linkbtn" onclick="openCategoryModal()">+ Новая</button>
+            <label>{{t "admin.common.category"}}</label>
+            <button type="button" class="admin-linkbtn" onclick="openCategoryModal()">+ {{t "admin.product.new_short"}}</button>
           </div>
           <select id="pf-category" onchange="pfOnCategoryChange()">
             {{range .Categories}}
@@ -41,17 +41,17 @@
         </div>
         <div class="admin-field">
           <div class="admin-field__labelrow">
-            <label>Подкатегория</label>
-            <button type="button" class="admin-linkbtn" onclick="openSubcategoryModal()">+ Новая</button>
+            <label>{{t "admin.products.subcategory"}}</label>
+            <button type="button" class="admin-linkbtn" onclick="openSubcategoryModal()">+ {{t "admin.product.new_short"}}</button>
           </div>
           <select id="pf-subcategory" onchange="pfOnSubcategoryChange()">
-            <option value="">Без подкатегории</option>
+            <option value="">{{t "admin.product.no_subcategory"}}</option>
           </select>
         </div>
         <div class="admin-field">
           <div class="admin-field__labelrow">
-            <label>Бренд</label>
-            <button type="button" class="admin-linkbtn" onclick="openBrandModal()">+ Новая</button>
+            <label>{{t "admin.product.brand"}}</label>
+            <button type="button" class="admin-linkbtn" onclick="openBrandModal()">+ {{t "admin.product.new_short"}}</button>
           </div>
           <input type="text" name="brand" id="pf-brand" list="pf-brand-list" value="{{.Brand}}" placeholder="Nike">
           <datalist id="pf-brand-list">
@@ -63,27 +63,27 @@
       </div>
 
       <div class="admin-field" style="max-width:260px">
-        <label>Базовая цена, сом</label>
+        <label>{{t "admin.product.base_price"}}</label>
         <input type="text" inputmode="decimal" name="base_price" value="{{.BasePrice}}" placeholder="4500">
       </div>
 
       <div class="admin-field admin-lang-field" data-lang="ru">
-        <label>Описание (рус.)</label>
-        <textarea name="description_ru" placeholder="Короткое описание модели, материал, особенности">{{.DescriptionRu}}</textarea>
+        <label>{{t "admin.product.description_ru"}}</label>
+        <textarea name="description_ru" placeholder="{{t "admin.product.description_placeholder"}}">{{.DescriptionRu}}</textarea>
       </div>
       <div class="admin-field admin-lang-field" data-lang="ky" hidden>
-        <label>Описание (кырг.)</label>
-        <textarea name="description_ky" placeholder="Короткое описание модели, материал, особенности">{{.DescriptionKy}}</textarea>
+        <label>{{t "admin.product.description_ky"}}</label>
+        <textarea name="description_ky" placeholder="{{t "admin.product.description_placeholder"}}">{{.DescriptionKy}}</textarea>
       </div>
     </div>
 
     <div class="admin-card admin-card--pad">
-      <div class="admin-card__title">Фотографии</div>
-      <div class="admin-card__hint">Первое фото — главное. JPEG, PNG или WEBP до 10 МБ, меньшая сторона от 600 px — фото автоматически приводится к белому квадрату.</div>
+      <div class="admin-card__title">{{t "admin.product.photos"}}</div>
+      <div class="admin-card__hint">{{t "admin.product.photos_hint"}}</div>
       <div id="pf-photo-slots" class="admin-photo-grid"></div>
       <button type="button" class="admin-photo-add" onclick="pfPickPhoto()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"></path></svg>
-        <span>Добавить фото</span>
+        <span>{{t "admin.product.add_photo"}}</span>
       </button>
       <input type="file" id="pf-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="pfFileChosen(event)">
     </div>
@@ -91,38 +91,38 @@
 
   <div class="admin-card">
     <div class="admin-card__pad-sm">
-      <div class="admin-card__title">Вариации</div>
-      <div class="admin-card__hint">Размер × цвет и остаток на каждой точке продаж. Сохраняются только изменённые ячейки: если остаток успел измениться (продажа, другой сотрудник), форма покажет актуальное значение вместо перезаписи.</div>
-      {{if not .StockPoints}}<div class="admin-card__hint">Точек продаж пока нет — остатки можно будет указать после создания точки в разделе «Склад и точки».</div>{{end}}
+      <div class="admin-card__title">{{t "admin.product.variants"}}</div>
+      <div class="admin-card__hint">{{t "admin.product.variants_hint"}}</div>
+      {{if not .StockPoints}}<div class="admin-card__hint">{{t "admin.product.no_points_hint"}}</div>{{end}}
     </div>
     <div class="admin-table-wrap">
       <table class="admin-table admin-variants-table">
         <thead>
           <tr>
-            <th scope="col">Размер</th>
-            <th scope="col">Цвет</th>
-            <th scope="col">Фото цвета</th>
+            <th scope="col">{{t "admin.common.size"}}</th>
+            <th scope="col">{{t "admin.common.color"}}</th>
+            <th scope="col">{{t "admin.product.color_photos"}}</th>
             {{range .StockPoints}}
-            <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Inactive}} <span class="admin-variants-table__inactive">(неактивна)</span>{{end}}</th>
+            <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Inactive}} <span class="admin-variants-table__inactive">{{t "admin.common.inactive_suffix"}}</span>{{end}}</th>
             {{end}}
-            <th scope="col">Всего</th>
-            <th scope="col"><span class="admin-visually-hidden">Удалить</span></th>
+            <th scope="col">{{t "admin.product.total"}}</th>
+            <th scope="col"><span class="admin-visually-hidden">{{t "admin.common.delete"}}</span></th>
           </tr>
         </thead>
         <tbody id="pf-variant-rows">
           {{range .Variants}}
           <tr class="admin-variant-row" data-key="{{.Key}}">
-            <td><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="Размер"></td>
-            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="Белый" aria-label="Цвет"></td>
-            <td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета">
+            <td><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="{{t "admin.common.size"}}"></td>
+            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="{{t "admin.product.color_placeholder"}}" aria-label="{{t "admin.common.color"}}"></td>
+            <td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="{{t "admin.product.this_color_photos"}}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
               <span class="admin-variant-photo-count">0</span>
             </button></td>
             {{range .Cells}}
-            <td><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="Остаток: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="Значение обновлено: остаток изменился, пока форма была открыта"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
+            <td><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
             {{end}}
             <td><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
-            <td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию">
+            <td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="{{t "admin.product.remove_variant"}}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
             </button></td>
           </tr>
@@ -131,13 +131,13 @@
       </table>
     </div>
     <div class="admin-card__pad-sm">
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="pfAddVariant()">+ Добавить вариацию</button>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="pfAddVariant()">+ {{t "admin.product.add_variant"}}</button>
     </div>
   </div>
 
   <div class="admin-form-sticky">
-    <a href="/admin/products" class="admin-btn admin-btn--secondary">Отмена</a>
-    <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+    <a href="/admin/products" class="admin-btn admin-btn--secondary">{{t "admin.common.cancel"}}</a>
+    <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
   </div>
 </form>
 
@@ -150,16 +150,16 @@
      since staff only shoots one set of photos per color, not per size. */}}
 <div id="pf-colorphoto-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--lg" role="dialog" aria-modal="true" aria-labelledby="pf-colorphoto-title">
-    <div class="admin-modal__title" id="pf-colorphoto-title">Фото цвета</div>
-    <div class="admin-modal__text">Эти фото покажутся покупателю, когда он выберет этот цвет в карточке товара.</div>
+    <div class="admin-modal__title" id="pf-colorphoto-title">{{t "admin.product.color_photos"}}</div>
+    <div class="admin-modal__text">{{t "admin.product.color_photos_hint"}}</div>
     <div id="pf-colorphoto-grid" class="admin-photo-grid" style="margin-top:14px"></div>
     <button type="button" class="admin-photo-add" onclick="pfPickColorPhoto()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"></path></svg>
-      <span>Добавить фото</span>
+      <span>{{t "admin.product.add_photo"}}</span>
     </button>
     <input type="file" id="pf-colorphoto-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="pfColorFileChosen(event)">
     <div class="admin-modal__actions">
-      <button type="button" class="admin-btn admin-btn--primary" onclick="closeColorPhotoModal()">Готово</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="closeColorPhotoModal()">{{t "admin.common.done"}}</button>
     </div>
   </div>
 </div>
@@ -171,49 +171,49 @@
      Replaces the earlier window.prompt()-chain UI with real fields. */}}
 <div id="pf-category-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-category-modal-title">
-    <div class="admin-modal__title" id="pf-category-modal-title">Новая категория</div>
+    <div class="admin-modal__title" id="pf-category-modal-title">{{t "admin.categories.new_title"}}</div>
     <div class="admin-field" style="margin-top:18px">
-      <label for="pf-newcat-name">Название категории</label>
-      <input type="text" id="pf-newcat-name" placeholder="Сандалии" onkeydown="if(event.key==='Enter')pfSaveCategory()">
+      <label for="pf-newcat-name">{{t "admin.product.category_name"}}</label>
+      <input type="text" id="pf-newcat-name" placeholder="{{t "admin.product.category_placeholder"}}" onkeydown="if(event.key==='Enter')pfSaveCategory()">
     </div>
     <div class="admin-form-error" id="pf-newcat-error" hidden></div>
     <div class="admin-modal__actions">
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryModal()">Отмена</button>
-      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveCategory()">Добавить</button>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryModal()">{{t "admin.common.cancel"}}</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveCategory()">{{t "admin.common.add"}}</button>
     </div>
   </div>
 </div>
 
 <div id="pf-subcategory-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-subcategory-modal-title">
-    <div class="admin-modal__title" id="pf-subcategory-modal-title">Новая подкатегория</div>
-    <div class="admin-modal__text">Например «Классика» или «Спортивные» внутри выбранной категории.</div>
+    <div class="admin-modal__title" id="pf-subcategory-modal-title">{{t "admin.product.new_subcategory"}}</div>
+    <div class="admin-modal__text">{{t "admin.product.subcategory_hint"}}</div>
     <div class="admin-field" style="margin-top:14px">
-      <label for="pf-newsub-parent">Категория</label>
+      <label for="pf-newsub-parent">{{t "admin.common.category"}}</label>
       <select id="pf-newsub-parent"></select>
     </div>
     <div class="admin-field">
-      <label for="pf-newsub-name">Название подкатегории</label>
-      <input type="text" id="pf-newsub-name" placeholder="Классика" onkeydown="if(event.key==='Enter')pfSaveSubcategory()">
+      <label for="pf-newsub-name">{{t "admin.product.subcategory_name"}}</label>
+      <input type="text" id="pf-newsub-name" placeholder="{{t "admin.product.subcategory_placeholder"}}" onkeydown="if(event.key==='Enter')pfSaveSubcategory()">
     </div>
     <div class="admin-form-error" id="pf-newsub-error" hidden></div>
     <div class="admin-modal__actions">
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeSubcategoryModal()">Отмена</button>
-      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveSubcategory()">Добавить</button>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeSubcategoryModal()">{{t "admin.common.cancel"}}</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveSubcategory()">{{t "admin.common.add"}}</button>
     </div>
   </div>
 </div>
 
 <div id="pf-brand-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-brand-modal-title">
-    <div class="admin-modal__title" id="pf-brand-modal-title">Новый бренд</div>
+    <div class="admin-modal__title" id="pf-brand-modal-title">{{t "admin.product.new_brand"}}</div>
     <div class="admin-field" style="margin-top:18px">
-      <label for="pf-newbrand-name">Название бренда</label>
+      <label for="pf-newbrand-name">{{t "admin.product.brand_name"}}</label>
       <input type="text" id="pf-newbrand-name" placeholder="New Balance" onkeydown="if(event.key==='Enter')pfSaveBrand()">
     </div>
     <div class="admin-modal__actions">
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeBrandModal()">Отмена</button>
-      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveBrand()">Добавить</button>
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeBrandModal()">{{t "admin.common.cancel"}}</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfSaveBrand()">{{t "admin.common.add"}}</button>
     </div>
   </div>
 </div>
@@ -223,6 +223,28 @@
 
 <script>
 (function () {
+  // Translated strings for the dynamic parts of the form (admin locale).
+  var L = {
+    enterName: {{t "admin.product.enter_name"}},
+    catFailed: {{t "admin.product.category_create_failed"}},
+    subFailed: {{t "admin.product.subcategory_create_failed"}},
+    noSub: {{t "admin.product.no_subcategory"}},
+    outOfStock: {{t "admin.stock.out_of_stock"}},
+    pcs: {{t "admin.stock.pcs"}},
+    size: {{t "admin.common.size"}},
+    color: {{t "admin.common.color"}},
+    colorPlaceholder: {{t "admin.product.color_placeholder"}},
+    thisColorPhotos: {{t "admin.product.this_color_photos"}},
+    stock: {{t "admin.common.stock"}},
+    removeVariant: {{t "admin.product.remove_variant"}},
+    mainPhoto: {{t "admin.product.main_photo"}},
+    maxPhotos: {{t "admin.product.max_photos"}},
+    fileTooBig: {{t "admin.product.file_too_big"}},
+    uploadOffline: {{t "admin.product.upload_offline"}},
+    uploadFailed: {{t "admin.product.upload_failed"}},
+    colorFirst: {{t "admin.product.color_first"}},
+    colorPhotosOf: {{t "admin.product.color_photos_of"}}
+  };
   var initialTop = {{.TopCategoryID}};
   var initialSub = {{.SubCategoryID}};
   var initialCategoryID = {{.CategoryID}};
@@ -250,7 +272,10 @@
 
   function populateSubcategories(topID, selectSubID) {
     var sel = document.getElementById('pf-subcategory');
-    sel.innerHTML = '<option value="">Без подкатегории</option>';
+    sel.innerHTML = '';
+    var none = document.createElement('option');
+    none.value = ''; none.textContent = L.noSub;
+    sel.appendChild(none);
     subcategoriesFor(topID).forEach(function (c) {
       var opt = document.createElement('option');
       opt.value = c.ID; opt.textContent = c.Name;
@@ -304,7 +329,7 @@
   window.pfSaveCategory = function () {
     var nameRu = document.getElementById('pf-newcat-name').value.trim();
     var errEl = document.getElementById('pf-newcat-error');
-    if (!nameRu) { errEl.textContent = 'Введите название'; errEl.hidden = false; return; }
+    if (!nameRu) { errEl.textContent = L.enterName; errEl.hidden = false; return; }
 
     fetch('/admin/api/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -322,7 +347,7 @@
       populateSubcategories(cat.id, '');
       document.getElementById('pf-category-id').value = cat.id;
       closeCategoryModal();
-    }).catch(function () { errEl.textContent = 'Не удалось создать категорию'; errEl.hidden = false; });
+    }).catch(function () { errEl.textContent = L.catFailed; errEl.hidden = false; });
   };
 
   // --- "+ Новая подкатегория" modal ---
@@ -348,7 +373,7 @@
     var topID = document.getElementById('pf-newsub-parent').value;
     var nameRu = document.getElementById('pf-newsub-name').value.trim();
     var errEl = document.getElementById('pf-newsub-error');
-    if (!nameRu) { errEl.textContent = 'Введите название'; errEl.hidden = false; return; }
+    if (!nameRu) { errEl.textContent = L.enterName; errEl.hidden = false; return; }
 
     fetch('/admin/api/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -364,7 +389,7 @@
       populateSubcategories(topID, cat.id);
       document.getElementById('pf-category-id').value = cat.id;
       closeSubcategoryModal();
-    }).catch(function () { errEl.textContent = 'Не удалось создать подкатегорию'; errEl.hidden = false; });
+    }).catch(function () { errEl.textContent = L.subFailed; errEl.hidden = false; });
   };
 
   // --- "+ Новая" brand modal — brand is a free-text column on products,
@@ -401,9 +426,9 @@
     });
     var badge = row.querySelector('.admin-variant-badge');
     var label, fg, bg;
-    if (qty === 0) { label = 'Нет в наличии'; fg = '#C62828'; bg = '#FFEBEE'; }
-    else if (qty < 5) { label = qty + ' шт'; fg = '#B85C00'; bg = '#FFF3E0'; }
-    else { label = qty + ' шт'; fg = '#2E7D32'; bg = '#E8F5E9'; }
+    if (qty === 0) { label = L.outOfStock; fg = '#C62828'; bg = '#FFEBEE'; }
+    else if (qty < 5) { label = L.pcs.replace('%d', qty); fg = '#B85C00'; bg = '#FFF3E0'; }
+    else { label = L.pcs.replace('%d', qty); fg = '#2E7D32'; bg = '#E8F5E9'; }
     badge.textContent = label;
     badge.style.color = fg;
     badge.style.background = bg;
@@ -425,15 +450,16 @@
     var tdSize = el('td');
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_key', value: key }));
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_id', value: '' }));
-    tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': 'Размер' }));
+    tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': L.size }));
     tr.appendChild(tdSize);
 
     var tdColor = el('td');
-    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', 'class': 'admin-variant-input', placeholder: 'Белый', 'aria-label': 'Цвет' }));
+    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', 'class': 'admin-variant-input', placeholder: L.colorPlaceholder, 'aria-label': L.color }));
     tr.appendChild(tdColor);
 
     var tdPhoto = el('td');
-    tdPhoto.innerHTML = '<button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button>';
+    tdPhoto.innerHTML = '<button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button>';
+    tdPhoto.firstChild.setAttribute('aria-label', L.thisColorPhotos);
     tr.appendChild(tdPhoto);
 
     stockPoints.forEach(function (p) {
@@ -442,7 +468,7 @@
         type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric',
         name: 'qty_' + key + '_' + p.ID, value: '0',
         'class': 'admin-variant-input admin-variant-input--qty',
-        'aria-label': 'Остаток: ' + p.Name
+        'aria-label': L.stock + ': ' + p.Name
       });
       input.addEventListener('input', function () { pfUpdateBadge(input); });
       td.appendChild(input);
@@ -450,11 +476,13 @@
     });
 
     var tdBadge = el('td');
-    tdBadge.innerHTML = '<span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span>';
+    tdBadge.innerHTML = '<span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE"></span>';
+    tdBadge.firstChild.textContent = L.outOfStock;
     tr.appendChild(tdBadge);
 
     var tdRemove = el('td');
-    tdRemove.innerHTML = '<button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    tdRemove.innerHTML = '<button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    tdRemove.firstChild.setAttribute('aria-label', L.removeVariant);
     tr.appendChild(tdRemove);
 
     tbody.appendChild(tr);
@@ -559,7 +587,7 @@
       if (i === 0) {
         var main = document.createElement('span');
         main.className = 'admin-photo-slot__main';
-        main.textContent = 'Главное';
+        main.textContent = L.mainPhoto;
         slot.appendChild(main);
       }
       var rm = document.createElement('button');
@@ -581,7 +609,7 @@
 
   window.pfPickPhoto = function () {
     var count = photos.filter(function (p) { return !p.color; }).length;
-    if (count >= MAX_SLOTS) { alert('Максимум ' + MAX_SLOTS + ' фото'); return; }
+    if (count >= MAX_SLOTS) { alert(L.maxPhotos.replace('%d', MAX_SLOTS)); return; }
     document.getElementById('pf-file-input').click();
   };
 
@@ -594,23 +622,23 @@
   // gets the generic message. The error's .message is what alert() shows.
   function uploadPhoto(file) {
     if (file.size > MAX_UPLOAD_BYTES) {
-      return Promise.reject(new Error('Файл больше 10 МБ'));
+      return Promise.reject(new Error(L.fileTooBig));
     }
     var body = new FormData();
     body.append('file', file);
     return fetch('/admin/api/media/upload', { method: 'POST', body: body }).catch(function () {
-      throw new Error('Не удалось загрузить фото: нет связи с сервером');
+      throw new Error(L.uploadOffline);
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         if (r.status === 400 && data.message) throw new Error(data.message);
-        if (!r.ok || !data.object_key) throw new Error('Не удалось загрузить фото');
+        if (!r.ok || !data.object_key) throw new Error(L.uploadFailed);
         return { objectKey: data.object_key, url: data.thumb_url };
       });
     });
   }
 
   function uploadFailed(err) {
-    alert((err && err.message) || 'Не удалось загрузить фото');
+    alert((err && err.message) || L.uploadFailed);
   }
 
   window.pfFileChosen = function (evt) {
@@ -654,9 +682,9 @@
     var row = btnEl.closest('tr');
     var colorInput = row.querySelector('input[name="variant_color"]');
     var color = (colorInput.value || '').trim();
-    if (!color) { alert('Сначала укажите цвет вариации'); return; }
+    if (!color) { alert(L.colorFirst); return; }
     currentModalColor = color;
-    document.getElementById('pf-colorphoto-title').textContent = 'Фото цвета «' + color + '»';
+    document.getElementById('pf-colorphoto-title').textContent = L.colorPhotosOf.replace('%s', color);
     renderColorModalGrid();
     document.getElementById('pf-colorphoto-modal').style.display = 'flex';
   };

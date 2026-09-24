@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -49,6 +50,7 @@ var layoutPartials = []string{
 	"_header.gohtml",
 	"_toast.gohtml",
 	"_confirm_modal.gohtml",
+	"_langswitch.gohtml",
 }
 
 // NavItem is one already-RBAC-filtered, already-ordered sidebar entry for
@@ -66,6 +68,11 @@ type NavItem struct {
 // Screens wire their own content through Data; everything else backs the
 // shared layout/sidebar/header/toast/modal state.
 type PageData struct {
+	// Lang is the admin language ("ru"/"ky"). Empty means "the language
+	// the auth-gate attached to the ResponseWriter" (see lang.go), so
+	// handlers behind requireStaffRole don't need to set it.
+	Lang string
+
 	Screen      string // "login", "no_access", "orders", "order_detail", "products", "reports", "points", "staff", "categories"
 	PageTitle   string
 	ShowSidebar bool // false only for "login"/"no_access", which have no chrome
@@ -89,19 +96,27 @@ type PageData struct {
 	Data any
 }
 
-// Renderer holds one parsed template set per screen, built once at startup
-// (RegisterRoutes) so a broken .gohtml file fails fast there instead of
-// mid-request.
+// Renderer holds one parsed template set per language per screen, built
+// once at startup (RegisterRoutes) so a broken .gohtml file fails fast
+// there instead of mid-request. tmpl[lang][screen].
 type Renderer struct {
-	tmpl map[string]*template.Template
+	tmpl map[string]map[string]*template.Template
 }
 
 // NewRenderer parses every screen's templates. Template paths are relative
 // to the process's working directory (admin/templates/...), matching how
 // internal/web's NewRenderer already resolves web/templates/... — both
 // assume cmd/server runs from the repo root.
+//
+// Each screen is parsed once, then cloned per language with that
+// language's {{t}}/{{tf}}/{{lang}} funcs (lang.go's templateFuncs) — no
+// per-request parsing or Funcs calls.
 func NewRenderer() (*Renderer, error) {
-	rr := &Renderer{tmpl: map[string]*template.Template{}}
+	rr := &Renderer{tmpl: map[string]map[string]*template.Template{}}
+	langs := []string{i18n.LangRU, i18n.LangKY}
+	for _, lang := range langs {
+		rr.tmpl[lang] = map[string]*template.Template{}
+	}
 
 	for screen, page := range screenPages {
 		files := make([]string, 0, len(layoutPartials)+1)
@@ -110,19 +125,30 @@ func NewRenderer() (*Renderer, error) {
 		}
 		files = append(files, filepath.Join(templatesDir, page))
 
-		t, err := template.New("layout.gohtml").ParseFiles(files...)
+		t, err := template.New("layout.gohtml").Funcs(templateFuncs(i18n.DefaultLang)).ParseFiles(files...)
 		if err != nil {
 			return nil, fmt.Errorf("admin: parsing templates for screen %q: %w", screen, err)
 		}
-		rr.tmpl[screen] = t
+		for _, lang := range langs {
+			c, err := t.Clone()
+			if err != nil {
+				return nil, fmt.Errorf("admin: cloning templates for screen %q: %w", screen, err)
+			}
+			rr.tmpl[lang][screen] = c.Funcs(templateFuncs(lang))
+		}
 	}
 
 	return rr, nil
 }
 
-// Render executes the "layout" template for screen using data.
+// Render executes the "layout" template for screen using data, in
+// data.Lang, else the language the auth-gate attached to w, else Russian.
 func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) error {
-	t, ok := rr.tmpl[screen]
+	if data.Lang == "" {
+		data.Lang = langFromWriter(w)
+	}
+	data.Lang = supportedLang(data.Lang)
+	t, ok := rr.tmpl[data.Lang][screen]
 	if !ok {
 		return fmt.Errorf("admin: no template registered for screen %q", screen)
 	}

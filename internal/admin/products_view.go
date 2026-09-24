@@ -8,7 +8,6 @@ package admin
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"math"
 	"net/url"
@@ -156,25 +155,25 @@ type ImportPageData struct {
 // stockChip mirrors the design canvas's stockMeta(n) (Cozy Admin.dc.html
 // ~848-852): the exact thresholds/colors for the stock-level chip shown on
 // both the products list and the variant table in the form.
-func stockChip(qty int) (label, fg, bg string) {
+func stockChip(t tr, qty int) (label, fg, bg string) {
 	switch {
 	case qty == 0:
-		return "Нет в наличии", "#C62828", "#FFEBEE"
+		return t.T("admin.stock.out_of_stock"), "#C62828", "#FFEBEE"
 	case qty < 5:
-		return fmt.Sprintf("%d шт", qty), "#B85C00", "#FFF3E0"
+		return t.F("admin.stock.pcs", qty), "#B85C00", "#FFF3E0"
 	default:
-		return fmt.Sprintf("%d шт", qty), "#2E7D32", "#E8F5E9"
+		return t.F("admin.stock.pcs", qty), "#2E7D32", "#E8F5E9"
 	}
 }
 
 // countLabel renders the products-list footer's "N товаров" count.
-func countLabel(total int) string {
-	return fmt.Sprintf("%d %s", total, pluralRu(total, "товар", "товара", "товаров"))
+func countLabel(t tr, total int) string {
+	return t.N(total, "admin.plural.product")
 }
 
 // variantsLabel renders the table's "Вариаций" cell / card subtitle.
-func variantsLabel(n int) string {
-	return fmt.Sprintf("%d %s", n, pluralRu(n, "вариация", "вариации", "вариаций"))
+func variantsLabel(t tr, n int) string {
+	return t.N(n, "admin.plural.variant")
 }
 
 // formatMoney renders a KGS amount the same way internal/web's
@@ -206,21 +205,21 @@ func formatMoney(v float64) string {
 }
 
 // statusLabel mirrors the design's {{ p.status }} binding.
-func statusLabel(isActive bool) string {
+func statusLabel(t tr, isActive bool) string {
 	if isActive {
-		return "Активен"
+		return t.T("admin.product.active")
 	}
-	return "Неактивен"
+	return t.T("admin.product.inactive")
 }
 
 // deactivateLabel mirrors the design's {{ p.deactivateLabel }} toggle
 // button text — "Деактивировать" for an active product, "Активировать" to
 // bring a previously-deactivated one back.
-func deactivateLabel(isActive bool) string {
+func deactivateLabel(t tr, isActive bool) string {
 	if isActive {
-		return "Деактивировать"
+		return t.T("admin.common.deactivate")
 	}
-	return "Активировать"
+	return t.T("admin.common.activate")
 }
 
 // findCategoryBySlug searches the full tree (including every level of
@@ -296,9 +295,9 @@ func resolveCategoryFilter(tree []*catalog.Category, catSlug, subSlug string) (c
 
 // buildCategoryChips renders the "Все" + top-level category chip row,
 // preserving the current search query across chip clicks.
-func buildCategoryChips(tree []*catalog.Category, activeTop *catalog.Category, query string) []ChipVM {
+func buildCategoryChips(t tr, tree []*catalog.Category, activeTop *catalog.Category, query string) []ChipVM {
 	chips := make([]ChipVM, 0, len(tree)+1)
-	chips = append(chips, ChipVM{Label: "Все", URL: productsListURL("", "", query), Active: activeTop == nil})
+	chips = append(chips, ChipVM{Label: t.T("admin.common.all"), URL: productsListURL("", "", query), Active: activeTop == nil})
 	for _, c := range tree {
 		chips = append(chips, ChipVM{
 			Label:  c.NameRu,
@@ -312,12 +311,12 @@ func buildCategoryChips(tree []*catalog.Category, activeTop *catalog.Category, q
 // buildSubChips renders the subcategory chip row for the currently active
 // top-level category, including its own "Все" (== activeTop with no
 // subcategory) option, mirroring the design's showSubs/subChips.
-func buildSubChips(activeTop *catalog.Category, activeSub *catalog.Category, query string) []ChipVM {
+func buildSubChips(t tr, activeTop *catalog.Category, activeSub *catalog.Category, query string) []ChipVM {
 	if activeTop == nil || len(activeTop.Children) == 0 {
 		return nil
 	}
 	chips := make([]ChipVM, 0, len(activeTop.Children)+1)
-	chips = append(chips, ChipVM{Label: "Все", URL: productsListURL(activeTop.Slug, "", query), Active: activeSub == nil})
+	chips = append(chips, ChipVM{Label: t.T("admin.common.all"), URL: productsListURL(activeTop.Slug, "", query), Active: activeSub == nil})
 	for _, c := range activeTop.Children {
 		chips = append(chips, ChipVM{
 			Label:  c.NameRu,

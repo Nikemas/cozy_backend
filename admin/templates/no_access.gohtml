@@ -9,10 +9,10 @@
     <div class="admin-login__logo">
       <img src="/admin/static/img/cozy-logo.png" alt="Cozy" width="84" height="84">
     </div>
-    <div class="admin-login__title">Нет доступа</div>
-    <div class="admin-login__hint">У вашей роли пока нет доступа к админ-панели.</div>
+    <div class="admin-login__title">{{t "admin.no_access.title"}}</div>
+    <div class="admin-login__hint">{{t "admin.no_access.text"}}</div>
     <form method="post" action="/admin/logout" style="margin-top: 18px">
-      <button type="submit" class="admin-btn admin-btn--secondary admin-login__submit">Выйти</button>
+      <button type="submit" class="admin-btn admin-btn--secondary admin-login__submit">{{t "admin.common.logout"}}</button>
     </form>
   </div>
 </div>

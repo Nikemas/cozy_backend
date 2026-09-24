@@ -28,8 +28,8 @@ func TestRenderPointsExecutesWithRows(t *testing.T) {
 		Data: pointsPageData{
 			Error: "название обязательно",
 			Rows: []pointRow{
-				newPointRow(&points.Point{ID: "p1", Name: "Дордой-Центр", Address: "ул. Дордой, 1", IsActive: true}),
-				newPointRow(&points.Point{ID: "p2", Name: "Склад", Address: "ул. Ленина, 5", IsActive: false}),
+				newPointRow(ruTr, &points.Point{ID: "p1", Name: "Дордой-Центр", Address: "ул. Дордой, 1", IsActive: true}),
+				newPointRow(ruTr, &points.Point{ID: "p2", Name: "Склад", Address: "ул. Ленина, 5", IsActive: false}),
 			},
 		},
 	}
@@ -66,9 +66,9 @@ func TestRenderStaffExecutesWithRows(t *testing.T) {
 			Error:  "нельзя понизить или деактивировать последнего владельца",
 			Points: pts,
 			Rows: []staffRow{
-				newStaffRow(staff.Staff{ID: "s1", Name: "Айгерим Б.", Phone: "+996555000001", Role: staff.RoleOwner, IsActive: true}, pointNames),
-				newStaffRow(staff.Staff{ID: "s2", Name: "Данияр К.", Phone: "+996555000002", Role: staff.RoleManager, IsActive: true}, pointNames),
-				newStaffRow(staff.Staff{ID: "s3", Name: "Нурлан Т.", Phone: "+996555000003", Role: staff.RolePointStaff, PointID: &pointID, IsActive: false}, pointNames),
+				newStaffRow(ruTr, staff.Staff{ID: "s1", Name: "Айгерим Б.", Phone: "+996555000001", Role: staff.RoleOwner, IsActive: true}, pointNames),
+				newStaffRow(ruTr, staff.Staff{ID: "s2", Name: "Данияр К.", Phone: "+996555000002", Role: staff.RoleManager, IsActive: true}, pointNames),
+				newStaffRow(ruTr, staff.Staff{ID: "s3", Name: "Нурлан Т.", Phone: "+996555000003", Role: staff.RolePointStaff, PointID: &pointID, IsActive: false}, pointNames),
 			},
 		},
 	}

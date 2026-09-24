@@ -19,7 +19,7 @@ import (
 
 func TestResolveOrderFilterInvalidStatusIsDroppedNot500(t *testing.T) {
 	p := parseOrdersListParams(url.Values{"status": {"shipped'; --"}})
-	f, notes := resolveOrderFilter(&p, time.Now())
+	f, notes := resolveOrderFilter(ruTr, &p, time.Now())
 	if f.Status != nil {
 		t.Fatalf("Status = %v, want nil (never passed to SQL)", *f.Status)
 	}
@@ -30,7 +30,7 @@ func TestResolveOrderFilterInvalidStatusIsDroppedNot500(t *testing.T) {
 
 func TestResolveOrderFilterCustomRangeIsBishkekDays(t *testing.T) {
 	p := parseOrdersListParams(url.Values{"range": {"custom"}, "from": {"2026-09-01"}, "to": {"2026-09-10"}, "status": {"placed"}})
-	f, notes := resolveOrderFilter(&p, time.Now())
+	f, notes := resolveOrderFilter(ruTr, &p, time.Now())
 	if len(notes) != 0 {
 		t.Fatalf("notes = %v", notes)
 	}
@@ -47,20 +47,20 @@ func TestResolveOrderFilterCustomRangeIsBishkekDays(t *testing.T) {
 
 func TestResolveOrderFilterBadDateAndPresetRange(t *testing.T) {
 	p := parseOrdersListParams(url.Values{"range": {"custom"}, "from": {"01.09.2026"}})
-	f, notes := resolveOrderFilter(&p, time.Now())
+	f, notes := resolveOrderFilter(ruTr, &p, time.Now())
 	if f.From != nil || len(notes) != 1 || p.From != "" {
 		t.Errorf("bad date: From = %v, notes = %v", f.From, notes)
 	}
 
 	now := time.Date(2026, 9, 15, 20, 0, 0, 0, time.UTC) // Sep 16, 02:00 in Bishkek
 	p = parseOrdersListParams(url.Values{"range": {"7"}})
-	f, _ = resolveOrderFilter(&p, now)
+	f, _ = resolveOrderFilter(ruTr, &p, now)
 	if want := time.Date(2026, 9, 10, 0, 0, 0, 0, reports.Location); f.From == nil || !f.From.Equal(want) {
 		t.Errorf("7 days From = %v, want %v", f.From, want)
 	}
 
 	p = parseOrdersListParams(url.Values{"range": {"999"}})
-	f, _ = resolveOrderFilter(&p, now)
+	f, _ = resolveOrderFilter(ruTr, &p, now)
 	if f.From != nil || p.Range != "all" {
 		t.Errorf("unknown range: From = %v, Range = %q", f.From, p.Range)
 	}

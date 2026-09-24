@@ -11,7 +11,6 @@ package admin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -150,18 +149,18 @@ type orderStatusMeta struct {
 	Class string
 }
 
-func orderStatusMetaFor(s orders.OrderStatus) orderStatusMeta {
+func orderStatusMetaFor(t tr, s orders.OrderStatus) orderStatusMeta {
 	switch s {
 	case orders.StatusPlaced:
-		return orderStatusMeta{Label: "Оформлен", Class: "admin-chip--placed"}
+		return orderStatusMeta{Label: t.T("admin.status.placed"), Class: "admin-chip--placed"}
 	case orders.StatusConfirmed:
-		return orderStatusMeta{Label: "Подтверждён", Class: "admin-chip--confirmed"}
+		return orderStatusMeta{Label: t.T("admin.status.confirmed"), Class: "admin-chip--confirmed"}
 	case orders.StatusCourierAssigned:
-		return orderStatusMeta{Label: "Передан курьеру", Class: "admin-chip--courier"}
+		return orderStatusMeta{Label: t.T("admin.status.courier_assigned"), Class: "admin-chip--courier"}
 	case orders.StatusDelivered:
-		return orderStatusMeta{Label: "Доставлен", Class: "admin-chip--delivered"}
+		return orderStatusMeta{Label: t.T("admin.status.delivered"), Class: "admin-chip--delivered"}
 	case orders.StatusCancelled:
-		return orderStatusMeta{Label: "Отменён", Class: "admin-chip--cancelled"}
+		return orderStatusMeta{Label: t.T("admin.status.cancelled"), Class: "admin-chip--cancelled"}
 	default:
 		return orderStatusMeta{Label: string(s), Class: "admin-chip--placed"}
 	}
@@ -171,26 +170,26 @@ func orderStatusMetaFor(s orders.OrderStatus) orderStatusMeta {
 // 'При получении'`, extended with the other online payment states (Task S:
 // online_card orders carry orders.payment_status) so staff don't ship an
 // order that was never paid.
-func paymentLabel(pm orders.PaymentMethod, ps *orders.PaymentStatus) string {
+func paymentLabel(t tr, pm orders.PaymentMethod, ps *orders.PaymentStatus) string {
 	if pm != orders.PaymentOnlineCard {
-		return "При получении"
+		return t.T("admin.payment.cod")
 	}
 	if ps == nil {
-		return "Онлайн"
+		return t.T("admin.payment.online")
 	}
 	switch *ps {
 	case orders.PaymentPaid:
-		return "Онлайн, оплачено"
+		return t.T("admin.payment.paid")
 	case orders.PaymentPending:
-		return "Онлайн, ожидает оплаты"
+		return t.T("admin.payment.pending")
 	case orders.PaymentFailed:
-		return "Онлайн, оплата не прошла"
+		return t.T("admin.payment.failed")
 	case orders.PaymentCancelled:
-		return "Онлайн, оплата отменена"
+		return t.T("admin.payment.cancelled")
 	case orders.PaymentRefunded:
-		return "Онлайн, возврат"
+		return t.T("admin.payment.refunded")
 	default:
-		return "Онлайн, " + string(*ps)
+		return t.T("admin.payment.online") + ", " + string(*ps)
 	}
 }
 
@@ -273,14 +272,14 @@ func nextStatusOptions(from orders.OrderStatus) []orders.OrderStatus {
 // this same rule server-side (in internal/admin, not internal/orders)
 // before calling AdminUpdateStatus, so a manager can't bypass the hidden
 // button by POSTing status=cancelled directly.
-func buildStatusButtons(from orders.OrderStatus, role staff.Role) []StatusButtonView {
+func buildStatusButtons(t tr, from orders.OrderStatus, role staff.Role) []StatusButtonView {
 	options := nextStatusOptions(from)
 	buttons := make([]StatusButtonView, 0, len(options))
 	for _, s := range options {
 		if s == orders.StatusCancelled && role != staff.RoleOwner {
 			continue
 		}
-		meta := orderStatusMetaFor(s)
+		meta := orderStatusMetaFor(t, s)
 		buttons = append(buttons, StatusButtonView{Label: meta.Label, Value: string(s), Class: meta.Class})
 	}
 	return buttons
@@ -288,7 +287,7 @@ func buildStatusButtons(from orders.OrderStatus, role staff.Role) []StatusButton
 
 // ---------- filter definitions ----------
 
-// orderStatusFilters is the fixed status-chip row (design canvas
+// orderStatusFilters (Label = locale key) is the fixed status-chip row (design canvas
 // ~line 405): "Все" first (empty query value = no status filter), then
 // one chip per real orders.OrderStatus, in state-machine order.
 var orderStatusFilters = []struct {
@@ -296,23 +295,24 @@ var orderStatusFilters = []struct {
 	Label string
 	Class string
 }{
-	{"", "Все", "admin-chip--all"},
-	{string(orders.StatusPlaced), "Оформлен", "admin-chip--placed"},
-	{string(orders.StatusConfirmed), "Подтверждён", "admin-chip--confirmed"},
-	{string(orders.StatusCourierAssigned), "Передан курьеру", "admin-chip--courier"},
-	{string(orders.StatusDelivered), "Доставлен", "admin-chip--delivered"},
-	{string(orders.StatusCancelled), "Отменён", "admin-chip--cancelled"},
+	{"", "admin.common.all", "admin-chip--all"},
+	{string(orders.StatusPlaced), "admin.status.placed", "admin-chip--placed"},
+	{string(orders.StatusConfirmed), "admin.status.confirmed", "admin-chip--confirmed"},
+	{string(orders.StatusCourierAssigned), "admin.status.courier_assigned", "admin-chip--courier"},
+	{string(orders.StatusDelivered), "admin.status.delivered", "admin-chip--delivered"},
+	{string(orders.StatusCancelled), "admin.status.cancelled", "admin-chip--cancelled"},
 }
 
-// orderRangeOptions is the date-range <select> (design canvas ~line 410).
+// orderRangeOptions is the date-range <select> (design canvas ~line 410);
+// Label is a locale key.
 var orderRangeOptions = []struct {
 	Value string
 	Label string
 }{
-	{"7", "Последние 7 дней"},
-	{"30", "Последние 30 дней"},
-	{"all", "Весь период"},
-	{"custom", "Произвольный период"},
+	{"7", "admin.range.last7"},
+	{"30", "admin.range.last30"},
+	{"all", "admin.range.all"},
+	{"custom", "admin.range.custom"},
 }
 
 // ordersListURL builds /admin/orders?status=...&range=...&page=... —
@@ -351,7 +351,7 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 		if !known {
 			params.Point = ""
 		}
-		pointOpts = append(pointOpts, PointOptionVM{ID: "", Name: "Все точки", Selected: params.Point == ""})
+		pointOpts = append(pointOpts, PointOptionVM{ID: "", Name: h.tr(r).T("admin.common.all_points"), Selected: params.Point == ""})
 		for _, p := range pts {
 			pointOpts = append(pointOpts, PointOptionVM{ID: p.ID, Name: p.Name, Selected: p.ID == params.Point})
 		}
@@ -359,7 +359,7 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 		params.Point = "" // point_staff: forced below, never from the URL
 	}
 
-	filter, notes := resolveOrderFilter(&params, time.Now())
+	filter, notes := resolveOrderFilter(h.tr(r), &params, time.Now())
 
 	// point_staff only ever sees its own point's orders (the JSON API's
 	// rule, httpapi/admin_orders.go); no point at all fails closed.
@@ -382,10 +382,10 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	data.Points = pointOpts
 	data.Notes = notes
 
-	pageData := h.shellPageData("orders", "Заказы", st)
+	pageData := h.shellPageData("orders", "admin.nav.orders", st)
 	pageData.Data = data
 	if err := h.render.Render(w, "orders", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -399,12 +399,13 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 // row's customer phone and item count come from loadOrderListMeta — two
 // batch queries for the whole page, not one lookup per row.
 func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Order, total int, p ordersListParams) OrdersListData {
+	t := trFromContext(ctx)
 	chips := make([]StatusChipLink, 0, len(orderStatusFilters))
 	for _, f := range orderStatusFilters {
 		cp := p
 		cp.Status, cp.Page = f.Value, 1
 		chips = append(chips, StatusChipLink{
-			Label:  f.Label,
+			Label:  t.T(f.Label),
 			URL:    cp.URL(),
 			Class:  f.Class,
 			Active: f.Value == p.Status,
@@ -417,7 +418,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 		cp.Range, cp.Page = ro.Value, 1
 		ranges = append(ranges, RangeOptionLink{
 			Value:    ro.Value,
-			Label:    ro.Label,
+			Label:    t.T(ro.Label),
 			URL:      cp.URL(),
 			Selected: ro.Value == p.Range,
 		})
@@ -427,7 +428,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 	thumbs := h.loadOrderThumbs(ctx, list)
 	rows := make([]OrderRowView, 0, len(list))
 	for _, o := range list {
-		meta := orderStatusMetaFor(o.Status)
+		meta := orderStatusMetaFor(t, o.Status)
 		itemsCount := itemCounts[o.ID]
 		rows = append(rows, OrderRowView{
 			URL:          "/admin/orders/" + o.ID,
@@ -436,9 +437,9 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 			DateLabel:    o.CreatedAt.In(reports.Location).Format("02.01.2006"),
 			Phone:        phones[o.CustomerID],
 			ItemsCount:   itemsCount,
-			ItemsLabel:   fmt.Sprintf("%d %s", itemsCount, pluralRu(itemsCount, "товар", "товара", "товаров")),
+			ItemsLabel:   t.N(itemsCount, "admin.plural.product"),
 			TotalLabel:   formatSom(o.TotalAmount),
-			PaymentLabel: paymentLabel(o.PaymentMethod, o.PaymentStatus),
+			PaymentLabel: paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 			StatusLabel:  meta.Label,
 			StatusClass:  meta.Class,
 		})
@@ -451,7 +452,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 		RangeOptions: ranges,
 		Rows:         rows,
 		Empty:        len(rows) == 0,
-		CountLabel:   fmt.Sprintf("%d %s", total, pluralRu(total, "заказ", "заказа", "заказов")),
+		CountLabel:   t.N(total, "admin.plural.order"),
 		HasPrev:      p.Page > 1,
 		HasNext:      total > p.Page*orders.AdminPageSize,
 		PrevURL:      prev.URL(),
@@ -539,7 +540,7 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !staffCanSeeOrder(st, order) {
-		http.Error(w, "заказ не найден", http.StatusNotFound)
+		http.Error(w, h.tr(r).T("admin.apperr.order_not_found"), http.StatusNotFound)
 		return
 	}
 
@@ -551,7 +552,7 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	// isn't read by any template, only Render's explicit screen argument
 	// below picks order_detail.gohtml (see render.go's PageData doc
 	// comment and handlers.go's renderLogin for the same pattern).
-	pageData := h.shellPageData("orders", fmt.Sprintf("Заказ %s", order.OrderNumber), st)
+	pageData := h.shellPageData("orders", h.tr(r).F("admin.order.title", order.OrderNumber), st)
 	pageData.Screen = "order_detail"
 	pageData.ShowBack = true
 	if msg := r.URL.Query().Get("status_error"); msg != "" {
@@ -560,13 +561,14 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	pageData.Data = data
 
 	if err := h.render.Render(w, "order_detail", pageData); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
 // buildOrderDetailView turns one orders.Order into OrderDetailData.
 func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, role staff.Role) OrderDetailData {
-	meta := orderStatusMetaFor(o.Status)
+	t := trFromContext(ctx)
+	meta := orderStatusMetaFor(t, o.Status)
 
 	phone := ""
 	if c, err := h.customers.GetByID(ctx, o.CustomerID); err == nil && c != nil {
@@ -592,7 +594,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	for _, it := range o.Items {
 		variant := ""
 		if it.SizeSnapshot != "" || it.ColorSnapshot != "" {
-			variant = fmt.Sprintf("Размер %s, %s", it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
+			variant = t.F("admin.order.item_variant", it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
 		}
 		items = append(items, OrderDetailItemView{
 			ThumbURL:   h.photoURL(thumbs[it.VariantID]),
@@ -610,13 +612,13 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		StatusLabel:      meta.Label,
 		StatusClass:      meta.Class,
 		Phone:            phone,
-		PaymentLabel:     paymentLabel(o.PaymentMethod, o.PaymentStatus),
+		PaymentLabel:     paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 		AddressText:      addressText,
 		Comment:          comment,
 		Items:            items,
 		TotalLabel:       formatSom(o.TotalAmount),
-		StatusButtons:    buildStatusButtons(o.Status, role),
-		OrderHistoryData: buildOrderHistoryData(o),
+		StatusButtons:    buildStatusButtons(t, o.Status, role),
+		OrderHistoryData: buildOrderHistoryData(t, o),
 	}
 }
 
@@ -649,7 +651,7 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 		if pts, err := h.pointsRepo.List(ctx); err == nil {
 			for _, p := range pts {
 				if p.ID == *o.PointID {
-					return "Самовывоз: " + p.Name + ", " + p.Address, comment
+					return trFromContext(ctx).F("admin.order.pickup_at", p.Name, p.Address), comment
 				}
 			}
 		}
@@ -669,7 +671,7 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	detailURL := "/admin/orders/" + id
 
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape("не удалось прочитать форму"), http.StatusSeeOther)
+		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.err.form")), http.StatusSeeOther)
 		return
 	}
 	newStatus := orders.OrderStatus(r.FormValue("status"))
@@ -679,23 +681,23 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	// comment): hiding the button isn't enough on its own, since nothing
 	// stops a manager from POSTing status=cancelled directly.
 	if newStatus == orders.StatusCancelled && st.Role != staff.RoleOwner {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape("только владелец может отменить заказ"), http.StatusSeeOther)
+		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.apperr.cancel_forbidden")), http.StatusSeeOther)
 		return
 	}
 
 	if st.Role == staff.RolePointStaff {
 		order, err := h.ordersSvc.AdminGetOrder(r.Context(), id)
 		if err != nil || !staffCanSeeOrder(st, order) {
-			http.Error(w, "заказ не найден", http.StatusNotFound)
+			http.Error(w, h.tr(r).T("admin.apperr.order_not_found"), http.StatusNotFound)
 			return
 		}
 	}
 
 	if _, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus); err != nil {
-		msg := "не удалось изменить статус"
+		msg := h.tr(r).T("admin.order.status_change_failed")
 		var appErr *apperr.AppError
 		if errors.As(err, &appErr) {
-			msg = appErr.Message
+			msg = appErrMessage(h.tr(r), err)
 		}
 		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(msg), http.StatusSeeOther)
 		return
@@ -726,8 +728,8 @@ func staffCanSeeOrder(st *staff.Staff, o *orders.Order) bool {
 func (h *handlers) handleOrdersServiceError(w http.ResponseWriter, err error) {
 	var appErr *apperr.AppError
 	if errors.As(err, &appErr) {
-		http.Error(w, appErr.Message, appErr.Status)
+		http.Error(w, appErrMessage(trFromWriter(w), err), appErr.Status)
 		return
 	}
-	http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+	http.Error(w, trFromWriter(w).T("admin.err.internal"), http.StatusInternalServerError)
 }

@@ -50,8 +50,8 @@ func TestRenderStaffHasPasswordResetAndDeactivateConfirm(t *testing.T) {
 			Notice:            staffNotices["password"],
 			MinPasswordLength: staff.MinPasswordLength,
 			Rows: []staffRow{
-				newStaffRow(staff.Staff{ID: "s2", Name: "Данияр К.", Role: staff.RoleManager, IsActive: true}, nil),
-				newStaffRow(staff.Staff{ID: "s3", Name: "Нурлан Т.", Role: staff.RoleManager, IsActive: false}, nil),
+				newStaffRow(ruTr, staff.Staff{ID: "s2", Name: "Данияр К.", Role: staff.RoleManager, IsActive: true}, nil),
+				newStaffRow(ruTr, staff.Staff{ID: "s3", Name: "Нурлан Т.", Role: staff.RoleManager, IsActive: false}, nil),
 			},
 		},
 	}

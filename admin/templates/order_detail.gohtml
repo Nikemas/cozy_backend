@@ -8,7 +8,7 @@
 <div class="admin-order-detail">
   <div class="admin-card admin-card--pad admin-order-detail__header">
     <div>
-      <div class="admin-order-detail__title">Заказ {{.Data.Number}}</div>
+      <div class="admin-order-detail__title">{{tf "admin.order.title" .Data.Number}}</div>
       <div class="admin-order-detail__date">{{.Data.DateLabel}}</div>
     </div>
     <span class="admin-chip {{.Data.StatusClass}}">{{.Data.StatusLabel}}</span>
@@ -16,19 +16,19 @@
 
   <div class="admin-order-detail__grid">
     <div class="admin-card admin-card--pad">
-      <div class="admin-order-detail__label">Покупатель</div>
+      <div class="admin-order-detail__label">{{t "admin.orders.col_customer"}}</div>
       <div class="admin-order-detail__value">{{.Data.Phone}}</div>
       <div class="admin-order-detail__sub">{{.Data.PaymentLabel}}</div>
     </div>
     <div class="admin-card admin-card--pad">
-      <div class="admin-order-detail__label">Доставка</div>
+      <div class="admin-order-detail__label">{{t "admin.order.delivery"}}</div>
       <div class="admin-order-detail__address">{{.Data.AddressText}}</div>
-      <div class="admin-order-detail__sub">Комментарий: {{.Data.Comment}}</div>
+      <div class="admin-order-detail__sub">{{t "admin.order.comment"}}: {{.Data.Comment}}</div>
     </div>
   </div>
 
   <div class="admin-card admin-order-detail__items">
-    <div class="admin-order-detail__items-title">Состав заказа</div>
+    <div class="admin-order-detail__items-title">{{t "admin.order.items"}}</div>
     <table>
       <tbody>
         {{range .Data.Items}}
@@ -46,12 +46,12 @@
     </table>
     {{if .Data.DeliveryFeeLabel}}
     <div class="admin-order-detail__total">
-      <span>Доставка</span>
+      <span>{{t "admin.order.delivery"}}</span>
       <span>{{.Data.DeliveryFeeLabel}}</span>
     </div>
     {{end}}
     <div class="admin-order-detail__total">
-      <span>Итого</span>
+      <span>{{t "admin.order.total"}}</span>
       <span class="admin-order-detail__total-sum">{{.Data.TotalLabel}}</span>
     </div>
   </div>
@@ -59,13 +59,13 @@
   {{/* История статусов + флаг возврата — блок fix/orders-integrity. */}}
   {{if .Data.RefundRequired}}
   <div class="admin-card admin-card--pad admin-order-detail__refund" role="alert">
-    <div class="admin-order-detail__label">Нужен возврат денег</div>
-    <div class="admin-order-detail__sub">Заказ оплачен онлайн, но отменён — верните деньги покупателю через банк.</div>
+    <div class="admin-order-detail__label">{{t "admin.order.refund_title"}}</div>
+    <div class="admin-order-detail__sub">{{t "admin.order.refund_text"}}</div>
   </div>
   {{end}}
   {{if .Data.History}}
   <div class="admin-card admin-card--pad admin-order-detail__history">
-    <div class="admin-order-detail__label">История статусов</div>
+    <div class="admin-order-detail__label">{{t "admin.order.history"}}</div>
     <table>
       <tbody>
         {{range .Data.History}}
@@ -83,12 +83,12 @@
 
   {{if .Data.StatusButtons}}
   <div class="admin-card admin-card--pad">
-    <div class="admin-order-detail__label">Сменить статус</div>
+    <div class="admin-order-detail__label">{{t "admin.order.change_status"}}</div>
     <div class="admin-order-detail__statusbtns">
       {{range .Data.StatusButtons}}
       <form method="post" action="/admin/orders/{{$.Data.ID}}/status"{{if eq .Value "cancelled"}}
-            data-confirm="Заказ {{$.Data.Number}} будет отменён — это действие необратимо." data-confirm-title="Отменить заказ?"
-            data-confirm-label="Отменить заказ" data-confirm-danger="1"{{end}}>
+            data-confirm="{{tf "admin.order.cancel_confirm_text" $.Data.Number}}" data-confirm-title="{{t "admin.order.cancel_confirm_title"}}"
+            data-confirm-label="{{t "admin.order.cancel_confirm_label"}}" data-confirm-danger="1"{{end}}>
         <input type="hidden" name="status" value="{{.Value}}">
         <button type="submit" class="admin-status-btn {{.Class}}">{{.Label}}</button>
       </form>

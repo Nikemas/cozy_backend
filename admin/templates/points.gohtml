@@ -4,8 +4,8 @@
 {{define "content"}}
 <div class="admin-screen-narrow">
   <div class="admin-list-toolbar">
-    <div class="admin-list-note">Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются.</div>
-    <button type="button" class="admin-btn admin-btn--primary" onclick="openPointModal()">+ Добавить точку</button>
+    <div class="admin-list-note">{{t "admin.points.note"}}</div>
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openPointModal()">+ {{t "admin.points.add"}}</button>
   </div>
 
   {{/* .Data is admin.pointsPageData, but PageData.Data is an `any` that
@@ -18,7 +18,7 @@
 
   <div class="admin-row-list">
     {{if not .Rows}}
-      <div class="admin-row-list__empty">Пока нет точек продаж</div>
+      <div class="admin-row-list__empty">{{t "admin.points.empty"}}</div>
     {{end}}
     {{range .Rows}}
     <div class="admin-row">
@@ -32,17 +32,17 @@
       <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
               data-id="{{.ID}}" data-name="{{.Name}}" data-address="{{.Address}}"
-              onclick="openPointModal(this)" aria-label="Изменить точку «{{.Name}}»">Изменить</button>
+              onclick="openPointModal(this)" aria-label="{{tf "admin.points.edit_aria" .Name}}">{{t "admin.common.change"}}</button>
       <form method="post" action="/admin/points/{{.ID}}/toggle"{{if .IsActive}}
-            data-confirm="Точка «{{.Name}}» перестанет показываться покупателям, и на неё нельзя будет оформить самовывоз. История заказов и остатки сохранятся."
-            data-confirm-title="Деактивировать точку?" data-confirm-label="Деактивировать" data-confirm-danger="1"{{end}}>
+            data-confirm="{{tf "admin.points.deactivate_text" .Name}}"
+            data-confirm-title="{{t "admin.points.deactivate_title"}}" data-confirm-label="{{t "admin.common.deactivate"}}" data-confirm-danger="1"{{end}}>
         <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
       </form>
     </div>
     {{end}}
   </div>
   {{else}}
-  <div class="admin-row-list"><div class="admin-row-list__empty">Пока нет точек продаж</div></div>
+  <div class="admin-row-list"><div class="admin-row-list__empty">{{t "admin.points.empty"}}</div></div>
   {{end}}
 </div>
 
@@ -53,19 +53,19 @@
      Plain <form method="post">: a full page reload after submit. */}}
 <div id="admin-point-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-point-modal-title">
-    <div class="admin-modal__title" id="admin-point-modal-title">Новая точка продаж</div>
+    <div class="admin-modal__title" id="admin-point-modal-title">{{t "admin.points.new_title"}}</div>
     <form method="post" action="/admin/points" id="admin-point-form">
       <div class="admin-field">
-        <label for="point-name">Название</label>
+        <label for="point-name">{{t "admin.common.name"}}</label>
         <input id="point-name" name="name" placeholder="Дордой-Центр" required maxlength="200">
       </div>
       <div class="admin-field">
-        <label for="point-address">Адрес</label>
-        <input id="point-address" name="address" placeholder="ул. Дордой, 1" required maxlength="300">
+        <label for="point-address">{{t "admin.common.address"}}</label>
+        <input id="point-address" name="address" placeholder="{{t "admin.points.address_placeholder"}}" required maxlength="300">
       </div>
       <div class="admin-modal__actions">
-        <button type="button" class="admin-btn admin-btn--secondary" onclick="closePointModal()">Отмена</button>
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closePointModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
       </div>
     </form>
   </div>
@@ -78,12 +78,12 @@ function openPointModal(btn) {
   var address = document.getElementById('point-address');
   if (btn && btn.dataset && btn.dataset.id) {
     form.action = '/admin/points/' + encodeURIComponent(btn.dataset.id);
-    title.textContent = 'Редактировать точку';
+    title.textContent = {{t "admin.points.edit_title"}};
     name.value = btn.dataset.name || '';
     address.value = btn.dataset.address || '';
   } else {
     form.action = '/admin/points';
-    title.textContent = 'Новая точка продаж';
+    title.textContent = {{t "admin.points.new_title"}};
     name.value = '';
     address.value = '';
   }

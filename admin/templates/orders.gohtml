@@ -7,24 +7,24 @@
      renders once the server already has the rows (Task 3 brief: "skip —
      no fake delay needed server-side"). */}}
 {{define "content"}}
-<h1>Заказы</h1>
+<h1>{{t "admin.nav.orders"}}</h1>
 
 <form method="get" action="/admin/orders" class="admin-filterbar" role="search" id="orders-filter">
   {{if .Data.Status}}<input type="hidden" name="status" value="{{.Data.Status}}">{{end}}
   <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
-    <label for="orders-q">Поиск</label>
-    <input type="search" id="orders-q" name="q" value="{{.Data.Query}}" placeholder="№ заказа или телефон" maxlength="100">
+    <label for="orders-q">{{t "admin.common.search"}}</label>
+    <input type="search" id="orders-q" name="q" value="{{.Data.Query}}" placeholder="{{t "admin.orders.search_placeholder"}}" maxlength="100">
   </div>
   {{if .Data.CanChoosePoint}}
   <div class="admin-field admin-filterbar__field">
-    <label for="orders-point">Точка продаж</label>
+    <label for="orders-point">{{t "admin.common.point_of_sale"}}</label>
     <select id="orders-point" name="point" onchange="this.form.submit()">
       {{range .Data.Points}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
     </select>
   </div>
   {{end}}
   <div class="admin-field admin-filterbar__field">
-    <label for="orders-range">Период</label>
+    <label for="orders-range">{{t "admin.common.period"}}</label>
     <select id="orders-range" name="range" onchange="ordersRangeChanged(this)">
       {{range .Data.RangeOptions}}
       <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
@@ -33,16 +33,16 @@
   </div>
   <div class="admin-filterbar__dates" id="orders-dates"{{if ne .Data.Range "custom"}} hidden{{end}}>
     <div class="admin-field admin-filterbar__field">
-      <label for="orders-from">С</label>
+      <label for="orders-from">{{t "admin.common.from"}}</label>
       <input type="date" id="orders-from" name="from" value="{{.Data.From}}">
     </div>
     <div class="admin-field admin-filterbar__field">
-      <label for="orders-to">По</label>
+      <label for="orders-to">{{t "admin.common.to"}}</label>
       <input type="date" id="orders-to" name="to" value="{{.Data.To}}">
     </div>
   </div>
-  <button type="submit" class="admin-btn admin-btn--secondary">Найти</button>
-  {{if .Data.Filtered}}<a href="{{.Data.ResetURL}}" class="admin-btn admin-btn--secondary">Сбросить</a>{{end}}
+  <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.common.find"}}</button>
+  {{if .Data.Filtered}}<a href="{{.Data.ResetURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.reset"}}</a>{{end}}
 </form>
 <script>
 function ordersRangeChanged(sel) {
@@ -57,7 +57,7 @@ function ordersRangeChanged(sel) {
 {{range .Data.Notes}}<div class="admin-form-error" role="status">{{.}}</div>{{end}}
 
 <div class="admin-orders-filters">
-  <div class="admin-orders-chips" role="group" aria-label="Статус заказа">
+  <div class="admin-orders-chips" role="group" aria-label="{{t "admin.orders.status_filter"}}">
     {{range .Data.StatusChips}}
     <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
     {{end}}
@@ -70,21 +70,21 @@ function ordersRangeChanged(sel) {
     <div class="admin-empty__icon">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12"></path></svg>
     </div>
-    <div class="admin-empty__title">{{if .Data.Filtered}}Ничего не найдено{{else}}Пока нет заказов{{end}}</div>
-    <div class="admin-empty__text">{{if .Data.Filtered}}Попробуйте изменить поиск или фильтры{{else}}Новые заказы появятся здесь{{end}}</div>
+    <div class="admin-empty__title">{{if .Data.Filtered}}{{t "admin.orders.empty_filtered_title"}}{{else}}{{t "admin.orders.empty_title"}}{{end}}</div>
+    <div class="admin-empty__text">{{if .Data.Filtered}}{{t "admin.orders.empty_filtered_text"}}{{else}}{{t "admin.orders.empty_text"}}{{end}}</div>
   </div>
   {{else}}
   <div class="admin-orders-table">
     <table>
       <thead>
         <tr>
-          <th>№ заказа</th>
-          <th>Дата</th>
-          <th>Покупатель</th>
-          <th>Товаров</th>
-          <th style="text-align:right">Сумма</th>
-          <th>Оплата</th>
-          <th>Статус</th>
+          <th>{{t "admin.orders.col_number"}}</th>
+          <th>{{t "admin.orders.col_date"}}</th>
+          <th>{{t "admin.orders.col_customer"}}</th>
+          <th>{{t "admin.orders.col_items"}}</th>
+          <th style="text-align:right">{{t "admin.orders.col_total"}}</th>
+          <th>{{t "admin.orders.col_payment"}}</th>
+          <th>{{t "admin.common.status"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -125,8 +125,8 @@ function ordersRangeChanged(sel) {
     <div class="admin-orders-count">{{.Data.CountLabel}}</div>
     {{if or .Data.HasPrev .Data.HasNext}}
     <div class="admin-orders-pager">
-      {{if .Data.HasPrev}}<a href="{{.Data.PrevURL}}" class="admin-btn admin-btn--secondary">Назад</a>{{end}}
-      {{if .Data.HasNext}}<a href="{{.Data.NextURL}}" class="admin-btn admin-btn--secondary">Дальше</a>{{end}}
+      {{if .Data.HasPrev}}<a href="{{.Data.PrevURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.prev"}}</a>{{end}}
+      {{if .Data.HasNext}}<a href="{{.Data.NextURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.next"}}</a>{{end}}
     </div>
     {{end}}
   </div>

@@ -7,24 +7,24 @@
 {{define "content"}}
 <div class="admin-reports">
   <form method="get" class="admin-reports__toolbar">
-    <label for="report-period" class="admin-visually-hidden">Период</label>
+    <label for="report-period" class="admin-visually-hidden">{{t "admin.common.period"}}</label>
     <select id="report-period" name="period" class="admin-reports__period" onchange="reportsPeriodChanged(this)">
       {{range .Data.Periods}}
       <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
       {{end}}
     </select>
     <span class="admin-reports__custom" id="report-custom"{{if not .Data.Custom}} hidden{{end}}>
-      <label for="report-from">с</label>
+      <label for="report-from">{{t "admin.reports.from"}}</label>
       <input type="date" id="report-from" name="from" value="{{.Data.From}}">
-      <label for="report-to">по</label>
+      <label for="report-to">{{t "admin.reports.to"}}</label>
       <input type="date" id="report-to" name="to" value="{{.Data.To}}">
-      <button type="submit" class="admin-btn admin-btn--secondary">Показать</button>
+      <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.reports.show"}}</button>
     </span>
     <div class="admin-reports__spacer"></div>
-    <a class="admin-btn admin-btn--secondary" href="{{.Data.ExportURL}}">Экспорт в Excel</a>
+    <a class="admin-btn admin-btn--secondary" href="{{.Data.ExportURL}}">{{t "admin.reports.export"}}</a>
   </form>
   {{if .Data.Err}}<div class="admin-form-error" role="alert">{{.Data.Err}}</div>{{end}}
-  <div class="admin-reports__note">Дни — по времени Бишкека. В выручку не входят отменённые заказы и онлайн-заказы без подтверждённой оплаты.</div>
+  <div class="admin-reports__note">{{t "admin.reports.note"}}</div>
   <script>
   function reportsPeriodChanged(sel) {
     var custom = document.getElementById('report-custom');
@@ -46,7 +46,7 @@
   </div>
 
   <div class="admin-reports__card">
-    <div class="admin-reports__chart-title">Продажи по дням</div>
+    <div class="admin-reports__chart-title">{{t "admin.reports.sales_by_day"}}</div>
     <div class="admin-reports__chart-note">{{.Data.ChartNote}}</div>
     <div class="admin-bars">
       {{range .Data.Bars}}
@@ -60,7 +60,7 @@
 
   <div class="admin-reports__lists">
     <div class="admin-reports__card admin-ranked-list">
-      <div class="admin-ranked-list__title">Топ товаров</div>
+      <div class="admin-ranked-list__title">{{t "admin.reports.top_products"}}</div>
       {{if .Data.TopProducts}}
         {{range .Data.TopProducts}}
         <div class="admin-ranked-list__row">
@@ -70,12 +70,12 @@
         </div>
         {{end}}
       {{else}}
-      <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_sales"}}</div>
       {{end}}
     </div>
 
     <div class="admin-reports__card admin-ranked-list">
-      <div class="admin-ranked-list__title">По брендам</div>
+      <div class="admin-ranked-list__title">{{t "admin.reports.by_brand"}}</div>
       {{if .Data.TopBrands}}
         {{range .Data.TopBrands}}
         <div class="admin-ranked-list__row">
@@ -85,17 +85,17 @@
         </div>
         {{end}}
       {{else}}
-      <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_sales"}}</div>
       {{end}}
     </div>
   </div>
 
   <div class="admin-reports__card admin-ranked-list">
-    <div class="admin-ranked-list__title">По категориям</div>
+    <div class="admin-ranked-list__title">{{t "admin.reports.by_category"}}</div>
     {{if .Data.Categories}}
     <table class="admin-table admin-category-report">
       <thead>
-        <tr><th scope="col">Категория</th><th scope="col">Доля</th><th scope="col">Заказов</th><th scope="col">Продано</th><th scope="col" class="admin-table__num-col">Выручка</th></tr>
+        <tr><th scope="col">{{t "admin.common.category"}}</th><th scope="col">{{t "admin.reports.col_share"}}</th><th scope="col">{{t "admin.reports.col_orders"}}</th><th scope="col">{{t "admin.reports.col_sold"}}</th><th scope="col" class="admin-table__num-col">{{t "admin.reports.revenue"}}</th></tr>
       </thead>
       <tbody>
         {{range .Data.Categories}}
@@ -110,7 +110,7 @@
       </tbody>
     </table>
     {{else}}
-    <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+    <div class="admin-ranked-list__empty">{{t "admin.reports.no_sales"}}</div>
     {{end}}
   </div>
 </div>

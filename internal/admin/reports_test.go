@@ -139,7 +139,7 @@ func TestBuildStatCards(t *testing.T) {
 		{Key: "2026-09-01", OrderCount: 2, ItemCount: 3, Revenue: 300},
 		{Key: "2026-09-02", OrderCount: 1, ItemCount: 1, Revenue: 100},
 	}
-	stats := buildStatCards(rows)
+	stats := buildStatCards(ruTr, rows)
 	if len(stats) != 4 {
 		t.Fatalf("expected 4 stat cards, got %d", len(stats))
 	}
@@ -158,7 +158,7 @@ func TestBuildStatCards(t *testing.T) {
 }
 
 func TestBuildStatCardsEmptyRangeNoDivideByZero(t *testing.T) {
-	stats := buildStatCards(nil)
+	stats := buildStatCards(ruTr, nil)
 	if stats[2].Value != "0 сом" {
 		t.Errorf("avg order on empty range = %q, want %q", stats[2].Value, "0 сом")
 	}
@@ -207,7 +207,7 @@ func TestBuildTopProductsRanksByQuantityDescending(t *testing.T) {
 		{Key: "Кроссовки", ItemCount: 20},
 		{Key: "Сандалии", ItemCount: 10},
 	}
-	top := buildTopProducts(rows)
+	top := buildTopProducts(ruTr, rows)
 	if len(top) != 3 {
 		t.Fatalf("expected 3 rows, got %d", len(top))
 	}
@@ -227,7 +227,7 @@ func TestBuildTopProductsCapsAtLimit(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		rows = append(rows, reports.Row{Key: string(rune('a' + i)), ItemCount: i})
 	}
-	top := buildTopProducts(rows)
+	top := buildTopProducts(ruTr, rows)
 	if len(top) != reportsTopLimit {
 		t.Fatalf("expected %d rows, got %d", reportsTopLimit, len(top))
 	}

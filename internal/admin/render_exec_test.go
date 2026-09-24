@@ -111,8 +111,8 @@ func TestRenderShellScreensExecute(t *testing.T) {
 				// not just render an empty stub.
 				if sc.screen == "reports" {
 					data.Data = ReportsData{
-						Periods: reportPeriodOptions(defaultReportPeriod()),
-						Stats:   buildStatCards(nil),
+						Periods: reportPeriodOptions(ruTr, defaultReportPeriod()),
+						Stats:   buildStatCards(ruTr, nil),
 						Bars:    buildBars(nil, time.Now().UTC(), time.Now().UTC()),
 					}
 				}

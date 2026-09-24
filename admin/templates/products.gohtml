@@ -15,15 +15,15 @@
     </div>
     {{if .CanEdit}}
     <div class="admin-products__actions">
-      <a href="{{.ImportURL}}" class="admin-btn admin-btn--secondary">Импорт</a>
-      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary">+ Добавить товар</a>
+      <a href="{{.ImportURL}}" class="admin-btn admin-btn--secondary">{{t "admin.products.import"}}</a>
+      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary">+ {{t "admin.products.add"}}</a>
     </div>
     {{end}}
   </div>
 
   {{if .ShowSubs}}
   <div class="admin-chipbar admin-chipbar--sub">
-    <span class="admin-chipbar__label">Подкатегория</span>
+    <span class="admin-chipbar__label">{{t "admin.products.subcategory"}}</span>
     {{range .SubChips}}
     <a href="{{.URL}}" class="admin-chip-filter admin-chip-filter--sm{{if .Active}} active{{end}}">{{.Label}}</a>
     {{end}}
@@ -36,10 +36,10 @@
       <div class="admin-empty__icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
       </div>
-      <div class="admin-empty__title">Ничего не нашлось</div>
-      <div class="admin-empty__text">Попробуйте другое название или категорию</div>
+      <div class="admin-empty__title">{{t "admin.common.nothing_found"}}</div>
+      <div class="admin-empty__text">{{t "admin.products.empty_text"}}</div>
       {{if .CanEdit}}
-      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary" style="margin-top:8px">+ Добавить товар</a>
+      <a href="{{.NewURL}}" class="admin-btn admin-btn--primary" style="margin-top:8px">+ {{t "admin.products.add"}}</a>
       {{end}}
     </div>
     {{else}}
@@ -48,13 +48,13 @@
       <table class="admin-table">
         <thead>
           <tr>
-            <th class="admin-table__photo-col">Фото</th>
-            <th>Название</th>
-            <th>Категория</th>
-            <th class="admin-table__num-col">Цена</th>
-            <th>Вариаций</th>
-            <th>Остаток</th>
-            <th>Статус</th>
+            <th class="admin-table__photo-col">{{t "admin.products.col_photo"}}</th>
+            <th>{{t "admin.common.name"}}</th>
+            <th>{{t "admin.common.category"}}</th>
+            <th class="admin-table__num-col">{{t "admin.products.col_price"}}</th>
+            <th>{{t "admin.products.col_variants"}}</th>
+            <th>{{t "admin.common.stock"}}</th>
+            <th>{{t "admin.common.status"}}</th>
             <th class="admin-table__menu-col"></th>
           </tr>
         </thead>
@@ -80,15 +80,15 @@
             <td class="admin-table__menu-col">
               {{if $.Data.CanEdit}}
               <div class="admin-rowmenu">
-                <button type="button" class="admin-rowmenu__trigger" onclick="toggleRowMenu(event, this)" aria-label="Действия">⋯</button>
+                <button type="button" class="admin-rowmenu__trigger" onclick="toggleRowMenu(event, this)" aria-label="{{t "admin.common.actions"}}">⋯</button>
                 <div class="admin-rowmenu__panel">
-                  <a href="{{.EditURL}}" class="admin-rowmenu__item">Редактировать</a>
+                  <a href="{{.EditURL}}" class="admin-rowmenu__item">{{t "admin.common.edit"}}</a>
                   <form method="post" action="{{.ToggleActiveURL}}" class="admin-rowmenu__form">
                     <button type="submit" class="admin-rowmenu__item">{{.DeactivateLabel}}</button>
                   </form>
                   {{if $.Data.CanDelete}}
                   <button type="button" class="admin-rowmenu__item admin-rowmenu__item--danger"
-                    onclick="closeAllRowMenus(); openConfirmModal('Удалить товар?', '«{{.Name}}» будет удалён и перестанет отображаться в каталоге.', '{{.DeleteURL}}')">Удалить</button>
+                    onclick="closeAllRowMenus(); openConfirmModal({{t "admin.products.delete_title"}}, {{tf "admin.products.delete_text" .Name}}, '{{.DeleteURL}}')">{{t "admin.common.delete"}}</button>
                   {{end}}
                 </div>
               </div>
@@ -126,7 +126,7 @@
       <div class="admin-table__muted">{{.CountLabel}}</div>
       <form method="get" action="/admin/products" class="admin-pagesize">
         {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
-        <span class="admin-table__muted">Строк на странице</span>
+        <span class="admin-table__muted">{{t "admin.products.page_size"}}</span>
         <select name="page_size" onchange="this.form.submit()" class="admin-pagesize__select">
           <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
           <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>

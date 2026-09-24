@@ -63,17 +63,17 @@ func stockOrigFieldName(key, pointID string) string {
 func parseStockQty(s string) (int, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, fmt.Errorf("пустое количество")
+		return 0, localizedError{"admin.qty.err_empty"}
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil {
-		return 0, fmt.Errorf("количество должно быть целым числом")
+		return 0, localizedError{"admin.qty.err_not_int"}
 	}
 	if n < 0 {
-		return 0, fmt.Errorf("количество не может быть отрицательным")
+		return 0, localizedError{"admin.qty.err_negative"}
 	}
 	if n > maxStockQty {
-		return 0, fmt.Errorf("слишком большое количество")
+		return 0, localizedError{"admin.qty.err_too_big"}
 	}
 	return n, nil
 }
@@ -84,23 +84,23 @@ func parsePrice(s string) (float64, error) {
 	s = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), " ", ""))
 	s = strings.ReplaceAll(s, ",", ".")
 	if s == "" {
-		return 0, fmt.Errorf("укажите цену")
+		return 0, localizedError{"admin.price.err_empty"}
 	}
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return 0, fmt.Errorf("цена должна быть числом")
+		return 0, localizedError{"admin.price.err_not_number"}
 	}
 	if v < 0 {
-		return 0, fmt.Errorf("цена не может быть отрицательной")
+		return 0, localizedError{"admin.price.err_negative"}
 	}
 	return v, nil
 }
 
 // errStaleForm marks a hidden orig_ value that isn't a valid quantity —
 // only possible with a tampered or corrupted form.
-var errStaleForm = errors.New("форма повреждена — обновите страницу")
+var errStaleForm error = localizedError{"admin.product.err_stale_form"}
 
-const staleFormMessage = "Форма повреждена — обновите страницу"
+const staleFormMessage = "admin.product.err_stale_form_banner" // locale key
 
 // parsedCell is one stock cell as submitted.
 type parsedCell struct {
@@ -153,7 +153,7 @@ type parsedProductForm struct {
 
 // parseProductForm reads the whole form. points are the matrix columns
 // the form was rendered with (every point of sale).
-func parseProductForm(form url.Values, productID string, isActive bool, points []StockPointVM) parsedProductForm {
+func parseProductForm(t tr, form url.Values, productID string, isActive bool, points []StockPointVM) parsedProductForm {
 	var out parsedProductForm
 	addErr := func(msg string) {
 		for _, e := range out.Errs {
@@ -166,7 +166,7 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 
 	price, err := parsePrice(form.Get("base_price"))
 	if err != nil {
-		addErr("Цена: " + err.Error())
+		addErr(t.T("admin.product.price_label") + ": " + errText(t, err))
 	}
 	out.Input = productSaveInput{
 		ProductID: productID,
@@ -195,7 +195,7 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 			key = fmt.Sprintf("row%d", i)
 		}
 		if seenKeys[key] {
-			addErr("Форма повреждена (повтор строки вариации) — обновите страницу")
+			addErr(t.T("admin.product.err_duplicate_row"))
 			continue
 		}
 		seenKeys[key] = true
@@ -205,7 +205,7 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 			continue // an empty row the staff member added and never filled in
 		}
 		if size == "" || color == "" {
-			addErr("У каждой вариации должны быть размер и цвет")
+			addErr(t.T("admin.product.err_size_color"))
 		}
 
 		row := VariantRowVM{Key: key, ID: id, Size: size, Color: color}
@@ -226,9 +226,9 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 			pc, err := parseStockCell(raw, present, origRaw, hasOrig)
 			if err != nil {
 				if errors.Is(err, errStaleForm) {
-					addErr(staleFormMessage)
+					addErr(t.T(staleFormMessage))
 				} else {
-					addErr(fmt.Sprintf("Остаток %s / %s, «%s»: %s", orEmpty(size), orEmpty(color), p.Name, err.Error()))
+					addErr(t.F("admin.product.err_stock_cell", orEmpty(size), orEmpty(color), p.Name, errText(t, err)))
 				}
 				cell.Invalid = true
 				row.Cells = append(row.Cells, cell)
@@ -241,7 +241,7 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 			}
 		}
 		row.Qty = total
-		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(total)
+		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(t, total)
 
 		out.Rows = append(out.Rows, row)
 		out.Input.Variants = append(out.Input.Variants, variantRowInput{Key: key, ID: id, Size: size, Color: color})
@@ -289,7 +289,7 @@ func rowHasStock(form url.Values, key string, points []StockPointVM) bool {
 // submitted) to the current stored quantity — both the visible value and
 // the hidden original — so re-submitting the form after reviewing them
 // saves against the fresh values instead of conflicting forever.
-func markStockConflicts(rows []VariantRowVM, conflicts []stockConflict) {
+func markStockConflicts(t tr, rows []VariantRowVM, conflicts []stockConflict) {
 	type cellKey struct{ row, point string }
 	byCell := make(map[cellKey]stockConflict, len(conflicts))
 	for _, c := range conflicts {
@@ -313,13 +313,13 @@ func markStockConflicts(rows []VariantRowVM, conflicts []stockConflict) {
 			}
 		}
 		rows[i].Qty = total
-		rows[i].BadgeLbl, rows[i].BadgeFG, rows[i].BadgeBG = stockChip(total)
+		rows[i].BadgeLbl, rows[i].BadgeFG, rows[i].BadgeBG = stockChip(t, total)
 	}
 }
 
 // buildVariantRows is the edit page's initial Вариации matrix: one row per
 // variant, one cell per point, each cell's value = its stored quantity.
-func buildVariantRows(variants []catalog.Variant, entries []catalog.StockEntry, points []StockPointVM) []VariantRowVM {
+func buildVariantRows(t tr, variants []catalog.Variant, entries []catalog.StockEntry, points []StockPointVM) []VariantRowVM {
 	type cellKey struct{ variant, point string }
 	stored := make(map[cellKey]int, len(entries))
 	for _, e := range entries {
@@ -345,7 +345,7 @@ func buildVariantRows(variants []catalog.Variant, entries []catalog.StockEntry, 
 			}
 			row.Cells = append(row.Cells, cell)
 		}
-		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(row.Qty)
+		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(t, row.Qty)
 		rows = append(rows, row)
 	}
 	return rows

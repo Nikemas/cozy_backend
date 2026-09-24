@@ -11,9 +11,9 @@
   </div>
   <nav class="admin-nav">
     {{range .NavItems}}
-    <a href="{{.URL}}" title="{{.Label}}" class="admin-nav__item{{if .Active}} active{{end}}">
+    <a href="{{.URL}}" title="{{t .Label}}" class="admin-nav__item{{if .Active}} active{{end}}">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{.IconPath}}"></path></svg>
-      <span class="admin-nav__label">{{.Label}}</span>
+      <span class="admin-nav__label">{{t .Label}}</span>
     </a>
     {{end}}
   </nav>
@@ -23,11 +23,11 @@
       <div class="admin-sidebar__initials">{{.Initials}}</div>
       <div class="admin-sidebar__userinfo">
         <div class="admin-sidebar__username">{{.Staff.Name}}</div>
-        <div class="admin-sidebar__userrole">{{.RoleLabel}}</div>
+        <div class="admin-sidebar__userrole">{{t .RoleLabel}}</div>
       </div>
     </div>
     <form method="post" action="/admin/logout" class="admin-sidebar__logoutform">
-      <button type="submit" class="admin-sidebar__logout">Выйти</button>
+      <button type="submit" class="admin-sidebar__logout">{{t "admin.common.logout"}}</button>
     </form>
   </div>
 </aside>

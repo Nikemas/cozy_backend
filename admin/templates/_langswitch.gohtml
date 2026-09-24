@@ -1,0 +1,12 @@
+{{/* _langswitch is the RU/KY admin language switcher (header + login
+     page). POST /admin/lang stores the choice in the admin_lang cookie
+     and returns to "next" (filled with the current URL on submit) — see
+     internal/admin/lang.go. {{lang}} is the language being rendered. */}}
+{{define "_langswitch"}}
+<form method="post" action="/admin/lang" class="admin-langswitch" role="group" aria-label="{{t "admin.lang.label"}}"
+      onsubmit="this.elements.next.value = location.pathname + location.search">
+  <input type="hidden" name="next" value="">
+  <button type="submit" name="lang" value="ru" lang="ru" title="{{t "admin.lang.ru_title"}}" class="admin-langswitch__btn{{if eq lang "ru"}} active{{end}}"{{if eq lang "ru"}} aria-current="true"{{end}}>RU</button>
+  <button type="submit" name="lang" value="ky" lang="ky" title="{{t "admin.lang.ky_title"}}" class="admin-langswitch__btn{{if eq lang "ky"}} active{{end}}"{{if eq lang "ky"}} aria-current="true"{{end}}>KY</button>
+</form>
+{{end}}

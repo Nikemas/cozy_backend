@@ -17,7 +17,7 @@ func TestOrderStatusMetaForCoversEveryKnownStatus(t *testing.T) {
 	}
 	seen := map[string]bool{}
 	for _, s := range cases {
-		m := orderStatusMetaFor(s)
+		m := orderStatusMetaFor(ruTr, s)
 		if m.Label == "" || m.Class == "" {
 			t.Errorf("orderStatusMetaFor(%q) = %+v, want non-empty Label/Class", s, m)
 		}
@@ -29,14 +29,14 @@ func TestOrderStatusMetaForCoversEveryKnownStatus(t *testing.T) {
 }
 
 func TestOrderStatusMetaForFallsBackOnUnknownStatus(t *testing.T) {
-	m := orderStatusMetaFor(orders.OrderStatus("some_future_status"))
+	m := orderStatusMetaFor(ruTr, orders.OrderStatus("some_future_status"))
 	if m.Label == "" || m.Class == "" {
 		t.Fatalf("orderStatusMetaFor(unknown) = %+v, want a non-empty fallback", m)
 	}
 }
 
 func TestPaymentLabel(t *testing.T) {
-	if got := paymentLabel(orders.PaymentCashOnDelivery, nil); got != "При получении" {
+	if got := paymentLabel(ruTr, orders.PaymentCashOnDelivery, nil); got != "При получении" {
 		t.Errorf("paymentLabel(cash_on_delivery) = %q", got)
 	}
 	cases := map[orders.PaymentStatus]string{
@@ -48,7 +48,7 @@ func TestPaymentLabel(t *testing.T) {
 	}
 	for st, want := range cases {
 		st := st
-		if got := paymentLabel(orders.PaymentOnlineCard, &st); got != want {
+		if got := paymentLabel(ruTr, orders.PaymentOnlineCard, &st); got != want {
 			t.Errorf("paymentLabel(online_card, %s) = %q, want %q", st, got, want)
 		}
 	}
@@ -118,7 +118,7 @@ func TestNextStatusOptionsMatchesOrderStateMachine(t *testing.T) {
 }
 
 func TestBuildStatusButtonsOwnerSeesCancel(t *testing.T) {
-	buttons := buildStatusButtons(orders.StatusPlaced, staff.RoleOwner)
+	buttons := buildStatusButtons(ruTr, orders.StatusPlaced, staff.RoleOwner)
 	if len(buttons) != 2 {
 		t.Fatalf("owner: got %d buttons, want 2: %+v", len(buttons), buttons)
 	}
@@ -141,7 +141,7 @@ func TestBuildStatusButtonsOwnerSeesCancel(t *testing.T) {
 // rationale and the accepted backend gap.
 func TestBuildStatusButtonsManagerNeverSeesCancel(t *testing.T) {
 	for _, from := range []orders.OrderStatus{orders.StatusPlaced, orders.StatusConfirmed, orders.StatusCourierAssigned} {
-		buttons := buildStatusButtons(from, staff.RoleManager)
+		buttons := buildStatusButtons(ruTr, from, staff.RoleManager)
 		for _, b := range buttons {
 			if b.Value == string(orders.StatusCancelled) {
 				t.Errorf("manager, from %q: got a cancel button among %+v, want none", from, buttons)
@@ -163,7 +163,7 @@ func TestBuildStatusButtonsManagerNeverSeesCancel(t *testing.T) {
 func TestBuildStatusButtonsTerminalStatusHasNone(t *testing.T) {
 	for _, from := range []orders.OrderStatus{orders.StatusDelivered, orders.StatusCancelled} {
 		for _, role := range []staff.Role{staff.RoleOwner, staff.RoleManager} {
-			if got := buildStatusButtons(from, role); len(got) != 0 {
+			if got := buildStatusButtons(ruTr, from, role); len(got) != 0 {
 				t.Errorf("buildStatusButtons(%q, %q) = %+v, want none (terminal status)", from, role, got)
 			}
 		}
@@ -249,7 +249,7 @@ func TestRenderOrderDetailExecutes(t *testing.T) {
 			{Name: "Nike Air Max 90", Variant: "Размер 42, чёрный", Qty: 1, PriceLabel: "6 500 сом"},
 		},
 		TotalLabel:    "6 500 сом",
-		StatusButtons: buildStatusButtons(orders.StatusPlaced, manager.Role),
+		StatusButtons: buildStatusButtons(ruTr, orders.StatusPlaced, manager.Role),
 	}
 
 	pageData := PageData{

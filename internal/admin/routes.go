@@ -61,6 +61,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/login", h.loginPage)
 	mux.HandleFunc("POST /admin/login", h.loginSubmit)
 	mux.HandleFunc("POST /admin/logout", h.logoutSubmit)
+	// RU/KY switcher (header + login page) — see lang.go.
+	mux.HandleFunc("POST /admin/lang", h.setLang)
 
 	// /admin/no-access only requires being logged in as SOME staff member
 	// — it's the landing page for a role that isn't allowed on any of the

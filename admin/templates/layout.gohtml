@@ -1,10 +1,10 @@
 {{define "layout"}}
 <!doctype html>
-<html lang="ru">
+<html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cozy Admin — {{.PageTitle}}</title>
+  <title>Cozy Admin — {{t .PageTitle}}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -52,7 +52,7 @@ function openConfirmModal(title, text, confirmURL, opts) {
   document.getElementById('admin-confirm-title').textContent = title;
   document.getElementById('admin-confirm-text').textContent = text;
   var btn = document.getElementById('admin-confirm-action');
-  btn.textContent = opts.confirmLabel || 'Подтвердить';
+  btn.textContent = opts.confirmLabel || {{t "admin.common.confirm"}};
   btn.className = 'admin-btn ' + (opts.danger ? 'admin-btn--danger' : 'admin-btn--dark');
   btn.onclick = null;
   if (confirmURL) {
@@ -80,7 +80,7 @@ document.addEventListener('submit', function (evt) {
   var form = evt.target;
   if (!form.matches || !form.matches('form[data-confirm]')) return;
   evt.preventDefault();
-  openConfirmModal(form.getAttribute('data-confirm-title') || 'Подтвердите действие',
+  openConfirmModal(form.getAttribute('data-confirm-title') || {{t "admin.common.confirm_title"}},
     form.getAttribute('data-confirm'), null, {
       confirmLabel: form.getAttribute('data-confirm-label'),
       danger: form.hasAttribute('data-confirm-danger'),

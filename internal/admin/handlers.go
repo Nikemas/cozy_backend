@@ -58,7 +58,7 @@ func (h *handlers) loginPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderLogin(w, PageData{Phone: r.URL.Query().Get("phone")})
+	h.renderLogin(w, r, PageData{Phone: r.URL.Query().Get("phone")})
 }
 
 // loginSubmit handles POST /admin/login: calls the existing
@@ -69,7 +69,7 @@ func (h *handlers) loginPage(w http.ResponseWriter, r *http.Request) {
 // Err set and Phone kept sticky, mirroring the design canvas's err state.
 func (h *handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderLogin(w, PageData{Err: "не удалось прочитать форму"})
+		h.renderLogin(w, r, PageData{Err: h.tr(r).T("admin.err.form")})
 		return
 	}
 	phone := r.FormValue("phone")
@@ -85,7 +85,7 @@ func (h *handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		if !errors.As(err, &appErr) {
 			slog.ErrorContext(r.Context(), "admin: staff login failed", "err", err)
 		}
-		h.renderLogin(w, PageData{Phone: phone, Err: appErrMessage(err)})
+		h.renderLogin(w, r, PageData{Phone: phone, Err: appErrMessage(h.tr(r), err)})
 		return
 	}
 
@@ -118,14 +118,16 @@ func (h *handlers) staffForToken(r *http.Request, token string) (*staff.Staff, e
 	return h.staffSvc.StaffFromRequest(cloned)
 }
 
-// renderLogin fills in Screen/PageTitle/ShowSidebar for the login screen
-// so every call site only has to set Phone/Err.
-func (h *handlers) renderLogin(w http.ResponseWriter, data PageData) {
+// renderLogin fills in Lang/Screen/PageTitle/ShowSidebar for the login
+// screen so every call site only has to set Phone/Err. The login page is
+// outside the auth-gate, so its language comes from r directly.
+func (h *handlers) renderLogin(w http.ResponseWriter, r *http.Request, data PageData) {
+	data.Lang = langFromRequest(r)
 	data.Screen = "login"
-	data.PageTitle = "Вход"
+	data.PageTitle = "admin.login.title"
 	data.ShowSidebar = false
 	if err := h.render.Render(w, "login", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -148,12 +150,12 @@ func (h *handlers) noAccessPage(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 	data := PageData{
 		Screen:      "no_access",
-		PageTitle:   "Нет доступа",
+		PageTitle:   "admin.no_access.title",
 		ShowSidebar: false,
 		Staff:       st,
 	}
 	if err := h.render.Render(w, "no_access", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -161,6 +163,9 @@ func (h *handlers) noAccessPage(w http.ResponseWriter, r *http.Request) {
 // inside the full app shell (sidebar + header) — nav items, initials, and
 // role label all derive from st, which the auth-gate has already
 // guaranteed is non-nil by the time a stub/real page handler runs.
+//
+// title may be a locale key ("admin.nav.orders") or ready text — the
+// templates print it through {{t}} either way.
 func (h *handlers) shellPageData(screen, title string, st *staff.Staff) PageData {
 	return PageData{
 		Screen:      screen,

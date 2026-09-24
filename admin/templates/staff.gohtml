@@ -11,7 +11,7 @@
 {{$pdata := .Data}}
 <div class="admin-screen-narrow">
   <div class="admin-list-toolbar admin-list-toolbar--end">
-    <button type="button" class="admin-btn admin-btn--primary" onclick="openStaffModal()">+ Добавить сотрудника</button>
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openStaffModal()">+ {{t "admin.staff.add"}}</button>
   </div>
 
   {{with $pdata}}
@@ -20,7 +20,7 @@
 
   <div class="admin-row-list">
     {{if not .Rows}}
-      <div class="admin-row-list__empty">Пока нет сотрудников</div>
+      <div class="admin-row-list__empty">{{t "admin.staff.empty"}}</div>
     {{end}}
     {{range .Rows}}
     <div class="admin-row">
@@ -33,16 +33,16 @@
       <div class="admin-row__scope">{{.Scope}}</div>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
               data-staff-id="{{.ID}}" data-staff-name="{{.Name}}"
-              onclick="openStaffPasswordModal(this)">Сменить пароль</button>
+              onclick="openStaffPasswordModal(this)">{{t "admin.staff.change_password"}}</button>
       <form method="post" action="/admin/staff/{{.ID}}/toggle"
-            {{if .IsActive}}data-confirm="Деактивировать сотрудника «{{.Name}}»? Он сразу потеряет доступ к админке." onsubmit="return confirmStaffAction(this)"{{end}}>
+            {{if .IsActive}}data-confirm="{{tf "admin.staff.deactivate_confirm" .Name}}" onsubmit="return confirmStaffAction(this)"{{end}}>
         <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
       </form>
     </div>
     {{end}}
   </div>
   {{else}}
-  <div class="admin-row-list"><div class="admin-row-list__empty">Пока нет сотрудников</div></div>
+  <div class="admin-row-list"><div class="admin-row-list__empty">{{t "admin.staff.empty"}}</div></div>
   {{end}}
 </div>
 
@@ -58,41 +58,41 @@
      field since it only ever models owner/manager staff. */}}
 <div id="admin-staff-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--lg">
-    <div class="admin-modal__title">Новый сотрудник</div>
+    <div class="admin-modal__title">{{t "admin.staff.new_title"}}</div>
     <form method="post" action="/admin/staff">
       <div class="admin-field">
-        <label for="staff-name">Имя</label>
+        <label for="staff-name">{{t "admin.staff.name"}}</label>
         <input id="staff-name" name="name" placeholder="Айгерим Б." required>
       </div>
       <div class="admin-field-row">
         <div class="admin-field">
-          <label for="staff-phone">Телефон</label>
+          <label for="staff-phone">{{t "admin.staff.phone"}}</label>
           <input id="staff-phone" name="phone" placeholder="+996 555 123 456" required>
         </div>
         <div class="admin-field">
-          <label for="staff-role">Роль</label>
+          <label for="staff-role">{{t "admin.staff.role"}}</label>
           <select id="staff-role" name="role" onchange="toggleStaffPointField()">
-            <option value="manager">Менеджер</option>
-            <option value="point_staff">Кладовщик</option>
+            <option value="manager">{{t "admin.role.manager"}}</option>
+            <option value="point_staff">{{t "admin.role.point_staff"}}</option>
           </select>
         </div>
       </div>
       <div class="admin-field" id="staff-point-field" style="display:none">
-        <label for="staff-point">Точка</label>
+        <label for="staff-point">{{t "admin.common.point_of_sale"}}</label>
         <select id="staff-point" name="point_id">
           {{if $pdata}}{{range $pdata.Points}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
       </div>
       <div class="admin-field">
-        <label for="staff-password">Пароль</label>
+        <label for="staff-password">{{t "admin.login.password"}}</label>
         <div class="admin-password-row">
-          <input id="staff-password" name="password" placeholder="Минимум {{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}} символов" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
-          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-password')">Сгенерировать</button>
+          <input id="staff-password" name="password" placeholder="{{if $pdata}}{{tf "admin.staff.password_min" $pdata.MinPasswordLength}}{{else}}{{tf "admin.staff.password_min" 8}}{{end}}" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
+          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-password')">{{t "admin.common.generate"}}</button>
         </div>
       </div>
       <div class="admin-modal__actions">
-        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffModal()">Отмена</button>
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
       </div>
     </form>
   </div>
@@ -101,23 +101,23 @@
      row; openStaffPasswordModal() points the form at that row's id. */}}
 <div id="admin-staff-password-modal" class="admin-modal-backdrop" style="display:none" role="dialog" aria-modal="true" aria-labelledby="staff-password-modal-title">
   <div class="admin-modal">
-    <div class="admin-modal__title" id="staff-password-modal-title">Новый пароль: <span id="staff-password-modal-name"></span></div>
+    <div class="admin-modal__title" id="staff-password-modal-title">{{t "admin.staff.new_password"}}: <span id="staff-password-modal-name"></span></div>
     <form method="post" id="staff-password-form" action="">
       <div class="admin-field">
-        <label for="staff-new-password">Новый пароль</label>
+        <label for="staff-new-password">{{t "admin.staff.new_password"}}</label>
         <div class="admin-password-row">
           <input id="staff-new-password" name="password" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
-          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-new-password', 'staff-new-password-confirm')">Сгенерировать</button>
+          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-new-password', 'staff-new-password-confirm')">{{t "admin.common.generate"}}</button>
         </div>
       </div>
       <div class="admin-field">
-        <label for="staff-new-password-confirm">Повторите пароль</label>
+        <label for="staff-new-password-confirm">{{t "admin.staff.repeat_password"}}</label>
         <input id="staff-new-password-confirm" name="password_confirm" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
       </div>
-      <div class="admin-list-note">Сотрудник выйдет из всех сеансов. Передайте ему новый пароль лично.</div>
+      <div class="admin-list-note">{{t "admin.staff.password_note"}}</div>
       <div class="admin-modal__actions">
-        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffPasswordModal()">Отмена</button>
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить пароль</button>
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffPasswordModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.staff.save_password"}}</button>
       </div>
     </form>
   </div>

@@ -237,6 +237,18 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
   outline: none;
 }
 
+/* RU/KY admin language switcher (_langswitch.gohtml): header + login. */
+.admin-langswitch { display: inline-flex; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); overflow: hidden; flex: none; }
+.admin-langswitch__btn {
+  height: 34px; min-width: 40px; padding: 0 10px;
+  border: 0; background: var(--admin-surface); color: var(--admin-muted);
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.admin-langswitch__btn + .admin-langswitch__btn { border-left: 1px solid var(--admin-border); }
+.admin-langswitch__btn.active { background: var(--admin-text); color: #FFFFFF; }
+.admin-langswitch__btn:focus-visible { outline: 2px solid var(--admin-primary); outline-offset: -2px; }
+.admin-login__lang { position: absolute; top: 16px; right: 16px; }
+
 .admin-content { padding: 24px; flex: 1; }
 
 /* ---------- Toast ---------- */

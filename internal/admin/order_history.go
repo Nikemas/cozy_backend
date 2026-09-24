@@ -22,7 +22,7 @@ type OrderHistoryRowView struct {
 	Note      string
 }
 
-func buildOrderHistoryData(o *orders.Order) OrderHistoryData {
+func buildOrderHistoryData(t tr, o *orders.Order) OrderHistoryData {
 	d := OrderHistoryData{RefundRequired: o.RefundRequired}
 	if o.DeliveryFee > 0 {
 		d.DeliveryFeeLabel = formatSom(o.DeliveryFee)
@@ -30,11 +30,11 @@ func buildOrderHistoryData(o *orders.Order) OrderHistoryData {
 	for _, h := range o.History {
 		row := OrderHistoryRowView{
 			DateLabel: h.CreatedAt.Format("02.01.2006 15:04"),
-			ToLabel:   orderStatusMetaFor(h.ToStatus).Label,
-			Actor:     historyActorLabel(h),
+			ToLabel:   orderStatusMetaFor(t, h.ToStatus).Label,
+			Actor:     historyActorLabel(t, h),
 		}
 		if h.FromStatus != nil {
-			row.FromLabel = orderStatusMetaFor(*h.FromStatus).Label
+			row.FromLabel = orderStatusMetaFor(t, *h.FromStatus).Label
 		}
 		if h.Note != nil {
 			row.Note = *h.Note
@@ -44,17 +44,17 @@ func buildOrderHistoryData(o *orders.Order) OrderHistoryData {
 	return d
 }
 
-func historyActorLabel(h orders.StatusChange) string {
+func historyActorLabel(t tr, h orders.StatusChange) string {
 	switch h.ActorType {
 	case orders.ActorCustomer:
-		return "покупатель"
+		return t.T("admin.history.actor_customer")
 	case orders.ActorSystem:
-		return "система"
+		return t.T("admin.history.actor_system")
 	case orders.ActorStaff:
 		if h.ActorName != nil && *h.ActorName != "" {
 			return *h.ActorName
 		}
-		return "сотрудник"
+		return t.T("admin.history.actor_staff")
 	default:
 		return string(h.ActorType)
 	}

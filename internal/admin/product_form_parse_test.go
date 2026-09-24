@@ -40,7 +40,7 @@ func TestParseProductFormOnlyChangedCellsBecomeWrites(t *testing.T) {
 	f.Set("qty_v2_pB", "4")
 	f.Set("orig_v2_pB", "")
 
-	got := parseProductForm(f, "p1", true, parsePoints)
+	got := parseProductForm(ruTr, f, "p1", true, parsePoints)
 	if len(got.Errs) != 0 {
 		t.Fatalf("Errs = %v", got.Errs)
 	}
@@ -73,7 +73,7 @@ func TestParseProductFormInvalidQtyIsFormError(t *testing.T) {
 	f.Set("qty_v1_pB", "")
 	f.Set("orig_v1_pB", "2")
 
-	got := parseProductForm(f, "p1", true, parsePoints)
+	got := parseProductForm(ruTr, f, "p1", true, parsePoints)
 	if len(got.Errs) == 0 {
 		t.Fatal("want a form error for a non-numeric and a cleared quantity")
 	}
@@ -96,7 +96,7 @@ func TestParseProductFormPriceAndVariantValidation(t *testing.T) {
 	f["variant_size"] = []string{"42"}
 	f["variant_color"] = []string{""}
 
-	got := parseProductForm(f, "", true, parsePoints)
+	got := parseProductForm(ruTr, f, "", true, parsePoints)
 	joined := strings.Join(got.Errs, " | ")
 	if !strings.Contains(joined, "Цена") || !strings.Contains(joined, "размер и цвет") {
 		t.Errorf("Errs = %v, want price and size/color errors", got.Errs)
@@ -113,7 +113,7 @@ func TestParseProductFormNewRowAndBlankRowSkipped(t *testing.T) {
 	f.Set("qty_n1_pB", "0")
 	f.Set("qty_n2_pA", "0")
 
-	got := parseProductForm(f, "", true, parsePoints)
+	got := parseProductForm(ruTr, f, "", true, parsePoints)
 	if len(got.Errs) != 0 {
 		t.Fatalf("Errs = %v", got.Errs)
 	}
@@ -134,13 +134,13 @@ func TestParseProductFormTamperedOrigIsError(t *testing.T) {
 	f.Set("qty_v1_pA", "1")
 	f.Set("orig_v1_pA", "x")
 
-	if got := parseProductForm(f, "p1", true, parsePoints); len(got.Errs) == 0 {
+	if got := parseProductForm(ruTr, f, "p1", true, parsePoints); len(got.Errs) == 0 {
 		t.Fatal("want an error for a non-numeric orig value")
 	}
 }
 
 func TestMarkStockConflictsRefreshesOnlyConflictingCells(t *testing.T) {
-	rows := buildVariantRows(
+	rows := buildVariantRows(ruTr,
 		[]catalog.Variant{{ID: "v1", Size: "42", Color: "Белый"}},
 		[]catalog.StockEntry{{VariantID: "v1", PointID: "pA", Quantity: 5}, {VariantID: "v1", PointID: "pB", Quantity: 3}},
 		parsePoints,
@@ -148,7 +148,7 @@ func TestMarkStockConflictsRefreshesOnlyConflictingCells(t *testing.T) {
 	rows[0].Cells[0].Value = "9" // staff typed 9 at pA
 	rows[0].Cells[1].Value = "7" // and 7 at pB, which was sold down to 1 meanwhile
 
-	markStockConflicts(rows, []stockConflict{{RowKey: "v1", PointID: "pB", Current: 1, Exists: true}})
+	markStockConflicts(ruTr, rows, []stockConflict{{RowKey: "v1", PointID: "pB", Current: 1, Exists: true}})
 
 	if rows[0].Cells[0].Value != "9" || rows[0].Cells[0].Conflict {
 		t.Errorf("non-conflicting cell changed: %+v", rows[0].Cells[0])
@@ -163,7 +163,7 @@ func TestMarkStockConflictsRefreshesOnlyConflictingCells(t *testing.T) {
 }
 
 func TestBuildVariantRowsPerPointCells(t *testing.T) {
-	rows := buildVariantRows(
+	rows := buildVariantRows(ruTr,
 		[]catalog.Variant{{ID: "v1", Size: "42", Color: "Белый"}},
 		[]catalog.StockEntry{{VariantID: "v1", PointID: "pB", Quantity: 4}},
 		parsePoints,

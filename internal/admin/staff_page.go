@@ -49,10 +49,10 @@ func roleChipClass(role staff.Role) string {
 // newStaffRow builds one row, resolving PointID to a human-readable point
 // name via pointNames (built once per request in renderStaffPage, keyed
 // by points.Point.ID) rather than showing the raw UUID.
-func newStaffRow(s staff.Staff, pointNames map[string]string) staffRow {
-	scope := "Все точки"
+func newStaffRow(t tr, s staff.Staff, pointNames map[string]string) staffRow {
+	scope := t.T("admin.common.all_points")
 	if s.Role == staff.RolePointStaff {
-		scope = "точка не найдена"
+		scope = t.T("admin.staff.point_not_found")
 		if s.PointID != nil {
 			if name, ok := pointNames[*s.PointID]; ok {
 				scope = name
@@ -60,9 +60,9 @@ func newStaffRow(s staff.Staff, pointNames map[string]string) staffRow {
 		}
 	}
 
-	toggleLabel := "Деактивировать"
+	toggleLabel := t.T("admin.common.deactivate")
 	if !s.IsActive {
-		toggleLabel = "Активировать"
+		toggleLabel = t.T("admin.common.activate")
 	}
 
 	return staffRow{
@@ -70,7 +70,7 @@ func newStaffRow(s staff.Staff, pointNames map[string]string) staffRow {
 		Initials:    initialsFor(s.Name),
 		Name:        s.Name,
 		Phone:       s.Phone,
-		RoleLabel:   roleLabel(s.Role),
+		RoleLabel:   t.T(roleLabel(s.Role)),
 		RoleClass:   roleChipClass(s.Role),
 		Scope:       scope,
 		ToggleLabel: toggleLabel,
@@ -94,15 +94,20 @@ type staffPageData struct {
 	MinPasswordLength int
 }
 
-// staffNotices are the success banners a redirect back to the list can ask
-// for via ?done=... — a fixed map, so the query string can't inject text.
+// staffNotices are the success banners (locale keys) a redirect back to
+// the list can ask for via ?done=... — a fixed map, so the query string
+// can't inject text.
 var staffNotices = map[string]string{
-	"password": "Пароль изменён. Сотрудник выйдет из всех сеансов и войдёт с новым паролем.",
+	"password": "admin.staff.notice_password",
 }
 
 // staffPage handles GET /admin/staff.
 func (h *handlers) staffPage(w http.ResponseWriter, r *http.Request) {
-	h.renderStaffPageWithNotice(w, r, "", staffNotices[r.URL.Query().Get("done")])
+	notice := ""
+	if key := staffNotices[r.URL.Query().Get("done")]; key != "" {
+		notice = h.tr(r).T(key)
+	}
+	h.renderStaffPageWithNotice(w, r, "", notice)
 }
 
 // renderStaffPage re-lists every staff account and every point of sale
@@ -120,12 +125,12 @@ func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Requ
 
 	list, err := h.staffSvc.ListStaff(r.Context())
 	if err != nil {
-		http.Error(w, "не удалось загрузить сотрудников", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.staff.load_failed"), http.StatusInternalServerError)
 		return
 	}
 	pts, err := h.pointsRepo.List(r.Context())
 	if err != nil {
-		http.Error(w, "не удалось загрузить точки продаж", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.points.load_failed"), http.StatusInternalServerError)
 		return
 	}
 
@@ -136,13 +141,13 @@ func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Requ
 
 	rows := make([]staffRow, 0, len(list))
 	for _, s := range list {
-		rows = append(rows, newStaffRow(s, pointNames))
+		rows = append(rows, newStaffRow(h.tr(r), s, pointNames))
 	}
 
-	data := h.shellPageData("staff", "Сотрудники", st)
+	data := h.shellPageData("staff", "admin.nav.staff", st)
 	data.Data = staffPageData{Rows: rows, Points: pts, Error: errMsg, Notice: notice, MinPasswordLength: staff.MinPasswordLength}
 	if err := h.render.Render(w, "staff", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -155,7 +160,7 @@ func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Requ
 // the error message.
 func (h *handlers) staffCreate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderStaffPage(w, r, "не удалось прочитать форму")
+		h.renderStaffPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 
@@ -175,7 +180,7 @@ func (h *handlers) staffCreate(w http.ResponseWriter, r *http.Request) {
 		PointID:  pointID,
 	}
 	if _, err := h.staffSvc.CreateStaff(r.Context(), in); err != nil {
-		h.renderStaffPage(w, r, appErrMessage(err))
+		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -196,7 +201,7 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.staffSvc.ListStaff(r.Context())
 	if err != nil {
-		http.Error(w, "не удалось загрузить сотрудников", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.staff.load_failed"), http.StatusInternalServerError)
 		return
 	}
 	var target *staff.Staff
@@ -207,7 +212,7 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if target == nil {
-		h.renderStaffPage(w, r, "сотрудник не найден")
+		h.renderStaffPage(w, r, h.tr(r).T("admin.apperr.staff_not_found"))
 		return
 	}
 
@@ -218,7 +223,7 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 		IsActive: !target.IsActive,
 	}
 	if _, err := h.staffSvc.UpdateStaff(r.Context(), id, in); err != nil {
-		h.renderStaffPage(w, r, appErrMessage(err))
+		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -231,16 +236,16 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 // minimum length and ends all of that account's sessions.
 func (h *handlers) staffResetPassword(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderStaffPage(w, r, "не удалось прочитать форму")
+		h.renderStaffPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 	password := r.FormValue("password")
 	if password != r.FormValue("password_confirm") {
-		h.renderStaffPage(w, r, "пароли не совпадают")
+		h.renderStaffPage(w, r, h.tr(r).T("admin.staff.passwords_mismatch"))
 		return
 	}
 	if err := h.staffSvc.ResetPassword(r.Context(), r.PathValue("id"), password); err != nil {
-		h.renderStaffPage(w, r, appErrMessage(err))
+		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 	http.Redirect(w, r, "/admin/staff?done=password", http.StatusSeeOther)

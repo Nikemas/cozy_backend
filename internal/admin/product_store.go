@@ -96,9 +96,9 @@ func (e *stockConflictError) Error() string {
 	return fmt.Sprintf("stock changed concurrently in %d cell(s)", len(e.Cells))
 }
 
-// stockConflictMessage is the form-level banner for a stockConflictError.
-const stockConflictMessage = "Остаток изменился, пока вы редактировали форму (продажа или другой сотрудник). " +
-	"Подсвеченные ячейки обновлены до текущих значений — проверьте их и сохраните ещё раз. Ничего не сохранено."
+// stockConflictMessage is the locale key of the form-level banner for a
+// stockConflictError.
+const stockConflictMessage = "admin.stock.err_conflict"
 
 // productStore runs the transactional product-form save.
 type productStore struct {

@@ -10,7 +10,7 @@
 {{$pdata := .Data}}
 <div class="admin-screen-narrow">
   <div class="admin-list-toolbar admin-list-toolbar--end">
-    <button type="button" class="admin-btn admin-btn--primary" onclick="openCategoryCreateModal()">+ Добавить категорию</button>
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openCategoryCreateModal()">+ {{t "admin.categories.add"}}</button>
   </div>
 
   {{with $pdata}}
@@ -18,7 +18,7 @@
 
   <div class="admin-row-list">
     {{if not .Rows}}
-      <div class="admin-row-list__empty">Пока нет категорий</div>
+      <div class="admin-row-list__empty">{{t "admin.categories.empty"}}</div>
     {{end}}
     {{range .Rows}}
     <div class="admin-row">
@@ -30,29 +30,29 @@
         onclick="openCategoryEditModal({
           id: {{.ID}}, parentId: {{.ParentID}}, nameRu: {{.NameRu}},
           nameKy: {{.NameKy}}, slug: {{.Slug}}, sortOrder: {{.SortOrder}}
-        })">Редактировать</button>
+        })">{{t "admin.common.edit"}}</button>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
-        onclick="openConfirmModal('Удалить категорию?', '«{{.NameRu}}» будет удалена. Если на неё ссылаются товары или подкатегории, удаление будет отклонено.', '/admin/categories/{{.ID}}/delete')">Удалить</button>
+        onclick="openConfirmModal({{t "admin.categories.delete_title"}}, {{tf "admin.categories.delete_text" .NameRu}}, '/admin/categories/{{.ID}}/delete')">{{t "admin.common.delete"}}</button>
     </div>
     {{end}}
   </div>
   {{else}}
-  <div class="admin-row-list"><div class="admin-row-list__empty">Пока нет категорий</div></div>
+  <div class="admin-row-list"><div class="admin-row-list__empty">{{t "admin.categories.empty"}}</div></div>
   {{end}}
 </div>
 
 {{/* Create modal. */}}
 <div id="admin-category-create-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-create-title">
-    <div class="admin-modal__title" id="admin-category-create-title">Новая категория</div>
+    <div class="admin-modal__title" id="admin-category-create-title">{{t "admin.categories.new_title"}}</div>
     <form method="post" action="/admin/categories">
       <div class="admin-field-row">
         <div class="admin-field">
-          <label for="cat-create-name-ru">Название (рус.)</label>
+          <label for="cat-create-name-ru">{{t "admin.common.name_ru"}}</label>
           <input id="cat-create-name-ru" name="name_ru" placeholder="Кроссовки" required>
         </div>
         <div class="admin-field">
-          <label for="cat-create-name-ky">Название (кырг.)</label>
+          <label for="cat-create-name-ky">{{t "admin.common.name_ky"}}</label>
           <input id="cat-create-name-ky" name="name_ky" placeholder="Кроссовкалар" required>
         </div>
       </div>
@@ -62,20 +62,20 @@
           <input id="cat-create-slug" name="slug" placeholder="krossovki" required>
         </div>
         <div class="admin-field">
-          <label for="cat-create-sort">Порядок</label>
+          <label for="cat-create-sort">{{t "admin.categories.sort_order"}}</label>
           <input id="cat-create-sort" name="sort_order" type="number" min="0" value="0">
         </div>
       </div>
       <div class="admin-field">
-        <label for="cat-create-parent">Родительская категория</label>
+        <label for="cat-create-parent">{{t "admin.categories.parent"}}</label>
         <select id="cat-create-parent" name="parent_id">
-          <option value="">— нет (корневая) —</option>
+          <option value="">{{t "admin.categories.no_parent"}}</option>
           {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
       </div>
       <div class="admin-modal__actions">
-        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryCreateModal()">Отмена</button>
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryCreateModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
       </div>
     </form>
   </div>
@@ -87,15 +87,15 @@
      categories). */}}
 <div id="admin-category-edit-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-edit-title">
-    <div class="admin-modal__title" id="admin-category-edit-title">Редактировать категорию</div>
+    <div class="admin-modal__title" id="admin-category-edit-title">{{t "admin.categories.edit_title"}}</div>
     <form method="post" id="admin-category-edit-form">
       <div class="admin-field-row">
         <div class="admin-field">
-          <label for="cat-edit-name-ru">Название (рус.)</label>
+          <label for="cat-edit-name-ru">{{t "admin.common.name_ru"}}</label>
           <input id="cat-edit-name-ru" name="name_ru" required>
         </div>
         <div class="admin-field">
-          <label for="cat-edit-name-ky">Название (кырг.)</label>
+          <label for="cat-edit-name-ky">{{t "admin.common.name_ky"}}</label>
           <input id="cat-edit-name-ky" name="name_ky" required>
         </div>
       </div>
@@ -105,20 +105,20 @@
           <input id="cat-edit-slug" name="slug" required>
         </div>
         <div class="admin-field">
-          <label for="cat-edit-sort">Порядок</label>
+          <label for="cat-edit-sort">{{t "admin.categories.sort_order"}}</label>
           <input id="cat-edit-sort" name="sort_order" type="number" min="0">
         </div>
       </div>
       <div class="admin-field">
-        <label for="cat-edit-parent">Родительская категория</label>
+        <label for="cat-edit-parent">{{t "admin.categories.parent"}}</label>
         <select id="cat-edit-parent" name="parent_id">
-          <option value="">— нет (корневая) —</option>
+          <option value="">{{t "admin.categories.no_parent"}}</option>
           {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
       </div>
       <div class="admin-modal__actions">
-        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryEditModal()">Отмена</button>
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryEditModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
       </div>
     </form>
   </div>

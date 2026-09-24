@@ -102,7 +102,7 @@ func validOrderStatus(s string) bool {
 // resolveOrderFilter validates p into a filter. Invalid values never reach
 // SQL (an unknown status used to be cast to the order_status enum and
 // 500): they are dropped from p and reported in notes instead.
-func resolveOrderFilter(p *ordersListParams, now time.Time) (orderSearchFilter, []string) {
+func resolveOrderFilter(t tr, p *ordersListParams, now time.Time) (orderSearchFilter, []string) {
 	var notes []string
 	f := orderSearchFilter{Query: p.Q, Page: p.Page}
 
@@ -111,7 +111,7 @@ func resolveOrderFilter(p *ordersListParams, now time.Time) (orderSearchFilter, 
 			s := orders.OrderStatus(p.Status)
 			f.Status = &s
 		} else {
-			notes = append(notes, "Неизвестный статус — показаны заказы во всех статусах")
+			notes = append(notes, t.T("admin.orders.note_bad_status"))
 			p.Status = ""
 		}
 	}
@@ -133,7 +133,7 @@ func resolveOrderFilter(p *ordersListParams, now time.Time) (orderSearchFilter, 
 		if p.From != "" {
 			from, err := reports.ParseReportDate(p.From)
 			if err != nil {
-				notes = append(notes, "Дата «с» не распознана")
+				notes = append(notes, t.T("admin.orders.note_bad_from"))
 				p.From = ""
 			} else {
 				f.From = &from
@@ -142,7 +142,7 @@ func resolveOrderFilter(p *ordersListParams, now time.Time) (orderSearchFilter, 
 		if p.To != "" {
 			to, err := reports.ParseReportDate(p.To)
 			if err != nil {
-				notes = append(notes, "Дата «по» не распознана")
+				notes = append(notes, t.T("admin.orders.note_bad_to"))
 				p.To = ""
 			} else {
 				end := to.AddDate(0, 0, 1)
@@ -150,7 +150,7 @@ func resolveOrderFilter(p *ordersListParams, now time.Time) (orderSearchFilter, 
 			}
 		}
 		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-			notes = append(notes, "Дата «с» позже даты «по»")
+			notes = append(notes, t.T("admin.orders.note_from_after_to"))
 		}
 	default:
 		p.Range = "all"

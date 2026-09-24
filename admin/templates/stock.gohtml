@@ -8,19 +8,19 @@
   <form method="get" action="/admin/stock" class="admin-filterbar" role="search">
     {{if .CanChoosePoint}}
     <div class="admin-field admin-filterbar__field">
-      <label for="stock-point">Точка продаж</label>
+      <label for="stock-point">{{t "admin.common.point_of_sale"}}</label>
       <select id="stock-point" name="point" onchange="this.form.submit()">
         {{range .Points}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
     </div>
     {{else if .PointName}}
-    <div class="admin-filterbar__static">Точка: <strong>{{.PointName}}</strong></div>
+    <div class="admin-filterbar__static">{{t "admin.common.point_of_sale"}}: <strong>{{.PointName}}</strong></div>
     {{end}}
     <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
-      <label for="stock-q">Поиск</label>
-      <input type="search" id="stock-q" name="q" value="{{.Query}}" placeholder="Название, бренд или артикул">
+      <label for="stock-q">{{t "admin.common.search"}}</label>
+      <input type="search" id="stock-q" name="q" value="{{.Query}}" placeholder="{{t "admin.stock.search_placeholder"}}">
     </div>
-    <button type="submit" class="admin-btn admin-btn--secondary">Найти</button>
+    <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.common.find"}}</button>
   </form>
 
   {{if .Err}}<div class="admin-form-error" role="alert">{{.Err}}</div>{{end}}
@@ -34,20 +34,20 @@
     <input type="hidden" name="page" value="{{.Page}}">
     {{if .Empty}}
     <div class="admin-empty">
-      <div class="admin-empty__title">Ничего не нашлось</div>
-      <div class="admin-empty__text">Попробуйте другое название</div>
+      <div class="admin-empty__title">{{t "admin.common.nothing_found"}}</div>
+      <div class="admin-empty__text">{{t "admin.stock.empty_text"}}</div>
     </div>
     {{else}}
     <div class="admin-table-wrap">
       <table class="admin-table admin-variants-table">
-        <caption class="admin-visually-hidden">Остатки на точке «{{.PointName}}»</caption>
+        <caption class="admin-visually-hidden">{{tf "admin.stock.caption" .PointName}}</caption>
         <thead>
           <tr>
-            <th scope="col">Товар</th>
-            <th scope="col">Размер</th>
-            <th scope="col">Цвет</th>
-            <th scope="col">Остаток</th>
-            <th scope="col">Уровень</th>
+            <th scope="col">{{t "admin.stock.col_product"}}</th>
+            <th scope="col">{{t "admin.common.size"}}</th>
+            <th scope="col">{{t "admin.common.color"}}</th>
+            <th scope="col">{{t "admin.common.stock"}}</th>
+            <th scope="col">{{t "admin.stock.col_level"}}</th>
           </tr>
         </thead>
         <tbody>
@@ -62,7 +62,7 @@
             <td>
               <input type="hidden" name="variant_id" value="{{.VariantID}}">
               {{with .Cell}}
-              <input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="Остаток: {{$.Data.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}>
+              <input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{$.Data.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}>
               {{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}
               {{end}}
             </td>
@@ -75,9 +75,9 @@
     <div class="admin-orders-footer">
       <div class="admin-orders-count">{{.CountLabel}}</div>
       <div class="admin-orders-pager">
-        {{if .HasPrev}}<a href="{{.PrevURL}}" class="admin-btn admin-btn--secondary">Назад</a>{{end}}
-        {{if .HasNext}}<a href="{{.NextURL}}" class="admin-btn admin-btn--secondary">Дальше</a>{{end}}
-        <button type="submit" class="admin-btn admin-btn--primary">Сохранить изменения</button>
+        {{if .HasPrev}}<a href="{{.PrevURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.prev"}}</a>{{end}}
+        {{if .HasNext}}<a href="{{.NextURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.next"}}</a>{{end}}
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.stock.save_changes"}}</button>
       </div>
     </div>
     {{end}}

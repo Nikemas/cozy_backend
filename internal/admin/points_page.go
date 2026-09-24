@@ -33,16 +33,16 @@ type pointRow struct {
 // green as in-stock/delivered order-status chips (#2E7D32/#E8F5E9);
 // inactive reuses the neutral grey of the "placed" order-status chip
 // (#8A8A86/#EDEDEB) — see admin.css's .admin-chip--active/--inactive.
-func newPointRow(p *points.Point) pointRow {
+func newPointRow(t tr, p *points.Point) pointRow {
 	row := pointRow{ID: p.ID, Name: p.Name, Address: p.Address, IsActive: p.IsActive}
 	if p.IsActive {
-		row.ChipLabel = "Активна"
+		row.ChipLabel = t.T("admin.points.active")
 		row.ChipClass = "admin-chip--active"
-		row.ToggleLabel = "Деактивировать"
+		row.ToggleLabel = t.T("admin.common.deactivate")
 	} else {
-		row.ChipLabel = "Неактивна"
+		row.ChipLabel = t.T("admin.points.inactive")
 		row.ChipClass = "admin-chip--inactive"
-		row.ToggleLabel = "Активировать"
+		row.ToggleLabel = t.T("admin.common.activate")
 	}
 	return row
 }
@@ -68,18 +68,18 @@ func (h *handlers) renderPointsPage(w http.ResponseWriter, r *http.Request, errM
 
 	list, err := h.pointsRepo.List(r.Context())
 	if err != nil {
-		http.Error(w, "не удалось загрузить точки продаж", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.points.load_failed"), http.StatusInternalServerError)
 		return
 	}
 	rows := make([]pointRow, 0, len(list))
 	for _, p := range list {
-		rows = append(rows, newPointRow(p))
+		rows = append(rows, newPointRow(h.tr(r), p))
 	}
 
-	data := h.shellPageData("points", "Склад и точки", st)
+	data := h.shellPageData("points", "admin.nav.points", st)
 	data.Data = pointsPageData{Rows: rows, Error: errMsg}
 	if err := h.render.Render(w, "points", data); err != nil {
-		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
 
@@ -91,7 +91,7 @@ func (h *handlers) renderPointsPage(w http.ResponseWriter, r *http.Request, errM
 // message instead of losing the user's input to a blank error page.
 func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		h.renderPointsPage(w, r, "не удалось прочитать форму")
+		h.renderPointsPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 		IsActive: true,
 	}
 	if _, err := h.pointsRepo.Create(r.Context(), in); err != nil {
-		h.renderPointsPage(w, r, appErrMessage(err))
+		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -113,13 +113,13 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := r.ParseForm(); err != nil {
-		h.renderPointsPage(w, r, "не удалось прочитать форму")
+		h.renderPointsPage(w, r, h.tr(r).T("admin.err.form"))
 		return
 	}
 
 	current, err := h.pointsRepo.GetByID(r.Context(), id)
 	if err != nil {
-		h.renderPointsPage(w, r, appErrMessage(err))
+		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 		IsActive: current.IsActive,
 	}
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
-		h.renderPointsPage(w, r, appErrMessage(err))
+		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
@@ -145,13 +145,13 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 
 	target, err := h.pointsRepo.GetByID(r.Context(), id)
 	if err != nil {
-		h.renderPointsPage(w, r, appErrMessage(err))
+		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 
 	in := points.PointInput{Name: target.Name, Address: target.Address, IsActive: !target.IsActive}
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
-		h.renderPointsPage(w, r, appErrMessage(err))
+		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
 

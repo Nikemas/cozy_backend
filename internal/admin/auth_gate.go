@@ -45,7 +45,7 @@ func requireStaffRole(resolver staffResolver, roles ...staff.Role) func(http.Han
 		return func(w http.ResponseWriter, r *http.Request) {
 			st, err := resolver.StaffFromRequest(r)
 			if err != nil {
-				http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+				http.Error(w, trFor(langFromRequest(r)).T("admin.err.internal"), http.StatusInternalServerError)
 				return
 			}
 			if st == nil {
@@ -57,7 +57,12 @@ func requireStaffRole(resolver staffResolver, roles ...staff.Role) func(http.Han
 				return
 			}
 
-			next(w, r.WithContext(staff.NewContextWithStaff(r.Context(), st)))
+			// The admin language (admin_lang cookie) goes into the context
+			// and onto w, so pages and view builders render in it without
+			// each handler passing it on — see lang.go.
+			ctx := contextWithLang(staff.NewContextWithStaff(r.Context(), st), langFromRequest(r))
+			r = r.WithContext(ctx)
+			next(withLang(w, r), r)
 		}
 	}
 }

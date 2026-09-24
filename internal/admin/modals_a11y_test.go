@@ -16,7 +16,7 @@ func renderOrderDetail(t *testing.T, role staff.Role) string {
 	pd := PageData{
 		Screen: "order_detail", PageTitle: "Заказ", ShowSidebar: true, Staff: st,
 		NavItems: navItemsForRole(role, "orders"),
-		Data:     OrderDetailData{ID: "o1", Number: "COZY-1", StatusButtons: buildStatusButtons(orders.StatusPlaced, role)},
+		Data:     OrderDetailData{ID: "o1", Number: "COZY-1", StatusButtons: buildStatusButtons(ruTr, orders.StatusPlaced, role)},
 	}
 	w := httptest.NewRecorder()
 	if err := rr.Render(w, "order_detail", pd); err != nil {

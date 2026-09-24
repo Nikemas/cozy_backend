@@ -21,7 +21,7 @@ func TestStockChipThresholds(t *testing.T) {
 		{100, "100 шт", "#2E7D32", "#E8F5E9"},
 	}
 	for _, c := range cases {
-		label, fg, bg := stockChip(c.qty)
+		label, fg, bg := stockChip(ruTr, c.qty)
 		if label != c.wantLabel || fg != c.wantFG || bg != c.wantBG {
 			t.Errorf("stockChip(%d) = (%q,%q,%q), want (%q,%q,%q)", c.qty, label, fg, bg, c.wantLabel, c.wantFG, c.wantBG)
 		}
@@ -48,22 +48,22 @@ func TestPluralRuProducts(t *testing.T) {
 }
 
 func TestCountLabel(t *testing.T) {
-	if got := countLabel(1); got != "1 товар" {
+	if got := countLabel(ruTr, 1); got != "1 товар" {
 		t.Errorf("countLabel(1) = %q, want %q", got, "1 товар")
 	}
-	if got := countLabel(20); got != "20 товаров" {
+	if got := countLabel(ruTr, 20); got != "20 товаров" {
 		t.Errorf("countLabel(20) = %q, want %q", got, "20 товаров")
 	}
 }
 
 func TestVariantsLabel(t *testing.T) {
-	if got := variantsLabel(1); got != "1 вариация" {
+	if got := variantsLabel(ruTr, 1); got != "1 вариация" {
 		t.Errorf("variantsLabel(1) = %q, want %q", got, "1 вариация")
 	}
-	if got := variantsLabel(3); got != "3 вариации" {
+	if got := variantsLabel(ruTr, 3); got != "3 вариации" {
 		t.Errorf("variantsLabel(3) = %q, want %q", got, "3 вариации")
 	}
-	if got := variantsLabel(0); got != "0 вариаций" {
+	if got := variantsLabel(ruTr, 0); got != "0 вариаций" {
 		t.Errorf("variantsLabel(0) = %q, want %q", got, "0 вариаций")
 	}
 }
@@ -86,16 +86,16 @@ func TestFormatMoney(t *testing.T) {
 }
 
 func TestStatusAndDeactivateLabel(t *testing.T) {
-	if got := statusLabel(true); got != "Активен" {
+	if got := statusLabel(ruTr, true); got != "Активен" {
 		t.Errorf("statusLabel(true) = %q", got)
 	}
-	if got := statusLabel(false); got != "Неактивен" {
+	if got := statusLabel(ruTr, false); got != "Неактивен" {
 		t.Errorf("statusLabel(false) = %q", got)
 	}
-	if got := deactivateLabel(true); got != "Деактивировать" {
+	if got := deactivateLabel(ruTr, true); got != "Деактивировать" {
 		t.Errorf("deactivateLabel(true) = %q", got)
 	}
-	if got := deactivateLabel(false); got != "Активировать" {
+	if got := deactivateLabel(ruTr, false); got != "Активировать" {
 		t.Errorf("deactivateLabel(false) = %q", got)
 	}
 }
@@ -231,7 +231,7 @@ func TestProductsListURL(t *testing.T) {
 
 func TestBuildCategoryChipsMarksActive(t *testing.T) {
 	tree := sampleTree()
-	chips := buildCategoryChips(tree, tree[0], "")
+	chips := buildCategoryChips(ruTr, tree, tree[0], "")
 	if len(chips) != 3 { // "Все" + men + women
 		t.Fatalf("len(chips) = %d, want 3", len(chips))
 	}
@@ -248,17 +248,17 @@ func TestBuildCategoryChipsMarksActive(t *testing.T) {
 
 func TestBuildSubChipsNoChildren(t *testing.T) {
 	tree := sampleTree()
-	if got := buildSubChips(tree[1], nil, ""); got != nil { // women has no children
+	if got := buildSubChips(ruTr, tree[1], nil, ""); got != nil { // women has no children
 		t.Errorf("buildSubChips(women) = %v, want nil", got)
 	}
-	if got := buildSubChips(nil, nil, ""); got != nil {
+	if got := buildSubChips(ruTr, nil, nil, ""); got != nil {
 		t.Errorf("buildSubChips(nil) = %v, want nil", got)
 	}
 }
 
 func TestBuildSubChipsWithChildren(t *testing.T) {
 	tree := sampleTree()
-	chips := buildSubChips(tree[0], tree[0].Children[0], "")
+	chips := buildSubChips(ruTr, tree[0], tree[0].Children[0], "")
 	if len(chips) != 2 { // "Все" + classic
 		t.Fatalf("len(chips) = %d, want 2", len(chips))
 	}

@@ -34,19 +34,19 @@ const noAccessPath = "/admin/no-access"
 // route/nav item it can't see.
 type navDef struct {
 	key   string
-	label string
+	label string // locale key (admin.nav.*), printed via {{t .Label}}
 	icon  string
 	roles []staff.Role
 }
 
 var navDefs = []navDef{
-	{"orders", "Заказы", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
-	{"products", "Товары", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
-	{"stock", "Остатки", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
-	{"categories", "Категории", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
-	{"reports", "Отчёты", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
-	{"points", "Склад и точки", pointsIconPath, []staff.Role{staff.RoleOwner}},
-	{"staff", "Сотрудники", staffIconPath, []staff.Role{staff.RoleOwner}},
+	{"orders", "admin.nav.orders", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
+	{"products", "admin.nav.products", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"stock", "admin.nav.stock", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
+	{"categories", "admin.nav.categories", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"reports", "admin.nav.reports", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"points", "admin.nav.points", pointsIconPath, []staff.Role{staff.RoleOwner}},
+	{"staff", "admin.nav.staff", staffIconPath, []staff.Role{staff.RoleOwner}},
 }
 
 func roleCanSee(d navDef, role staff.Role) bool {
@@ -93,16 +93,14 @@ func firstAllowedPath(role staff.Role) string {
 	return noAccessPath
 }
 
-// roleLabel is the Russian label shown under the staff member's name in
-// the sidebar footer (design canvas's {{ roleLabel }} binding).
+// roleLabel is the locale key (admin.role.*) of the label shown under the
+// staff member's name in the sidebar footer (design canvas's
+// {{ roleLabel }} binding); templates print it via {{t .RoleLabel}}. An
+// unknown role is returned as-is, which {{t}} also prints as-is.
 func roleLabel(role staff.Role) string {
 	switch role {
-	case staff.RoleOwner:
-		return "Владелец"
-	case staff.RoleManager:
-		return "Менеджер"
-	case staff.RolePointStaff:
-		return "Кладовщик"
+	case staff.RoleOwner, staff.RoleManager, staff.RolePointStaff:
+		return "admin.role." + string(role)
 	default:
 		return string(role)
 	}

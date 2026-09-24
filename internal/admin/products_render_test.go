@@ -123,7 +123,7 @@ func TestRenderProductFormExecutes(t *testing.T) {
 			Brand: "Nike", BasePrice: "4500", DescriptionRu: "Описание", DescriptionKy: "Баяны",
 			Categories: categories, CategoriesJSON: categoryOptionsJSON(categories),
 			Images: []ImageRowVM{{ObjectKey: "products/a.jpg", URL: "http://localhost:9000/cozy-media/products/a.jpg"}},
-			Variants: buildVariantRows(
+			Variants: buildVariantRows(ruTr,
 				[]catalog.Variant{{ID: "v1", Size: "42", Color: "Белый"}, {ID: "v2", Size: "43", Color: "Чёрный"}},
 				[]catalog.StockEntry{{VariantID: "v1", PointID: "pt1", Quantity: 12}},
 				testStockPoints,
