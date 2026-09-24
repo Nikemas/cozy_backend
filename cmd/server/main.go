@@ -129,7 +129,7 @@ func run() error {
 	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
 	}
-	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
+	if err := registerWebRoutes(mux, db, cfg, authSvc, payProvider); err != nil {
 		return err
 	}
 
@@ -228,7 +228,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
-func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service, payProvider payments.Provider) error {
 	web.SetCookieSecure(cfg.Security.CookieSecure)
-	return web.RegisterRoutes(mux, db, cfg, authSvc)
+	return web.RegisterRoutes(mux, db, cfg, authSvc, payProvider)
 }

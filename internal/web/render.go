@@ -32,6 +32,9 @@ var screenPages = map[string]string{
 	"checkout": "checkout.gohtml",
 	// "error" is the branded 404/500 page (errors.go's renderHTMLError).
 	"error": "error.gohtml",
+	// "pay_return" is where the payment provider sends the customer back
+	// (pay_handlers.go).
+	"pay_return": "pay_return.gohtml",
 }
 
 // staticPages are the legal/info pages (/about, /contacts, /delivery,
