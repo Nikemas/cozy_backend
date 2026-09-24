@@ -19,8 +19,10 @@ type fakeCustomerProfileStore struct {
 	getByIDResult     *storefront.Customer
 	getByIDErr        error
 
-	setNameCustomerID, setNameName string
-	setNameErr                     error
+	updateCustomerID string
+	update           storefront.ProfileUpdate
+	updateResult     *storefront.Customer
+	updateErr        error
 }
 
 func (f *fakeCustomerProfileStore) GetByID(_ context.Context, id string) (*storefront.Customer, error) {
@@ -31,9 +33,12 @@ func (f *fakeCustomerProfileStore) GetByID(_ context.Context, id string) (*store
 	return f.getByIDResult, nil
 }
 
-func (f *fakeCustomerProfileStore) SetName(_ context.Context, id, name string) error {
-	f.setNameCustomerID, f.setNameName = id, name
-	return f.setNameErr
+func (f *fakeCustomerProfileStore) UpdateProfile(_ context.Context, id string, u storefront.ProfileUpdate) (*storefront.Customer, error) {
+	f.updateCustomerID, f.update = id, u
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	return f.updateResult, nil
 }
 
 func TestGetCustomerProfileHandlerReturnsOwnProfile(t *testing.T) {
@@ -87,7 +92,7 @@ func TestGetCustomerProfileHandlerDefendsAgainstMissingCustomer(t *testing.T) {
 
 func TestUpdateCustomerProfileHandlerSetsNameAndReturnsProfile(t *testing.T) {
 	name := "Нурлан"
-	fake := &fakeCustomerProfileStore{getByIDResult: &storefront.Customer{ID: "customer-1", Phone: "+996700000001", Name: &name}}
+	fake := &fakeCustomerProfileStore{updateResult: &storefront.Customer{ID: "customer-1", Phone: "+996700000001", Name: &name, Lang: "ru", PromoPush: true}}
 	handler := apperr.Wrap(updateCustomerProfileHandler(fake))
 
 	body := `{"name":"Нурлан"}`
@@ -98,8 +103,11 @@ func TestUpdateCustomerProfileHandlerSetsNameAndReturnsProfile(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
-	if fake.setNameCustomerID != "customer-1" || fake.setNameName != "Нурлан" {
-		t.Errorf("SetName called with (%q, %q), want (customer-1, Нурлан)", fake.setNameCustomerID, fake.setNameName)
+	if fake.updateCustomerID != "customer-1" || fake.update.Name == nil || *fake.update.Name != "Нурлан" {
+		t.Errorf("UpdateProfile called with (%q, %+v), want (customer-1, name Нурлан)", fake.updateCustomerID, fake.update)
+	}
+	if fake.update.Lang != nil || fake.update.PromoPush != nil {
+		t.Errorf("absent fields must stay nil (partial update), got %+v", fake.update)
 	}
 	if !strings.Contains(rec.Body.String(), `"name":"Нурлан"`) {
 		t.Errorf("body = %s, want the updated name", rec.Body.String())
@@ -119,9 +127,10 @@ func TestUpdateCustomerProfileHandlerRequiresAuth(t *testing.T) {
 }
 
 func TestUpdateCustomerProfileHandlerPropagatesBlankNameError(t *testing.T) {
-	// SetName owns blank-name validation (apperr.BadRequest("invalid_name",
-	// ...)) — the handler must not duplicate it, just propagate it.
-	fake := &fakeCustomerProfileStore{setNameErr: apperr.BadRequest("invalid_name", "укажите имя")}
+	// storefront.ProfileUpdate owns blank-name validation
+	// (apperr.BadRequest("invalid_name", ...)) — the handler must not
+	// duplicate it, just propagate it.
+	fake := &fakeCustomerProfileStore{updateErr: apperr.BadRequest("invalid_name", "укажите имя")}
 	handler := apperr.Wrap(updateCustomerProfileHandler(fake))
 
 	req := withCustomer(httptest.NewRequest(http.MethodPut, "/api/v1/customer", strings.NewReader(`{"name":"   "}`)), "customer-1")
@@ -133,6 +142,41 @@ func TestUpdateCustomerProfileHandlerPropagatesBlankNameError(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "invalid_name") {
 		t.Errorf("body = %s, want invalid_name error code", rec.Body.String())
+	}
+}
+
+func TestUpdateCustomerProfileHandlerPartialLangAndPromoPush(t *testing.T) {
+	fake := &fakeCustomerProfileStore{updateResult: &storefront.Customer{ID: "customer-1", Phone: "+996700000001", Lang: "ky", PromoPush: false}}
+	handler := apperr.Wrap(updateCustomerProfileHandler(fake))
+
+	body := `{"lang":"ky","promo_push":false}`
+	req := withCustomer(httptest.NewRequest(http.MethodPut, "/api/v1/customer", strings.NewReader(body)), "customer-1")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	u := fake.update
+	if u.Name != nil {
+		t.Errorf("name absent from body must not be updated, got %q", *u.Name)
+	}
+	if u.Lang == nil || *u.Lang != "ky" || u.PromoPush == nil || *u.PromoPush {
+		t.Errorf("update = %+v, want lang=ky promo_push=false", u)
+	}
+	got := rec.Body.String()
+	if !strings.Contains(got, `"lang":"ky"`) || !strings.Contains(got, `"promo_push":false`) {
+		t.Errorf("body = %s, want lang/promo_push fields", got)
+	}
+}
+
+func TestGetCustomerProfileHandlerExposesLangAndPromoPush(t *testing.T) {
+	fake := &fakeCustomerProfileStore{getByIDResult: &storefront.Customer{ID: "c", Phone: "+996700000000", Lang: "ru", PromoPush: true}}
+	rec := httptest.NewRecorder()
+	apperr.Wrap(getCustomerProfileHandler(fake)).ServeHTTP(rec,
+		withCustomer(httptest.NewRequest(http.MethodGet, "/api/v1/customer", nil), "c"))
+	if got := rec.Body.String(); !strings.Contains(got, `"lang":"ru"`) || !strings.Contains(got, `"promo_push":true`) {
+		t.Errorf("body = %s, want lang and promo_push", got)
 	}
 }
 

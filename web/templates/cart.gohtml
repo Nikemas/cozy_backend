@@ -54,9 +54,9 @@
     <aside class="cart-summary">
       <div class="cart-summary__title">{{t "cart.summary"}}</div>
       <div class="cart-summary__row"><span>{{t "cart.items_total"}}</span><span>{{money .Data.ItemsTotal}}</span></div>
-      <div class="cart-summary__row"><span>{{t "cart.delivery"}}</span><span>{{money .Data.DeliveryFee}}</span></div>
+      <div class="cart-summary__row"><span>{{t "cart.delivery"}}</span><span>{{if .Data.DeliveryFrom}}{{printf (t "cart.from_amount") (money .Data.DeliveryFee)}}{{else}}{{money .Data.DeliveryFee}}{{end}}</span></div>
       <div class="cart-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
-      <div class="cart-summary__row cart-summary__row--total"><span>{{t "cart.total"}}</span><span>{{money .Data.GrandTotal}}</span></div>
+      <div class="cart-summary__row cart-summary__row--total"><span>{{t "cart.total"}}</span><span>{{if .Data.DeliveryFrom}}{{printf (t "cart.from_amount") (money .Data.GrandTotal)}}{{else}}{{money .Data.GrandTotal}}{{end}}</span></div>
       <a class="btn btn--primary cart-summary__cta" href="/checkout">{{t "cart.checkout"}}</a>
     </aside>
   </div>

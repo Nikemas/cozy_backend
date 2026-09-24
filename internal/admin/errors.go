@@ -14,9 +14,14 @@ import (
 // message in Russian, which is what the Russian admin shows verbatim; in
 // Kyrgyz the error's Code picks admin.apperr.<code> from the locale file
 // (falling back to the Russian message for a code with no translation).
+// A localizedError (admin-side validation) is shown in t's language.
 // Any other error (a raw database/driver failure) gets a generic message
 // instead of leaking internals to the page.
 func appErrMessage(t tr, err error) string {
+	var le localizedError
+	if errors.As(err, &le) {
+		return t.T(le.key)
+	}
 	var ae *apperr.AppError
 	if errors.As(err, &ae) {
 		key := "admin.apperr." + ae.Code

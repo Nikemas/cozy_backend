@@ -52,10 +52,18 @@ type OrderInfoLookup interface {
 	OrderInfo(ctx context.Context, o orders.Order) (OrderInfo, error)
 }
 
-// LanguageFunc returns a customer's preferred language (i18n.LangRU /
-// i18n.LangKY). The customers table has no language column yet, so the
-// default (nil) is always Russian.
-type LanguageFunc func(ctx context.Context, customerID string) string
+// CustomerContact is what a customer-facing notification needs to know
+// about its recipient. Phone is empty for a deleted (anonymized) customer.
+type CustomerContact struct {
+	Lang  string // i18n.LangRU / i18n.LangKY; empty → default language
+	Phone string
+}
+
+// ContactLookup resolves a customer's language and phone (see
+// SQLContactLookup).
+type ContactLookup interface {
+	CustomerContact(ctx context.Context, customerID string) (CustomerContact, error)
+}
 
 // Config wires a Dispatcher. Push/Staff default to the no-op senders,
 // so a zero Config is a valid "everything disabled" dispatcher.
@@ -64,8 +72,16 @@ type Config struct {
 	Tokens TokenStore
 	Staff  notify.StaffMessenger
 	Lookup OrderInfoLookup
-	// Language picks the push language per customer; nil → Russian.
-	Language LanguageFunc
+	// Contacts resolves the customer's language (customers.lang) and phone
+	// for order-status notifications; nil → Russian, no SMS fallback.
+	Contacts ContactLookup
+	// SMS + SMSFallback: when SMSFallback is on and an order-status
+	// update reaches none of the customer's devices (no device tokens, or
+	// all of them invalid), the title is texted to the customer's phone
+	// instead. Off by default (env SMS_STATUS_FALLBACK) — every SMS costs
+	// money.
+	SMS         notify.SMSSender
+	SMSFallback bool
 	// AdminBaseURL (e.g. "https://cozy.kg") prefixes the admin order link
 	// in staff messages; empty omits the link.
 	AdminBaseURL string
@@ -98,6 +114,9 @@ func NewDispatcher(cfg Config) *Dispatcher {
 	}
 	if cfg.Staff == nil {
 		cfg.Staff = notify.NopStaffMessenger{}
+	}
+	if cfg.SMS == nil {
+		cfg.SMS = notify.NopSMSSender{}
 	}
 	if cfg.MaxInFlight <= 0 {
 		cfg.MaxInFlight = defaultMaxInFlight
@@ -204,26 +223,22 @@ func (d *Dispatcher) sendStaffNewOrder(ctx context.Context, o orders.Order) {
 }
 
 func (d *Dispatcher) pushStatus(ctx context.Context, o orders.Order, from orders.OrderStatus) {
-	lang := i18n.DefaultLang
-	if d.cfg.Language != nil {
-		if l := d.cfg.Language(ctx, o.CustomerID); l != "" {
-			lang = l
+	if _, _, ok := statusPushText(i18n.DefaultLang, o); !ok {
+		return // this status has no customer-facing notification
+	}
+	contact := d.customerContact(ctx, o)
+	title, body, _ := statusPushText(contact.Lang, o)
+
+	var tokens []string
+	if d.cfg.Tokens != nil {
+		var err error
+		tokens, err = d.cfg.Tokens.TokensForCustomer(ctx, o.CustomerID)
+		if err != nil {
+			// Unknown whether a push would have reached them — don't
+			// fall back to a paid SMS on a DB hiccup.
+			slog.Error("notifications: loading device tokens failed", "order_number", o.OrderNumber, "err", err)
+			return
 		}
-	}
-	title, body, ok := statusPushText(lang, o)
-	if !ok {
-		return
-	}
-	if d.cfg.Tokens == nil {
-		return
-	}
-	tokens, err := d.cfg.Tokens.TokensForCustomer(ctx, o.CustomerID)
-	if err != nil {
-		slog.Error("notifications: loading device tokens failed", "order_number", o.OrderNumber, "err", err)
-		return
-	}
-	if len(tokens) == 0 {
-		return
 	}
 
 	msg := push.Message{
@@ -252,7 +267,48 @@ func (d *Dispatcher) pushStatus(ctx context.Context, o orders.Order, from orders
 			slog.Error("notifications: push send failed", "order_number", o.OrderNumber, "err", err)
 		}
 	}
-	slog.Info("notifications: order status push",
-		"order_number", o.OrderNumber, "from", from, "to", o.Status,
-		"sent", sent, "invalid_tokens_removed", dropped, "failed", failed)
+	if len(tokens) > 0 {
+		slog.Info("notifications: order status push",
+			"order_number", o.OrderNumber, "from", from, "to", o.Status, "lang", contact.Lang,
+			"sent", sent, "invalid_tokens_removed", dropped, "failed", failed)
+	}
+
+	// No device reached and none merely failing transiently → the customer
+	// has no working app install: text them instead (if enabled).
+	if sent == 0 && failed == 0 && d.cfg.SMSFallback {
+		d.smsStatus(ctx, o, contact)
+	}
+}
+
+// customerContact loads the recipient's language/phone; on failure it
+// logs and falls back to the default language with no phone.
+func (d *Dispatcher) customerContact(ctx context.Context, o orders.Order) CustomerContact {
+	var c CustomerContact
+	if d.cfg.Contacts != nil {
+		var err error
+		c, err = d.cfg.Contacts.CustomerContact(ctx, o.CustomerID)
+		if err != nil {
+			slog.Warn("notifications: customer contact lookup failed", "order_number", o.OrderNumber, "err", err)
+			c = CustomerContact{}
+		}
+	}
+	if c.Lang != i18n.LangRU && c.Lang != i18n.LangKY {
+		c.Lang = i18n.DefaultLang
+	}
+	return c
+}
+
+func (d *Dispatcher) smsStatus(ctx context.Context, o orders.Order, c CustomerContact) {
+	if c.Phone == "" {
+		return // deleted customer or lookup failed
+	}
+	text, ok := statusSMSText(c.Lang, o)
+	if !ok {
+		return
+	}
+	if err := d.cfg.SMS.SendSMS(ctx, c.Phone, text); err != nil {
+		slog.Error("notifications: order status SMS failed", "order_number", o.OrderNumber, "err", err)
+		return
+	}
+	slog.Info("notifications: order status SMS fallback", "order_number", o.OrderNumber, "to", o.Status)
 }

@@ -36,3 +36,26 @@ func (l *SQLOrderInfoLookup) OrderInfo(ctx context.Context, o orders.Order) (Ord
 	}
 	return info, err
 }
+
+// SQLContactLookup reads a customer's language and phone from customers.
+// A deleted (anonymized) customer yields an empty phone, so no SMS goes to
+// the 'deleted:<id>' placeholder.
+type SQLContactLookup struct {
+	db *sql.DB
+}
+
+func NewSQLContactLookup(db *sql.DB) *SQLContactLookup {
+	return &SQLContactLookup{db: db}
+}
+
+func (l *SQLContactLookup) CustomerContact(ctx context.Context, customerID string) (CustomerContact, error) {
+	const q = `
+		SELECT lang, CASE WHEN deleted_at IS NULL THEN phone ELSE '' END
+		FROM customers WHERE id = $1`
+	var c CustomerContact
+	err := l.db.QueryRowContext(ctx, q, customerID).Scan(&c.Lang, &c.Phone)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CustomerContact{}, nil
+	}
+	return c, err
+}

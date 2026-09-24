@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/points"
 )
 
 // --- list screen view models ---
@@ -47,6 +48,12 @@ type ProductRowVM struct {
 	ToggleActiveURL string
 	DeactivateLabel string
 	DeleteURL       string
+
+	// fix/admin-ops: stock at the list's selected point (empty when no
+	// point is selected).
+	PointStockLabel string
+	PointStockFG    string
+	PointStockBG    string
 }
 
 // ProductsPageData backs products.gohtml (screen "products").
@@ -69,6 +76,98 @@ type ProductsPageData struct {
 
 	NewURL    string
 	ImportURL string
+
+	// fix/admin-ops: point selector (stock column + "нет в наличии в
+	// точке" filter) and the bulk bar.
+	CatSlug        string
+	SubSlug        string
+	PointOptions   []PointOptionVM
+	PointID        string
+	PointName      string
+	OutOfStockOnly bool
+	BulkURL        string
+	ReturnURL      string
+	BulkCategories []BulkCategoryOption
+}
+
+// BulkCategoryOption is one <option> of the bulk bar's "Сменить
+// категорию" select: top-level categories and their subcategories
+// (Label carries the "Топ / Под" path).
+type BulkCategoryOption struct {
+	ID    string
+	Label string
+}
+
+// flatCategoryOptions flattens the category tree for the bulk select.
+func flatCategoryOptions(tree []*catalog.Category) []BulkCategoryOption {
+	var out []BulkCategoryOption
+	for _, top := range tree {
+		out = append(out, BulkCategoryOption{ID: top.ID, Label: top.NameRu})
+		for _, sub := range top.Children {
+			out = append(out, BulkCategoryOption{ID: sub.ID, Label: top.NameRu + " / " + sub.NameRu})
+		}
+	}
+	return out
+}
+
+// productsPointSel is the products list's resolved ?point=&oos= state.
+type productsPointSel struct {
+	ID      string // "" = no point selected
+	Name    string
+	OOS     bool // only products with nothing in stock at ID
+	Options []PointOptionVM
+}
+
+// oosPointID is the catalog.AdminListFilter.OutOfStockAtPoint value.
+func (p productsPointSel) oosPointID() string {
+	if p.OOS {
+		return p.ID
+	}
+	return ""
+}
+
+// resolveProductsPoint validates the requested point against the known
+// points (an unknown id is dropped, and oos without a point is ignored)
+// and builds the select's options ("Все точки" first).
+func resolveProductsPoint(t tr, pts []*points.Point, requested string, oos bool) productsPointSel {
+	sel := productsPointSel{}
+	for _, p := range pts {
+		if p.ID == requested {
+			sel.ID, sel.Name = p.ID, p.Name
+		}
+	}
+	sel.OOS = oos && sel.ID != ""
+	sel.Options = append(sel.Options, PointOptionVM{ID: "", Name: t.T("admin.products.all_points_no_column"), Selected: sel.ID == ""})
+	for _, p := range pts {
+		name := p.Name
+		if !p.IsActive {
+			name += " " + t.T("admin.common.inactive_suffix")
+		}
+		sel.Options = append(sel.Options, PointOptionVM{ID: p.ID, Name: name, Selected: p.ID == sel.ID})
+	}
+	return sel
+}
+
+// withPointParams carries the point selection over to chip links, so
+// switching category keeps the stock column/filter.
+func withPointParams(chips []ChipVM, sel productsPointSel) []ChipVM {
+	if sel.ID == "" {
+		return chips
+	}
+	for i := range chips {
+		u, err := url.Parse(chips[i].URL)
+		if err != nil {
+			continue
+		}
+		q := u.Query()
+		q.Set("point", sel.ID)
+		if sel.OOS {
+			q.Set("oos", "1")
+		}
+		u.RawQuery = q.Encode()
+		chips[i].URL = u.String()
+	}
+	return chips
 }
 
 // --- form screen view models ---

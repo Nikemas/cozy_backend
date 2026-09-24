@@ -19,6 +19,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -31,8 +32,10 @@ const staticMaxAge = 10 * time.Minute
 // RegisterRoutes mounts the storefront on mux. authSvc must be the same
 // *auth.Service instance registerAPIRoutes uses for /api/v1/auth/* — the
 // web login flow calls its RequestOTP/VerifyOTP directly rather than
-// duplicating the OTP business logic.
-func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+// duplicating the OTP business logic. payProvider is the active online
+// payment provider (the same instance the JSON API uses); nil hides
+// "card online" at checkout.
+func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service, payProvider payments.Provider) error {
 	bundle, err := i18n.Load("locales")
 	if err != nil {
 		return err
@@ -61,6 +64,10 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 
 		cartRepo:  orders.NewCartRepo(db),
 		ordersSvc: orders.NewService(db),
+		zones:     orders.NewDeliveryZoneRepo(db),
+	}
+	if payProvider != nil {
+		h.paySvc = payments.NewService(db, payProvider, h.ordersSvc, cfg.PaymentsBaseURL())
 	}
 
 	session := WithSession([]byte(cfg.JWTSecret))
@@ -87,6 +94,12 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /lang", withSession(apperr.Wrap(h.langScreen)))
 	mux.Handle("POST /lang", withSession(apperr.Wrap(h.setLang)))
 	mux.Handle("GET /order/{orderNumber}/done", withSession(apperr.Wrap(h.done)))
+
+	// Online payment: where the bank (or the mock) sends the customer
+	// back, its HTMX status poll, and "pay again" — see pay_handlers.go.
+	mux.Handle("GET /pay/return/{orderID}", withSession(apperr.Wrap(h.payReturn)))
+	mux.Handle("GET /pay/return/{orderID}/status", withSession(apperr.Wrap(h.payReturnStatus)))
+	mux.Handle("POST /pay/{orderID}/retry", withSession(apperr.Wrap(h.payRetry)))
 
 	// Web login: cookie wrapper over the existing OTP service, extended
 	// with the 3rd step (name-for-a-new-customer) this task adds.

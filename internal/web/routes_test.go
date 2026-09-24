@@ -22,7 +22,7 @@ func newTestMux(t *testing.T) *http.ServeMux {
 
 	mux := http.NewServeMux()
 	cfg := &config.Config{JWTSecret: "test-secret-test-secret-test-secret", PublicBaseURL: "https://cozy.test"}
-	if err := RegisterRoutes(mux, nil, cfg, nil); err != nil {
+	if err := RegisterRoutes(mux, nil, cfg, nil, nil); err != nil {
 		t.Fatalf("RegisterRoutes: %v", err)
 	}
 	return mux

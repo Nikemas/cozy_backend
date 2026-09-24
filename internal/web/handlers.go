@@ -14,6 +14,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -42,6 +43,10 @@ type handlers struct {
 	// (not cart) to avoid colliding with the /cart screen handler below.
 	cartRepo  *orders.CartRepo
 	ordersSvc *orders.Service
+	zones     *orders.DeliveryZoneRepo
+	// paySvc runs online card payment (checkout, /pay/*); nil when no
+	// provider was configured.
+	paySvc *payments.Service
 }
 
 // t translates key into lang — used by handlers that need a translated
@@ -176,12 +181,10 @@ func (h *handlers) langScreen(w http.ResponseWriter, r *http.Request) error {
 	return h.render.Render(w, "lang", h.base(r, "lang"))
 }
 
-// setLang stores the chosen language in a long-lived cookie. Task 1
-// (Foundation) left this open for Task 4 to also persist the choice on
-// customers for a logged-in visitor; the site works fully off the cookie
-// alone (the mobile app doesn't share web language state per the tech
-// spec), so this stays cookie-only — a `lang` column on customers would
-// be a schema change with no consumer yet.
+// setLang stores the chosen language in a long-lived cookie and, for a
+// logged-in visitor, on customers.lang (migration 000032) — the language
+// order-status pushes and promo broadcasts are sent in. Saving it is
+// best-effort: a DB error is logged, the site keeps working off the cookie.
 func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
 		return apperr.BadRequest("bad_request", "некорректная форма")
@@ -191,6 +194,11 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 		lang = i18n.DefaultLang
 	}
 	setLangCookie(w, lang)
+	if customerID := CustomerID(r); customerID != "" && h.customers != nil {
+		if err := h.customers.SetLang(r.Context(), customerID, lang); err != nil {
+			slog.WarnContext(r.Context(), "web: saving customer language failed", "err", err)
+		}
+	}
 	http.Redirect(w, r, "/lang", http.StatusSeeOther)
 	return nil
 }

@@ -1,0 +1,92 @@
+{{/* audit.gohtml — fix/admin-ops (W5): Журнал действий (owner only).
+     Data is internal/admin/audit_page.go's AuditPageData; guarded with
+     {{with .Data}} for render_exec_test.go's nil-Data smoke test. */}}
+{{define "content"}}
+{{with .Data}}
+<h1>{{t "admin.audit.title"}}</h1>
+
+<form method="get" action="/admin/audit" class="admin-filterbar" role="search">
+  <div class="admin-field admin-filterbar__field">
+    <label for="audit-staff">{{t "admin.audit.entity.staff"}}</label>
+    <select id="audit-staff" name="staff">
+      {{range .StaffOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </div>
+  <div class="admin-field admin-filterbar__field">
+    <label for="audit-entity">{{t "admin.audit.col_entity"}}</label>
+    <select id="audit-entity" name="entity">
+      {{range .EntityOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </div>
+  <div class="admin-filterbar__dates">
+    <div class="admin-field admin-filterbar__field">
+      <label for="audit-from">{{t "admin.common.from"}}</label>
+      <input type="date" id="audit-from" name="from" value="{{.From}}">
+    </div>
+    <div class="admin-field admin-filterbar__field">
+      <label for="audit-to">{{t "admin.common.to"}}</label>
+      <input type="date" id="audit-to" name="to" value="{{.To}}">
+    </div>
+  </div>
+  <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
+    <label for="audit-q">{{t "admin.audit.q_label"}}</label>
+    <input type="search" id="audit-q" name="q" value="{{.Query}}" maxlength="100" placeholder="{{t "admin.audit.q_placeholder"}}">
+  </div>
+  <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.common.find"}}</button>
+  {{if .Filtered}}<a href="/admin/audit" class="admin-btn admin-btn--secondary">{{t "admin.common.reset"}}</a>{{end}}
+</form>
+
+{{if .Err}}<div class="admin-form-error" role="status">{{.Err}}</div>{{end}}
+
+<div class="admin-card">
+  {{if .Empty}}
+  <div class="admin-empty">
+    <div class="admin-empty__title">{{if .Filtered}}{{t "admin.orders.empty_filtered_title"}}{{else}}{{t "admin.audit.empty_title"}}{{end}}</div>
+    <div class="admin-empty__text">{{if .Filtered}}{{t "admin.audit.empty_filtered_text"}}{{else}}{{t "admin.audit.empty_text"}}{{end}}</div>
+  </div>
+  {{else}}
+  <div class="admin-table-wrap">
+    <table class="admin-table admin-audit-table">
+      <thead>
+        <tr>
+          <th>{{t "admin.audit.col_when"}}</th>
+          <th>{{t "admin.audit.col_who"}}</th>
+          <th>{{t "admin.audit.col_entity"}}</th>
+          <th>{{t "admin.audit.col_action"}}</th>
+          <th>{{t "admin.audit.col_what"}}</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td class="admin-table__muted">{{.When}}</td>
+          <td>{{.Staff}}</td>
+          <td>
+            {{if .EntityURL}}<a href="{{.EntityURL}}">{{.EntityLabel}}</a>{{else}}{{.EntityLabel}}{{end}}
+            {{if .EntityID}}<div class="admin-audit-table__id" title="{{.EntityID}}">{{printf "%.8s" .EntityID}}</div>{{end}}
+          </td>
+          <td>{{.ActionLabel}}</td>
+          <td>
+            {{.Summary}}
+            {{if .DetailsText}}<div class="admin-audit-table__details">{{.DetailsText}}</div>{{end}}
+          </td>
+          <td class="admin-table__muted">{{.IP}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="admin-table-footer">
+    <div class="admin-table__muted">{{.CountLabel}} · {{.PageLabel}}</div>
+    {{if or .HasPrev .HasNext}}
+    <div class="admin-orders-pager">
+      {{if .HasPrev}}<a href="{{.PrevURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.prev"}}</a>{{end}}
+      {{if .HasNext}}<a href="{{.NextURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.next"}}</a>{{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
+{{end}}

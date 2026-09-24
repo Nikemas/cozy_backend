@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -100,10 +101,12 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 		Address:  strings.TrimSpace(r.FormValue("address")),
 		IsActive: true,
 	}
-	if _, err := h.pointsRepo.Create(r.Context(), in); err != nil {
+	created, err := h.pointsRepo.Create(r.Context(), in)
+	if err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditPoint(r.Context(), audit.ActionPointCreate, created.ID, nil, in)
 
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
 }
@@ -132,6 +135,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditPoint(r.Context(), audit.ActionPointUpdate, id, current, in)
 
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
 }
@@ -154,6 +158,11 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	toggleAction := audit.ActionPointDeactivate
+	if in.IsActive {
+		toggleAction = audit.ActionPointActivate
+	}
+	h.auditPoint(r.Context(), toggleAction, id, target, in)
 
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
 }

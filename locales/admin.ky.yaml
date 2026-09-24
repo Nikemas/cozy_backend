@@ -279,6 +279,195 @@ admin.import.skipped: Ката менен өткөрүлүп жиберилди
 admin.import.row: Сап
 admin.import.run_failed: Импорттоо мүмкүн болбоду
 
+# Wave 2 screens: broadcasts, delivery zones, audit journal, bulk actions, import v2
+admin.common.yes: ооба
+admin.common.no: жок
+admin.nav.broadcasts: Жөнөтмөлөр
+admin.nav.delivery: Жеткирүү
+admin.nav.audit: Журнал
+admin.order.zone: Жеткирүү зонасы
+admin.broadcasts.status_queued: Кезекте
+admin.broadcasts.status_sending: Жөнөтүлүүдө
+admin.broadcasts.status_done: Жөнөтүлдү
+admin.broadcasts.status_failed: Ката
+admin.broadcasts.queued_toast: Жөнөтмө кезекке коюлду — статистика төмөндө жаңыланат
+admin.broadcasts.load_failed: жөнөтмөлөрдү жүктөө мүмкүн болбоду
+admin.broadcasts.search_failed: издөөдө ката кетти
+admin.broadcasts.note_who: Push-билдирүүнү «Акциялар жана арзандатуулар» күйгүзүлгөн жана тиркеме орнотулган сатып алуучулар алат.
+admin.broadcasts.note_now: "Азыр:"
+admin.broadcasts.devices_short: түзмөк
+admin.broadcasts.customers: сатып алуучу
+admin.broadcasts.note_lang: Текст сатып алуучунун тилинде жөнөтүлөт; кыргызча текст толтурулбаса — орусчасы жөнөтүлөт.
+admin.broadcasts.confirm_text: Push-билдирүүнү %d түзмөк (%d сатып алуучу) алат. Ырастагандан кийин жөнөтүүнү жокко чыгарууга болбойт.
+admin.broadcasts.confirm_title: Жөнөтмөнү жөнөтөсүзбү?
+admin.broadcasts.send: Жөнөтүү
+admin.broadcasts.title: Аталышы
+admin.broadcasts.body: Текст
+admin.broadcasts.body_placeholder: Билдирүүнүн тексти
+admin.broadcasts.ky_empty_hint: Бош болсо — орусчасы жөнөтүлөт
+admin.broadcasts.link_legend: Push кайда алып барат
+admin.broadcasts.link_app: Тиркемени ачуу
+admin.broadcasts.product_search: Аталышын же брендин жаза баштаңыз
+admin.broadcasts.picked: Тандалды
+admin.broadcasts.choose: — тандаңыз —
+admin.broadcasts.preview: Алдын ала көрүү
+admin.broadcasts.history: Тарых
+admin.broadcasts.empty: Азырынча жөнөтмөлөр болгон жок
+admin.broadcasts.link: шилтеме
+admin.broadcasts.stat_targets: алуучулар
+admin.broadcasts.stat_sent: жеткирилди
+admin.broadcasts.stat_failed: каталар
+admin.broadcasts.stat_invalid: жараксыз токендер өчүрүлдү
+admin.broadcasts.opens_product: Товарды ачат
+admin.broadcasts.no_product: Товар тандалган жок
+admin.broadcasts.opens_category: Категорияны ачат
+admin.broadcasts.no_category: Категория тандалган жок
+admin.broadcasts.opens_app: Тиркемени ачат
+admin.broadcasts.pick_product: Тизмеден товар тандаңыз
+admin.delivery.load_failed: жеткирүү зоналарын жүктөө мүмкүн болбоду
+admin.delivery.err_amount: сумма сан болушу керек
+admin.delivery.err_fee_required: жеткирүүнүн баасын көрсөтүңүз
+admin.delivery.err_sort_order: тартиби бүтүн сан болушу керек
+admin.delivery.note: "Сатып алуучу жеткирүүнү тариздөөдө зонаны тандайт; баасын сервер эсептейт: зонанын баасы, же товарлардын суммасы «акысыз жеткирүүнүн чегинен» кем эмес болсо — 0."
+admin.delivery.pickup_free: Өзү алып кетүү ар дайым акысыз.
+admin.delivery.no_zones_flat: Азыр активдүү зоналар жок — бардык даректерге жеткирүү %s сом (DELIVERY_FEE_SOM).
+admin.delivery.add: Зона кошуу
+admin.delivery.empty: Азырынча жеткирүү зоналары жок
+admin.delivery.free_from_short: "%s сомдон баштап акысыз"
+admin.delivery.edit_aria: "«%s» зонасын өзгөртүү"
+admin.delivery.deactivate_text: "«%s» зонасы буйрутма тариздөөдө сунушталбай калат. Тариздалган буйрутмалар өзгөрбөйт."
+admin.delivery.deactivate_title: Зонаны активсиздештиресизби?
+admin.delivery.delete_text: "«%s» зонасын өчүрөсүзбү? Буйрутмалары бар зонаны өчүрүүгө болбойт — активсиздештирсеңиз гана болот."
+admin.delivery.delete_title: Зонаны өчүрөсүзбү?
+admin.delivery.delete_aria: "«%s» зонасын өчүрүү"
+admin.delivery.new_title: Жаңы жеткирүү зонасы
+admin.delivery.edit_title: Зонаны түзөтүү
+admin.delivery.fee: Баасы, сом
+admin.delivery.free_from: Акысыз жеткирүүнүн чеги, сом
+admin.delivery.not_set: көрсөтүлгөн эмес
+admin.audit.title: Аракеттер журналы
+admin.audit.entity.product: Товар
+admin.audit.entity.variant: Вариация
+admin.audit.entity.stock: Калдык
+admin.audit.entity.order: Буйрутма
+admin.audit.entity.category: Категория
+admin.audit.entity.point: Сатуу жайы
+admin.audit.entity.staff: Кызматкер
+admin.audit.action.create: Түзүү
+admin.audit.action.update: Өзгөртүү
+admin.audit.action.activate: Активдештирүү
+admin.audit.action.deactivate: Активсиздештирүү
+admin.audit.action.delete: Өчүрүү
+admin.audit.action.category: Категорияны алмаштыруу
+admin.audit.action.images: Сүрөттөр
+admin.audit.action.stock: Калдыкты өзгөртүү
+admin.audit.action.password: Сырсөздү жаңылоо
+admin.audit.action.order_status: Абалын өзгөртүү
+admin.audit.field.category: категория
+admin.audit.field.name_ru: аталышы (орусча)
+admin.audit.field.name_ky: аталышы (кыргызча)
+admin.audit.field.description_ru: сыпаттамасы (орусча)
+admin.audit.field.description_ky: сыпаттамасы (кыргызча)
+admin.audit.field.brand: бренд
+admin.audit.field.price: баасы
+admin.audit.field.quantity: саны
+admin.audit.field.point: сатуу жайы
+admin.audit.field.is_active: активдүү
+admin.audit.field.name: аталышы
+admin.audit.field.address: дареги
+admin.audit.field.phone: телефон
+admin.audit.field.role: ролу
+admin.audit.field.size: өлчөм
+admin.audit.field.color: түс
+admin.audit.field.sku: артикул
+admin.audit.field.price_override: вариациянын баасы
+admin.audit.field.slug: slug
+admin.audit.field.sort_order: тартиби
+admin.audit.field.parent: негизги категория
+admin.audit.err_from: башталыш күнү ЖЖЖЖ-АА-КК форматында болушу керек
+admin.audit.err_to: аяктоо күнү ЖЖЖЖ-АА-КК форматында болушу керек
+admin.audit.err_range: башталыш күнү аяктоо күнүнөн кеч
+admin.audit.all_staff: Бардык кызматкерлер
+admin.audit.staff_inactive: (өчүрүлгөн)
+admin.audit.all_entities: Бардык объекттер
+admin.audit.page_of: "%d/%d-барак"
+admin.audit.col_entity: Объект
+admin.audit.col_when: Качан
+admin.audit.col_who: Ким
+admin.audit.col_action: Аракет
+admin.audit.col_what: Эмне өзгөрдү
+admin.audit.q_label: Объекттин ID же буйрутма №
+admin.audit.q_placeholder: мисалы, 3f2a9c же COZY-20260924-001
+admin.audit.empty_title: Журнал бош
+admin.audit.empty_filtered_text: Чыпкаларды өзгөртүп көрүңүз
+admin.audit.empty_text: Бул жерде товарлардын, калдыктардын, буйрутмалардын, сатуу жайларынын жана кызматкерлердин өзгөрүүлөрү көрүнөт
+admin.plural.record.one: жазуу
+admin.plural.record.few: жазуу
+admin.plural.record.many: жазуу
+admin.plural.product_gen.one: товар
+admin.plural.product_gen.few: товар
+admin.plural.product_gen.many: товар
+admin.bulk.selected: Тандалды
+admin.bulk.new_status: Жаңы абал
+admin.bulk.orders_title: Буйрутмалардын абалын өзгөртөсүзбү?
+admin.bulk.orders_confirm: Тандалган буйрутмаларга ({n}) «{value}» абалы коюлат. Мындай өтүүгө болбогон буйрутмалар өзгөрүүсүз калат — алардын тизмеси колдонулгандан кийин көрсөтүлөт.
+admin.bulk.apply: Колдонуу
+admin.bulk.select_all_orders: Беттеги бардык буйрутмаларды тандоо
+admin.bulk.select_order: "%s буйрутмасын тандоо"
+admin.bulk.select_all_products: Беттеги бардык товарларды тандоо
+admin.bulk.select_product: "«%s» тандоо"
+admin.bulk.activate_title: Товарларды активдештиресизби?
+admin.bulk.activate_confirm: Тандалган товарлар ({n}) каталогдо көрүнөт.
+admin.bulk.deactivate_title: Товарларды активсиздештиресизби?
+admin.bulk.deactivate_confirm: Тандалган товарлар ({n}) каталогдо көрүнбөй калат.
+admin.bulk.new_category: Жаңы категория
+admin.bulk.category_title: Категорияны алмаштырасызбы?
+admin.bulk.category_confirm: Тандалган товарлар ({n}) «{value}» категориясына которулат.
+admin.bulk.category_button: Категорияны алмаштыруу
+admin.bulk.choose_status: Абалды тандаңыз
+admin.bulk.status_done: "«%s» абалы коюлду: %d / %d"
+admin.bulk.and_more: … жана дагы %d
+admin.bulk.already_in_status: буга чейин эле ушул абалда
+admin.bulk.none_selected: Бир да сап тандалган жок
+admin.bulk.too_many: Бир жолу %d саптан ашык өзгөртүүгө болбойт
+admin.bulk.unknown_action: Белгисиз аракет
+admin.bulk.products_done: "Даяр: %d / %d %s өзгөртүлдү"
+admin.products.all_points_no_column: Бардык сатуу жайлары (тилкесиз)
+admin.products.stock_at_point: Сатуу жайындагы калдык
+admin.products.oos_only: Ушул сатуу жайында жоктор гана
+admin.products.at_point: Сатуу жайында
+admin.import.template: Үлгүнү жүктөп алуу
+admin.import.point_label: "«Калдык» тилкеси үчүн сатуу жайы"
+admin.import.loading: Жүктөлүүдө…
+admin.import.check: Текшерүү
+admin.import.run: Импорттоо
+admin.import.model: Модель
+admin.import.reason: Себеби
+admin.import.file: Файл
+admin.import.no_points: Активдүү сатуу жайлары жок — калдыктар жүктөлбөйт
+admin.import.default_point: Биринчи активдүү сатуу жайы (демейки)
+admin.import.st_created: түзүлдү
+admin.import.st_will_create: түзүлөт
+admin.import.st_updated: жаңыланды
+admin.import.st_will_update: жаңыланат
+admin.import.st_skipped: өткөрүлдү
+admin.import.st_will_skip: өткөрүлөт
+admin.import.st_error: ката
+admin.import.dry_errors: "Текшерүү: каталар бар. Эч нерсе жазылган жок — файлды оңдоңуз же туура моделдерди гана импорттоңуз."
+admin.import.dry_ok: Текшерүү ийгиликтүү, эч нерсе жазылган жок. Импорттосоңуз болот.
+admin.import.rows: Саптар
+admin.import.with_errors: ката менен
+admin.import.will_not: Импорттолбойт
+admin.import.not_imported: Импорттолгон жок
+admin.import.confirm_run: Файл азырынча катасыз текшерилген жок. Азыр импорттойсузбу? Туура моделдер жазылат, катасы барлары өткөрүлөт.
+admin.apperr.invalid_broadcast: орусча аталышын жана текстин толтуруңуз (аталышы 65, тексти 240 белгиден ашпасын)
+admin.apperr.invalid_broadcast_link: шилтеме үчүн товарды же категорияны тандаңыз
+admin.apperr.invalid_submit_token: форма эскирди — баракты жаңылаңыз
+admin.apperr.broadcast_not_found: жөнөтмө табылган жок
+admin.apperr.invalid_delivery_zone_input: "жеткирүү зонасынын талааларын текшериңиз: эки тилдеги аталышы милдеттүү, баасы — 0дон кем эмес сан"
+admin.apperr.delivery_zone_not_found: жеткирүү зонасы табылган жок
+admin.apperr.delivery_zone_in_use: бул зона боюнча буйрутмалар бар — аны активсиздештирсеңиз гана болот
+
 # Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
 admin.err.generic: ката кетти, кайра аракет кылыңыз
 admin.err.form: форманы окуу мүмкүн болбоду

@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/dbtx"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -46,7 +47,8 @@ type stockPageStore interface {
 }
 
 type stockPageRepo struct {
-	db *sql.DB
+	db    *sql.DB
+	audit *audit.Log // nil = no journal
 }
 
 func newStockPageRepo(db *sql.DB) *stockPageRepo { return &stockPageRepo{db: db} }
@@ -109,7 +111,15 @@ func (r *stockPageRepo) Apply(ctx context.Context, changes []stockCellChange) er
 		idByKey[c.RowKey] = c.RowKey
 	}
 	return dbtx.WithTx(ctx, r.db, func(tx *sql.Tx) error {
-		return applyStockChangesTx(ctx, tx, idByKey, changes)
+		if err := applyStockChangesTx(ctx, tx, idByKey, changes); err != nil {
+			return err
+		}
+		if r.audit.Enabled() {
+			r.audit.RecordTxFunc(ctx, tx, func() ([]audit.Entry, error) {
+				return stockEntriesTx(ctx, tx, idByKey, changes)
+			})
+		}
+		return nil
 	})
 }
 

@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
@@ -15,36 +17,37 @@ import (
 // exhaust server memory before format detection has even run.
 const maxImportUploadSize = 20 << 20 // 20 MiB
 
-// RegisterAdminImportRoutes mounts POST /admin/products/import — bulk
-// product import from a CSV or Excel file, per §8 of the ТЗ. This path is
-// deliberately NOT under /admin/api/, unlike every other admin write
-// endpoint in this codebase — that's what the ТЗ and the Task acceptance
-// criteria both call for, so it's kept as-is rather than "corrected" to
-// match the rest of the admin API's prefix.
-//
-// Not wired into cmd/server/main.go by this change — see the accompanying
-// task notes: registerAdminRoutes is under heavy concurrent edit from other
-// Wave 3 work right now, so leaving the one-line call for whoever merges
-// next avoids adding a collision point to an already busy function.
-func RegisterAdminImportRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
-	deps := catalog.ImportDeps{
-		Categories: catalog.NewCategoryRepo(db),
-		Products:   catalog.NewProductRepo(db),
-		Variants:   catalog.NewVariantRepo(db),
-		Stock:      catalog.NewStockRepo(db),
-	}
-
-	managerOnly := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
-	mux.Handle("POST /admin/products/import", managerOnly(apperr.Wrap(importProductsHandler(deps))))
+// importBackend is everything the import endpoints need from the
+// database; *catalog.SQLImportStore implements it, tests use a fake.
+type importBackend interface {
+	catalog.ImportStore
+	ActivePoints(ctx context.Context) ([]catalog.ImportPoint, error)
+	TemplateCategories(ctx context.Context) ([]catalog.TemplateCategory, error)
 }
 
-// importProductsHandler extracts the uploaded file from a multipart
-// request, detects its format from the filename extension and/or
-// Content-Type, and delegates the actual parsing/validation/import to
-// catalog.ImportProducts. It takes deps (rather than concrete *catalog.*
-// repo types) so tests can drive it end-to-end with fakes, without a live
-// database.
-func importProductsHandler(deps catalog.ImportDeps) apperr.HandlerFunc {
+// RegisterAdminImportRoutes mounts the bulk product import (§8 of the ТЗ),
+// owner/manager only:
+//
+//	POST /admin/products/import          — multipart: file (.csv/.xlsx),
+//	                                       dry_run (1 = check only), point_id
+//	GET  /admin/products/import/template — the .xlsx template
+//	GET  /admin/products/import/points   — active points for the stock target
+//
+// Deliberately NOT under /admin/api/, unlike the other admin JSON
+// endpoints — that's the path the ТЗ names. The HTML page itself
+// (GET /admin/products/import) lives in internal/admin.
+func RegisterAdminImportRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
+	store := catalog.NewSQLImportStore(db)
+	managerOnly := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
+	mux.Handle("POST /admin/products/import", managerOnly(apperr.Wrap(importProductsHandler(store))))
+	mux.Handle("GET /admin/products/import/template", managerOnly(apperr.Wrap(importTemplateHandler(store))))
+	mux.Handle("GET /admin/products/import/points", managerOnly(apperr.Wrap(importPointsHandler(store))))
+}
+
+// importProductsHandler extracts the uploaded file, detects its format and
+// runs catalog.ImportProducts. Per-row problems are part of the 200
+// response; only an unusable request/file is an HTTP error.
+func importProductsHandler(store catalog.ImportStore) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		r.Body = http.MaxBytesReader(w, r.Body, maxImportUploadSize)
 		if err := r.ParseMultipartForm(maxImportUploadSize); err != nil {
@@ -57,17 +60,52 @@ func importProductsHandler(deps catalog.ImportDeps) apperr.HandlerFunc {
 		}
 		defer func() { _ = file.Close() }()
 
-		// Detected — and rejected, if unrecognized — before any parsing is
-		// attempted, per the task's acceptance criteria.
+		// Detected — and rejected, if unrecognized — before any parsing.
 		format, ok := catalog.DetectImportFormat(header.Filename, header.Header.Get("Content-Type"))
 		if !ok {
 			return apperr.BadRequest("unsupported_format", "поддерживаются только файлы .csv и .xlsx")
 		}
 
-		result, err := catalog.ImportProducts(r.Context(), file, format, deps)
+		dryRun, _ := strconv.ParseBool(r.FormValue("dry_run"))
+		result, err := catalog.ImportProducts(r.Context(), file, format, store, catalog.ImportOptions{
+			DryRun:  dryRun,
+			PointID: r.FormValue("point_id"),
+		})
 		if err != nil {
 			return err
 		}
 		return writeJSON(w, http.StatusOK, result)
+	}
+}
+
+// importTemplateHandler serves the .xlsx template, with the current
+// categories on a reference sheet.
+func importTemplateHandler(b importBackend) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		cats, err := b.TemplateCategories(r.Context())
+		if err != nil {
+			return err
+		}
+		data, err := catalog.BuildImportTemplate(cats)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", `attachment; filename="cozy_import_template.xlsx"`)
+		w.Header().Set("Cache-Control", "no-store")
+		_, err = w.Write(data)
+		return err
+	}
+}
+
+// importPointsHandler lists active points of sale; the first one is the
+// default stock target.
+func importPointsHandler(b importBackend) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		points, err := b.ActivePoints(r.Context())
+		if err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, map[string]any{"points": points})
 	}
 }

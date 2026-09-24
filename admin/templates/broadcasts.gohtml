@@ -1,0 +1,278 @@
+{{/* broadcasts.gohtml — "Рассылки" (W2 fix/promo-push): promo push to
+     customers who kept "Акции и скидки" on. Owner + manager. .Data is
+     admin.broadcastsPageData (internal/admin/broadcasts_page.go). The form
+     posts once per render (hidden submit_token = idempotency key), after
+     the shared confirm dialog (form[data-confirm], layout.gohtml). */}}
+{{define "content"}}
+<style>
+  /* .admin-field is display:flex, which would beat the [hidden] UA rule. */
+  #bc-form [hidden] { display: none !important; }
+  .bc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+  @media (max-width: 1023px) { .bc-grid { grid-template-columns: minmax(0, 1fr); } }
+  .bc-textarea { min-height: 84px; resize: vertical; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field);
+    padding: 10px 14px; font-size: 15px; color: var(--admin-text); background: var(--admin-surface); outline: none; }
+  .bc-count { font-size: 12px; color: var(--admin-muted); text-align: right; }
+  .bc-count--over { color: var(--admin-danger); font-weight: 600; }
+  .bc-lang-title { font-size: 13px; font-weight: 700; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 10px; }
+  .bc-radios { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; }
+  .bc-radios label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+  .bc-results { border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); max-height: 220px; overflow-y: auto; }
+  .bc-results button { display: block; width: 100%; text-align: left; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--admin-border);
+    background: var(--admin-surface); font-size: 14px; cursor: pointer; }
+  .bc-results button:hover, .bc-results button:focus { background: #FAFAF8; }
+  .bc-picked { font-size: 14px; font-weight: 600; margin-top: 8px; }
+  .bc-preview { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
+  .bc-notif { background: #F3F2EF; border-radius: 18px; padding: 12px 14px; font-size: 13px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .bc-notif__app { font-size: 11px; color: var(--admin-muted); margin-bottom: 4px; }
+  .bc-notif__title { font-weight: 700; color: var(--admin-text); word-break: break-word; }
+  .bc-notif__body { color: var(--admin-text); word-break: break-word; white-space: pre-line; }
+  .bc-notif__link { font-size: 11px; color: var(--admin-muted); margin-top: 6px; }
+  .bc-stats { font-size: 13px; color: var(--admin-muted); font-variant-numeric: tabular-nums; }
+  .bc-stats b { color: var(--admin-text); }
+</style>
+<div class="admin-screen-narrow" style="max-width:1200px">
+{{with .Data}}
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+
+  <div class="admin-list-note" style="max-width:none">
+    {{t "admin.broadcasts.note_who"}}
+    {{t "admin.broadcasts.note_now"}} <b>{{.Devices}}</b> {{t "admin.broadcasts.devices_short"}} / <b>{{.Customers}}</b> {{t "admin.broadcasts.customers"}}. {{t "admin.broadcasts.note_lang"}}
+  </div>
+
+  <div class="bc-grid">
+    <form method="post" action="/admin/broadcasts" id="bc-form" class="admin-card admin-card--pad"
+          data-confirm="{{tf "admin.broadcasts.confirm_text" .Devices .Customers}}"
+          data-confirm-title="{{t "admin.broadcasts.confirm_title"}}" data-confirm-label="{{t "admin.broadcasts.send"}}">
+      <input type="hidden" name="submit_token" value="{{.SubmitToken}}">
+
+      <div class="bc-lang-title">{{t "admin.lang.ru_title"}}</div>
+      <div class="admin-field">
+        <label for="bc-title-ru">{{t "admin.broadcasts.title"}}</label>
+        <input id="bc-title-ru" name="title_ru" value="{{.Form.TitleRU}}" required maxlength="{{.MaxTitle}}" data-count="{{.MaxTitle}}" placeholder="Скидки до 30% на кроссовки">
+      </div>
+      <div class="admin-field">
+        <label for="bc-body-ru">{{t "admin.broadcasts.body"}}</label>
+        <textarea id="bc-body-ru" name="body_ru" class="bc-textarea" required maxlength="{{.MaxBody}}" data-count="{{.MaxBody}}" placeholder="Только до воскресенья — успейте выбрать свою пару">{{.Form.BodyRU}}</textarea>
+      </div>
+
+      <div class="bc-lang-title">{{t "admin.lang.ky_title"}}</div>
+      <div class="admin-field">
+        <label for="bc-title-ky">{{t "admin.broadcasts.title"}}</label>
+        <input id="bc-title-ky" name="title_ky" value="{{.Form.TitleKY}}" maxlength="{{.MaxTitle}}" data-count="{{.MaxTitle}}" placeholder="{{t "admin.broadcasts.ky_empty_hint"}}">
+      </div>
+      <div class="admin-field">
+        <label for="bc-body-ky">{{t "admin.broadcasts.body"}}</label>
+        <textarea id="bc-body-ky" name="body_ky" class="bc-textarea" maxlength="{{.MaxBody}}" data-count="{{.MaxBody}}" placeholder="{{t "admin.broadcasts.ky_empty_hint"}}">{{.Form.BodyKY}}</textarea>
+      </div>
+
+      <fieldset style="border:0;padding:0;margin:0 0 8px">
+        <legend class="bc-lang-title">{{t "admin.broadcasts.link_legend"}}</legend>
+        <div class="bc-radios">
+          <label><input type="radio" name="link_type" value="" {{if eq .Form.LinkType ""}}checked{{end}}> {{t "admin.broadcasts.link_app"}}</label>
+          <label><input type="radio" name="link_type" value="product" {{if eq .Form.LinkType "product"}}checked{{end}}> {{t "admin.stock.col_product"}}</label>
+          <label><input type="radio" name="link_type" value="category" {{if eq .Form.LinkType "category"}}checked{{end}}> {{t "admin.common.category"}}</label>
+        </div>
+      </fieldset>
+
+      <div class="admin-field" id="bc-product-field" hidden>
+        <label for="bc-product-q">{{t "admin.stock.col_product"}}</label>
+        <input id="bc-product-q" type="search" autocomplete="off" placeholder="{{t "admin.broadcasts.product_search"}}" aria-controls="bc-product-results">
+        <div id="bc-product-results" class="bc-results" hidden></div>
+        <input type="hidden" name="product_id" id="bc-product-id" value="{{.Form.ProductID}}">
+        <input type="hidden" name="product_label" id="bc-product-label" value="{{.Form.ProductLabel}}">
+        <div class="bc-picked" id="bc-product-picked" aria-live="polite">{{if .Form.ProductLabel}}{{t "admin.broadcasts.picked"}}: {{.Form.ProductLabel}}{{end}}</div>
+      </div>
+
+      <div class="admin-field" id="bc-category-field" hidden>
+        <label for="bc-category">{{t "admin.common.category"}}</label>
+        <select id="bc-category" name="category_id">
+          <option value="">{{t "admin.broadcasts.choose"}}</option>
+          {{$cat := .Form.CategoryID}}
+          {{range .Categories}}<option value="{{.ID}}" {{if eq .ID $cat}}selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </div>
+
+      <div class="admin-modal__actions" style="justify-content:flex-start">
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.broadcasts.send"}}…</button>
+      </div>
+    </form>
+
+    <div class="bc-preview" aria-label="{{t "admin.broadcasts.preview"}}">
+      <div class="bc-lang-title">{{t "admin.broadcasts.preview"}}</div>
+      <div class="bc-notif">
+        <div class="bc-notif__app">Cozy · RU</div>
+        <div class="bc-notif__title" id="bc-prev-title-ru"></div>
+        <div class="bc-notif__body" id="bc-prev-body-ru"></div>
+        <div class="bc-notif__link" data-prev-link></div>
+      </div>
+      <div class="bc-notif">
+        <div class="bc-notif__app">Cozy · KY</div>
+        <div class="bc-notif__title" id="bc-prev-title-ky"></div>
+        <div class="bc-notif__body" id="bc-prev-body-ky"></div>
+        <div class="bc-notif__link" data-prev-link></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bc-lang-title" style="margin-top:8px">{{t "admin.broadcasts.history"}}</div>
+  <div class="admin-row-list" id="bc-history">
+    {{if not .History}}<div class="admin-row-list__empty">{{t "admin.broadcasts.empty"}}</div>{{end}}
+    {{range .History}}
+    <div class="admin-row" data-bc-id="{{.ID}}"{{if .Active}} data-bc-active="1"{{end}}>
+      <div class="admin-row__info">
+        <div class="admin-row__title">{{.Title}}</div>
+        <div class="admin-row__subtitle">{{.DateLabel}} · {{if .Author}}{{.Author}}{{else}}—{{end}}{{if .LinkLabel}} · {{t "admin.broadcasts.link"}}: {{.LinkLabel}}{{end}}</div>
+        <div class="bc-stats" data-bc-stats>
+          {{t "admin.broadcasts.stat_targets"}} <b data-k="targets">{{.Targets}}</b> · {{t "admin.broadcasts.stat_sent"}} <b data-k="sent">{{.Sent}}</b> · {{t "admin.broadcasts.stat_failed"}} <b data-k="failed">{{.Failed}}</b> · {{t "admin.broadcasts.stat_invalid"}} <b data-k="invalid_removed">{{.Invalid}}</b>
+        </div>
+        {{if .Error}}<div class="bc-stats" style="color:var(--admin-danger)">{{.Error}}</div>{{end}}
+      </div>
+      <span class="admin-chip {{.ChipClass}}" data-bc-chip>{{.StatusLabel}}</span>
+    </div>
+    {{end}}
+  </div>
+{{end}}
+</div>
+<script>
+(function () {
+  var form = document.getElementById('bc-form');
+  if (!form) return;
+  function $(id) { return document.getElementById(id); }
+  var L = {
+    opensProduct: {{t "admin.broadcasts.opens_product"}},
+    noProduct: {{t "admin.broadcasts.no_product"}},
+    opensCategory: {{t "admin.broadcasts.opens_category"}},
+    noCategory: {{t "admin.broadcasts.no_category"}},
+    opensApp: {{t "admin.broadcasts.opens_app"}},
+    title: {{t "admin.broadcasts.title"}},
+    body: {{t "admin.broadcasts.body_placeholder"}},
+    nothing: {{t "admin.orders.empty_filtered_title"}},
+    picked: {{t "admin.broadcasts.picked"}},
+    pickProduct: {{t "admin.broadcasts.pick_product"}}
+  };
+
+  // Character counters under every field with data-count.
+  form.querySelectorAll('[data-count]').forEach(function (el) {
+    var max = parseInt(el.getAttribute('data-count'), 10);
+    var counter = document.createElement('div');
+    counter.className = 'bc-count';
+    el.insertAdjacentElement('afterend', counter);
+    function upd() {
+      var n = Array.from(el.value).length;
+      counter.textContent = n + ' / ' + max;
+      counter.classList.toggle('bc-count--over', n > max);
+    }
+    el.addEventListener('input', upd);
+    upd();
+  });
+
+  // Live preview; empty KY falls back to RU, like the server does.
+  function linkText() {
+    var type = (form.querySelector('input[name=link_type]:checked') || {}).value || '';
+    if (type === 'product') return $('bc-product-label').value ? L.opensProduct + ': ' + $('bc-product-label').value : L.noProduct;
+    if (type === 'category') {
+      var sel = $('bc-category');
+      return sel.value ? L.opensCategory + ': ' + sel.options[sel.selectedIndex].text : L.noCategory;
+    }
+    return L.opensApp;
+  }
+  function preview() {
+    var tRu = $('bc-title-ru').value.trim(), bRu = $('bc-body-ru').value.trim();
+    var tKy = $('bc-title-ky').value.trim() || tRu, bKy = $('bc-body-ky').value.trim() || bRu;
+    $('bc-prev-title-ru').textContent = tRu || L.title;
+    $('bc-prev-body-ru').textContent = bRu || L.body;
+    $('bc-prev-title-ky').textContent = tKy || L.title;
+    $('bc-prev-body-ky').textContent = bKy || L.body;
+    document.querySelectorAll('[data-prev-link]').forEach(function (el) { el.textContent = linkText(); });
+  }
+
+  // Link type switches which picker is shown.
+  function syncLinkType() {
+    var type = (form.querySelector('input[name=link_type]:checked') || {}).value || '';
+    $('bc-product-field').hidden = type !== 'product';
+    $('bc-category-field').hidden = type !== 'category';
+    $('bc-category').required = type === 'category';
+    preview();
+  }
+  form.querySelectorAll('input[name=link_type]').forEach(function (r) { r.addEventListener('change', syncLinkType); });
+  $('bc-category').addEventListener('change', preview);
+  form.addEventListener('input', preview);
+
+  // Product search (GET /admin/broadcasts/products?q=).
+  var q = $('bc-product-q'), results = $('bc-product-results'), timer = null, seq = 0;
+  q.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var term = q.value.trim(), my = ++seq;
+      if (term.length < 2) { results.hidden = true; results.innerHTML = ''; return; }
+      fetch('/admin/broadcasts/products?q=' + encodeURIComponent(term), { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (items) {
+          if (my !== seq) return;
+          results.innerHTML = '';
+          if (!items.length) {
+            var none = document.createElement('div');
+            none.className = 'admin-row-list__empty';
+            none.textContent = L.nothing;
+            results.appendChild(none);
+          }
+          items.forEach(function (it) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = it.label;
+            b.addEventListener('click', function () {
+              $('bc-product-id').value = it.id;
+              $('bc-product-label').value = it.label;
+              $('bc-product-picked').textContent = L.picked + ': ' + it.label;
+              results.hidden = true;
+              q.value = '';
+              preview();
+            });
+            results.appendChild(b);
+          });
+          results.hidden = false;
+        })
+        .catch(function () {});
+    }, 250);
+  });
+
+  // The confirm dialog only opens for a form the browser considers valid,
+  // plus a picked product when linking to one. Registered on window in the
+  // capture phase so it runs before layout.gohtml's form[data-confirm]
+  // listener (document, capture).
+  window.addEventListener('submit', function (evt) {
+    if (evt.target !== form) return;
+    var type = (form.querySelector('input[name=link_type]:checked') || {}).value || '';
+    if (type === 'product' && !$('bc-product-id').value) {
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      $('bc-product-picked').textContent = L.pickProduct;
+      q.focus();
+    }
+  }, true);
+
+  syncLinkType();
+
+  // Live stats for queued/sending broadcasts.
+  function poll() {
+    var rows = document.querySelectorAll('[data-bc-active]');
+    if (!rows.length) return;
+    rows.forEach(function (row) {
+      fetch('/admin/broadcasts/' + encodeURIComponent(row.getAttribute('data-bc-id')) + '/stats', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return;
+          row.querySelectorAll('[data-k]').forEach(function (el) { el.textContent = s[el.getAttribute('data-k')]; });
+          var chip = row.querySelector('[data-bc-chip]');
+          chip.textContent = s.status_label;
+          chip.className = 'admin-chip ' + s.chip_class;
+          if (!s.active) row.removeAttribute('data-bc-active');
+        })
+        .catch(function () {});
+    });
+    setTimeout(poll, 3000);
+  }
+  setTimeout(poll, 1500);
+})();
+</script>
+{{end}}

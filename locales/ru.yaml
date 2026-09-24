@@ -246,3 +246,29 @@ shop.results.one: товар
 shop.results.few: товара
 shop.results.many: товаров
 filter.title: Фильтры
+
+# fix/checkout-payments: delivery zones, online payment.
+cart.from_amount: от %s
+checkout.zone: Зона доставки
+checkout.zone_free: бесплатно
+checkout.zone_free_from: бесплатно от %s
+checkout.payment: Оплата
+checkout.payment_cash: Наличными или картой при получении
+checkout.payment_card: Картой онлайн
+checkout.place_and_pay: Перейти к оплате
+screen.pay_return.title: Оплата заказа
+pay.return.paid: Оплата прошла
+pay.return.pending: Ждём подтверждения оплаты
+pay.return.pending_text: Обычно это занимает несколько секунд — страница обновится сама.
+pay.return.timed_out: Банк ещё не подтвердил оплату. Обновите страницу чуть позже или оплатите снова.
+pay.return.failed: Оплата не прошла
+pay.return.failed_text: Банк отклонил платёж. Заказ сохранён — можно попробовать оплатить ещё раз.
+pay.return.cancelled: Заказ отменён
+pay.return.cancelled_text: Оплата не была завершена, товары вернулись в продажу. Оформите заказ заново.
+pay.return.retry: Оплатить снова
+pay.return.refresh: Обновить статус
+pay.return.back_to_app: Вернуться в приложение
+pay.return.app_title: Оплата завершена
+pay.return.app_text: Если вы оплачивали заказ в приложении Cozy, вернитесь в него — статус оплаты виден в заказе.
+pay.return.login: Войти на сайт
+pay.return.my_orders: Мои заказы

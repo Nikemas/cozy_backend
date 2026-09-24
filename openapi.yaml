@@ -283,8 +283,11 @@ paths:
       tags: [Customer]
       summary: List favorited products
       description: |
-        Returns full `Product` objects (not bare IDs) — the mobile favorites
-        screen needs to render cards directly. A product that's since gone
+        Returns full product objects, newest favorite first — each item has
+        exactly the `GET /api/v1/products/{id}` shape (`images`, `variants`
+        with per-point `stock`), so the app renders the list and opens a
+        product without a request per item. Served with a constant number of
+        queries regardless of list length. A product that's since gone
         inactive/deleted is silently skipped rather than failing the request.
       security: [{ customerBearerAuth: [] }]
       responses:
@@ -294,7 +297,7 @@ paths:
             application/json:
               schema:
                 type: object
-                properties: { items: { type: array, items: { $ref: "#/components/schemas/Product" } } }
+                properties: { items: { type: array, items: { $ref: "#/components/schemas/ProductDetailResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/v1/favorites/{productId}:
@@ -383,6 +386,14 @@ paths:
         registered to a different customer (app reinstall, account switch on
         the same device), ownership moves to the current customer rather
         than erroring.
+
+        Pushes sent to a registered token (title/body in the customer's
+        `lang`, see `CustomerProfile`), FCM `data` payload:
+        - order status: `{"type":"order_status","order_id":"<uuid>","status":"<status>"}`,
+          Android channel `orders`;
+        - promo broadcast (admin "Рассылки", only while `promo_push` is on):
+          `{"type":"promo","link":"<path>"}` where `link` is `/product/<id>`,
+          `/catalog?category=<id>` or `""` (just open the app); default channel.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
@@ -440,7 +451,12 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
     put:
       tags: [Customer]
-      summary: Update the logged-in customer's name
+      summary: Update the logged-in customer's profile (partial)
+      description: |
+        Partial update: every field is optional and an absent field is left
+        unchanged — e.g. `{"promo_push": false}` from the "Акции и скидки"
+        switch, or `{"lang": "ky"}` when the app language changes. An empty
+        object changes nothing and returns the current profile.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
@@ -448,15 +464,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
-                name: { type: string, example: "Айбек" }
+                name: { type: string, maxLength: 100, example: "Айбек" }
+                lang: { type: string, enum: [ru, ky], description: "Language of order-status and promo pushes." }
+                promo_push: { type: boolean, description: "Receive promo broadcasts (default true). Order-status pushes are not affected." }
       responses:
         "200":
           description: Updated profile.
           content: { application/json: { schema: { $ref: "#/components/schemas/CustomerProfile" } } }
         "400":
-          description: "`invalid_name` — blank name."
+          description: "`invalid_name` — blank/too long name; `invalid_lang` — lang not `ru`/`ky`; `bad_request` — malformed JSON."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
     delete:
@@ -515,8 +532,10 @@ paths:
         default `1.0.0`; `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID`,
         default empty string). Served with `Cache-Control: public, max-age=300`.
         `delivery_fee` is the flat delivery charge in som (`DELIVERY_FEE_SOM`,
-        default 200) that the server adds to `total_amount` of every
-        delivery order; self-pickup is free.
+        default 200) that the server adds to `total_amount` of a delivery
+        order while no delivery zone is active (`GET /api/v1/delivery-zones`
+        returns `[]`); with zones, the chosen zone's fee applies instead.
+        Self-pickup is free.
       responses:
         "200":
           description: Current version policy.
@@ -531,6 +550,23 @@ paths:
                   store_url_ios: { type: string, example: "" }
                   store_url_android: { type: string, example: "" }
                   delivery_fee: { type: number, format: double, example: 200, description: "Som added to a delivery order's total (DELIVERY_FEE_SOM)." }
+
+  /api/v1/delivery-zones:
+    get:
+      tags: [Catalog]
+      summary: Active delivery zones
+      description: |
+        Public, unauthenticated; `Cache-Control: public, max-age=60`. Active
+        zones in display order (the owner manages them in the admin,
+        «Доставка»). A delivery order must send one of these ids as
+        `delivery_zone_id`; its `delivery_fee` is the zone's `fee`, or 0
+        when the items total (delivery excluded) is ≥ `free_from`
+        (`free_from` null = never free). An empty list means zones are off
+        and the flat `delivery_fee` of `GET /api/v1/app/config` applies.
+      responses:
+        "200":
+          description: Active zones.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DeliveryZone" } } } }
 
   /api/v1/orders:
     post:
@@ -552,18 +588,30 @@ paths:
           is created in the same transaction, then a checkout session is
           opened with the active provider. The response carries
           `payment_url`: open it (WebView/browser) for the customer to pay;
-          afterwards poll `GET /api/v1/orders/{id}` for `payment_status`. If
-          the payment fails or is cancelled, the order is cancelled
-          automatically and its stock returned; place a new order to retry.
-          A payment still `pending` after `PAYMENT_PENDING_TTL` (default 30m)
-          is cancelled by a background job the same way. Staff are notified
+          afterwards poll `GET /api/v1/orders/{id}` for `payment_status`.
+          After paying, the provider sends the customer to
+          `<PUBLIC_BASE_URL>/pay/return/<order_id>` — a site page with the
+          result and a «Вернуться в приложение» button linking to
+          `cozy://orders/<order_id>`.
+          A declined card (`payment_status: failed`) keeps the order
+          (`placed`, stock reserved): pay again with
+          `POST /api/v1/orders/{id}/pay`. If the customer cancels on the bank
+          page (`cancelled`), the order is cancelled and its stock returned.
+          If the latest attempt stays `pending` (or `failed` and never
+          retried) for `PAYMENT_PENDING_TTL` (default 30m), a background job
+          cancels the order and returns the stock. Staff are notified
           (Telegram) about an `online_card` order only once it is paid; a
           `cash_on_delivery` order is announced right away.
 
-        **Delivery fee.** A delivery order (`address_id`) gets
-        `delivery_fee` = `DELIVERY_FEE_SOM` (see `GET /api/v1/app/config`),
-        included in `total_amount` (and in the online payment amount).
-        Self-pickup: `delivery_fee` = 0.
+        **Delivery fee.** A delivery order (`address_id`) is charged by
+        zone: while any zone is active (`GET /api/v1/delivery-zones`),
+        `delivery_zone_id` is required and `delivery_fee` = the zone's
+        `fee`, or 0 when the items total ≥ its `free_from`. With no active
+        zone, `delivery_fee` = `DELIVERY_FEE_SOM` (see
+        `GET /api/v1/app/config`) and `delivery_zone_id` is not needed. The
+        fee is included in `total_amount` (and in the online payment
+        amount). Self-pickup: `delivery_fee` = 0 (`delivery_zone_id` is
+        ignored).
 
         **Idempotency.** Send an `Idempotency-Key` header (≤ 64 printable
         ASCII chars, e.g. a UUID generated once per checkout attempt and
@@ -592,7 +640,7 @@ paths:
         "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "200": { description: "Idempotent replay — the order created earlier with the same `Idempotency-Key`.", content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "400":
-          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_idempotency_key`, `invalid_payment_method`, or malformed body."
+          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_idempotency_key`, `invalid_payment_method`, `delivery_zone_required` (delivery order without a zone while zones are active), `invalid_delivery_zone` (unknown or deactivated zone), or malformed body."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { description: "`address_not_found`, `pickup_point_not_found`, or `variant_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
@@ -650,6 +698,46 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "409":
           description: "`order_not_cancellable` — already confirmed/shipped/finished, or paid online (contact the store)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/orders/{id}/pay:
+    post:
+      tags: [Customer]
+      summary: Pay again for an online order
+      description: |
+        Opens a new payment attempt on the customer's own order and returns
+        its `payment_url` (open it like the one from `POST /api/v1/orders`;
+        the provider returns to `/pay/return/<order_id>` as well). Allowed
+        when the order is `online_card`, not cancelled (`placed`) and
+        `payment_status` is `pending` (customer left the bank page) or
+        `failed` (declined). A still-open previous attempt is closed; if the
+        customer did complete it after all, that payment is still accepted.
+        Each attempt restarts the `PAYMENT_PENDING_TTL` clock; at most 10
+        attempts per order. `{id}` may be the UUID or `order_number`.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: New checkout session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payment_url]
+                properties:
+                  payment_url: { type: string, format: uri }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`order_not_found` — missing or another customer's."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: "`payment_not_retryable` — cash order, cancelled, already paid, or too many attempts."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: "`payment_create_failed` — the provider couldn't open a session; the order stays open (`payment_status: failed`), try again."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: "`payments_not_configured`."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /api/v1/cart:
@@ -979,6 +1067,15 @@ paths:
         set stock at their own point (`staff.point_id`) — a `point_staff`
         member targeting a different point gets `403 forbidden` even though
         `RequireRole` itself let the role through.
+
+        **Optimistic concurrency.** Send `expected_quantity` — the quantity
+        the client last saw (a missing stock row counts as 0) — and the
+        write only happens if the stored value still equals it; otherwise
+        `409 stock_conflict` with `current_quantity`, nothing written.
+        Without `expected_quantity` the value is written as is (legacy
+        behaviour; clients editing stock interactively should always send
+        it). Every change is recorded in the admin audit journal
+        (old → new).
       security: [{ staffSessionCookie: [] }]
       parameters:
         - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -990,13 +1087,33 @@ paths:
             schema:
               type: object
               required: [quantity]
-              properties: { quantity: { type: integer, minimum: 0 } }
+              properties:
+                quantity: { type: integer, minimum: 0 }
+                expected_quantity:
+                  type: integer
+                  minimum: 0
+                  description: Optional. The quantity the client last saw; mismatch → 409.
+            example: { quantity: 7, expected_quantity: 5 }
       responses:
         "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/StockEntry" } } } }
+        "400":
+          description: Negative quantity/expected_quantity, or unknown variant/point (`invalid_variant_or_point`).
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
           description: Insufficient role, or `point_staff` targeting a point other than their own.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: The stored quantity no longer equals `expected_quantity`; nothing was written.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, current_quantity]
+                properties:
+                  code: { type: string, enum: [stock_conflict] }
+                  message: { type: string }
+                  current_quantity: { type: integer, description: Quantity stored now (0 if no stock row). }
 
   # --------------------------------------------------------- Admin/Media ---
   /admin/api/media/upload:
@@ -1235,11 +1352,17 @@ paths:
         product, but its `order_count` still dedupes by order id). An empty
         range or no matching orders returns a valid report with zero rows,
         not an error.
+
+        `category` groups sold line items by top-level catalog category (a
+        product in a subcategory counts toward its parent), with the same
+        sale rules as the admin HTML report's "По категориям" block
+        (cancelled orders and unpaid online orders excluded); rows are
+        sorted by revenue, highest first.
       security: [{ staffSessionCookie: [] }]
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-01" }
         - { name: to, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-15" }
-        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point, category] } }
       responses:
         "200": { description: Aggregated report., content: { application/json: { schema: { $ref: "#/components/schemas/SalesReportResponse" } } } }
         "400": { description: "`from`/`to` malformed, `from > to`, or invalid `group_by`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
@@ -1255,10 +1378,10 @@ paths:
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date } }
-        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point, category] } }
       responses:
         "200":
-          description: "`.xlsx` workbook, `Content-Disposition: attachment; filename=\"sales_report.xlsx\"`."
+          description: "`.xlsx` workbook, `Content-Disposition: attachment; filename=\"sales_report.xlsx\"` (`sales_by_category.xlsx` for `group_by=category`)."
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
@@ -1270,18 +1393,38 @@ paths:
   /admin/products/import:
     post:
       tags: [Admin — Import]
-      summary: Bulk product import from CSV or Excel
+      summary: Bulk product import from CSV or Excel (with dry run)
       description: |
-        Deliberately **not** under `/admin/api/` — matches §8 of the ТЗ
-        exactly. Format is detected from the filename extension and/or
-        `Content-Type` and rejected with 400 before any parsing is attempted.
-        A syntactically broken file (unparseable CSV/XLSX) fails the whole
-        request with 400; a per-row validation problem (missing field, bad
-        price, unknown category, ...) does NOT abort the batch — it's
-        collected into `errors` and the next row is processed. A stock-upsert
-        failure for one of a row's optional `stock:<pointId>` columns is
-        recorded as a warning-style row error but still counts the row as
-        imported, since the product/variant itself was created successfully.
+        Deliberately **not** under `/admin/api/` — matches §8 of the ТЗ.
+        Owner/manager only. Format is detected from the filename extension
+        and/or `Content-Type` and rejected with 400 before any parsing.
+
+        **Rows → products.** Rows are grouped into models: by the article
+        column (`model_code` / «Артикул») when present, otherwise by
+        brand + name + category. One model = one product; each row with
+        size + color is one variant. The first non-empty value of each
+        product field in the model wins; `price` of the first row is the
+        base price, a row whose `price` differs gets it as `price_override`
+        (an explicit `price_override` column wins).
+
+        **Re-import updates, never duplicates.** A product is matched by
+        article, then by any of its rows' SKUs, then by brand + name +
+        category; a variant by SKU, then by size + color (case-insensitive
+        color). Matched rows update name/category/base price/description
+        (empty optional cells keep stored text), variant price override,
+        and stock at the target point. `is_active` is never changed.
+
+        **Atomicity.** Each model is written in one transaction; a model
+        with any invalid row (or a DB conflict) is not imported at all —
+        the failing row is `error`, its other rows `skipped`; other models
+        are unaffected. `dry_run=1` runs the same checks (including DB
+        lookups/constraints, in a rolled-back transaction) and writes
+        nothing.
+
+        Prices: non-negative decimals only (`4990`, `4 990`, `4990,50`);
+        NaN/Inf/negative/exponent values are row errors. Quantities:
+        non-negative integers. Required columns (else 400
+        `missing_columns`): name_ru, category, price.
       security: [{ staffSessionCookie: [] }]
       requestBody:
         required: true
@@ -1294,12 +1437,65 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: ".csv or .xlsx, columns (by header name, case-insensitive): name_ru, name_ky, category (slug or UUID), price, optionally brand/description_ru/description_ky/size/color/sku/price_override/stock:<pointId>."
+                  description: |
+                    .csv (`,` or `;`) or .xlsx (first sheet). Headers are case-insensitive; English key or Russian caption:
+                    model_code|Артикул, name_ru|Название*, name_ky|Название (KY), category|Категория* (UUID, slug or RU/KY name),
+                    brand|Бренд, price|Цена*, price_override|Цена варианта, size|Размер, color|Цвет, sku|SKU|Штрихкод,
+                    quantity|Остаток (stock at `point_id`), description_ru|Описание, description_ky|Описание (KY),
+                    stock:<pointId> (stock at that point). Unknown columns are ignored.
+                dry_run:
+                  type: string
+                  enum: ["1", "0", "true", "false"]
+                  description: "`1`/`true` = validate and report only, write nothing."
+                point_id:
+                  type: string
+                  format: uuid
+                  description: Active point of sale for the `quantity` column. Default — the oldest active point.
       responses:
-        "200": { description: "Import finished (possibly with per-row errors — check `errors`, not just the HTTP status).", content: { application/json: { schema: { $ref: "#/components/schemas/ImportResult" } } } }
+        "200": { description: "Import (or dry run) finished — check `summary`/`rows`, not just the HTTP status.", content: { application/json: { schema: { $ref: "#/components/schemas/ImportResult" } } } }
         "400":
-          description: "`missing_file`, `unsupported_format`, or `invalid_multipart` — the whole file was rejected before any row was processed."
+          description: "`missing_file`, `unsupported_format`, `invalid_multipart`, `invalid_csv`, `invalid_xlsx`, `empty_file`, `missing_columns`, `duplicate_column` or `invalid_point` — nothing was processed."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/products/import/template:
+    get:
+      tags: [Admin — Import]
+      summary: Download the .xlsx import template
+      description: Sheets «Товары» (headers + example rows), «Инструкция» and «Категории» (current categories). Owner/manager only.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: The template workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/products/import/points:
+    get:
+      tags: [Admin — Import]
+      summary: Active points of sale for the import stock target
+      description: The first one is the default `point_id`. Owner/manager only.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: Active points, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        address: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -1379,8 +1575,9 @@ paths:
       description: |
         Plays the bank: builds a signed mock callback for `result` and runs it
         through the same code path as `POST /api/v1/payments/mock/callback`,
-        then renders the outcome with a link back to
-        `/order/{orderNumber}/done`. Scriptable:
+        then renders the outcome and returns the customer (link + 2 s
+        auto-redirect) to `/pay/return/{order_id}` — the same page a real
+        provider returns to. Scriptable:
         `curl -X POST "$payment_url?result=paid"`.
       requestBody:
         content:
@@ -1476,11 +1673,13 @@ components:
 
     CustomerProfile:
       type: object
-      required: [id, phone]
+      required: [id, phone, lang, promo_push]
       properties:
         id: { type: string, format: uuid }
         phone: { type: string, example: "+996700123456" }
         name: { type: string, description: "Omitted until the customer sets it." }
+        lang: { type: string, enum: [ru, ky], description: "Language order-status and promo pushes are sent in (default `ru`); also set by the website's language switch." }
+        promo_push: { type: boolean, description: "Receives promo broadcasts (default true)." }
 
     Category:
       type: object
@@ -1676,9 +1875,18 @@ components:
         payment_status:
           type: string
           enum: [pending, paid, failed, cancelled, refunded]
-          description: "Only present for `online_card` orders (omitted for `cash_on_delivery`). `failed`/`cancelled` orders are auto-cancelled."
+          description: "Only present for `online_card` orders (omitted for `cash_on_delivery`). `failed` = declined: the order stays `placed` and can be paid again (`POST /api/v1/orders/{id}/pay`) until it expires; `cancelled` = cancelled on the bank page or expired (the order is cancelled)."
         total_amount: { type: number, format: double, description: "What the customer pays: items + delivery_fee." }
         delivery_fee: { type: number, format: double, description: "Delivery charge included in total_amount (som); 0 for self-pickup and for orders placed before delivery was charged." }
+        delivery_zone:
+          type: object
+          nullable: true
+          description: "The delivery zone the fee was charged for; null for pickup and for delivery orders placed while no zone was active. Names are the zone's current ones."
+          required: [id, name_ru, name_ky]
+          properties:
+            id: { type: string, format: uuid }
+            name_ru: { type: string }
+            name_ky: { type: string }
         refund_required:
           type: boolean
           description: "true when money was taken for an order that ended up cancelled (paid then cancelled, or a late `paid` callback after the payment failed/expired) — staff must refund it."
@@ -1714,6 +1922,9 @@ components:
         color_snapshot: { type: string }
         quantity: { type: integer }
         price: { type: number, format: double }
+        product_id: { type: string, format: uuid, nullable: true, description: "Current product of the variant — for \"repeat order\" / opening the product." }
+        photo_url: { type: string, nullable: true, description: "Full-size photo of the product (the variant's color if tagged); null when none." }
+        thumb_url: { type: string, nullable: true, description: "400px thumbnail of the same photo; null when none." }
 
     OrderCreateRequest:
       type: object
@@ -1729,8 +1940,19 @@ components:
               quantity: { type: integer, minimum: 1 }
         address_id: { type: string, format: uuid, nullable: true, description: "Delivery. Exactly one of address_id/pickup_point_id must be set." }
         pickup_point_id: { type: string, format: uuid, nullable: true, description: "Self-pickup. Exactly one of address_id/pickup_point_id must be set." }
+        delivery_zone_id: { type: string, format: uuid, nullable: true, description: "Delivery only (ignored for pickup): a zone from `GET /api/v1/delivery-zones` — required while any zone is active. The fee is computed server-side." }
         payment_method: { type: string, enum: [cash_on_delivery, online_card], default: cash_on_delivery }
         comment: { type: string, maxLength: 500, description: "Optional note to the store (delivery time, intercom code…). Blank = none." }
+
+    DeliveryZone:
+      type: object
+      required: [id, name_ru, name_ky, fee, free_from]
+      properties:
+        id: { type: string, format: uuid }
+        name_ru: { type: string, example: "Бишкек" }
+        name_ky: { type: string, example: "Бишкек ш." }
+        fee: { type: number, format: double, example: 200, description: "Delivery charge to this zone, som." }
+        free_from: { type: number, format: double, nullable: true, example: 5000, description: "Items total (som, delivery excluded) from which delivery is free; null = never." }
 
     OrderCreateResponse:
       allOf:
@@ -1822,13 +2044,13 @@ components:
       properties:
         from: { type: string, format: date }
         to: { type: string, format: date }
-        group_by: { type: string, enum: [day, product, point] }
+        group_by: { type: string, enum: [day, product, point, category] }
         rows: { type: array, items: { $ref: "#/components/schemas/SalesRow" } }
 
     SalesRow:
       type: object
       properties:
-        key: { type: string, description: "Date, product name, or point name, depending on group_by." }
+        key: { type: string, description: "Date, product name, point name, or category name, depending on group_by." }
         order_count: { type: integer }
         item_count: { type: integer }
         revenue: { type: number, format: double }
@@ -1839,8 +2061,34 @@ components:
         row: { type: integer, description: "1-based, counting the header as row 1 — matches what an admin sees opening the file in a spreadsheet app." }
         message: { type: string }
 
+    ImportRowResult:
+      type: object
+      properties:
+        row: { type: integer, description: "Spreadsheet row number (header = 1)." }
+        status: { type: string, enum: [created, updated, skipped, error], description: "In a dry run — what would happen. `skipped` = valid row of a model that failed on another row." }
+        model: { type: string, description: "Article, or product name when there is none." }
+        size: { type: string }
+        color: { type: string }
+        sku: { type: string }
+        message: { type: string, description: "Reason, for error/skipped." }
+
     ImportResult:
       type: object
       properties:
-        imported: { type: integer }
-        errors: { type: array, items: { $ref: "#/components/schemas/RowError" } }
+        dry_run: { type: boolean }
+        point_id: { type: string, format: uuid, nullable: true, description: "Where the quantity column went; null if unused." }
+        summary:
+          type: object
+          properties:
+            rows: { type: integer, description: "Non-blank data rows." }
+            created: { type: integer }
+            updated: { type: integer }
+            skipped: { type: integer }
+            errors: { type: integer }
+            products_created: { type: integer }
+            products_updated: { type: integer }
+            variants_created: { type: integer }
+            variants_updated: { type: integer }
+        rows: { type: array, items: { $ref: "#/components/schemas/ImportRowResult" } }
+        imported: { type: integer, description: "Legacy: products created + updated." }
+        errors: { type: array, items: { $ref: "#/components/schemas/RowError" }, description: "Legacy: error and skipped rows." }

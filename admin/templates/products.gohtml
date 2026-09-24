@@ -30,7 +30,44 @@
   </div>
   {{end}}
 
+  {{/* fix/admin-ops: stock at one point of sale (column + filter). */}}
+  <form method="get" action="/admin/products" class="admin-filterbar admin-products__pointbar" id="products-point-form">
+    {{if .CatSlug}}<input type="hidden" name="cat" value="{{.CatSlug}}">{{end}}
+    {{if .SubSlug}}<input type="hidden" name="sub" value="{{.SubSlug}}">{{end}}
+    {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
+    {{if ne .PageSize 25}}<input type="hidden" name="page_size" value="{{.PageSize}}">{{end}}
+    <div class="admin-field admin-filterbar__field">
+      <label for="products-point">{{t "admin.products.stock_at_point"}}</label>
+      <select id="products-point" name="point" onchange="this.form.submit()">
+        {{range .PointOptions}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    {{if .PointID}}
+    <label class="admin-check"><input type="checkbox" name="oos" value="1"{{if .OutOfStockOnly}} checked{{end}} onchange="this.form.submit()"> {{t "admin.products.oos_only"}}</label>
+    {{end}}
+    <noscript><button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.reports.show"}}</button></noscript>
+  </form>
+
   <div class="admin-card">
+    {{if and .CanEdit (not .Empty)}}
+    {{/* fix/admin-ops: bulk bar, shown by bulk.js once a row is checked. */}}
+    <form method="post" action="{{.BulkURL}}" id="products-bulk" class="admin-bulkbar" data-bulk hidden>
+      <input type="hidden" name="back" value="{{.ReturnURL}}">
+      <input type="hidden" name="action" value="">
+      <span class="admin-bulkbar__count">{{t "admin.bulk.selected"}}: <span class="js-bulk-count">0</span></span>
+      <button type="button" class="admin-btn admin-btn--secondary" data-bulk-action="activate"
+        data-bulk-title="{{t "admin.bulk.activate_title"}}" data-bulk-confirm="{{t "admin.bulk.activate_confirm"}}">{{t "admin.common.activate"}}</button>
+      <button type="button" class="admin-btn admin-btn--secondary" data-bulk-action="deactivate" data-bulk-danger
+        data-bulk-title="{{t "admin.bulk.deactivate_title"}}" data-bulk-confirm="{{t "admin.bulk.deactivate_confirm"}}">{{t "admin.common.deactivate"}}</button>
+      <label class="admin-visually-hidden" for="products-bulk-category">{{t "admin.bulk.new_category"}}</label>
+      <select id="products-bulk-category" name="category_id">
+        <option value="">{{t "admin.common.category"}}…</option>
+        {{range .BulkCategories}}<option value="{{.ID}}">{{.Label}}</option>{{end}}
+      </select>
+      <button type="button" class="admin-btn admin-btn--secondary" data-bulk-action="category" data-bulk-requires="category_id"
+        data-bulk-title="{{t "admin.bulk.category_title"}}" data-bulk-confirm="{{t "admin.bulk.category_confirm"}}">{{t "admin.bulk.category_button"}}</button>
+    </form>
+    {{end}}
     {{if .Empty}}
     <div class="admin-empty">
       <div class="admin-empty__icon">
@@ -48,12 +85,14 @@
       <table class="admin-table">
         <thead>
           <tr>
+            {{if .CanEdit}}<th class="admin-table__check-col"><input type="checkbox" class="js-bulk-all" data-bulk-for="products-bulk" aria-label="{{t "admin.bulk.select_all_products"}}"></th>{{end}}
             <th class="admin-table__photo-col">{{t "admin.products.col_photo"}}</th>
             <th>{{t "admin.common.name"}}</th>
             <th>{{t "admin.common.category"}}</th>
             <th class="admin-table__num-col">{{t "admin.products.col_price"}}</th>
             <th>{{t "admin.products.col_variants"}}</th>
             <th>{{t "admin.common.stock"}}</th>
+            {{if .PointID}}<th>{{t "admin.products.at_point"}}: {{.PointName}}</th>{{end}}
             <th>{{t "admin.common.status"}}</th>
             <th class="admin-table__menu-col"></th>
           </tr>
@@ -61,6 +100,7 @@
         <tbody>
           {{range .Products}}
           <tr>
+            {{if $.Data.CanEdit}}<td class="admin-table__check-col"><input type="checkbox" class="js-bulk-item" form="products-bulk" name="id" value="{{.ID}}" aria-label="{{tf "admin.bulk.select_product" .Name}}"></td>{{end}}
             <td>
               {{if .HasPhoto}}
               <div class="admin-thumb" style="background-image:url('{{.PhotoURL}}')"></div>
@@ -76,6 +116,7 @@
             <td class="admin-table__num">{{.PriceText}}</td>
             <td class="admin-table__muted">{{.VariantsLabel}}</td>
             <td><span class="admin-chip" style="color:{{.StockFG}};background:{{.StockBG}}">{{.StockLabel}}</span></td>
+            {{if $.Data.PointID}}<td><span class="admin-chip" style="color:{{.PointStockFG}};background:{{.PointStockBG}}">{{.PointStockLabel}}</span></td>{{end}}
             <td class="admin-table__muted">{{.StatusLabel}}</td>
             <td class="admin-table__menu-col">
               {{if $.Data.CanEdit}}
@@ -114,6 +155,7 @@
           <div class="admin-cardrow__row">
             <span class="admin-cardrow__price">{{.PriceText}}</span>
             <span class="admin-chip" style="color:{{.StockFG}};background:{{.StockBG}}">{{.StockLabel}}</span>
+            {{if $.Data.PointID}}<span class="admin-chip" style="color:{{.PointStockFG}};background:{{.PointStockBG}}" title="{{t "admin.products.at_point"}}: {{$.Data.PointName}}">{{$.Data.PointName}}: {{.PointStockLabel}}</span>{{end}}
             <span class="admin-table__muted">{{.StatusLabel}}</span>
           </div>
         </div>
@@ -126,6 +168,8 @@
       <div class="admin-table__muted">{{.CountLabel}}</div>
       <form method="get" action="/admin/products" class="admin-pagesize">
         {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
+        {{if .PointID}}<input type="hidden" name="point" value="{{.PointID}}">{{end}}
+        {{if .OutOfStockOnly}}<input type="hidden" name="oos" value="1">{{end}}
         <span class="admin-table__muted">{{t "admin.products.page_size"}}</span>
         <select name="page_size" onchange="this.form.submit()" class="admin-pagesize__select">
           <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
@@ -137,6 +181,7 @@
   </div>
 </div>
 
+<script src="/admin/static/js/bulk.js" defer></script>
 <script>
 // Row "⋯" menu: only one open at a time, closed by clicking anywhere else
 // or pressing Escape. Kept local to this screen (not layout.gohtml) since

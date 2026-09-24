@@ -2,15 +2,15 @@ package catalog
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"strings"
 
-	"github.com/xuri/excelize/v2"
+	"github.com/google/uuid"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 )
@@ -24,103 +24,146 @@ const (
 	ImportFormatXLSX
 )
 
-// stockPointColumnPrefix marks an optional per-point stock column, e.g.
-// "stock:11111111-1111-1111-1111-111111111111" — the header suffix after
-// the colon is passed straight through to StockRepo.Upsert as pointID.
-// Unlike category, there is no id-or-slug resolver for points of sale in
-// this codebase yet (Task G, building the points-of-sale admin API, is a
-// separate concurrent stream), so this deliberately only accepts the raw
-// point UUID rather than a human-friendly slug.
-const stockPointColumnPrefix = "stock:"
+// Row statuses in ImportResult.Rows. In a dry run "created"/"updated" mean
+// "would be created/updated".
+const (
+	RowStatusCreated = "created"
+	RowStatusUpdated = "updated"
+	RowStatusSkipped = "skipped" // valid row of a model that failed elsewhere
+	RowStatusError   = "error"
+)
 
-// RowError describes one row of an import batch that failed — either a
-// validation error, or a failure from ProductRepo/VariantRepo/StockRepo.
-// Row is 1-based and counts the header as row 1, so it points at the same
-// row number a spreadsheet application would show (the first data row is
-// row 2) — this is what an admin fixing the file needs, not an offset into
-// only the data rows.
+// RowError is the legacy per-row error shape (kept in ImportResult.Errors
+// for existing API clients). Row is 1-based and counts the header as row 1.
 type RowError struct {
 	Row     int    `json:"row"`
 	Message string `json:"message"`
 }
 
+// ImportRowResult reports what happened to one non-blank data row.
+type ImportRowResult struct {
+	Row     int    `json:"row"`
+	Status  string `json:"status"`
+	Model   string `json:"model,omitempty"` // model article, or product name when there is none
+	Size    string `json:"size,omitempty"`
+	Color   string `json:"color,omitempty"`
+	SKU     string `json:"sku,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// ImportSummary counts rows by status and products/variants by outcome.
+type ImportSummary struct {
+	Rows            int `json:"rows"`
+	Created         int `json:"created"`
+	Updated         int `json:"updated"`
+	Skipped         int `json:"skipped"`
+	Errors          int `json:"errors"`
+	ProductsCreated int `json:"products_created"`
+	ProductsUpdated int `json:"products_updated"`
+	VariantsCreated int `json:"variants_created"`
+	VariantsUpdated int `json:"variants_updated"`
+}
+
 // ImportResult is the outcome of ImportProducts.
 type ImportResult struct {
+	DryRun bool `json:"dry_run"`
+	// PointID is where the "Остаток" (quantity) column went; nil when the
+	// file had no quantities or there is no active point.
+	PointID *string           `json:"point_id"`
+	Summary ImportSummary     `json:"summary"`
+	Rows    []ImportRowResult `json:"rows"`
+
+	// Imported (products created + updated) and Errors (error and skipped
+	// rows) keep the pre-2026-09 response shape working.
 	Imported int        `json:"imported"`
 	Errors   []RowError `json:"errors"`
 }
 
-// productCreator is the subset of *ProductRepo the importer depends on, so
-// tests can inject a fake instead of a live database — mirrors the
-// stockUpserter pattern in internal/httpapi/admin_catalog.go.
-type productCreator interface {
-	Create(ctx context.Context, in ProductInput) (*Product, error)
+// ImportOptions tune one ImportProducts run.
+type ImportOptions struct {
+	// DryRun validates everything — including against the database, inside
+	// a transaction that is always rolled back — and reports what would
+	// happen without writing anything.
+	DryRun bool
+	// PointID is the point of sale the quantity column is stored at. Empty
+	// means the first active point (by creation time).
+	PointID string
 }
 
-// variantCreator is the subset of *VariantRepo the importer depends on.
-type variantCreator interface {
-	Create(ctx context.Context, productID string, in VariantInput) (*Variant, error)
+// ImportProduct is the product-level data of one model.
+type ImportProduct struct {
+	ModelCode     string
+	CategoryID    string
+	NameRu        string
+	NameKy        string
+	Brand         string
+	DescriptionRu string
+	DescriptionKy string
+	BasePrice     float64
 }
 
-// categoryResolver is the subset of *CategoryRepo the importer depends on.
-type categoryResolver interface {
-	ResolveID(ctx context.Context, idOrSlug string) (string, error)
+// ImportVariant is one size × color row.
+type ImportVariant struct {
+	Size          string
+	Color         string
+	SKU           string
+	PriceOverride *float64
 }
 
-// stockSetter is the subset of *StockRepo the importer depends on for the
-// optional per-point stock columns.
-type stockSetter interface {
-	Upsert(ctx context.Context, variantID, pointID string, quantity int) (*StockEntry, error)
+// ImportVariantRef identifies an existing variant.
+type ImportVariantRef struct {
+	ID        string
+	ProductID string
+	// ProductModelCode is the owning product's article ("" if none).
+	ProductModelCode string
 }
 
-// ImportDeps bundles everything ImportProducts needs to create rows,
-// behind small interfaces so it's fully testable without a live database
-// (construct it directly with fakes) or with the real repos (the fields
-// accept *ProductRepo/*VariantRepo/*CategoryRepo/*StockRepo as-is).
-type ImportDeps struct {
-	Categories categoryResolver
-	Products   productCreator
-	Variants   variantCreator
-	// Stock is optional: a nil Stock disables per-point stock columns
-	// entirely (they're skipped rather than erroring), since §8 of the ТЗ
-	// only asks for "опционально размеры/цвета/остатки по точкам" — stock
-	// is a nice-to-have on top of product+variant creation, not a hard
-	// requirement.
-	Stock stockSetter
+// ImportStore is the database side of the importer. Lookups that don't
+// need a transaction live here; writes go through a session so each model
+// is all-or-nothing. NewSQLImportStore is the Postgres implementation.
+type ImportStore interface {
+	// ResolveCategory maps a category cell (UUID, slug or RU/KY name) to
+	// its id; the error text is shown to the admin as-is.
+	ResolveCategory(ctx context.Context, raw string) (string, error)
+	// ActivePoint reports whether id is an active point of sale.
+	ActivePoint(ctx context.Context, id string) (bool, error)
+	// DefaultPoint returns the first active point of sale, "" if none.
+	DefaultPoint(ctx context.Context) (string, error)
+	// Begin opens a session; with dryRun nothing it does is ever committed.
+	Begin(ctx context.Context, dryRun bool) (ImportSession, error)
 }
 
-// importRow is the common intermediate shape both CSV and XLSX parsing
-// produce: a header-name -> trimmed-cell-value map, plus the originating
-// row number for error reporting.
-type importRow struct {
-	line   int
-	fields map[string]string
+// ImportSession runs models atomically.
+type ImportSession interface {
+	// Model runs fn in its own transaction (or savepoint, in a dry run):
+	// if fn fails nothing it did is kept.
+	Model(ctx context.Context, fn func(tx ImportTx) error) error
+	Close() error
 }
 
-func (row importRow) get(header string) string {
-	return row.fields[header]
-}
+// ImportTx is what one model's import may do. Lookups return ""/nil when
+// nothing matches.
+type ImportTx interface {
+	ProductByModelCode(ctx context.Context, code string) (string, error)
+	// ProductsByName finds products by brand + name + category; when
+	// modelCode is non-empty only products without a model code qualify
+	// (a product with a different code is a different model).
+	ProductsByName(ctx context.Context, brand, nameRu, categoryID, modelCode string) ([]string, error)
+	CreateProduct(ctx context.Context, p ImportProduct) (string, error)
+	UpdateProduct(ctx context.Context, id string, p ImportProduct) error
 
-// isBlank reports whether every cell in the row is empty — such rows (a
-// stray blank line at the end of a CSV export, or a fully empty Excel row)
-// are skipped silently rather than reported as errors.
-func (row importRow) isBlank() bool {
-	for _, v := range row.fields {
-		if v != "" {
-			return false
-		}
-	}
-	return true
+	VariantBySKU(ctx context.Context, sku string) (*ImportVariantRef, error)
+	VariantBySizeColor(ctx context.Context, productID, size, color string) (*ImportVariantRef, error)
+	CreateVariant(ctx context.Context, productID string, v ImportVariant) (string, error)
+	UpdateVariant(ctx context.Context, id string, v ImportVariant) error
+
+	SetStock(ctx context.Context, variantID, pointID string, qty int) error
 }
 
 // DetectImportFormat decides whether an uploaded import file is CSV or
 // XLSX from its filename extension and/or declared Content-Type. The
-// extension wins when present and recognized; Content-Type is checked as a
-// fallback so a browser sending a generic type for a correctly-named file
-// doesn't get rejected, and also so a file whose name has no extension at
-// all can still be recognized. An unrecognized combination reports ok=false
-// so the HTTP handler can reject the upload with apperr.BadRequest before
-// attempting to parse anything.
+// extension wins when present and recognized; Content-Type is the
+// fallback. ok=false means "reject before parsing".
 func DetectImportFormat(filename, contentType string) (format ImportFormat, ok bool) {
 	switch strings.ToLower(filepath.Ext(filename)) {
 	case ".csv":
@@ -143,18 +186,19 @@ func DetectImportFormat(filename, contentType string) (format ImportFormat, ok b
 	return 0, false
 }
 
-// ImportProducts parses r as either CSV or XLSX (per format) and, for each
-// data row, resolves its category, validates required fields, and creates
-// the product — plus a variant when size/color are both present, plus
-// per-point stock rows when deps.Stock is set and the row has any
-// "stock:<pointId>" columns. A row that fails validation or creation is
-// recorded in the result's Errors and the batch continues with the next
-// row: one bad row must never abort the rest of the import.
+// ImportProducts parses r (CSV or XLSX), groups its rows into models (one
+// product per model: by the article column when present, otherwise by
+// brand + name + category; each row is a size × color variant), validates
+// everything, and then imports model by model, each in one transaction.
 //
-// A non-nil error return (as opposed to a populated ImportResult.Errors)
-// means the file itself couldn't be read at all — e.g. malformed CSV
-// syntax or an unreadable Excel file — so nothing could be imported.
-func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, deps ImportDeps) (*ImportResult, error) {
+// Re-importing the same file updates instead of duplicating: a product is
+// matched by article, then by any of its rows' SKUs, then by brand + name
+// + category; a variant by SKU, then by size + color.
+//
+// A model with any invalid row is not imported at all (its other rows are
+// reported as skipped); other models are unaffected. A non-nil error
+// return means the file (or the request) as a whole is unusable.
+func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, store ImportStore, opts ImportOptions) (*ImportResult, error) {
 	var rows []importRow
 	var err error
 	switch format {
@@ -169,243 +213,280 @@ func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, deps 
 		return nil, err
 	}
 
-	result := &ImportResult{Errors: []RowError{}}
-	for _, row := range rows {
-		if row.isBlank() {
-			continue
-		}
-
-		warnings, err := importRowOne(ctx, deps, row)
-		if err != nil {
-			result.Errors = append(result.Errors, RowError{Row: row.line, Message: err.Error()})
-			continue
-		}
-		result.Imported++
-		for _, w := range warnings {
-			result.Errors = append(result.Errors, RowError{Row: row.line, Message: w})
-		}
-	}
-	return result, nil
-}
-
-// importRowOne creates the product (and optional variant/stock) for a
-// single row. The returned error, if any, means the row as a whole failed
-// (nothing importable happened) and is recorded as-is — apperr messages
-// are already human-readable Russian text. The returned warnings are
-// non-fatal notes about optional stock columns that failed after the
-// product itself was already created successfully; the row still counts as
-// imported when only warnings (no error) come back.
-func importRowOne(ctx context.Context, deps ImportDeps, row importRow) ([]string, error) {
-	nameRu := row.get("name_ru")
-	nameKy := row.get("name_ky")
-	categoryRaw := row.get("category")
-	priceRaw := row.get("price")
-
-	if nameRu == "" {
-		return nil, errors.New("name_ru обязателен")
-	}
-	if nameKy == "" {
-		return nil, errors.New("name_ky обязателен")
-	}
-	if categoryRaw == "" {
-		return nil, errors.New("category обязателен")
-	}
-	if priceRaw == "" {
-		return nil, errors.New("price обязателен")
-	}
-
-	price, err := strconv.ParseFloat(priceRaw, 64)
-	if err != nil {
-		return nil, fmt.Errorf("некорректная цена %q", priceRaw)
-	}
-	if price < 0 {
-		return nil, errors.New("price не может быть отрицательным")
-	}
-
-	categoryID, err := deps.Categories.ResolveID(ctx, categoryRaw)
-	if err != nil {
-		return nil, fmt.Errorf("категория %q не найдена", categoryRaw)
-	}
-
-	product, err := deps.Products.Create(ctx, ProductInput{
-		CategoryID:    categoryID,
-		NameRu:        nameRu,
-		NameKy:        nameKy,
-		DescriptionRu: optionalString(row.get("description_ru")),
-		DescriptionKy: optionalString(row.get("description_ky")),
-		Brand:         optionalString(row.get("brand")),
-		BasePrice:     price,
-		IsActive:      true,
-	})
+	pointID, err := resolveTargetPoint(ctx, store, opts.PointID)
 	if err != nil {
 		return nil, err
 	}
 
-	size := row.get("size")
-	color := row.get("color")
-	var variant *Variant
-	switch {
-	case size != "" && color != "":
-		priceOverride, err := optionalFloat(row.get("price_override"))
-		if err != nil {
-			return nil, fmt.Errorf("некорректный price_override %q", row.get("price_override"))
+	p := &planner{ctx: ctx, store: store, pointID: pointID,
+		categories: map[string]categoryLookup{}, points: map[string]bool{}}
+	models, err := p.plan(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &ImportResult{DryRun: opts.DryRun, Rows: []ImportRowResult{}, Errors: []RowError{}}
+	if p.usedPoint {
+		res.PointID = &pointID
+	}
+	if len(models) == 0 {
+		return res, nil
+	}
+
+	sess, err := store.Begin(ctx, opts.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = sess.Close() }()
+
+	for _, m := range models {
+		if m.failed() {
+			res.addModel(m, nil)
+			continue
 		}
-		variant, err = deps.Variants.Create(ctx, product.ID, VariantInput{
-			Size:          size,
-			Color:         color,
-			SKU:           optionalString(row.get("sku")),
-			PriceOverride: priceOverride,
+		var out modelOutcome
+		err := sess.Model(ctx, func(tx ImportTx) error {
+			out = modelOutcome{}
+			return importModel(ctx, tx, m, &out)
 		})
 		if err != nil {
-			return nil, err
-		}
-	case size != "" || color != "":
-		return nil, errors.New("для вариации нужны оба поля: size и color")
-	}
-
-	if deps.Stock == nil || variant == nil {
-		return nil, nil
-	}
-
-	var warnings []string
-	for header, value := range row.fields {
-		pointID, ok := strings.CutPrefix(header, stockPointColumnPrefix)
-		if !ok || value == "" {
+			var rf *rowFailure
+			if !errors.As(err, &rf) {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				rf = &rowFailure{line: m.rows[0].line, msg: dbErrorMessage(err)}
+			}
+			m.fail(rf.line, rf.msg)
+			res.addModel(m, nil)
 			continue
 		}
-		qty, err := strconv.Atoi(value)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("товар создан, но остаток по точке %s не выставлен: некорректное количество %q", pointID, value))
-			continue
-		}
-		if _, err := deps.Stock.Upsert(ctx, variant.ID, pointID, qty); err != nil {
-			warnings = append(warnings, fmt.Sprintf("товар создан, но остаток по точке %s не выставлен: %s", pointID, err.Error()))
-		}
+		res.addModel(m, &out)
 	}
-	return warnings, nil
+	sort.SliceStable(res.Rows, func(i, j int) bool { return res.Rows[i].Row < res.Rows[j].Row })
+	sort.SliceStable(res.Errors, func(i, j int) bool { return res.Errors[i].Row < res.Errors[j].Row })
+	return res, nil
 }
 
-func optionalString(s string) *string {
-	if s == "" {
-		return nil
+func resolveTargetPoint(ctx context.Context, store ImportStore, requested string) (string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		return store.DefaultPoint(ctx)
 	}
-	return &s
-}
-
-func optionalFloat(s string) (*float64, error) {
-	if s == "" {
-		return nil, nil
+	if _, err := uuid.Parse(requested); err != nil {
+		return "", apperr.BadRequest("invalid_point", "точка продаж не найдена")
 	}
-	f, err := strconv.ParseFloat(s, 64)
+	ok, err := store.ActivePoint(ctx, requested)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &f, nil
+	if !ok {
+		return "", apperr.BadRequest("invalid_point", "точка продаж не найдена или отключена")
+	}
+	return requested, nil
 }
 
-// normalizeHeader lowercases and trims a header cell, and strips a leading
-// UTF-8 byte-order mark if present — common in CSV files exported from
-// Excel, which would otherwise corrupt the first column's name (it would no
-// longer match a plain "name_ru").
-func normalizeHeader(h string) string {
-	h = strings.TrimPrefix(h, "\ufeff")
-	return strings.ToLower(strings.TrimSpace(h))
+// rowFailure is a failure attributed to one spreadsheet row.
+type rowFailure struct {
+	line int
+	msg  string
 }
 
-// buildRow zips headers with record into an importRow, tolerating a record
-// shorter than headers (missing trailing columns count as empty) —
-// encoding/csv is configured to allow this too (see parseCSVRows).
-func buildRow(headers []string, record []string, line int) importRow {
-	fields := make(map[string]string, len(headers))
-	for i, h := range headers {
-		if h == "" {
+func (f *rowFailure) Error() string { return fmt.Sprintf("строка %d: %s", f.line, f.msg) }
+
+// modelOutcome is what importModel did, for the report.
+type modelOutcome struct {
+	productCreated bool
+	rowStatus      map[int]string // line -> created/updated
+	variantsNew    int
+	variantsUpd    int
+}
+
+// importModel writes one validated model through tx.
+func importModel(ctx context.Context, tx ImportTx, m *plannedModel, out *modelOutcome) error {
+	out.rowStatus = map[int]string{}
+	cur := m.rows[0].line
+	wrap := func(err error) error {
+		var rf *rowFailure
+		if errors.As(err, &rf) {
+			return err
+		}
+		return &rowFailure{line: cur, msg: dbErrorMessage(err)}
+	}
+
+	productID, err := findProduct(ctx, tx, m)
+	if err != nil {
+		return wrap(err)
+	}
+	if productID == "" {
+		if productID, err = tx.CreateProduct(ctx, m.product); err != nil {
+			return wrap(err)
+		}
+		out.productCreated = true
+	} else if err := tx.UpdateProduct(ctx, productID, m.product); err != nil {
+		return wrap(err)
+	}
+
+	for _, row := range m.rows {
+		cur = row.line
+		if !row.hasVariant {
+			out.rowStatus[row.line] = productStatus(out.productCreated)
 			continue
 		}
-		if i < len(record) {
-			fields[h] = strings.TrimSpace(record[i])
+		var ref *ImportVariantRef
+		if row.variant.SKU != "" {
+			if ref, err = tx.VariantBySKU(ctx, row.variant.SKU); err != nil {
+				return wrap(err)
+			}
+			if ref != nil && ref.ProductID != productID {
+				return &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q уже используется у другого товара", row.variant.SKU)}
+			}
+		}
+		if ref == nil && !out.productCreated {
+			if ref, err = tx.VariantBySizeColor(ctx, productID, row.variant.Size, row.variant.Color); err != nil {
+				return wrap(err)
+			}
+		}
+		var variantID string
+		if ref == nil {
+			if variantID, err = tx.CreateVariant(ctx, productID, row.variant); err != nil {
+				return wrap(err)
+			}
+			out.rowStatus[row.line] = RowStatusCreated
+			out.variantsNew++
 		} else {
-			fields[h] = ""
+			variantID = ref.ID
+			if err := tx.UpdateVariant(ctx, variantID, row.variant); err != nil {
+				return wrap(err)
+			}
+			out.rowStatus[row.line] = RowStatusUpdated
+			out.variantsUpd++
+		}
+		for _, s := range row.stock {
+			if err := tx.SetStock(ctx, variantID, s.pointID, s.qty); err != nil {
+				return wrap(err)
+			}
 		}
 	}
-	return importRow{line: line, fields: fields}
+	return nil
 }
 
-// parseCSVRows reads r as CSV: the first record is the header row (line 1),
-// every subsequent record a data row.
-func parseCSVRows(r io.Reader) ([]importRow, error) {
-	cr := csv.NewReader(r)
-	cr.FieldsPerRecord = -1 // tolerate rows with fewer trailing columns than the header
+func productStatus(created bool) string {
+	if created {
+		return RowStatusCreated
+	}
+	return RowStatusUpdated
+}
 
-	header, err := cr.Read()
-	if errors.Is(err, io.EOF) {
-		return nil, apperr.BadRequest("empty_file", "файл импорта пустой")
-	}
-	if err != nil {
-		return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error())
-	}
-	headers := make([]string, len(header))
-	for i, h := range header {
-		headers[i] = normalizeHeader(h)
-	}
-
-	var rows []importRow
-	line := 1
-	for {
-		record, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
+// findProduct matches an existing product for m: by article, then by the
+// SKUs of its rows, then by brand + name + category. "" means "create".
+func findProduct(ctx context.Context, tx ImportTx, m *plannedModel) (string, error) {
+	if m.product.ModelCode != "" {
+		id, err := tx.ProductByModelCode(ctx, m.product.ModelCode)
+		if err != nil || id != "" {
+			return id, err
 		}
+	}
+
+	var bySKU string
+	for _, row := range m.rows {
+		if !row.hasVariant || row.variant.SKU == "" {
+			continue
+		}
+		ref, err := tx.VariantBySKU(ctx, row.variant.SKU)
 		if err != nil {
-			return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error())
+			return "", err
 		}
-		line++
-		rows = append(rows, buildRow(headers, record, line))
+		if ref == nil {
+			continue
+		}
+		if m.product.ModelCode != "" && ref.ProductModelCode != "" && !strings.EqualFold(ref.ProductModelCode, m.product.ModelCode) {
+			return "", &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q уже используется у другого товара (артикул %s)", row.variant.SKU, ref.ProductModelCode)}
+		}
+		if bySKU != "" && ref.ProductID != bySKU {
+			return "", &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q относится к другому товару, чем остальные строки модели", row.variant.SKU)}
+		}
+		bySKU = ref.ProductID
 	}
-	return rows, nil
+	if bySKU != "" {
+		return bySKU, nil
+	}
+
+	ids, err := tx.ProductsByName(ctx, m.product.Brand, m.product.NameRu, m.product.CategoryID, m.product.ModelCode)
+	if err != nil {
+		return "", err
+	}
+	switch len(ids) {
+	case 0:
+		return "", nil
+	case 1:
+		return ids[0], nil
+	default:
+		return "", &rowFailure{line: m.rows[0].line,
+			msg: fmt.Sprintf("найдено несколько товаров «%s» в этой категории — укажите артикул модели или SKU", m.product.NameRu)}
+	}
 }
 
-// xlsxUnzipSizeLimit / xlsxUnzipXMLSizeLimit cap how much an uploaded
-// .xlsx (a zip) may decompress to — in total, and per worksheet XML kept
-// in memory. excelize's defaults (16 GiB total) would let a few-MB "zip
-// bomb" exhaust memory/disk; a real product import is far below 64 MiB
-// unpacked. Variables so tests can lower them.
-var (
-	xlsxUnzipSizeLimit    int64 = 64 << 20
-	xlsxUnzipXMLSizeLimit int64 = 16 << 20
-)
+// dbErrorMessage turns a database error into admin-facing text. Constraint
+// violations are the expected cases (a size/color or SKU clash, a stale
+// point id); anything else is logged and reported generically.
+func dbErrorMessage(err error) string {
+	var ae *apperr.AppError
+	if errors.As(err, &ae) {
+		return ae.Message
+	}
+	switch pgErrCode(err) {
+	case pgUniqueViolation:
+		return "конфликт с существующими данными: такой размер/цвет, SKU или артикул уже есть у другого товара/вариации"
+	case pgForeignKeyViolation:
+		return "категория или точка продаж не найдена"
+	case pgCheckViolation:
+		return "значение вне допустимого диапазона"
+	}
+	slog.Error("catalog import: database error", "err", err)
+	return "внутренняя ошибка при сохранении — попробуйте ещё раз"
+}
 
-// parseXLSXRows reads r as an .xlsx workbook, using its first sheet: the
-// first row is the header row (line 1), every subsequent row a data row.
-func parseXLSXRows(r io.Reader) ([]importRow, error) {
-	f, err := excelize.OpenReader(r, excelize.Options{
-		UnzipSizeLimit:    xlsxUnzipSizeLimit,
-		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
-	})
-	if err != nil {
-		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать Excel-файл: "+err.Error())
+// addModel records m's rows in the report. out is nil when the model was
+// not imported (its failing rows are errors, the rest skipped).
+func (res *ImportResult) addModel(m *plannedModel, out *modelOutcome) {
+	if out != nil {
+		if out.productCreated {
+			res.Summary.ProductsCreated++
+		} else {
+			res.Summary.ProductsUpdated++
+		}
+		res.Imported++
+		res.Summary.VariantsCreated += out.variantsNew
+		res.Summary.VariantsUpdated += out.variantsUpd
 	}
-	defer func() { _ = f.Close() }()
-
-	sheet := f.GetSheetName(0)
-	if sheet == "" {
-		return nil, apperr.BadRequest("empty_file", "в Excel-файле нет листов")
+	for _, row := range m.rows {
+		r := ImportRowResult{Row: row.line, Model: m.label}
+		if row.hasVariant {
+			r.Size, r.Color, r.SKU = row.variant.Size, row.variant.Color, row.variant.SKU
+		}
+		switch {
+		case out != nil:
+			r.Status = out.rowStatus[row.line]
+		case row.err != "":
+			r.Status, r.Message = RowStatusError, row.err
+		default:
+			r.Status = RowStatusSkipped
+			r.Message = fmt.Sprintf("модель не импортирована из-за ошибки в строке %d", m.firstErrLine())
+		}
+		res.Summary.Rows++
+		switch r.Status {
+		case RowStatusCreated:
+			res.Summary.Created++
+		case RowStatusUpdated:
+			res.Summary.Updated++
+		case RowStatusSkipped:
+			res.Summary.Skipped++
+			res.Errors = append(res.Errors, RowError{Row: r.Row, Message: r.Message})
+		case RowStatusError:
+			res.Summary.Errors++
+			res.Errors = append(res.Errors, RowError{Row: r.Row, Message: r.Message})
+		}
+		res.Rows = append(res.Rows, r)
 	}
-	allRows, err := f.GetRows(sheet)
-	if err != nil {
-		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать лист: "+err.Error())
-	}
-	if len(allRows) == 0 {
-		return nil, apperr.BadRequest("empty_file", "файл импорта пустой")
-	}
-
-	headers := make([]string, len(allRows[0]))
-	for i, h := range allRows[0] {
-		headers[i] = normalizeHeader(h)
-	}
-
-	rows := make([]importRow, 0, len(allRows)-1)
-	for i, record := range allRows[1:] {
-		rows = append(rows, buildRow(headers, record, i+2)) // +2: header is line 1, allRows[1] is line 2
-	}
-	return rows, nil
 }

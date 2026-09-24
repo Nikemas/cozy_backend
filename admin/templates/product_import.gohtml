@@ -1,29 +1,70 @@
-{{/* product_import.gohtml — Wave 4 Task 2 (Товары: импорт, Cozy Admin.dc.html
-     lines 376-403). PageData.Data is a *admin.ImportPageData built by
-     productImportPage (products.go). The actual upload/parse is done by
-     this page's own JS, POSTing straight to the existing
-     POST /admin/products/import JSON endpoint — see products.go's package
-     doc comment for why. */}}
+{{/* product_import.gohtml — Товары: импорт (Cozy Admin.dc.html lines
+     376-403). PageData.Data is a *admin.ImportPageData built by
+     productImportPage (products.go). The page's own JS talks to the JSON
+     endpoints in internal/httpapi/admin_import.go:
+       POST <ImportURL>           — file + dry_run + point_id -> report
+       GET  <ImportURL>/points    — stock target choices
+       GET  <ImportURL>/template  — the .xlsx template (plain link)
+     Flow: choose file -> «Проверить» (dry run, nothing written) ->
+     «Импортировать». */}}
 {{define "content"}}
 {{with .Data}}
+<style>
+  #import-result:not([hidden]) { display: flex; flex-direction: column; gap: 16px; }
+  .admin-import__file { font-size: 13px; color: var(--admin-text); }
+  .admin-import__controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 16px; }
+  .admin-import__controls .admin-field { margin-bottom: 0; min-width: 240px; flex: 1; }
+  .admin-import__buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .admin-import__notice { background: #FFF8E1; border: 1px solid #F3E2B3; border-radius: var(--admin-radius-card); padding: 14px 18px; font-size: 14px; color: #6D5200; }
+  .admin-import__summary { font-size: 13px; font-weight: 500; margin-top: 6px; color: var(--admin-text); }
+  .admin-import__report { max-height: 480px; overflow: auto; }
+  .admin-import__report .admin-table { min-width: 0; }
+  .admin-import__status--created { color: #2E7D32; font-weight: 600; }
+  .admin-import__status--updated { color: #1565C0; font-weight: 600; }
+  .admin-import__status--skipped { color: #8A8A85; font-weight: 600; }
+  .admin-import__status--error { color: #C62828; font-weight: 600; }
+</style>
 <div class="admin-import">
   <div class="admin-card admin-card--pad">
     <div class="admin-import__dropzone" id="import-dropzone">
       <div class="admin-import__icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5"></path></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5"></path></svg>
       </div>
       <div class="admin-import__title">{{t "admin.import.drop"}}</div>
       <div class="admin-table__muted">{{t "admin.import.or"}}</div>
       <button type="button" class="admin-btn admin-btn--secondary" onclick="document.getElementById('import-file-input').click()">{{t "admin.import.choose"}}</button>
       <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none">
+      <div class="admin-import__file" id="import-file-name" aria-live="polite"></div>
+      <a class="admin-linkbtn" href="{{.ImportURL}}/template" download>{{t "admin.import.template"}}</a>
+    </div>
+
+    <div class="admin-import__controls">
+      <div class="admin-field">
+        <label for="import-point">{{t "admin.import.point_label"}}</label>
+        <select id="import-point" name="point_id">
+          <option value="">{{t "admin.import.loading"}}</option>
+        </select>
+      </div>
+      <div class="admin-import__buttons">
+        <button type="button" class="admin-btn admin-btn--secondary" id="import-check" disabled>{{t "admin.import.check"}}</button>
+        <button type="button" class="admin-btn admin-btn--primary" id="import-run" disabled>{{t "admin.import.run"}}</button>
+      </div>
     </div>
   </div>
 
   <div id="import-result" hidden>
-    <div class="admin-import__success" id="import-success"></div>
+    <div id="import-banner"></div>
     <div class="admin-card admin-card--pad" id="import-errors-card" hidden>
       <div class="admin-import__errors-title" id="import-errors-title"></div>
       <div id="import-errors-list"></div>
+    </div>
+    <div class="admin-card admin-import__report" id="import-report-card" hidden>
+      <table class="admin-table">
+        <thead>
+          <tr><th>{{t "admin.import.row"}}</th><th>{{t "admin.common.status"}}</th><th>{{t "admin.import.model"}}</th><th>{{t "admin.common.size"}}</th><th>{{t "admin.common.color"}}</th><th>SKU</th><th>{{t "admin.import.reason"}}</th></tr>
+        </thead>
+        <tbody id="import-report-body"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -33,13 +74,51 @@
   var importURL = {{.ImportURL}};
   var dropzone = document.getElementById('import-dropzone');
   var fileInput = document.getElementById('import-file-input');
+  var fileNameEl = document.getElementById('import-file-name');
+  var pointSelect = document.getElementById('import-point');
+  var checkBtn = document.getElementById('import-check');
+  var runBtn = document.getElementById('import-run');
   var resultEl = document.getElementById('import-result');
-  var successEl = document.getElementById('import-success');
+  var bannerEl = document.getElementById('import-banner');
   var errorsCard = document.getElementById('import-errors-card');
   var errorsTitle = document.getElementById('import-errors-title');
   var errorsList = document.getElementById('import-errors-list');
+  var reportCard = document.getElementById('import-report-card');
+  var reportBody = document.getElementById('import-report-body');
 
-  // Word forms come from the admin locale; in Kyrgyz all three are equal.
+  var chosenFile = null;
+  var checkedOK = false; // last dry run of this file/point had no errors
+  var busy = false;
+
+  // Translated strings (admin locale); plural forms are equal in Kyrgyz.
+  var L = {
+    file: {{t "admin.import.file"}},
+    noPoints: {{t "admin.import.no_points"}},
+    defaultPoint: {{t "admin.import.default_point"}},
+    created: [{{t "admin.import.st_created"}}, {{t "admin.import.st_will_create"}}],
+    updated: [{{t "admin.import.st_updated"}}, {{t "admin.import.st_will_update"}}],
+    skipped: [{{t "admin.import.st_skipped"}}, {{t "admin.import.st_will_skip"}}],
+    error: [{{t "admin.import.st_error"}}, {{t "admin.import.st_error"}}],
+    dryErrors: {{t "admin.import.dry_errors"}},
+    dryOK: {{t "admin.import.dry_ok"}},
+    imported: {{t "admin.import.imported"}},
+    products: {{t "admin.nav.products"}},
+    variants: {{t "admin.product.variants"}},
+    rows: {{t "admin.import.rows"}},
+    createdW: {{t "admin.import.st_created"}},
+    updatedW: {{t "admin.import.st_updated"}},
+    skippedW: {{t "admin.import.st_skipped"}},
+    withErrors: {{t "admin.import.with_errors"}},
+    willNot: {{t "admin.import.will_not"}},
+    notImported: {{t "admin.import.not_imported"}},
+    row: {{t "admin.import.row"}},
+    confirmRun: {{t "admin.import.confirm_run"}},
+    failed: {{t "admin.import.failed"}},
+    runFailed: {{t "admin.import.run_failed"}},
+    product: [{{t "admin.plural.product.one"}}, {{t "admin.plural.product.few"}}, {{t "admin.plural.product.many"}}],
+    line: [{{t "admin.plural.row.one"}}, {{t "admin.plural.row.few"}}, {{t "admin.plural.row.many"}}]
+  };
+
   function pluralRu(n, one, few, many) {
     var a = Math.abs(n) % 100, b = a % 10;
     if (a > 10 && a < 20) return many;
@@ -47,55 +126,148 @@
     if (b === 1) return one;
     return many;
   }
-  var L = {
-    failed: {{t "admin.import.failed"}},
-    imported: {{t "admin.import.imported"}},
-    skipped: {{t "admin.import.skipped"}},
-    row: {{t "admin.import.row"}},
-    runFailed: {{t "admin.import.run_failed"}},
-    product: [{{t "admin.plural.product.one"}}, {{t "admin.plural.product.few"}}, {{t "admin.plural.product.many"}}],
-    line: [{{t "admin.plural.row.one"}}, {{t "admin.plural.row.few"}}, {{t "admin.plural.row.many"}}]
-  };
 
-  function runImport(file) {
+  function setBusy(v) {
+    busy = v;
+    checkBtn.disabled = v || !chosenFile;
+    runBtn.disabled = v || !chosenFile;
+    dropzone.style.opacity = v ? '0.6' : '1';
+  }
+
+  function chooseFile(file) {
     if (!file) return;
+    chosenFile = file;
+    checkedOK = false;
+    fileNameEl.textContent = L.file + ': ' + file.name;
+    resultEl.hidden = true;
+    setBusy(false);
+  }
+
+  fetch(importURL + '/points', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+    .then(function (res) {
+      pointSelect.innerHTML = '';
+      var points = res.points || [];
+      if (!points.length) {
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = L.noPoints;
+        pointSelect.appendChild(none);
+        return;
+      }
+      points.forEach(function (p) {
+        var o = document.createElement('option');
+        o.value = p.id;
+        o.textContent = p.name + (p.address ? ' — ' + p.address : '');
+        pointSelect.appendChild(o);
+      });
+    })
+    .catch(function () {
+      pointSelect.innerHTML = '';
+      var o = document.createElement('option');
+      o.value = '';
+      o.textContent = L.defaultPoint;
+      pointSelect.appendChild(o);
+    });
+  pointSelect.addEventListener('change', function () { checkedOK = false; });
+
+  var statusLabels = { created: L.created, updated: L.updated, skipped: L.skipped, error: L.error };
+
+  function cell(tr, text, cls) {
+    var td = document.createElement('td');
+    td.textContent = text == null ? '' : String(text);
+    if (cls) td.className = cls;
+    tr.appendChild(td);
+  }
+
+  function render(res) {
+    var s = res.summary || {};
+    var dry = !!res.dry_run;
+    resultEl.hidden = false;
+
+    bannerEl.className = (s.errors || s.skipped) ? 'admin-import__notice' : 'admin-import__success';
+    bannerEl.textContent = '';
+    var head = document.createElement('div');
+    if (dry) {
+      head.textContent = (s.errors || s.skipped)
+        ? L.dryErrors
+        : L.dryOK;
+    } else {
+      var n = (s.products_created || 0) + (s.products_updated || 0);
+      head.textContent = L.imported + ': ' + n + ' ' + pluralRu(n, L.product[0], L.product[1], L.product[2]);
+    }
+    bannerEl.appendChild(head);
+    var line = document.createElement('div');
+    line.className = 'admin-import__summary';
+    line.textContent = L.products + ': ' + L.createdW + ' ' + (s.products_created || 0) + ', ' + L.updatedW + ' ' + (s.products_updated || 0) +
+      ' · ' + L.variants + ': ' + L.createdW + ' ' + (s.variants_created || 0) + ', ' + L.updatedW + ' ' + (s.variants_updated || 0) +
+      ' · ' + L.rows + ': ' + (s.rows || 0) + ', ' + L.withErrors + ' ' + (s.errors || 0) + ', ' + L.skippedW + ' ' + (s.skipped || 0);
+    bannerEl.appendChild(line);
+
+    var rows = res.rows || [];
+    var bad = rows.filter(function (r) { return r.status === 'error' || r.status === 'skipped'; });
+    errorsList.innerHTML = '';
+    if (bad.length) {
+      errorsCard.hidden = false;
+      errorsTitle.textContent = (dry ? L.willNot : L.notImported) + ': ' + bad.length + ' ' + pluralRu(bad.length, L.line[0], L.line[1], L.line[2]);
+      bad.forEach(function (r) {
+        var div = document.createElement('div');
+        div.className = 'admin-import__error-row';
+        div.textContent = L.row + ' ' + r.row + (r.model ? ' (' + r.model + ')' : '') + ' — ' + (r.message || r.status);
+        errorsList.appendChild(div);
+      });
+    } else {
+      errorsCard.hidden = true;
+    }
+
+    reportBody.innerHTML = '';
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      cell(tr, r.row);
+      var lbl = statusLabels[r.status] || [r.status, r.status];
+      cell(tr, dry ? lbl[1] : lbl[0], 'admin-import__status--' + r.status);
+      cell(tr, r.model);
+      cell(tr, r.size);
+      cell(tr, r.color);
+      cell(tr, r.sku);
+      cell(tr, r.message, 'admin-table__muted');
+      reportBody.appendChild(tr);
+    });
+    reportCard.hidden = rows.length === 0;
+  }
+
+  function send(dryRun) {
+    if (!chosenFile || busy) return;
+    if (!dryRun && !checkedOK && !confirm(L.confirmRun)) return;
     var form = new FormData();
-    form.append('file', file);
-    dropzone.style.opacity = '0.6';
-    fetch(importURL, { method: 'POST', body: form })
+    form.append('file', chosenFile);
+    form.append('dry_run', dryRun ? '1' : '0');
+    if (pointSelect.value) form.append('point_id', pointSelect.value);
+    setBusy(true);
+    fetch(importURL, { method: 'POST', body: form, credentials: 'same-origin' })
       .then(function (r) {
-        if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || L.failed); });
+        if (!r.ok) {
+          return r.json().catch(function () { return {}; }).then(function (e) {
+            throw new Error((e && (e.message || (e.error && e.error.message))) || L.failed);
+          });
+        }
         return r.json();
       })
       .then(function (res) {
-        dropzone.style.opacity = '1';
-        resultEl.hidden = false;
-        var imported = res.imported || 0;
-        successEl.textContent = L.imported + ': ' + imported + ' ' + pluralRu(imported, L.product[0], L.product[1], L.product[2]);
-        var errs = res.errors || [];
-        if (errs.length) {
-          errorsCard.hidden = false;
-          errorsTitle.textContent = L.skipped + ': ' + errs.length + ' ' + pluralRu(errs.length, L.line[0], L.line[1], L.line[2]);
-          errorsList.innerHTML = '';
-          errs.forEach(function (e) {
-            var row = document.createElement('div');
-            row.className = 'admin-import__error-row';
-            var rowNum = e.row || e.line || '?';
-            var msg = e.message || e.error || String(e);
-            row.textContent = L.row + ' ' + rowNum + ' — ' + msg;
-            errorsList.appendChild(row);
-          });
-        } else {
-          errorsCard.hidden = true;
-        }
+        setBusy(false);
+        var s = res.summary || {};
+        checkedOK = dryRun && !s.errors && !s.skipped;
+        render(res);
       })
       .catch(function (err) {
-        dropzone.style.opacity = '1';
+        setBusy(false);
         alert(err.message || L.runFailed);
       });
   }
 
-  fileInput.addEventListener('change', function (e) { runImport(e.target.files[0]); });
+  checkBtn.addEventListener('click', function () { send(true); });
+  runBtn.addEventListener('click', function () { send(false); });
+  fileInput.addEventListener('change', function (e) { chooseFile(e.target.files[0]); });
 
   ['dragenter', 'dragover'].forEach(function (evt) {
     dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.add('dragover'); });
@@ -104,8 +276,7 @@
     dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.remove('dragover'); });
   });
   dropzone.addEventListener('drop', function (e) {
-    var file = e.dataTransfer.files && e.dataTransfer.files[0];
-    runImport(file);
+    chooseFile(e.dataTransfer.files && e.dataTransfer.files[0]);
   });
 })();
 </script>

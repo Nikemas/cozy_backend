@@ -15,6 +15,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/admin"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/csrf"
 	"github.com/Nikemas/cozy_backend/internal/health"
@@ -87,7 +88,11 @@ func run() error {
 
 	// Must be installed before any orders.Service is constructed/used by
 	// the route registrations below.
-	notifier := buildNotifications(db, cfg)
+	pushSender := buildPushSender(cfg)
+	notifier, err := buildNotifications(db, cfg, pushSender)
+	if err != nil {
+		return err
+	}
 	orders.SetDefaultNotifier(notifier)
 
 	// Order settings (DELIVERY_FEE_SOM, MAX_OPEN_ORDERS_PER_CUSTOMER,
@@ -97,6 +102,10 @@ func run() error {
 		return err
 	}
 	orders.SetDefaultSettings(orderSettings)
+	// Order items in API responses carry product_id + photo_url/thumb_url.
+	orders.SetItemPhotoURLs(func(key string) (string, string) {
+		return cfg.PublicObjectURL(key), cfg.PublicObjectURL(media.ThumbKey(key))
+	})
 
 	payProvider, err := payments.NewProvider(cfg)
 	if err != nil {
@@ -120,6 +129,15 @@ func run() error {
 		orderSettings.PaymentPendingTTL, payments.DefaultExpiryInterval)
 	defer func() { stopExpiry(); <-expiryDone }()
 
+	// Promo broadcasts (admin "Рассылки") are sent by this background
+	// worker, batch by batch. On shutdown it finishes and records the batch
+	// in flight, then stops; an unfinished broadcast resumes on restart.
+	broadcastCtx, stopBroadcasts := context.WithCancel(context.Background())
+	broadcastsDone := broadcasts.NewWorker(broadcasts.NewRepo(db), pushSender, broadcasts.WorkerConfig{}).Start(broadcastCtx)
+	// Waited for (bounded by the shutdown timeout) in the shutdown path
+	// below; an early error return just stops it.
+	defer stopBroadcasts()
+
 	mux := http.NewServeMux()
 	health.Register(mux, 2*time.Second,
 		health.DBCheck(db),
@@ -129,7 +147,7 @@ func run() error {
 	if err := registerAdminRoutes(mux, db, mediaClient, cfg); err != nil {
 		return err
 	}
-	if err := registerWebRoutes(mux, db, cfg, authSvc); err != nil {
+	if err := registerWebRoutes(mux, db, cfg, authSvc, payProvider); err != nil {
 		return err
 	}
 
@@ -180,6 +198,12 @@ func run() error {
 	if nerr := notifier.Shutdown(shutdownCtx); nerr != nil {
 		slog.Warn("notifications: shutdown timed out, some notifications may be lost", "err", nerr)
 	}
+	stopBroadcasts()
+	select {
+	case <-broadcastsDone:
+	case <-shutdownCtx.Done():
+		slog.Warn("broadcasts: worker still finishing a batch at shutdown timeout; it resumes on restart")
+	}
 	return err
 }
 
@@ -206,7 +230,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 	httpapi.RegisterPublicPointsRoutes(mux, db)
 	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg, ordersSvc, paySvc)
 	httpapi.RegisterPaymentRoutes(mux, paySvc, cfg.PaymentsBaseURL())
-	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
+	httpapi.RegisterCustomerRoutes(mux, db, authSvc, cfg)
 	httpapi.RegisterAppConfigRoutes(mux, cfg)
 }
 
@@ -228,7 +252,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.
-func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service, payProvider payments.Provider) error {
 	web.SetCookieSecure(cfg.Security.CookieSecure)
-	return web.RegisterRoutes(mux, db, cfg, authSvc)
+	return web.RegisterRoutes(mux, db, cfg, authSvc, payProvider)
 }

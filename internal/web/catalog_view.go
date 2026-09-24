@@ -27,6 +27,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/media"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -295,11 +296,16 @@ func filterOptions(values []string, selected string) []FilterOption {
 // ProductData backs product.gohtml (screen "product") and its
 // HTMX-swapped #product-detail fragment (size/color change).
 type ProductData struct {
-	Name        string
-	Brand       string
-	Price       float64 // selected variant's price (JSON-LD)
-	PriceText   string
-	Description string // in the visitor's language; "" if none
+	// DeliveryFee is the courier fee for one pair of this product: the flat
+	// DELIVERY_FEE_SOM, or the cheapest active zone (DeliveryFrom when zones
+	// differ) — the same numbers the cart and checkout show.
+	DeliveryFee  float64
+	DeliveryFrom bool
+	Name         string
+	Brand        string
+	Price        float64 // selected variant's price (JSON-LD)
+	PriceText    string
+	Description  string // in the visitor's language; "" if none
 
 	HasPhoto bool // see ProductCard.HasPhoto
 	PhotoURL string
@@ -413,6 +419,9 @@ func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
+	if err := h.applyProductDelivery(r.Context(), pd); err != nil {
+		return err
+	}
 	data.Data = pd
 	h.productSEO(r, &data, pd)
 	return h.render.Render(w, "product", data)
@@ -619,4 +628,19 @@ func stringOr(p *string, def string) string {
 // the 400px variant, the product page passes the stored (full) key.
 func (h *handlers) photoURL(objectKey string) string {
 	return h.cfg.PublicObjectURL(objectKey)
+}
+
+// applyProductDelivery fills pd.DeliveryFee / DeliveryFrom via the cart's
+// zone logic, treating a single pair at pd.Price as the cart.
+func (h *handlers) applyProductDelivery(ctx context.Context, pd *ProductData) error {
+	page := &CartPageData{Lines: []CartLineView{{}}, ItemsTotal: pd.Price, DeliveryFee: orders.CurrentSettings().DeliveryFee}
+	if h.zones != nil {
+		zones, err := h.zones.ListActive(ctx)
+		if err != nil {
+			return err
+		}
+		applyZoneDelivery(page, zones)
+	}
+	pd.DeliveryFee, pd.DeliveryFrom = page.DeliveryFee, page.DeliveryFrom
+	return nil
 }

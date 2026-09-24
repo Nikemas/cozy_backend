@@ -22,6 +22,18 @@ type OrderHistoryRowView struct {
 	Note      string
 }
 
+// orderZoneName is the order's delivery zone name in t's language
+// (falling back to the Russian name), "" when the order has no zone.
+func orderZoneName(t tr, z *orders.OrderDeliveryZone) string {
+	if z == nil {
+		return ""
+	}
+	if t.Lang() == "ky" && z.NameKy != "" {
+		return z.NameKy
+	}
+	return z.NameRu
+}
+
 func buildOrderHistoryData(t tr, o *orders.Order) OrderHistoryData {
 	d := OrderHistoryData{RefundRequired: o.RefundRequired}
 	if o.DeliveryFee > 0 {

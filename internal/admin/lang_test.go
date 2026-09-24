@@ -14,6 +14,8 @@ import (
 	"unicode"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/audit"
+	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
@@ -260,6 +262,7 @@ func kyScreenFixtures() map[string]PageData {
 		CanChoosePoint: true, Points: []PointOptionVM{{ID: "", Name: kyTr.T("admin.common.all_points")}},
 		Notes: []string{kyTr.T("admin.orders.note_bad_status")}, Filtered: true, Range: "custom",
 		CountLabel: kyTr.N(1, "admin.plural.order"), HasPrev: true, HasNext: true,
+		BulkStatuses: bulkStatusOptions(kyTr, staff.RoleOwner), BulkURL: "/admin/orders/bulk-status", ReturnURL: "/admin/orders",
 	}
 	out["orders"] = ordersPage
 
@@ -268,6 +271,7 @@ func kyScreenFixtures() map[string]PageData {
 		ID: "o1", Number: "COZY-1", StatusLabel: meta.Label, StatusClass: meta.Class,
 		PaymentLabel: paymentLabel(kyTr, orders.PaymentCashOnDelivery, nil),
 		AddressText:  kyTr.F("admin.order.pickup_at", "Main", "Street 1"), Comment: "—",
+		ZoneName:      orderZoneName(kyTr, &orders.OrderDeliveryZone{ID: "z1", NameRu: "Бишкек", NameKy: "Bishkek city"}),
 		Items:         []OrderDetailItemView{{Name: "Nike", Variant: kyTr.F("admin.order.item_variant", "42", "white"), Qty: 1, PriceLabel: "6 500 сом"}},
 		TotalLabel:    "6 500 сом",
 		StatusButtons: buildStatusButtons(kyTr, orders.StatusPlaced, staff.RoleOwner),
@@ -288,6 +292,9 @@ func kyScreenFixtures() map[string]PageData {
 			StockLabel: stockLbl, StockFG: fg, StockBG: bg, StatusLabel: statusLabel(kyTr, true), EditURL: "/admin/products/p1",
 			DeactivateLabel: deactivateLabel(kyTr, true), DeleteURL: "/admin/products/p1/delete"}},
 		CountLabel: countLabel(kyTr, 1), PageSize: 25, NewURL: "/admin/products/new", ImportURL: "/admin/products/import",
+		PointOptions: resolveProductsPoint(kyTr, []*points.Point{{ID: "pt1", Name: "Main", IsActive: true}, {ID: "pt2", Name: "Old"}}, "pt1", true).Options,
+		PointID:      "pt1", PointName: "Main", OutOfStockOnly: true, BulkURL: "/admin/products/bulk", ReturnURL: "/admin/products",
+		BulkCategories: []BulkCategoryOption{{ID: "c1", Label: "Men"}},
 	}
 	out["products"] = products
 
@@ -342,6 +349,41 @@ func kyScreenFixtures() map[string]PageData {
 		CountLabel: kyTr.N(1, "admin.plural.variant"), HasPrev: true, HasNext: true, Err: "x",
 	}
 	out["stock"] = stock
+
+	bc := shell("broadcasts", "admin.nav.broadcasts")
+	errText := "boom"
+	bc.Data = broadcastsPageData{
+		SubmitToken: "tok", Form: broadcastForm{LinkType: "product", ProductID: "p1", ProductLabel: "Shoe"}, Error: "x",
+		Devices: 3, Customers: 2, Categories: []broadcasts.Option{{ID: "c1", Label: "Men"}},
+		History: []broadcastRow{
+			newBroadcastRow(kyTr, broadcasts.Broadcast{ID: "b1", TitleRU: "Sale", Status: broadcasts.StatusSending, LinkLabel: "Shoe", CreatedAt: now}),
+			newBroadcastRow(kyTr, broadcasts.Broadcast{ID: "b2", TitleRU: "Sale", Status: broadcasts.StatusFailed, Error: &errText, CreatedAt: now}),
+		},
+		MaxTitle: broadcasts.MaxTitleLen, MaxBody: broadcasts.MaxBodyLen,
+	}
+	out["broadcasts"] = bc
+
+	free := 3000.0
+	delivery := shell("delivery", "admin.nav.delivery")
+	delivery.Data = deliveryPageData{
+		Rows: []deliveryZoneRow{
+			newDeliveryZoneRow(kyTr, orders.DeliveryZone{ID: "z1", NameRu: "Bishkek", NameKy: "Bishkek", Fee: 200, FreeFrom: &free, IsActive: true}),
+			newDeliveryZoneRow(kyTr, orders.DeliveryZone{ID: "z2", NameRu: "Suburbs", NameKy: "Suburbs", Fee: 400}),
+		},
+		FlatFee: "200", AnyActive: false, Error: "x",
+	}
+	out["delivery"] = delivery
+
+	auditPage := shell("audit", "admin.audit.title")
+	staffID := "s1"
+	auditPage.Data = buildAuditPageData(kyTr, auditParams{Entity: audit.EntityProduct, Page: 1}, []staff.Staff{*owner, {ID: "s9", Name: "Old", IsActive: false}},
+		[]audit.Row{
+			{ID: "a1", At: now, StaffID: &staffID, StaffName: owner.Name, Action: audit.ActionProductUpdate, EntityType: audit.EntityProduct, EntityID: "p1",
+				Summary: "x", Details: map[string]any{"base_price": map[string]any{"from": 1.0, "to": 2.0}, "is_active": true}},
+			{ID: "a2", At: now, Action: audit.ActionOrderStatus, EntityType: audit.EntityOrder, EntityID: "o1",
+				Summary: "COZY-1", Details: map[string]any{"from": "placed", "to": "confirmed"}},
+		}, 120, "x")
+	out["audit"] = auditPage
 	return out
 }
 
@@ -364,13 +406,13 @@ func TestRenderEveryScreenInKyrgyz(t *testing.T) {
 	// Russian strings that must not appear in a Kyrgyz page: every ru
 	// value that differs from its ky translation, long enough not to
 	// collide with an unrelated word, without format verbs.
-	var russian []string
+	var russian []*regexp.Regexp
 	for _, k := range adminBundle.Keys(i18n.LangRU) {
 		rv, kv := adminBundle.T(i18n.LangRU, k), adminBundle.T(i18n.LangKY, k)
 		if rv == kv || len([]rune(rv)) < 5 || strings.Contains(rv, "%") || !hasCyrillic(rv) || strings.HasPrefix(k, "admin.apperr.") {
 			continue
 		}
-		russian = append(russian, rv)
+		russian = append(russian, wordRE(rv))
 	}
 
 	for screen, data := range fixtures {
@@ -387,9 +429,9 @@ func TestRenderEveryScreenInKyrgyz(t *testing.T) {
 				t.Errorf("raw locale key %q rendered", m)
 			}
 			text := visibleText(body)
-			for _, rv := range russian {
-				if strings.Contains(text, rv) {
-					t.Errorf("Russian UI string %q left in the Kyrgyz page", rv)
+			for _, re := range russian {
+				if re.MatchString(text) {
+					t.Errorf("Russian UI string %q left in the Kyrgyz page", re.String())
 				}
 			}
 		})
@@ -419,6 +461,12 @@ func TestRenderPicksLanguageFromWriter(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Сотрудники") || !strings.Contains(rec.Body.String(), `<html lang="ru">`) {
 		t.Error("expected the Russian page by default")
 	}
+}
+
+// wordRE matches phrase as whole words (so "точка" doesn't match inside
+// the Kyrgyz "карточкасы").
+func wordRE(phrase string) *regexp.Regexp {
+	return regexp.MustCompile(`(?:^|[^\p{L}])` + regexp.QuoteMeta(phrase) + `(?:$|[^\p{L}])`)
 }
 
 func hasCyrillic(s string) bool {

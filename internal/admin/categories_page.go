@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -133,10 +134,13 @@ func (h *handlers) categoriesCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.categories.Create(r.Context(), categoryInputFromForm(r)); err != nil {
+	in := categoryInputFromForm(r)
+	created, err := h.categories.Create(r.Context(), in)
+	if err != nil {
 		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditCategory(r.Context(), audit.ActionCategoryCreate, created.ID, in.NameRu, &in)
 
 	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
 }
@@ -151,10 +155,12 @@ func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.PathValue("id")
-	if _, err := h.categories.Update(r.Context(), id, categoryInputFromForm(r)); err != nil {
+	in := categoryInputFromForm(r)
+	if _, err := h.categories.Update(r.Context(), id, in); err != nil {
 		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditCategory(r.Context(), audit.ActionCategoryUpdate, id, in.NameRu, &in)
 
 	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
 }
@@ -166,10 +172,12 @@ func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 // raw 500.
 func (h *handlers) categoriesDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	name := h.categoryName(r.Context(), id)
 	if err := h.categories.Delete(r.Context(), id); err != nil {
 		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditCategory(r.Context(), audit.ActionCategoryDelete, id, name, nil)
 
 	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
 }

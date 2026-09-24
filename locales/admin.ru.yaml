@@ -282,6 +282,195 @@ admin.import.skipped: Пропущено с ошибками
 admin.import.row: Строка
 admin.import.run_failed: Не удалось выполнить импорт
 
+# Wave 2 screens: broadcasts, delivery zones, audit journal, bulk actions, import v2
+admin.common.yes: да
+admin.common.no: нет
+admin.nav.broadcasts: Рассылки
+admin.nav.delivery: Доставка
+admin.nav.audit: Журнал
+admin.order.zone: Зона доставки
+admin.broadcasts.status_queued: В очереди
+admin.broadcasts.status_sending: Отправляется
+admin.broadcasts.status_done: Отправлена
+admin.broadcasts.status_failed: Ошибка
+admin.broadcasts.queued_toast: Рассылка поставлена в очередь — статистика обновится ниже
+admin.broadcasts.load_failed: не удалось загрузить рассылки
+admin.broadcasts.search_failed: ошибка поиска
+admin.broadcasts.note_who: Push получат покупатели, у которых включено «Акции и скидки» и установлено приложение.
+admin.broadcasts.note_now: "Сейчас:"
+admin.broadcasts.devices_short: устр.
+admin.broadcasts.customers: покупателей
+admin.broadcasts.note_lang: Текст уходит на языке покупателя; если киргизский текст не заполнен — отправится русский.
+admin.broadcasts.confirm_text: Push получат %d устр. (%d покупателей). Отменить отправку после подтверждения нельзя.
+admin.broadcasts.confirm_title: Отправить рассылку?
+admin.broadcasts.send: Отправить
+admin.broadcasts.title: Заголовок
+admin.broadcasts.body: Текст
+admin.broadcasts.body_placeholder: Текст уведомления
+admin.broadcasts.ky_empty_hint: Пусто — отправим русский
+admin.broadcasts.link_legend: Куда ведёт push
+admin.broadcasts.link_app: Открыть приложение
+admin.broadcasts.product_search: Начните вводить название или бренд
+admin.broadcasts.picked: Выбран
+admin.broadcasts.choose: — выберите —
+admin.broadcasts.preview: Предпросмотр
+admin.broadcasts.history: История
+admin.broadcasts.empty: Рассылок ещё не было
+admin.broadcasts.link: ссылка
+admin.broadcasts.stat_targets: получателей
+admin.broadcasts.stat_sent: доставлено
+admin.broadcasts.stat_failed: ошибок
+admin.broadcasts.stat_invalid: удалено недействительных токенов
+admin.broadcasts.opens_product: Откроет товар
+admin.broadcasts.no_product: Товар не выбран
+admin.broadcasts.opens_category: Откроет категорию
+admin.broadcasts.no_category: Категория не выбрана
+admin.broadcasts.opens_app: Откроет приложение
+admin.broadcasts.pick_product: Выберите товар из списка
+admin.delivery.load_failed: не удалось загрузить зоны доставки
+admin.delivery.err_amount: сумма должна быть числом
+admin.delivery.err_fee_required: укажите стоимость доставки
+admin.delivery.err_sort_order: порядок — целое число
+admin.delivery.note: "Покупатель выбирает зону при оформлении доставки; стоимость считает сервер: цена зоны, или 0, если сумма товаров не меньше «бесплатно от»."
+admin.delivery.pickup_free: Самовывоз всегда бесплатный.
+admin.delivery.no_zones_flat: Сейчас нет активных зон — доставка стоит %s сом (DELIVERY_FEE_SOM) для всех адресов.
+admin.delivery.add: Добавить зону
+admin.delivery.empty: Пока нет зон доставки
+admin.delivery.free_from_short: бесплатно от %s сом
+admin.delivery.edit_aria: Изменить зону «%s»
+admin.delivery.deactivate_text: Зона «%s» перестанет предлагаться при оформлении заказа. Уже оформленные заказы не изменятся.
+admin.delivery.deactivate_title: Деактивировать зону?
+admin.delivery.delete_text: Удалить зону «%s»? Зону, по которой уже есть заказы, удалить нельзя — только деактивировать.
+admin.delivery.delete_title: Удалить зону?
+admin.delivery.delete_aria: Удалить зону «%s»
+admin.delivery.new_title: Новая зона доставки
+admin.delivery.edit_title: Редактировать зону
+admin.delivery.fee: Стоимость, сом
+admin.delivery.free_from: Бесплатно от, сом
+admin.delivery.not_set: не задано
+admin.audit.title: Журнал действий
+admin.audit.entity.product: Товар
+admin.audit.entity.variant: Вариация
+admin.audit.entity.stock: Остаток
+admin.audit.entity.order: Заказ
+admin.audit.entity.category: Категория
+admin.audit.entity.point: Точка продаж
+admin.audit.entity.staff: Сотрудник
+admin.audit.action.create: Создание
+admin.audit.action.update: Изменение
+admin.audit.action.activate: Активация
+admin.audit.action.deactivate: Деактивация
+admin.audit.action.delete: Удаление
+admin.audit.action.category: Смена категории
+admin.audit.action.images: Фото
+admin.audit.action.stock: Изменение остатка
+admin.audit.action.password: Сброс пароля
+admin.audit.action.order_status: Смена статуса
+admin.audit.field.category: категория
+admin.audit.field.name_ru: название (рус)
+admin.audit.field.name_ky: название (кырг)
+admin.audit.field.description_ru: описание (рус)
+admin.audit.field.description_ky: описание (кырг)
+admin.audit.field.brand: бренд
+admin.audit.field.price: цена
+admin.audit.field.quantity: количество
+admin.audit.field.point: точка
+admin.audit.field.is_active: активен
+admin.audit.field.name: название
+admin.audit.field.address: адрес
+admin.audit.field.phone: телефон
+admin.audit.field.role: роль
+admin.audit.field.size: размер
+admin.audit.field.color: цвет
+admin.audit.field.sku: артикул
+admin.audit.field.price_override: цена вариации
+admin.audit.field.slug: slug
+admin.audit.field.sort_order: порядок
+admin.audit.field.parent: родитель
+admin.audit.err_from: дата «с» должна быть в формате ГГГГ-ММ-ДД
+admin.audit.err_to: дата «по» должна быть в формате ГГГГ-ММ-ДД
+admin.audit.err_range: дата начала позже даты окончания
+admin.audit.all_staff: Все сотрудники
+admin.audit.staff_inactive: (отключён)
+admin.audit.all_entities: Все объекты
+admin.audit.page_of: Страница %d из %d
+admin.audit.col_entity: Объект
+admin.audit.col_when: Когда
+admin.audit.col_who: Кто
+admin.audit.col_action: Действие
+admin.audit.col_what: Что изменилось
+admin.audit.q_label: ID объекта или № заказа
+admin.audit.q_placeholder: например, 3f2a9c или COZY-20260924-001
+admin.audit.empty_title: Журнал пуст
+admin.audit.empty_filtered_text: Попробуйте изменить фильтры
+admin.audit.empty_text: Здесь появятся изменения товаров, остатков, заказов, точек и сотрудников
+admin.plural.record.one: запись
+admin.plural.record.few: записи
+admin.plural.record.many: записей
+admin.plural.product_gen.one: товара
+admin.plural.product_gen.few: товаров
+admin.plural.product_gen.many: товаров
+admin.bulk.selected: Выбрано
+admin.bulk.new_status: Новый статус
+admin.bulk.orders_title: Сменить статус заказов?
+admin.bulk.orders_confirm: Статус «{value}» будет установлен выбранным заказам ({n}). Заказы, для которых такой переход недопустим, останутся без изменений — список появится после применения.
+admin.bulk.apply: Применить
+admin.bulk.select_all_orders: Выбрать все заказы на странице
+admin.bulk.select_order: Выбрать заказ %s
+admin.bulk.select_all_products: Выбрать все товары на странице
+admin.bulk.select_product: Выбрать «%s»
+admin.bulk.activate_title: Активировать товары?
+admin.bulk.activate_confirm: Выбранные товары ({n}) станут видны в каталоге.
+admin.bulk.deactivate_title: Деактивировать товары?
+admin.bulk.deactivate_confirm: Выбранные товары ({n}) перестанут отображаться в каталоге.
+admin.bulk.new_category: Новая категория
+admin.bulk.category_title: Сменить категорию?
+admin.bulk.category_confirm: Выбранные товары ({n}) будут перенесены в категорию «{value}».
+admin.bulk.category_button: Сменить категорию
+admin.bulk.choose_status: Выберите статус
+admin.bulk.status_done: "Статус «%s» установлен: %d из %d"
+admin.bulk.and_more: … и ещё %d
+admin.bulk.already_in_status: уже в этом статусе
+admin.bulk.none_selected: Не выбрано ни одной строки
+admin.bulk.too_many: За один раз можно изменить не больше %d строк
+admin.bulk.unknown_action: Неизвестное действие
+admin.bulk.products_done: "Готово: изменено %d из %d %s"
+admin.products.all_points_no_column: Все точки (без колонки)
+admin.products.stock_at_point: Остаток в точке
+admin.products.oos_only: Только нет в наличии в этой точке
+admin.products.at_point: В точке
+admin.import.template: Скачать шаблон
+admin.import.point_label: Точка продаж для колонки «Остаток»
+admin.import.loading: Загрузка…
+admin.import.check: Проверить
+admin.import.run: Импортировать
+admin.import.model: Модель
+admin.import.reason: Причина
+admin.import.file: Файл
+admin.import.no_points: Нет активных точек — остатки не загружаются
+admin.import.default_point: Первая активная точка (по умолчанию)
+admin.import.st_created: создано
+admin.import.st_will_create: будет создано
+admin.import.st_updated: обновлено
+admin.import.st_will_update: будет обновлено
+admin.import.st_skipped: пропущено
+admin.import.st_will_skip: будет пропущено
+admin.import.st_error: ошибка
+admin.import.dry_errors: "Проверка: есть ошибки. Ничего не записано — исправьте файл или импортируйте только корректные модели."
+admin.import.dry_ok: Проверка пройдена, ничего не записано. Можно импортировать.
+admin.import.rows: Строк
+admin.import.with_errors: с ошибками
+admin.import.will_not: Не будет импортировано
+admin.import.not_imported: Не импортировано
+admin.import.confirm_run: Файл ещё не проверен без ошибок. Импортировать сейчас? Корректные модели будут записаны, модели с ошибками — пропущены.
+admin.apperr.invalid_broadcast: заполните заголовок и текст на русском
+admin.apperr.invalid_broadcast_link: выберите товар или категорию для ссылки
+admin.apperr.invalid_submit_token: форма устарела — обновите страницу
+admin.apperr.broadcast_not_found: рассылка не найдена
+admin.apperr.invalid_delivery_zone_input: проверьте поля зоны доставки
+admin.apperr.delivery_zone_not_found: зона доставки не найдена
+admin.apperr.delivery_zone_in_use: по этой зоне уже есть заказы — её можно только деактивировать
+
 # Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
 admin.err.generic: произошла ошибка, попробуйте ещё раз
 admin.err.form: не удалось прочитать форму

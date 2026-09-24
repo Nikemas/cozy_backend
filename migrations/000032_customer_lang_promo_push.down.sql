@@ -1,0 +1,3 @@
+ALTER TABLE customers
+  DROP COLUMN IF EXISTS promo_push,
+  DROP COLUMN IF EXISTS lang;

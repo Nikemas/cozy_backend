@@ -34,7 +34,7 @@ type SEOMeta struct {
 // not index (also Disallow-ed in robots.txt).
 var privateScreens = map[string]bool{
 	"cart": true, "checkout": true, "done": true, "fav": true, "profile": true,
-	"orders": true, "addresses": true, "lang": true, "error": true,
+	"orders": true, "addresses": true, "lang": true, "error": true, "pay_return": true,
 }
 
 // siteURL is the site's public origin: PUBLIC_BASE_URL when configured

@@ -928,3 +928,19 @@ img.admin-order-detail__thumb-box { display: block; object-fit: cover; backgroun
 .admin-orders-table__items { display: inline-flex; align-items: center; gap: 10px; }
 .admin-orders-thumb { display: inline-block; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--admin-bg); flex: none; vertical-align: middle; }
 .admin-order-card__phone .admin-orders-thumb { margin-right: 10px; }
+
+/* fix/admin-ops: bulk selection bar (Товары, Заказы), per-point stock
+   selector on the products list, Журнал. */
+.admin-bulkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; margin: 0; background: var(--admin-primary-tint); border-bottom: 1px solid var(--admin-border); border-radius: var(--admin-radius-card) var(--admin-radius-card) 0 0; }
+.admin-bulkbar[hidden] { display: none; }
+.admin-bulkbar__count { font-size: 14px; font-weight: 600; margin-right: 6px; }
+.admin-bulkbar select { height: 36px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); padding: 0 10px; font: inherit; background: var(--admin-surface); color: var(--admin-text); }
+.admin-table__check-col { width: 44px; }
+.admin-table__check-col input, .admin-orders-table__check input { width: 18px; height: 18px; cursor: pointer; }
+.admin-orders-table__check { width: 44px; }
+.admin-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; align-self: center; cursor: pointer; }
+.admin-check input { width: 18px; height: 18px; }
+.admin-products__pointbar { margin-bottom: 12px; }
+.admin-audit-table td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; height: auto; }
+.admin-audit-table__details { font-size: 12px; color: var(--admin-muted); margin-top: 4px; word-break: break-word; }
+.admin-audit-table__id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--admin-muted); }

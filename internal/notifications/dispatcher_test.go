@@ -92,6 +92,24 @@ func (f fakeLookup) OrderInfo(context.Context, orders.Order) (OrderInfo, error) 
 
 func strPtr(s string) *string { return &s }
 
+type fakeContacts map[string]CustomerContact
+
+func (f fakeContacts) CustomerContact(_ context.Context, id string) (CustomerContact, error) {
+	return f[id], nil
+}
+
+type fakeSMS struct {
+	mu   sync.Mutex
+	sent []string // "phone|text"
+}
+
+func (f *fakeSMS) SendSMS(_ context.Context, phone, text string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, phone+"|"+text)
+	return nil
+}
+
 func deliveryOrder(status orders.OrderStatus) orders.Order {
 	return orders.Order{
 		ID: "11111111-2222-3333-4444-555555555555", OrderNumber: "COZY-20260923-007",
@@ -153,7 +171,7 @@ func TestStatusChangeUsesCustomerLanguage(t *testing.T) {
 	d := NewDispatcher(Config{
 		Push:     p,
 		Tokens:   &fakeTokens{tokens: map[string][]string{"cust-1": {"t"}}},
-		Language: func(context.Context, string) string { return i18n.LangKY },
+		Contacts: fakeContacts{"cust-1": {Lang: i18n.LangKY, Phone: "+996700000001"}},
 	})
 	d.OrderStatusChanged(deliveryOrder(orders.StatusCancelled), orders.StatusConfirmed)
 	shutdown(t, d)
@@ -341,5 +359,88 @@ func TestOrderCancelledByCustomerNotifiesStaff(t *testing.T) {
 	if len(staff.msgs) != 1 || !strings.Contains(staff.msgs[0], "Покупатель отменил заказ COZY-20260923-007") ||
 		!strings.Contains(staff.msgs[0], "/admin/orders/11111111-2222-3333-4444-555555555555") {
 		t.Fatalf("staff messages = %q", staff.msgs)
+	}
+}
+
+func TestSMSFallbackWhenCustomerHasNoDevices(t *testing.T) {
+	sms := &fakeSMS{}
+	d := NewDispatcher(Config{
+		Push:        &fakePush{},
+		Tokens:      &fakeTokens{},
+		Contacts:    fakeContacts{"cust-1": {Lang: i18n.LangKY, Phone: "+996700000001"}},
+		SMS:         sms,
+		SMSFallback: true,
+	})
+	d.OrderStatusChanged(deliveryOrder(orders.StatusConfirmed), orders.StatusPlaced)
+	shutdown(t, d)
+
+	want := "+996700000001|Cozy: COZY-20260923-007 буйрутмаңыз ырасталды"
+	if len(sms.sent) != 1 || sms.sent[0] != want {
+		t.Fatalf("sms = %v, want [%s]", sms.sent, want)
+	}
+}
+
+func TestSMSFallbackWhenAllTokensInvalid(t *testing.T) {
+	sms := &fakePush{errFor: map[string]error{"dead": push.ErrInvalidToken}}
+	texts := &fakeSMS{}
+	d := NewDispatcher(Config{
+		Push:        sms,
+		Tokens:      &fakeTokens{tokens: map[string][]string{"cust-1": {"dead"}}},
+		Contacts:    fakeContacts{"cust-1": {Lang: i18n.LangRU, Phone: "+996700000001"}},
+		SMS:         texts,
+		SMSFallback: true,
+	})
+	d.OrderStatusChanged(deliveryOrder(orders.StatusDelivered), orders.StatusCourierAssigned)
+	shutdown(t, d)
+	if len(texts.sent) != 1 {
+		t.Fatalf("sms = %v, want one fallback SMS", texts.sent)
+	}
+}
+
+func TestNoSMSFallbackWhenDisabledPushedOrTransientFailure(t *testing.T) {
+	contacts := fakeContacts{"cust-1": {Lang: i18n.LangRU, Phone: "+996700000001"}}
+	cases := map[string]Config{
+		"flag off": {Tokens: &fakeTokens{}, Contacts: contacts},
+		"pushed":   {Tokens: &fakeTokens{tokens: map[string][]string{"cust-1": {"ok"}}}, Contacts: contacts, SMSFallback: true},
+		"transient push failure": {
+			Push:     &fakePush{errFor: map[string]error{"flaky": errors.New("503")}},
+			Tokens:   &fakeTokens{tokens: map[string][]string{"cust-1": {"flaky"}}},
+			Contacts: contacts, SMSFallback: true,
+		},
+		"deleted customer (no phone)": {Tokens: &fakeTokens{}, Contacts: fakeContacts{"cust-1": {Lang: "ru"}}, SMSFallback: true},
+		"token lookup error":          {Tokens: &fakeTokens{err: errors.New("db down")}, Contacts: contacts, SMSFallback: true},
+	}
+	for name, cfg := range cases {
+		t.Run(name, func(t *testing.T) {
+			sms := &fakeSMS{}
+			cfg.SMS = sms
+			if cfg.Push == nil {
+				cfg.Push = &fakePush{}
+			}
+			d := NewDispatcher(cfg)
+			d.OrderStatusChanged(deliveryOrder(orders.StatusConfirmed), orders.StatusPlaced)
+			shutdown(t, d)
+			if len(sms.sent) != 0 {
+				t.Errorf("unexpected SMS: %v", sms.sent)
+			}
+		})
+	}
+}
+
+func TestSQLContactLookup(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT lang, CASE WHEN deleted_at IS NULL THEN phone ELSE '' END")).
+		WithArgs("cust-1").
+		WillReturnRows(sqlmock.NewRows([]string{"lang", "phone"}).AddRow("ky", "+996700000001"))
+	c, err := NewSQLContactLookup(db).CustomerContact(context.Background(), "cust-1")
+	if err != nil || c.Lang != "ky" || c.Phone != "+996700000001" {
+		t.Fatalf("contact = %+v, err %v", c, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
 	}
 }

@@ -208,8 +208,12 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 type AdminListFilter struct {
 	CategoryIDs []string
 	Query       string
-	Page        int // 1-based
-	PageSize    int
+	// OutOfStockAtPoint (a point of sale id), when set, keeps only products
+	// with no stock > 0 at that point (fix/admin-ops: the products list's
+	// "нет в наличии в точке" filter).
+	OutOfStockAtPoint string
+	Page              int // 1-based
+	PageSize          int
 }
 
 // buildAdminListConditions turns filter into SQL WHERE fragments and their
@@ -227,6 +231,12 @@ func buildAdminListConditions(filter AdminListFilter) ([]string, []any) {
 		args = append(args, "%"+filter.Query+"%")
 		idx := len(args)
 		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d)", idx, idx))
+	}
+	if filter.OutOfStockAtPoint != "" {
+		args = append(args, filter.OutOfStockAtPoint)
+		conditions = append(conditions, fmt.Sprintf(`NOT EXISTS (
+			SELECT 1 FROM product_variants pv JOIN stock s ON s.variant_id = pv.id
+			WHERE pv.product_id = products.id AND s.point_id = $%d AND s.quantity > 0)`, len(args)))
 	}
 
 	return conditions, args

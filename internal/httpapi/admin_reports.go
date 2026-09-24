@@ -21,7 +21,14 @@ import (
 type salesRepo interface {
 	LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error)
 	PointNames(ctx context.Context) (map[string]string, error)
+	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 }
+
+// groupByCategory is the fix/admin-ops addition to reports.GroupBy for
+// these endpoints: sales per top-level catalog category (a subcategory
+// counts toward its parent), via reports.Repo.CategorySales — the same
+// numbers as the HTML report's "По категориям" block.
+const groupByCategory reports.GroupBy = "category"
 
 // RegisterAdminReportsRoutes mounts the admin sales report endpoints under
 // /admin/api/reports/*, per Task O / §8 and §14 of the ТЗ. Owner/manager
@@ -101,9 +108,12 @@ func parseSalesReportQuery(r *http.Request) (from, to time.Time, groupBy reports
 		return time.Time{}, time.Time{}, "", err
 	}
 
+	if q.Get("group_by") == string(groupByCategory) {
+		return from, to, groupByCategory, nil
+	}
 	groupBy, err = reports.ParseGroupBy(q.Get("group_by"))
 	if err != nil {
-		return time.Time{}, time.Time{}, "", err
+		return time.Time{}, time.Time{}, "", apperr.BadRequest("invalid_group_by", "group_by должен быть day, product, point или category")
 	}
 
 	return from, to, groupBy, nil
@@ -116,6 +126,14 @@ func parseSalesReportQuery(r *http.Request) (from, to time.Time, groupBy reports
 // when grouping by point, since that's the only mode that needs them.
 func loadSalesRows(ctx context.Context, repo salesRepo, from, to time.Time, groupBy reports.GroupBy) ([]reports.Row, error) {
 	loadTo := to.AddDate(0, 0, 1)
+
+	if groupBy == groupByCategory {
+		rows, err := repo.CategorySales(ctx, from, loadTo)
+		if rows == nil && err == nil {
+			rows = []reports.Row{}
+		}
+		return rows, err
+	}
 
 	ordersList, err := repo.LoadOrders(ctx, from, loadTo)
 	if err != nil {
@@ -170,6 +188,8 @@ func keyColumnHeader(groupBy reports.GroupBy) string {
 		return "Товар"
 	case reports.GroupByPoint:
 		return "Точка"
+	case groupByCategory:
+		return "Категория"
 	default:
 		return "Ключ"
 	}
@@ -197,6 +217,10 @@ func writeSalesXLSX(w http.ResponseWriter, groupBy reports.GroupBy, rows []repor
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="sales_report.xlsx"`)
+	filename := "sales_report.xlsx"
+	if groupBy == groupByCategory {
+		filename = "sales_by_category.xlsx"
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	return f.Write(w)
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -179,10 +180,13 @@ func (h *handlers) staffCreate(w http.ResponseWriter, r *http.Request) {
 		Role:     role,
 		PointID:  pointID,
 	}
-	if _, err := h.staffSvc.CreateStaff(r.Context(), in); err != nil {
+	created, err := h.staffSvc.CreateStaff(r.Context(), in)
+	if err != nil {
 		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditStaff(r.Context(), audit.ActionStaffCreate, created.ID, created.Name,
+		map[string]any{"phone": created.Phone, "role": string(created.Role), "point_id": deref(created.PointID)})
 
 	http.Redirect(w, r, "/admin/staff", http.StatusSeeOther)
 }
@@ -226,6 +230,11 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	staffAction := audit.ActionStaffDeactivate
+	if in.IsActive {
+		staffAction = audit.ActionStaffActivate
+	}
+	h.auditStaff(r.Context(), staffAction, id, target.Name, map[string]any{"is_active": audit.Change{From: target.IsActive, To: in.IsActive}})
 
 	http.Redirect(w, r, "/admin/staff", http.StatusSeeOther)
 }
@@ -248,5 +257,6 @@ func (h *handlers) staffResetPassword(w http.ResponseWriter, r *http.Request) {
 		h.renderStaffPage(w, r, appErrMessage(h.tr(r), err))
 		return
 	}
+	h.auditStaff(r.Context(), audit.ActionStaffPassword, r.PathValue("id"), "", nil)
 	http.Redirect(w, r, "/admin/staff?done=password", http.StatusSeeOther)
 }

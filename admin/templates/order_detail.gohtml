@@ -23,6 +23,7 @@
     <div class="admin-card admin-card--pad">
       <div class="admin-order-detail__label">{{t "admin.order.delivery"}}</div>
       <div class="admin-order-detail__address">{{.Data.AddressText}}</div>
+      {{if .Data.ZoneName}}<div class="admin-order-detail__sub">{{t "admin.order.zone"}}: {{.Data.ZoneName}}</div>{{end}}
       <div class="admin-order-detail__sub">{{t "admin.order.comment"}}: {{.Data.Comment}}</div>
     </div>
   </div>

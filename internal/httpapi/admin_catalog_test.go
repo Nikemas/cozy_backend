@@ -12,17 +12,22 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
-// fakeStockUpserter is an in-memory stockUpserter for tests, recording the
+// fakeStockUpserter is an in-memory stockSetter for tests, recording the
 // last call so a test can assert whether the handler ever reached it.
 type fakeStockUpserter struct {
 	called                     bool
 	lastVariantID, lastPointID string
 	lastQuantity               int
+	lastExpected               *int
+	err                        error
 }
 
-func (f *fakeStockUpserter) Upsert(_ context.Context, variantID, pointID string, quantity int) (*catalog.StockEntry, error) {
+func (f *fakeStockUpserter) Set(_ context.Context, variantID, pointID string, quantity int, expected *int) (*catalog.StockEntry, error) {
 	f.called = true
-	f.lastVariantID, f.lastPointID, f.lastQuantity = variantID, pointID, quantity
+	f.lastVariantID, f.lastPointID, f.lastQuantity, f.lastExpected = variantID, pointID, quantity, expected
+	if f.err != nil {
+		return nil, f.err
+	}
 	return &catalog.StockEntry{VariantID: variantID, PointID: pointID, Quantity: quantity}, nil
 }
 

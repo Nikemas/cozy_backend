@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -249,14 +250,16 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 
 	t := trFromContext(ctx)
 	return ReportsData{
-		Periods:     reportPeriodOptions(t, period),
-		ExportURL:   reportExportURL(from, to),
-		Stats:       buildStatCards(t, dayRows),
-		ChartNote:   from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
-		Bars:        buildBars(dayRows, from, to),
-		TopProducts: buildTopProducts(t, productRows),
-		TopBrands:   buildTopBrands(brandRows),
-		Categories:  buildCategoryBars(t, categoryRows),
+		Periods:   reportPeriodOptions(t, period),
+		ExportURL: reportExportURL(from, to),
+		// fix/admin-ops: the category report as xlsx (same numbers).
+		CategoryExportURL: strings.Replace(reportExportURL(from, to), "group_by=day", "group_by=category", 1),
+		Stats:             buildStatCards(t, dayRows),
+		ChartNote:         from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
+		Bars:              buildBars(dayRows, from, to),
+		TopProducts:       buildTopProducts(t, productRows),
+		TopBrands:         buildTopBrands(brandRows),
+		Categories:        buildCategoryBars(t, categoryRows),
 	}, nil
 }
 
@@ -267,8 +270,9 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 // toolbar, Stats the 4-card grid, ChartNote+Bars the day-by-day bar chart,
 // TopProducts/TopBrands the two ranked lists.
 type ReportsData struct {
-	Periods   []PeriodOption
-	ExportURL string
+	Periods           []PeriodOption
+	ExportURL         string
+	CategoryExportURL string
 
 	Stats []StatCard
 

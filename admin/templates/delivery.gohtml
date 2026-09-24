@@ -1,0 +1,102 @@
+{{/* delivery.gohtml — "Доставка" (fix/checkout-payments): delivery zones,
+     owner only. .Data is admin.deliveryPageData (internal/admin/delivery.go). */}}
+{{define "content"}}
+<div class="admin-screen-narrow">
+  {{with .Data}}
+  <div class="admin-list-toolbar">
+    <div class="admin-list-note">
+      {{t "admin.delivery.note"}}
+      {{if .AnyActive}}{{t "admin.delivery.pickup_free"}}{{else}}{{tf "admin.delivery.no_zones_flat" .FlatFee}}{{end}}
+    </div>
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openZoneModal()">+ {{t "admin.delivery.add"}}</button>
+  </div>
+
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+
+  <div class="admin-row-list">
+    {{if not .Rows}}
+      <div class="admin-row-list__empty">{{t "admin.delivery.empty"}}</div>
+    {{end}}
+    {{range .Rows}}
+    <div class="admin-row">
+      <div class="admin-row__icon">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"></path></svg>
+      </div>
+      <div class="admin-row__info">
+        <div class="admin-row__title">{{.NameRu}} <span class="admin-row__subtitle">/ {{.NameKy}}</span></div>
+        <div class="admin-row__subtitle">{{.Fee}} сом{{if .FreeFrom}} · {{tf "admin.delivery.free_from_short" .FreeFrom}}{{end}} · {{t "admin.categories.sort_order"}} {{.SortOrder}}</div>
+      </div>
+      <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+              data-id="{{.ID}}" data-name-ru="{{.NameRu}}" data-name-ky="{{.NameKy}}" data-fee="{{.Fee}}"
+              data-free-from="{{.FreeFrom}}" data-sort="{{.SortOrder}}"
+              onclick="openZoneModal(this)" aria-label="{{tf "admin.delivery.edit_aria" .NameRu}}">{{t "admin.common.change"}}</button>
+      <form method="post" action="/admin/delivery/{{.ID}}/toggle"{{if .IsActive}}
+            data-confirm="{{tf "admin.delivery.deactivate_text" .NameRu}}"
+            data-confirm-title="{{t "admin.delivery.deactivate_title"}}" data-confirm-label="{{t "admin.common.deactivate"}}" data-confirm-danger="1"{{end}}>
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
+      </form>
+      <form method="post" action="/admin/delivery/{{.ID}}/delete"
+            data-confirm="{{tf "admin.delivery.delete_text" .NameRu}}"
+            data-confirm-title="{{t "admin.delivery.delete_title"}}" data-confirm-label="{{t "admin.common.delete"}}" data-confirm-danger="1">
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row" aria-label="{{tf "admin.delivery.delete_aria" .NameRu}}">{{t "admin.common.delete"}}</button>
+      </form>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+
+<div id="admin-zone-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-zone-modal-title">
+    <div class="admin-modal__title" id="admin-zone-modal-title">{{t "admin.delivery.new_title"}}</div>
+    <form method="post" action="/admin/delivery" id="admin-zone-form">
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="zone-name-ru">{{t "admin.common.name_ru"}}</label>
+          <input id="zone-name-ru" name="name_ru" placeholder="Бишкек" required maxlength="100">
+        </div>
+        <div class="admin-field">
+          <label for="zone-name-ky">{{t "admin.common.name_ky"}}</label>
+          <input id="zone-name-ky" name="name_ky" placeholder="Бишкек ш." required maxlength="100">
+        </div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="zone-fee">{{t "admin.delivery.fee"}}</label>
+          <input id="zone-fee" name="fee" type="number" min="0" max="100000" step="0.01" required>
+        </div>
+        <div class="admin-field">
+          <label for="zone-free-from">{{t "admin.delivery.free_from"}}</label>
+          <input id="zone-free-from" name="free_from" type="number" min="0.01" step="0.01" placeholder="{{t "admin.delivery.not_set"}}">
+        </div>
+        <div class="admin-field">
+          <label for="zone-sort">{{t "admin.categories.sort_order"}}</label>
+          <input id="zone-sort" name="sort_order" type="number" value="0">
+        </div>
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeZoneModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openZoneModal(btn) {
+  var form = document.getElementById('admin-zone-form');
+  var title = document.getElementById('admin-zone-modal-title');
+  var d = (btn && btn.dataset && btn.dataset.id) ? btn.dataset : null;
+  form.action = d ? '/admin/delivery/' + encodeURIComponent(d.id) : '/admin/delivery';
+  title.textContent = d ? {{t "admin.delivery.edit_title"}} : {{t "admin.delivery.new_title"}};
+  document.getElementById('zone-name-ru').value = d ? d.nameRu : '';
+  document.getElementById('zone-name-ky').value = d ? d.nameKy : '';
+  document.getElementById('zone-fee').value = d ? d.fee : '';
+  document.getElementById('zone-free-from').value = d ? d.freeFrom : '';
+  document.getElementById('zone-sort').value = d ? d.sort : '0';
+  document.getElementById('admin-zone-modal').style.display = 'flex';
+  document.getElementById('zone-name-ru').focus();
+}
+function closeZoneModal() { document.getElementById('admin-zone-modal').style.display = 'none'; }
+</script>
+{{end}}

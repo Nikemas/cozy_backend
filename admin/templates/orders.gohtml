@@ -55,6 +55,7 @@ function ordersRangeChanged(sel) {
 </script>
 
 {{range .Data.Notes}}<div class="admin-form-error" role="status">{{.}}</div>{{end}}
+<script src="/admin/static/js/bulk.js" defer></script>
 
 <div class="admin-orders-filters">
   <div class="admin-orders-chips" role="group" aria-label="{{t "admin.orders.status_filter"}}">
@@ -74,10 +75,23 @@ function ordersRangeChanged(sel) {
     <div class="admin-empty__text">{{if .Data.Filtered}}{{t "admin.orders.empty_filtered_text"}}{{else}}{{t "admin.orders.empty_text"}}{{end}}</div>
   </div>
   {{else}}
+  {{/* fix/admin-ops: bulk status bar, shown by bulk.js once a row is checked. */}}
+  <form method="post" action="{{.Data.BulkURL}}" id="orders-bulk" class="admin-bulkbar" data-bulk hidden>
+    <input type="hidden" name="back" value="{{.Data.ReturnURL}}">
+    <span class="admin-bulkbar__count">{{t "admin.bulk.selected"}}: <span class="js-bulk-count">0</span></span>
+    <label class="admin-visually-hidden" for="orders-bulk-status">{{t "admin.bulk.new_status"}}</label>
+    <select id="orders-bulk-status" name="status">
+      <option value="">{{t "admin.bulk.new_status"}}…</option>
+      {{range .Data.BulkStatuses}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+    </select>
+    <button type="button" class="admin-btn admin-btn--dark" data-bulk-action="" data-bulk-requires="status"
+      data-bulk-title="{{t "admin.bulk.orders_title"}}" data-bulk-confirm="{{t "admin.bulk.orders_confirm"}}">{{t "admin.bulk.apply"}}</button>
+  </form>
   <div class="admin-orders-table">
     <table>
       <thead>
         <tr>
+          <th class="admin-orders-table__check"><input type="checkbox" class="js-bulk-all" data-bulk-for="orders-bulk" aria-label="{{t "admin.bulk.select_all_orders"}}"></th>
           <th>{{t "admin.orders.col_number"}}</th>
           <th>{{t "admin.orders.col_date"}}</th>
           <th>{{t "admin.orders.col_customer"}}</th>
@@ -90,6 +104,7 @@ function ordersRangeChanged(sel) {
       <tbody>
         {{range .Data.Rows}}
         <tr onclick="location.href='{{.URL}}'">
+          <td class="admin-orders-table__check" onclick="event.stopPropagation()"><input type="checkbox" class="js-bulk-item" form="orders-bulk" name="id" value="{{.ID}}" aria-label="{{tf "admin.bulk.select_order" .Number}}"></td>
           <td class="admin-orders-table__num"><a href="{{.URL}}">{{.Number}}</a></td>
           <td class="admin-orders-table__muted">{{.DateLabel}}</td>
           <td class="admin-orders-table__phone">{{.Phone}}</td>

@@ -13,9 +13,9 @@ import (
 // past xlsxUnzipSizeLimit is rejected as invalid instead of being inflated
 // into memory (zip-bomb guard).
 func TestParseXLSXRowsRefusesOversizedUnzip(t *testing.T) {
-	rows := [][]string{{"name", "sku"}}
+	rows := [][]string{{"name", "category", "price"}}
 	for i := 0; i < 200; i++ {
-		rows = append(rows, []string{strings.Repeat("x", 200), "SKU"})
+		rows = append(rows, []string{strings.Repeat("x", 200), "sneakers", "100"})
 	}
 	data := buildXLSX(t, rows)
 
