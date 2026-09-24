@@ -25,12 +25,22 @@ type loginWindow struct {
 	resetAt time.Time
 }
 
-// loginRateLimiter throttles login attempts per key (phone number). Its
-// zero value is ready to use, so it can be embedded in Service without
-// NewService needing to initialize it.
+// loginRateLimiter throttles login attempts per key (phone number, or
+// client IP). Its zero value is ready to use with loginAttemptLimit, so it
+// can be embedded in Service without NewService needing to initialize it;
+// limit overrides that budget when > 0.
 type loginRateLimiter struct {
+	limit int
+
 	mu       sync.Mutex
 	attempts map[string]*loginWindow
+}
+
+func (l *loginRateLimiter) max() int {
+	if l.limit > 0 {
+		return l.limit
+	}
+	return loginAttemptLimit
 }
 
 // allow reports whether key still has attempts left in its current window
@@ -55,7 +65,7 @@ func (l *loginRateLimiter) allow(key string) bool {
 		l.attempts[key] = w
 	}
 
-	if w.count >= loginAttemptLimit {
+	if w.count >= l.max() {
 		return false
 	}
 	w.count++

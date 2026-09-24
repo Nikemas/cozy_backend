@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -31,9 +32,18 @@ func ParseAccessToken(secret []byte, tokenStr string) (customerID string, err er
 	var claims accessClaims
 	_, err = jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
 		return secret, nil
-	})
+	},
+		// Pin the algorithm: never let the token header pick it (alg
+		// confusion / "none"), and never accept a token that doesn't
+		// expire — every token we issue carries exp.
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil {
 		return "", err
+	}
+	if claims.CustomerID == "" {
+		return "", errors.New("auth: access token has no customer_id")
 	}
 	return claims.CustomerID, nil
 }

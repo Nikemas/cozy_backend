@@ -57,6 +57,16 @@ func (f *fakeSessionStore) getActiveByHash(_ context.Context, tokenHash string) 
 	return s, nil
 }
 
+func (f *fakeSessionStore) revokeAllForStaff(_ context.Context, staffID string) error {
+	now := time.Now()
+	for _, s := range f.byHash {
+		if s.StaffID == staffID && s.RevokedAt == nil {
+			s.RevokedAt = &now
+		}
+	}
+	return nil
+}
+
 func (f *fakeSessionStore) revokeByHash(_ context.Context, tokenHash string) error {
 	s, ok := f.byHash[tokenHash]
 	if !ok {
@@ -152,4 +162,13 @@ func (f *fakeStaffAdmin) Update(_ context.Context, id string, in StaffUpdateInpu
 	f.byID[id] = updated
 	cp := *updated
 	return &cp, nil
+}
+
+func (f *fakeStaffAdmin) SetPassword(_ context.Context, id, passwordHash string) error {
+	s, ok := f.byID[id]
+	if !ok {
+		return apperr.NotFound("staff_not_found", "сотрудник не найден")
+	}
+	s.PasswordHash = passwordHash
+	return nil
 }

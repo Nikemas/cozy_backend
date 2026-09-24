@@ -95,6 +95,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.staffPage))
 	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))
 	mux.HandleFunc("POST /admin/staff/{id}/toggle", ownerOnly(h.staffToggle))
+	mux.HandleFunc("POST /admin/staff/{id}/password", ownerOnly(h.staffResetPassword))
 
 	// Task 2 (Товары): list, create/edit form, import — see products.go.
 	// GET /admin/products/new and .../import are registered before the

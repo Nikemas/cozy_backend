@@ -145,6 +145,22 @@ func (r *Repo) Update(ctx context.Context, id string, in StaffUpdateInput) (*Sta
 	return &updated, nil
 }
 
+// SetPassword replaces the password hash of one staff account.
+func (r *Repo) SetPassword(ctx context.Context, id, passwordHash string) error {
+	res, err := r.db.ExecContext(ctx, `UPDATE staff SET password_hash = $2 WHERE id = $1`, id, passwordHash)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return apperr.NotFound("staff_not_found", "сотрудник не найден")
+	}
+	return nil
+}
+
 // countOtherActiveOwners returns how many staff rows other than excludeID
 // are active owners, as part of tx. It locks those rows (SELECT ... FOR
 // UPDATE) so a concurrent transaction can't modify them — and so change the

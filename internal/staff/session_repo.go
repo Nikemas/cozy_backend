@@ -58,3 +58,11 @@ func (r *sessionRepo) revokeByHash(ctx context.Context, tokenHash string) error 
 	_, err := r.db.ExecContext(ctx, q, tokenHash)
 	return err
 }
+
+// revokeAllForStaff revokes every open session of one staff account
+// (password reset, deactivation).
+func (r *sessionRepo) revokeAllForStaff(ctx context.Context, staffID string) error {
+	const q = `UPDATE staff_sessions SET revoked_at = now() WHERE staff_id = $1 AND revoked_at IS NULL`
+	_, err := r.db.ExecContext(ctx, q, staffID)
+	return err
+}

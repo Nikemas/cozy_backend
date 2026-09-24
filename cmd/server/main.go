@@ -63,15 +63,13 @@ func run() error {
 
 	var sms notify.OTPSender
 	if cfg.SMSMockOTP {
-		if cfg.Env == "prod" {
-			return errors.New("SMS_MOCK_OTP is set but APP_ENV=prod — refusing to start with a fake OTP provider in production")
-		}
+		// config.Load already refuses SMS_MOCK_OTP with APP_ENV=prod.
 		slog.Warn("notify: SMS_MOCK_OTP is on — every login accepts code 0000, no real SMS is sent. Never set this in production.")
 		sms = notify.NewMockClient()
 	} else {
 		sms = notify.NewNikitaClient(cfg.NikitaAPIKey)
 	}
-	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
+	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth)
 
 	mediaClient, err := media.NewClient(cfg)
 	if err != nil {
@@ -97,8 +95,9 @@ func run() error {
 		return err
 	}
 	if cfg.PaymentsProvider == config.PaymentsProviderMock {
-		if cfg.Env == "prod" {
-			slog.Warn("payments: PAYMENTS_PROVIDER=mock with APP_ENV=prod — anyone can mark online orders paid through the mock checkout page. Staging only; never on the live shop.")
+		// config.Load already refuses PAYMENTS_PROVIDER=mock with APP_ENV=prod.
+		if cfg.IsProdLike() {
+			slog.Warn("payments: PAYMENTS_PROVIDER=mock on a public stand — anyone can mark online orders paid through the mock checkout page. Staging only; never on the live shop.", "env", cfg.Env)
 		} else {
 			slog.Info("payments: mock provider active — online_card orders are paid on a local test page", "checkout", cfg.PaymentsBaseURL()+payments.MockCheckoutPath+"{id}")
 		}
@@ -117,10 +116,18 @@ func run() error {
 		return err
 	}
 
-	// Outermost first: every request gets an ID, then is access-logged
-	// (after Recover has turned any panic into a 500 it can log), then
-	// hits the existing CSRF guard and the router.
-	handler := httpmw.Chain(csrf.Protect(mux), httpmw.RequestID, httpmw.AccessLog, httpmw.Recover)
+	// Outermost first: every request gets an ID and its real client IP
+	// (trusted-proxy aware — rate limits and the access log use it), then
+	// is access-logged (after Recover has turned any panic into a 500 it
+	// can log), gets its body size capped, then hits the CSRF guard and
+	// the router.
+	handler := httpmw.Chain(csrf.Protect(mux),
+		httpmw.RequestID,
+		httpmw.ClientIP(cfg.Security.TrustedProxies),
+		httpmw.AccessLog,
+		httpmw.Recover,
+		httpmw.LimitBody(cfg.Security.MaxBodyBytes, cfg.Security.MaxUploadBytes),
+	)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -192,6 +199,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 // internal/staff.
 func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client, cfg *config.Config) error {
 	staffSvc := staff.NewService(db)
+	staffSvc.SetLoginIPLimit(cfg.Security.Auth.StaffLoginPerIP)
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc, cfg)
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
@@ -204,5 +212,6 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 
 // registerWebRoutes mounts / — the public html/template storefront.
 func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+	web.SetCookieSecure(cfg.Security.CookieSecure)
 	return web.RegisterRoutes(mux, db, cfg, authSvc)
 }
