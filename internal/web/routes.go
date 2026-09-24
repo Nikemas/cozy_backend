@@ -114,6 +114,11 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("POST /addresses/{id}", withSession(apperr.Wrap(h.addressUpdate)))
 	mux.Handle("DELETE /addresses/{id}", withSession(apperr.Wrap(h.addressDelete)))
 
+	// Legal/info pages (footer links; the mobile app opens /privacy).
+	for _, name := range staticPages {
+		mux.Handle("GET /"+name, withSession(apperr.Wrap(h.staticPage(name))))
+	}
+
 	// SEO + static assets.
 	mux.Handle("GET /sitemap.xml", apperr.Wrap(h.sitemap))
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {

@@ -33,9 +33,9 @@
       <a class="profile-menu__item" href="/lang">
         <i class="ti ti-language"></i> <span>{{t "profile.language"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
       </a>
-      <div class="profile-menu__item profile-menu__item--disabled">
-        <i class="ti ti-headset"></i> <span>{{t "profile.support"}}</span> <span class="muted">{{t "common.soon"}}</span>
-      </div>
+      <a class="profile-menu__item" href="/contacts">
+        <i class="ti ti-headset"></i> <span>{{t "profile.support"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+      </a>
     </div>
 
     <form method="post" action="/logout" hx-post="/logout">

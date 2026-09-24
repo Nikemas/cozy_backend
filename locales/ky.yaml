@@ -173,3 +173,11 @@ error.code.address_in_use: Бул дарек буйрутмада колдону
 error.code.pickup_point_not_found: Алып кетүүчү дүкөн табылган жок
 error.code.order_not_found: Буйрутма табылган жок
 error.code.order_not_cancellable: Бул буйрутманы мындан ары жокко чыгарууга болбойт
+
+# Legal/info pages (web/templates/pages/*) and footer.
+screen.page_about.title: Дүкөн жөнүндө
+screen.page_contacts.title: Байланыш
+screen.page_delivery.title: Жеткирүү жана төлөө
+screen.page_privacy.title: Купуялык саясаты
+screen.page_terms.title: Коомдук оферта
+footer.nav_label: Дүкөн жөнүндө маалымат

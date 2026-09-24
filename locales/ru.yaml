@@ -173,3 +173,11 @@ error.code.address_in_use: Этот адрес использован в зак�
 error.code.pickup_point_not_found: Точка самовывоза не найдена
 error.code.order_not_found: Заказ не найден
 error.code.order_not_cancellable: Этот заказ уже нельзя отменить
+
+# Legal/info pages (web/templates/pages/*) and footer.
+screen.page_about.title: О магазине
+screen.page_contacts.title: Контакты
+screen.page_delivery.title: Доставка и оплата
+screen.page_privacy.title: Политика конфиденциальности
+screen.page_terms.title: Публичная оферта
+footer.nav_label: Информация о магазине

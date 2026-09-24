@@ -33,6 +33,13 @@ var screenPages = map[string]string{
 	"error": "error.gohtml",
 }
 
+// staticPages are the legal/info pages (/about, /contacts, /delivery,
+// /privacy, /terms). Their long-form copy doesn't fit the flat
+// one-line-per-key locales/*.yaml, so each has one content file per
+// language: web/templates/pages/<name>.<lang>.gohtml, registered as
+// screen "page_<name>".
+var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms"}
+
 // layoutPartials are parsed alongside every page: the shared chrome from
 // COZY_WEB_DESIGN.md §2 (header/aside/footer/toast), plus Task 4's
 // reusable fragments (the 3-step login card, the address list/form and
@@ -101,7 +108,15 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
 		rr.tmpl[lang] = map[string]*template.Template{}
 
+		pages := make(map[string]string, len(screenPages)+len(staticPages))
 		for screen, page := range screenPages {
+			pages[screen] = page
+		}
+		for _, name := range staticPages {
+			pages["page_"+name] = filepath.Join("pages", name+"."+lang+".gohtml")
+		}
+
+		for screen, page := range pages {
 			files := make([]string, 0, len(layoutPartials)+1)
 			for _, p := range layoutPartials {
 				files = append(files, filepath.Join(templatesDir, p))
