@@ -41,6 +41,10 @@ const DefaultPageSize = 20
 // CategoryRepo.ResolveID for the id-or-slug `category` param.
 type ListFilter struct {
 	CategoryID string
+	// CategoryIDs, when non-empty, matches any of these categories (the
+	// storefront passes a category plus its subcategories); it takes
+	// precedence over CategoryID.
+	CategoryIDs []string
 	Size       string
 	Color      string
 	PriceMin   *float64
@@ -72,7 +76,11 @@ func buildListConditions(filter ListFilter) ([]string, []any) {
 	conditions := []string{"is_active = true"}
 	var args []any
 
-	if filter.CategoryID != "" {
+	switch {
+	case len(filter.CategoryIDs) > 0:
+		args = append(args, filter.CategoryIDs)
+		conditions = append(conditions, fmt.Sprintf("category_id = ANY($%d)", len(args)))
+	case filter.CategoryID != "":
 		args = append(args, filter.CategoryID)
 		conditions = append(conditions, fmt.Sprintf("category_id = $%d", len(args)))
 	}

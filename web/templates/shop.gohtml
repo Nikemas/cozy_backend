@@ -27,22 +27,35 @@
 {{define "_shop_results"}}
 {{$d := .Data}}
 <div id="shop-results">
+  <h1 class="shop-title">{{if $d.CategoryName}}{{$d.CategoryName}}{{else if $d.Query}}{{t "shop.search_results"}} «{{$d.Query}}»{{else}}{{t "shop.heading"}}{{end}}</h1>
   <div class="shop-toolbar">
-    <div class="shop-chips">
+    <nav class="shop-chips" aria-label="{{t "sidebar.categories"}}">
       {{range $d.Categories}}
       <a class="chip chip--tab{{if .Active}} chip--tab--active{{end}}"
-         href="{{.Href}}"
+         href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}
          hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
-         hx-include="#shop-q, #shop-price-max">{{.Label}}</a>
+         hx-include="#shop-q, #shop-filters, #shop-sort">{{.Label}}</a>
       {{end}}
+    </nav>
+    <div class="shop-toolbar__right">
+      <div class="shop-count" role="status">{{$d.Total}} {{t "shop.results_word"}}</div>
+      <label class="shop-sort">
+        <span class="visually-hidden">{{t "shop.sort.label"}}</span>
+        <select id="shop-sort" name="sort"
+                hx-get="{{$d.BasePath}}" hx-trigger="change"
+                hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+                hx-include="#shop-q, #shop-filters">
+          {{range $d.SortOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
     </div>
-    <div class="shop-count">{{$d.Total}} {{t "shop.results_word"}}</div>
   </div>
 
   {{if $d.NoResults}}
   <div class="shop-empty">
-    <i class="ti ti-mood-empty"></i>
+    <i class="ti ti-mood-empty" aria-hidden="true"></i>
     <div>{{t "shop.empty"}}</div>
+    {{if or $d.HasFilters $d.Query}}<a class="btn btn--ghost shop-empty__reset" href="{{$d.BasePath}}">{{t "sidebar.reset"}}</a>{{end}}
   </div>
   {{else}}
   <div class="shop-grid">
@@ -55,7 +68,7 @@
       <a class="product-card__link" href="{{.DetailURL}}">
         <div class="product-card__thumb">
           {{if .HasPhoto}}
-          <img src="{{.PhotoURL}}" alt="{{.Name}}">
+          <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400" loading="lazy" decoding="async">
           {{else}}
           <svg width="120" height="72" viewBox="0 0 100 60" aria-hidden="true">
             <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
@@ -65,7 +78,7 @@
         </div>
         {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
         <div class="product-card__name">{{.Name}}</div>
-        <div class="product-card__price">{{.PriceText}}</div>
+        <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
       </a>
     </div>
     {{end}}

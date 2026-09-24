@@ -16,37 +16,72 @@
   <a class="btn btn--primary aside__login" href="/profile">{{t "sidebar.login"}}</a>
   {{end}}
 
-  <div class="aside__card">
+  <nav class="aside__card" aria-label="{{t "sidebar.categories"}}">
     <div class="aside__title">{{t "sidebar.categories"}}</div>
     {{if eq .Screen "shop"}}
     {{range .Data.Categories}}
     <a class="aside__pill{{if .Active}} aside__pill--active{{end}}"
-       href="{{.Href}}"
+       href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}
        hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
-       hx-include="#shop-q, #shop-price-max">{{.Label}}</a>
+       hx-include="#shop-q, #shop-filters, #shop-sort">{{.Label}}</a>
     {{end}}
     {{else}}
     <a class="aside__pill" href="/">{{t "sidebar.category.all"}}</a>
     {{end}}
-  </div>
-
-  <div class="aside__card">
-    <div class="aside__title">{{t "sidebar.price"}}{{if eq .Screen "shop"}}{{if .Data.PriceMax}} {{.Data.PriceMax}}{{end}}{{end}}</div>
-    {{if eq .Screen "shop"}}
-    <input type="range" id="shop-price-max" name="price_max" min="{{.Data.PriceSliderMin}}" max="{{.Data.PriceSliderMax}}" step="100"
-           value="{{if .Data.PriceMax}}{{.Data.PriceMax}}{{else}}{{.Data.PriceSliderMax}}{{end}}"
-           hx-get="{{.Data.BasePath}}" hx-trigger="change"
-           hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
-           hx-include="#shop-q">
-    {{else}}
-    <input type="range" min="1000" max="6000" step="100" disabled>
-    {{end}}
-  </div>
+  </nav>
 
   {{if eq .Screen "shop"}}
-  <a class="aside__reset" href="/">{{t "sidebar.reset"}}</a>
-  {{else}}
-  <button class="aside__reset" type="button" disabled>{{t "sidebar.reset"}}</button>
+  {{$d := .Data}}
+  <form id="shop-filters" class="aside__card aside__filters" method="get" action="{{$d.BasePath}}"
+        hx-get="{{$d.BasePath}}" hx-trigger="change, submit"
+        hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+        hx-include="#shop-q, #shop-sort">
+    {{if $d.SizeOptions}}
+    <fieldset class="aside__fieldset">
+      <legend class="aside__title">{{t "filter.size"}}</legend>
+      <div class="aside__chips">
+        <label class="chip-radio"><input type="radio" name="size" value=""{{if not $d.Size}} checked{{end}}><span>{{t "filter.any"}}</span></label>
+        {{range $d.SizeOptions}}
+        <label class="chip-radio"><input type="radio" name="size" value="{{.Value}}"{{if .Selected}} checked{{end}}><span>{{.Label}}</span></label>
+        {{end}}
+      </div>
+    </fieldset>
+    {{end}}
+
+    {{if $d.ColorOptions}}
+    <fieldset class="aside__fieldset">
+      <legend class="aside__title">{{t "filter.color"}}</legend>
+      <div class="aside__chips">
+        <label class="chip-radio"><input type="radio" name="color" value=""{{if not $d.Color}} checked{{end}}><span>{{t "filter.any"}}</span></label>
+        {{range $d.ColorOptions}}
+        <label class="chip-radio"><input type="radio" name="color" value="{{.Value}}"{{if .Selected}} checked{{end}}><span>{{.Label}}</span></label>
+        {{end}}
+      </div>
+    </fieldset>
+    {{end}}
+
+    <fieldset class="aside__fieldset">
+      <legend class="aside__title">{{t "filter.availability"}}</legend>
+      <label class="aside__checkbox"><input type="checkbox" name="in_stock" value="1"{{if $d.InStock}} checked{{end}}> {{t "filter.in_stock"}}</label>
+    </fieldset>
+
+    <fieldset class="aside__fieldset">
+      <legend class="aside__title">{{t "filter.price"}}</legend>
+      <div class="aside__price">
+        <label class="aside__price-field"><span>{{t "filter.price_from"}}</span>
+          <input type="number" name="price_min" inputmode="numeric" min="0" step="100" value="{{if $d.PriceMin}}{{$d.PriceMin}}{{end}}" placeholder="0">
+        </label>
+        <label class="aside__price-field"><span>{{t "filter.price_to"}}</span>
+          <input type="number" name="price_max" inputmode="numeric" min="0" step="100" value="{{if $d.PriceMax}}{{$d.PriceMax}}{{end}}" placeholder="∞">
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="aside__filter-actions">
+      <button type="submit" class="btn btn--ghost aside__apply">{{t "filter.apply"}}</button>
+      {{if $d.HasFilters}}<a class="aside__reset" href="{{$d.BasePath}}">{{t "sidebar.reset"}}</a>{{end}}
+    </div>
+  </form>
   {{end}}
 </aside>
 {{end}}

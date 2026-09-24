@@ -17,7 +17,6 @@ sidebar.orders: Заказы
 sidebar.favorites: Избранное
 sidebar.categories: Категории
 sidebar.category.all: Все
-sidebar.price: Цена до
 sidebar.reset: Сбросить фильтры
 
 footer.rights: © Cozy. Все права защищены.
@@ -192,3 +191,21 @@ product.stock_few: осталось
 product.out_of_stock: Этого размера и цвета сейчас нет в наличии
 product.delivery.more: Подробнее о доставке и оплате
 product.description: Описание
+
+# Shop filters and sorting.
+shop.heading: Каталог обуви
+shop.search_results: Результаты поиска
+shop.price_from: от %s
+shop.sort.label: Сортировка
+shop.sort.newest: Сначала новые
+shop.sort.price_asc: Сначала дешевле
+shop.sort.price_desc: Сначала дороже
+filter.size: Размер
+filter.color: Цвет
+filter.any: Любой
+filter.availability: Наличие
+filter.in_stock: Только в наличии
+filter.price: Цена, сом
+filter.price_from: от
+filter.price_to: до
+filter.apply: Применить

@@ -16,7 +16,7 @@
           {{if eq .Screen "shop"}}
           hx-get="{{.Data.BasePath}}" hx-trigger="input changed delay:400ms, search"
           hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
-          hx-include="#shop-price-max"
+          hx-include="#shop-filters, #shop-sort"
           {{end}}>
       <i class="ti ti-search"></i>
       <input type="search" id="shop-q" name="q" value="{{.SearchQuery}}" placeholder="{{t "search.placeholder"}}">

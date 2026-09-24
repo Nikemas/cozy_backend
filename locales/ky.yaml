@@ -17,7 +17,6 @@ sidebar.orders: Буйрутмалар
 sidebar.favorites: Тандалгандар
 sidebar.categories: Категориялар
 sidebar.category.all: Баары
-sidebar.price: Баасы чейин
 sidebar.reset: Чыпкаларды тазалоо
 
 footer.rights: © Cozy. Бардык укуктар корголгон.
@@ -192,3 +191,21 @@ product.stock_few: калды
 product.out_of_stock: Бул өлчөм жана түс азыр жок
 product.delivery.more: Жеткирүү жана төлөө жөнүндө кененирээк
 product.description: Сыпаттамасы
+
+# Shop filters and sorting.
+shop.heading: Бут кийим каталогу
+shop.search_results: Издөө жыйынтыктары
+shop.price_from: %sдон
+shop.sort.label: Иреттөө
+shop.sort.newest: Адегенде жаңылары
+shop.sort.price_asc: Адегенде арзандары
+shop.sort.price_desc: Адегенде кымбаттары
+filter.size: Өлчөм
+filter.color: Түс
+filter.any: Баары
+filter.availability: Бар болушу
+filter.in_stock: Бар болгондор гана
+filter.price: Баасы, сом
+filter.price_from: эң аз
+filter.price_to: эң көп
+filter.apply: Колдонуу

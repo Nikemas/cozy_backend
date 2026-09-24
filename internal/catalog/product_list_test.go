@@ -66,3 +66,13 @@ func TestListOrderBy(t *testing.T) {
 		t.Errorf("unknown sort = %q, want newest first", got)
 	}
 }
+
+func TestBuildListConditionsCategoryIDsTakePrecedence(t *testing.T) {
+	conds, args := buildListConditions(ListFilter{CategoryID: "a", CategoryIDs: []string{"a", "a-child"}})
+	if !strings.Contains(strings.Join(conds, " AND "), "category_id = ANY($1)") {
+		t.Fatalf("conds = %v, want category_id = ANY($1)", conds)
+	}
+	if ids, ok := args[0].([]string); !ok || len(ids) != 2 {
+		t.Fatalf("args = %v, want the id list", args)
+	}
+}

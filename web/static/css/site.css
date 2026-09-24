@@ -892,3 +892,32 @@ button, input { font-family: inherit; }
 .static-contacts__label { font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); font-weight: 700; margin-bottom: 2px; }
 .footer__links { flex-wrap: wrap; }
 @media (max-width: 700px) { .static-page { padding: 20px 16px; } }
+
+/* ---- Shop filters + sort (aside form #shop-filters, toolbar select) ---- */
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.aside__filters { display: flex; flex-direction: column; gap: 16px; }
+.aside__fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+.aside__fieldset .aside__title { padding: 0; }
+.chip-radio { position: relative; display: inline-flex; cursor: pointer; }
+.chip-radio input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chip-radio span {
+  border: 0.5px solid var(--cozy-border); background: var(--cozy-surface-2); color: var(--cozy-ink);
+  padding: 7px 12px; border-radius: var(--cozy-r-pill); font-size: 12.5px; font-weight: 600;
+}
+.chip-radio input:checked + span { background: var(--cozy-ink); border-color: var(--cozy-ink); color: var(--cozy-surface); }
+.chip-radio input:focus-visible + span { outline: 2px solid var(--cozy-accent-ink); outline-offset: 2px; }
+.aside__price { display: flex; gap: 8px; }
+.aside__price-field { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); }
+.aside__price-field input {
+  width: 100%; border: 0.5px solid var(--cozy-border); background: var(--cozy-surface-2); border-radius: var(--cozy-r-10);
+  padding: 9px 10px; font-size: var(--cozy-fs-14); color: var(--cozy-ink); font-family: inherit;
+}
+.aside__filter-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.aside__apply { padding: 9px 14px; }
+.shop-title { font-size: var(--cozy-fs-22); font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
+.shop-toolbar__right { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.shop-sort select {
+  border: 0.5px solid var(--cozy-border); background: var(--cozy-surface); border-radius: var(--cozy-r-10);
+  padding: 8px 10px; font-size: var(--cozy-fs-13); color: var(--cozy-ink); font-family: inherit; cursor: pointer;
+}
+.shop-empty__reset { margin-top: 14px; }

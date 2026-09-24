@@ -33,30 +33,32 @@ import (
 // package.
 const shopPageSize = catalog.DefaultPageSize
 
-// priceSliderMin/Max mirror the design's price-filter range
-// (design-system/COZY_WEB_DESIGN.md §4 editable props: priceMax default
-// range 1000–6000) — a fixed placeholder until the catalog has enough
-// products to compute a real max(base_price) per category.
-const (
-	priceSliderMin = 1000
-	priceSliderMax = 6000
-)
-
 // ShopData backs shop.gohtml (screen "shop") — both the initial full-page
-// render and every HTMX partial-swap response (see file doc comment).
+// render and every HTMX partial-swap response (see file doc comment) —
+// plus the aside's filter form (_aside_filters.gohtml).
 type ShopData struct {
 	// BasePath is the current category's canonical URL ("/" or
 	// "/catalog/:slug") — every filter control's hx-get target is built
 	// from this, so switching a filter never loses the active category.
 	BasePath string
+	// CategoryName is the active category's name ("" on the home page).
+	CategoryName string
 
 	Query    string
-	PriceMax int // 0 = no price filter applied
+	Size     string
+	Color    string
+	InStock  bool
+	Sort     string
+	PriceMin int // 0 = not set
+	PriceMax int // 0 = not set
 
-	// PriceSliderMin/Max are the range input's fixed bounds — see
-	// priceSliderMin/Max's doc comment for why they're a placeholder.
-	PriceSliderMin int
-	PriceSliderMax int
+	// SizeOptions/ColorOptions are every size/color on sale in the
+	// current category; SortOptions back the sort <select>.
+	SizeOptions  []FilterOption
+	ColorOptions []FilterOption
+	SortOptions  []FilterOption
+	// HasFilters shows the "reset filters" link.
+	HasFilters bool
 
 	Page       int
 	TotalPages int
@@ -65,19 +67,24 @@ type ShopData struct {
 	PrevHref   string
 	NextHref   string
 
-	// ShowBanner mirrors §3.1: the promo banner hides once a search or
-	// category filter is active.
+	// ShowBanner mirrors §3.1: the promo banner hides once a search,
+	// category or filter is active.
 	ShowBanner bool
 
 	// Categories backs both the shop's top chip bar and the aside's
-	// "Категории" pills — the real category tree (catalog.CategoryRepo.
-	// Tree), not the hardcoded gender pills the prototype/Foundation
-	// placeholder used, since the catalog schema has no gender concept.
+	// "Категории" pills — the real top-level category tree.
 	Categories []CategoryChip
 
 	Products  []ProductCard
 	Total     int
 	NoResults bool
+}
+
+// FilterOption is one choice in a filter control.
+type FilterOption struct {
+	Value    string
+	Label    string
+	Selected bool
 }
 
 // CategoryChip is one entry in the category chip bar / aside pill list.
@@ -93,6 +100,9 @@ type ProductCard struct {
 	Name      string
 	Brand     string
 	PriceText string
+	// PriceFrom marks a product whose variants differ in price — the card
+	// then reads "от <min>".
+	PriceFrom bool
 	DetailURL string
 
 	// HasPhoto/PhotoURL back the grid thumbnail — false/"" for a product
@@ -116,48 +126,28 @@ func (h *handlers) shop(w http.ResponseWriter, r *http.Request) error {
 
 func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error) {
 	ctx := r.Context()
-	q := r.URL.Query()
-
-	categorySlug := r.PathValue("slug") // only set on GET /catalog/{slug}
-	basePath := "/"
-	if categorySlug != "" {
-		basePath = "/catalog/" + categorySlug
-	}
-
-	filter := catalog.ListFilter{
-		Query:    q.Get("q"),
-		Sort:     catalog.SortNewest,
-		Page:     1,
-		PageSize: shopPageSize,
-	}
-	if v := q.Get("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			filter.Page = p
-		}
-	}
-
-	priceMax := 0
-	if v := q.Get("price_max"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			priceMax = p
-			pf := float64(p)
-			filter.PriceMax = &pf
-		}
-	}
-
-	if categorySlug != "" {
-		id, err := h.categories.ResolveID(ctx, categorySlug)
-		if err != nil {
-			return nil, err
-		}
-		filter.CategoryID = id
-	}
+	params := parseShopParams(r.URL.Query())
 
 	tree, err := h.categories.Tree(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	categorySlug := r.PathValue("slug") // only set on GET /catalog/{slug}
+	basePath := "/"
+	var categoryIDs []string
+	categoryName := ""
+	if categorySlug != "" {
+		cat, ids := findCategory(tree, categorySlug)
+		if cat == nil {
+			return nil, apperr.NotFound("category_not_found", "категория не найдена")
+		}
+		basePath = "/catalog/" + cat.Slug
+		categoryIDs = ids
+		categoryName = pickName(cat.NameRu, cat.NameKy, lang)
+	}
+
+	filter := params.listFilter(categoryIDs, shopPageSize)
 	products, total, err := h.products.List(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -171,15 +161,29 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	if err != nil {
 		return nil, err
 	}
+	prices, err := h.effectivePrices(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	facets, err := h.loadFacets(ctx, categoryIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	cards := make([]ProductCard, 0, len(products))
 	for _, p := range products {
-		name := pickName(p.NameRu, p.NameKy, lang)
+		price := p.BasePrice
+		from := false
+		if pr, ok := prices[p.ID]; ok {
+			price = pr.Min
+			from = pr.Max > pr.Min
+		}
 		card := ProductCard{
 			ID:        p.ID,
-			Name:      name,
+			Name:      pickName(p.NameRu, p.NameKy, lang),
 			Brand:     stringOr(p.Brand, ""),
-			PriceText: formatMoney(p.BasePrice),
+			PriceText: formatMoney(price),
+			PriceFrom: from,
 			DetailURL: ProductPath(p.ID, p.NameRu),
 		}
 		if img, ok := images[p.ID]; ok {
@@ -196,60 +200,69 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		Active: categorySlug == "",
 	})
 	for _, c := range tree {
+		_, subtree := findCategory([]*catalog.Category{c}, categorySlug)
 		chips = append(chips, CategoryChip{
 			Label:  pickName(c.NameRu, c.NameKy, lang),
 			Href:   "/catalog/" + c.Slug,
-			Active: c.Slug == categorySlug,
+			Active: categorySlug != "" && len(subtree) > 0,
 		})
 	}
 
 	totalPages := 1
 	if total > 0 {
-		totalPages = int(math.Ceil(float64(total) / float64(filter.PageSize)))
+		totalPages = int(math.Ceil(float64(total) / float64(shopPageSize)))
 	}
-	if filter.Page > totalPages {
-		filter.Page = totalPages
+	page := params.Page
+	if page > totalPages {
+		page = totalPages
 	}
 
 	sd := &ShopData{
-		BasePath:       basePath,
-		Query:          filter.Query,
-		PriceMax:       priceMax,
-		PriceSliderMin: priceSliderMin,
-		PriceSliderMax: priceSliderMax,
-		Page:           filter.Page,
-		TotalPages:     totalPages,
-		HasPrev:        filter.Page > 1,
-		HasNext:        filter.Page < totalPages,
-		ShowBanner:     filter.Query == "" && categorySlug == "",
-		Categories:     chips,
-		Products:       cards,
-		Total:          total,
-		NoResults:      len(cards) == 0,
+		BasePath:     basePath,
+		CategoryName: categoryName,
+		Query:        params.Query,
+		Size:         params.Size,
+		Color:        params.Color,
+		InStock:      params.InStock,
+		Sort:         params.Sort,
+		PriceMin:     params.PriceMin,
+		PriceMax:     params.PriceMax,
+		SizeOptions:  filterOptions(facets.Sizes, params.Size),
+		ColorOptions: filterOptions(facets.Colors, params.Color),
+		SortOptions: []FilterOption{
+			{Value: "", Label: h.bundle.T(lang, "shop.sort.newest"), Selected: params.Sort == ""},
+			{Value: catalog.SortPriceAsc, Label: h.bundle.T(lang, "shop.sort.price_asc"), Selected: params.Sort == catalog.SortPriceAsc},
+			{Value: catalog.SortPriceDesc, Label: h.bundle.T(lang, "shop.sort.price_desc"), Selected: params.Sort == catalog.SortPriceDesc},
+		},
+		HasFilters: params.hasFilters(),
+		Page:       page,
+		TotalPages: totalPages,
+		HasPrev:    page > 1,
+		HasNext:    page < totalPages,
+		ShowBanner: params.Query == "" && categorySlug == "" && !params.hasFilters() && page == 1,
+		Categories: chips,
+		Products:   cards,
+		Total:      total,
+		NoResults:  len(cards) == 0,
 	}
-	sd.PrevHref = shopPageHref(basePath, filter, filter.Page-1)
-	sd.NextHref = shopPageHref(basePath, filter, filter.Page+1)
+	sd.PrevHref = params.href(basePath, page-1)
+	sd.NextHref = params.href(basePath, page+1)
 	return sd, nil
 }
 
-// shopPageHref builds a shop/catalog URL for page, preserving the
-// current search/price filters (but never `category`, which is already
-// baked into basePath).
-func shopPageHref(basePath string, filter catalog.ListFilter, page int) string {
-	v := url.Values{}
-	if filter.Query != "" {
-		v.Set("q", filter.Query)
+// filterOptions marks selected among values; a selected value that's no
+// longer on sale is kept so the visitor can still see and clear it.
+func filterOptions(values []string, selected string) []FilterOption {
+	out := make([]FilterOption, 0, len(values)+1)
+	found := false
+	for _, v := range values {
+		out = append(out, FilterOption{Value: v, Label: v, Selected: v == selected})
+		found = found || v == selected
 	}
-	if filter.PriceMax != nil {
-		v.Set("price_max", strconv.Itoa(int(*filter.PriceMax)))
+	if selected != "" && !found {
+		out = append(out, FilterOption{Value: selected, Label: selected, Selected: true})
 	}
-	if page > 1 {
-		v.Set("page", strconv.Itoa(page))
-	}
-	if enc := v.Encode(); enc != "" {
-		return basePath + "?" + enc
-	}
-	return basePath
+	return out
 }
 
 // ProductData backs product.gohtml (screen "product") and its
