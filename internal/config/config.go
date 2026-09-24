@@ -17,7 +17,7 @@ const (
 )
 
 type Config struct {
-	Env         string // "dev" | "prod"
+	Env         string // EnvDev | EnvStaging | EnvProd — APP_ENV, required
 	HTTPAddr    string
 	DatabaseURL string
 
@@ -92,6 +92,10 @@ type Config struct {
 	// LogFormat is "text" (default, human-readable) or "json" (one object
 	// per line, for log shippers). LOG_FORMAT.
 	LogFormat string
+
+	// Security holds the hardening knobs (cookie Secure flag, trusted
+	// proxies, body-size and auth rate limits) — see security.go.
+	Security Security
 }
 
 // DBPool mirrors the *sql.DB pool knobs (SetMaxOpenConns & co.). Postgres'
@@ -117,7 +121,7 @@ type HTTPTimeouts struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Env:         getEnv("APP_ENV", "dev"),
+		Env:         strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 
@@ -152,7 +156,14 @@ func Load() (*Config, error) {
 		LogFormat:          getEnv("LOG_FORMAT", "text"),
 	}
 
+	if err := validateEnv(cfg.Env); err != nil {
+		return nil, err
+	}
+
 	var err error
+	if cfg.Security, err = loadSecurity(cfg.Env); err != nil {
+		return nil, err
+	}
 	if cfg.DB, err = loadDBPool(); err != nil {
 		return nil, err
 	}
@@ -171,8 +182,8 @@ func Load() (*Config, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
-	if cfg.JWTSecret == "" && cfg.Env != "dev" {
-		return nil, fmt.Errorf("JWT_SECRET is required outside dev")
+	if err := cfg.validate(); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
@@ -247,7 +258,7 @@ func getEnvDuration(key string, fallback time.Duration) (time.Duration, error) {
 // defaultPaymentsProvider is mock everywhere except prod, where an unset
 // PAYMENTS_PROVIDER must not silently expose the mock "pay for free" page.
 func defaultPaymentsProvider(env string) string {
-	if env == "prod" {
+	if env == EnvProd {
 		return PaymentsProviderBakai
 	}
 	return PaymentsProviderMock

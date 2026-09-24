@@ -63,9 +63,7 @@ func run() error {
 
 	var sms notify.OTPSender
 	if cfg.SMSMockOTP {
-		if cfg.Env == "prod" {
-			return errors.New("SMS_MOCK_OTP is set but APP_ENV=prod — refusing to start with a fake OTP provider in production")
-		}
+		// config.Load already refuses SMS_MOCK_OTP with APP_ENV=prod.
 		slog.Warn("notify: SMS_MOCK_OTP is on — every login accepts code 0000, no real SMS is sent. Never set this in production.")
 		sms = notify.NewMockClient()
 	} else {
@@ -97,8 +95,9 @@ func run() error {
 		return err
 	}
 	if cfg.PaymentsProvider == config.PaymentsProviderMock {
-		if cfg.Env == "prod" {
-			slog.Warn("payments: PAYMENTS_PROVIDER=mock with APP_ENV=prod — anyone can mark online orders paid through the mock checkout page. Staging only; never on the live shop.")
+		// config.Load already refuses PAYMENTS_PROVIDER=mock with APP_ENV=prod.
+		if cfg.IsProdLike() {
+			slog.Warn("payments: PAYMENTS_PROVIDER=mock on a public stand — anyone can mark online orders paid through the mock checkout page. Staging only; never on the live shop.", "env", cfg.Env)
 		} else {
 			slog.Info("payments: mock provider active — online_card orders are paid on a local test page", "checkout", cfg.PaymentsBaseURL()+payments.MockCheckoutPath+"{id}")
 		}
