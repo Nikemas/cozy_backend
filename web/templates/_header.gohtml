@@ -6,33 +6,34 @@
       <span class="logo__mark">Cozy</span>
     </a>
 
-    <nav class="nav">
+    <nav class="nav" aria-label="{{t "a11y.main_nav"}}">
       <a href="/" class="nav__link{{if eq .Screen "shop"}} nav__link--active{{end}}">{{t "nav.catalog"}}</a>
       <a href="/branches" class="nav__link{{if eq .Screen "branches"}} nav__link--active{{end}}">{{t "nav.branches"}}</a>
     </nav>
 
-    <form class="search" method="get"
+    <form class="search" role="search" method="get"
           action="{{if eq .Screen "shop"}}{{.Data.BasePath}}{{else}}/{{end}}"
           {{if eq .Screen "shop"}}
           hx-get="{{.Data.BasePath}}" hx-trigger="input changed delay:400ms, search"
           hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
           hx-include="#shop-filters, #shop-sort"
           {{end}}>
-      <i class="ti ti-search"></i>
-      <input type="search" id="shop-q" name="q" value="{{.SearchQuery}}" placeholder="{{t "search.placeholder"}}">
+      <i class="ti ti-search" aria-hidden="true"></i>
+      <label for="shop-q" class="visually-hidden">{{t "search.placeholder"}}</label>
+      <input type="search" id="shop-q" name="q" value="{{.SearchQuery}}" placeholder="{{t "search.placeholder"}}" maxlength="100" autocomplete="off">
     </form>
 
     <div class="header__actions">
       <a class="icon-btn{{if eq .Screen "fav"}} icon-btn--active{{end}}" href="/favorites" aria-label="{{t "nav.favorites"}}">
-        <i class="ti ti-heart"></i>
+        <i class="ti ti-heart" aria-hidden="true"></i>
         {{if gt .FavCount 0}}<span class="badge">{{.FavCount}}</span>{{end}}
       </a>
       <a class="icon-btn{{if eq .Screen "cart"}} icon-btn--active{{end}}" href="/cart" aria-label="{{t "nav.cart"}}">
-        <i class="ti ti-shopping-cart"></i>
+        <i class="ti ti-shopping-cart" aria-hidden="true"></i>
         {{if gt .CartCount 0}}<span class="badge">{{.CartCount}}</span>{{end}}
       </a>
       <a class="avatar-btn" href="/profile" aria-label="{{t "nav.profile"}}">
-        <i class="ti ti-user"></i>
+        <i class="ti ti-user" aria-hidden="true"></i>
       </a>
     </div>
   </div>

@@ -921,3 +921,71 @@ button, input { font-family: inherit; }
   padding: 8px 10px; font-size: var(--cozy-fs-13); color: var(--cozy-ink); font-family: inherit; cursor: pointer;
 }
 .shop-empty__reset { margin-top: 14px; }
+
+/* ==== Accessibility (WCAG 2.1 AA) overrides ====
+   Kept as one block at the end so the design-derived rules above stay
+   readable and this can be reviewed against the design in one place.
+   --cozy-accent-aa is the darkest-needed shade of the brand orange for
+   white text (4.5:1 on #C85000); propose adding it to
+   design-system/tokens.css. */
+:root {
+  --cozy-accent-aa:       #C85000;
+  --cozy-accent-aa-hover: #A84300;
+  --cozy-focus:           #1A1A1A;
+}
+
+/* Visible keyboard focus everywhere (the rules above remove outlines on
+   inputs); mouse clicks don't show it thanks to :focus-visible. */
+:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 2px; }
+.search:focus-within { border-color: var(--cozy-ink-2); box-shadow: 0 0 0 2px var(--cozy-accent-border); }
+.search input:focus-visible { outline: none; }
+.form-stack input:focus-visible,
+.address-form textarea:focus-visible,
+.aside__price-field input:focus-visible,
+.shop-sort select:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 1px; border-color: var(--cozy-ink-2); }
+
+/* Skip link: first focusable element, visible only on focus. */
+.skip-link { position: absolute; left: 12px; top: -48px; z-index: 50; background: var(--cozy-ink); color: var(--cozy-surface); padding: 10px 14px; border-radius: var(--cozy-r-10); font-size: var(--cozy-fs-14); font-weight: 700; }
+.skip-link:focus { top: 12px; }
+
+/* Field labels (previously placeholder-only inputs). */
+.field-label { font-size: var(--cozy-fs-13); font-weight: 600; color: var(--cozy-ink-2); margin-bottom: -6px; }
+
+/* White text on brand orange: 2.6:1 → 4.5:1+. */
+.btn--primary,
+.product-option--active,
+.icon-btn .badge { background: var(--cozy-accent-aa); }
+.product-option--active { border-color: var(--cozy-accent-aa); }
+.btn--primary:hover { background: var(--cozy-accent-aa-hover); }
+
+/* Orange text on white/light backgrounds → accent-ink (≈5:1). */
+.nav__link--active,
+.link-btn,
+.aside__reset,
+.shop-pager__link,
+.shop-banner__eyebrow,
+.branch-card__route,
+.icon-btn--active { color: var(--cozy-accent-ink); }
+/* Large price text needs 3:1 — accent-strong gives 3.25:1. */
+.product-meta__price { color: var(--cozy-accent-strong); }
+
+/* Secondary text: #999 (2.8:1) → #666 (5.7:1). */
+.muted,
+.aside__title,
+.aside__account-phone,
+.aside__link-count,
+.cart-line__meta,
+.cart-summary__title,
+.orders-empty,
+.profile-card__phone,
+.profile-stat__label,
+.profile-menu__item--disabled,
+.fav-card__brand,
+.shop-count,
+.shop-empty,
+.product-card__brand,
+.shop-pager__page,
+.product-meta__brand { color: var(--cozy-ink-2); }
+
+.product-option--unavailable { opacity: 1; color: var(--cozy-ink-3); text-decoration: line-through; }
+.product-option--active.product-option--unavailable { color: var(--cozy-surface); }

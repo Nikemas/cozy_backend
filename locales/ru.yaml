@@ -224,3 +224,11 @@ seo.page_contacts.description: Телефон, мессенджеры, e-mail и
 seo.page_delivery.description: Условия доставки по Бишкеку, бесплатный самовывоз из магазинов Cozy, способы оплаты, обмен и возврат.
 seo.page_privacy.description: Как интернет-магазин Cozy обрабатывает и защищает персональные данные покупателей.
 seo.page_terms.description: Публичная оферта интернет-магазина обуви Cozy: оформление заказа, оплата, доставка, обмен и возврат.
+
+# Accessibility labels.
+a11y.skip_to_content: Перейти к содержимому
+a11y.main_nav: Основное меню
+auth.phone_label: Номер телефона
+auth.code_label: Код из SMS
+address.label_label: Название адреса
+address.text_label: Адрес доставки

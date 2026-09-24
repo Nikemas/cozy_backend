@@ -2,7 +2,7 @@
 <div class="profile">
   {{if .Authed}}
     <div class="card profile-card">
-      <div class="profile-card__avatar"><i class="ti ti-user"></i></div>
+      <div class="profile-card__avatar"><i class="ti ti-user" aria-hidden="true"></i></div>
       <div class="profile-card__info">
         <div class="profile-card__name">{{if .CustomerName}}{{.CustomerName}}{{else}}{{t "nav.profile"}}{{end}}</div>
         {{if .MaskedPhone}}<div class="profile-card__phone">{{.MaskedPhone}}</div>{{end}}
@@ -25,16 +25,16 @@
 
     <div class="profile-menu">
       <a class="profile-menu__item" href="/orders">
-        <i class="ti ti-package"></i> <span>{{t "sidebar.orders"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+        <i class="ti ti-package" aria-hidden="true"></i> <span>{{t "sidebar.orders"}}</span> <i class="ti ti-chevron-right profile-menu__chevron" aria-hidden="true"></i>
       </a>
       <a class="profile-menu__item" href="/addresses">
-        <i class="ti ti-map-pin"></i> <span>{{t "profile.addresses"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+        <i class="ti ti-map-pin" aria-hidden="true"></i> <span>{{t "profile.addresses"}}</span> <i class="ti ti-chevron-right profile-menu__chevron" aria-hidden="true"></i>
       </a>
       <a class="profile-menu__item" href="/lang">
-        <i class="ti ti-language"></i> <span>{{t "profile.language"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+        <i class="ti ti-language" aria-hidden="true"></i> <span>{{t "profile.language"}}</span> <i class="ti ti-chevron-right profile-menu__chevron" aria-hidden="true"></i>
       </a>
       <a class="profile-menu__item" href="/contacts">
-        <i class="ti ti-headset"></i> <span>{{t "profile.support"}}</span> <i class="ti ti-chevron-right profile-menu__chevron"></i>
+        <i class="ti ti-headset" aria-hidden="true"></i> <span>{{t "profile.support"}}</span> <i class="ti ti-chevron-right profile-menu__chevron" aria-hidden="true"></i>
       </a>
     </div>
 

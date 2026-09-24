@@ -3,14 +3,14 @@
   {{if .Authed}}
   <div class="aside__card">
     <div class="aside__account">
-      <div class="aside__avatar"><i class="ti ti-user"></i></div>
+      <div class="aside__avatar"><i class="ti ti-user" aria-hidden="true"></i></div>
       <div class="aside__account-info">
         <div class="aside__account-name">{{if .CustomerName}}{{.CustomerName}}{{else}}{{t "nav.profile"}}{{end}}</div>
         <div class="aside__account-phone">{{.MaskedPhone}}</div>
       </div>
     </div>
-    <a class="aside__link" href="/orders"><i class="ti ti-package"></i> {{t "sidebar.orders"}} <span class="aside__link-count">{{.OrdersCount}}</span></a>
-    <a class="aside__link" href="/favorites"><i class="ti ti-heart"></i> {{t "sidebar.favorites"}} <span class="aside__link-count">{{.FavCount}}</span></a>
+    <a class="aside__link" href="/orders"><i class="ti ti-package" aria-hidden="true"></i> {{t "sidebar.orders"}} <span class="aside__link-count">{{.OrdersCount}}</span></a>
+    <a class="aside__link" href="/favorites"><i class="ti ti-heart" aria-hidden="true"></i> {{t "sidebar.favorites"}} <span class="aside__link-count">{{.FavCount}}</span></a>
   </div>
   {{else}}
   <a class="btn btn--primary aside__login" href="/profile">{{t "sidebar.login"}}</a>

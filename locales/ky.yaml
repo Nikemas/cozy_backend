@@ -224,3 +224,11 @@ seo.page_contacts.description: Бишкектеги Cozy бут кийим дү�
 seo.page_delivery.description: Бишкек боюнча жеткирүүнүн шарттары, Cozy дүкөндөрүнөн акысыз алып кетүү, төлөө ыкмалары, алмаштыруу жана кайтаруу.
 seo.page_privacy.description: Cozy интернет-дүкөнү сатып алуучулардын жеке маалыматтарын кантип иштетет жана коргойт.
 seo.page_terms.description: Cozy бут кийим интернет-дүкөнүнүн коомдук офертасы: буйрутма берүү, төлөө, жеткирүү, алмаштыруу жана кайтаруу.
+
+# Accessibility labels.
+a11y.skip_to_content: Мазмунга өтүү
+a11y.main_nav: Негизги меню
+auth.phone_label: Телефон номери
+auth.code_label: SMS-код
+address.label_label: Даректин аталышы
+address.text_label: Жеткирүү дареги

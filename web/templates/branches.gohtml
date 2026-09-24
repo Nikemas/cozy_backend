@@ -4,7 +4,7 @@
 
   {{if .Data.Empty}}
   <div class="orders-empty">
-    <i class="ti ti-map-pin-off orders-empty__icon"></i>
+    <i class="ti ti-map-pin-off orders-empty__icon" aria-hidden="true"></i>
     <div class="muted">{{t "branches.empty"}}</div>
   </div>
   {{else}}
@@ -37,7 +37,7 @@
         </div>
         <div class="branch-card__footer">
           <a class="branch-card__route" href="{{.RouteURL}}" target="_blank" rel="noopener noreferrer">
-            <i class="ti ti-navigation"></i> {{t "branches.route"}}
+            <i class="ti ti-navigation" aria-hidden="true"></i> {{t "branches.route"}}
           </a>
         </div>
       </div>

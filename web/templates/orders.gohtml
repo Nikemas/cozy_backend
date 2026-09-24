@@ -4,7 +4,7 @@
 
   {{if .Data.Empty}}
   <div class="orders-empty">
-    <i class="ti ti-package orders-empty__icon"></i>
+    <i class="ti ti-package orders-empty__icon" aria-hidden="true"></i>
     <div class="orders-empty__title">{{t "order.empty.title"}}</div>
     <div class="muted">{{t "order.empty.subtitle"}}</div>
     <a class="btn btn--primary orders-empty__cta" href="/">{{t "order.empty.cta"}}</a>
@@ -24,7 +24,7 @@
       <div class="order-card__items">
         {{range .Items}}
         <div class="order-item">
-          <div class="order-item__thumb"><i class="ti ti-shoe"></i></div>
+          <div class="order-item__thumb"><i class="ti ti-shoe" aria-hidden="true"></i></div>
           <div class="order-item__title">{{.Title}}</div>
           <div class="order-item__qty muted">×{{.Qty}}</div>
         </div>
@@ -36,13 +36,13 @@
         <div class="order-card__actions">
           {{if .ShowTrack}}
           <button class="btn btn--track" type="button" disabled title="{{t .StatusKey}}">
-            <i class="ti ti-map-pin"></i> {{t "order.action.track"}}
+            <i class="ti ti-map-pin" aria-hidden="true"></i> {{t "order.action.track"}}
           </button>
           {{end}}
           {{if .ShowRepeat}}
           <form method="post" action="/orders/{{.ID}}/repeat">
             <button class="btn btn--repeat" type="submit">
-              <i class="ti ti-repeat"></i> {{t "order.action.repeat"}}
+              <i class="ti ti-repeat" aria-hidden="true"></i> {{t "order.action.repeat"}}
             </button>
           </form>
           {{end}}

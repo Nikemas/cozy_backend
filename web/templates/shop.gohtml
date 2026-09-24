@@ -61,9 +61,9 @@
   <div class="shop-grid">
     {{range $d.Products}}
     <div class="product-card">
-      <button class="product-card__fav" type="button" aria-label="{{t "nav.favorites"}}"
+      <button class="product-card__fav" type="button" aria-label="{{t "product.add_to_favorites"}}: {{.Name}}"
               hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
-        <i class="ti ti-heart"></i>
+        <i class="ti ti-heart" aria-hidden="true"></i>
       </button>
       <a class="product-card__link" href="{{.DetailURL}}">
         <div class="product-card__thumb">
@@ -89,14 +89,14 @@
     {{if $d.HasPrev}}
     <a class="shop-pager__link" href="{{$d.PrevHref}}"
        hx-get="{{$d.PrevHref}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true">
-      <i class="ti ti-chevron-left"></i> {{t "shop.prev"}}
+      <i class="ti ti-chevron-left" aria-hidden="true"></i> {{t "shop.prev"}}
     </a>
     {{end}}
     <span class="shop-pager__page">{{$d.Page}} / {{$d.TotalPages}}</span>
     {{if $d.HasNext}}
     <a class="shop-pager__link" href="{{$d.NextHref}}"
        hx-get="{{$d.NextHref}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true">
-      {{t "shop.next"}} <i class="ti ti-chevron-right"></i>
+      {{t "shop.next"}} <i class="ti ti-chevron-right" aria-hidden="true"></i>
     </a>
     {{end}}
   </div>

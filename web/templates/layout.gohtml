@@ -27,7 +27,9 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/css/site.css">
   {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
-  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  {{/* htmx pinned to an exact file with Subresource Integrity: if the CDN
+       ever serves different bytes the browser refuses to run them. */}}
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous" defer></script>
   <script>
     // Let htmx swap 4xx/5xx responses that the server explicitly
     // retargeted (internal/web/errors.go sends HX-Retarget: #toast-slot
@@ -42,10 +44,11 @@
   </script>
 </head>
 <body>
+<a class="skip-link" href="#main">{{t "a11y.skip_to_content"}}</a>
 {{template "_header" .}}
 <div class="page">
   {{template "_aside_filters" .}}
-  <main class="main">
+  <main class="main" id="main" tabindex="-1">
     {{template "content" .}}
   </main>
 </div>
