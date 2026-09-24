@@ -23,9 +23,12 @@ import (
 
 func createOnlineOrder(ctx context.Context, svc *orders.Service, customerID string, items []orders.OrderItemInput,
 	addressID, pickupPointID *string, provider string) (*orders.Order, string, error) {
-	return svc.CreateOnlineOrder(ctx, customerID, items, addressID, pickupPointID, provider)
+	o, paymentID, _, err := svc.CreateOnlineOrder(ctx, orders.PlaceOrderInput{
+		CustomerID: customerID, Items: items, AddressID: addressID, PickupPointID: pickupPointID,
+	}, provider)
+	return o, paymentID, err
 }
 
 func cancelUnpaidOrderTx(ctx context.Context, tx *sql.Tx, orderID string) (bool, error) {
-	return orders.CancelUnpaidOrderTx(ctx, tx, orderID)
+	return orders.CancelUnpaidOrderTx(ctx, tx, orderID, "integration test")
 }

@@ -23,6 +23,12 @@ const (
 	otpMaxPerHour     = 5                // hard cap per phone — SMS cost is a real abuse vector
 	accessTokenTTL    = 15 * time.Minute
 	refreshTokenTTL   = 30 * 24 * time.Hour
+	// refreshReuseGrace: a token rotated less than this long ago is not
+	// treated as stolen when presented again — on mobile networks the
+	// response carrying the new pair is regularly lost and the app retries
+	// with the old token. Within the window a fresh pair is issued in the
+	// same family (if the session wasn't logged out) instead of revoking it.
+	refreshReuseGrace = 30 * time.Second
 )
 
 // customerStore is the subset of *storefront.CustomerRepo the login flow
@@ -42,6 +48,8 @@ type Service struct {
 	limits      config.AuthLimits
 	verifyFails *windowLimiter // wrong OTP codes per client IP per hour
 	refreshIP   *windowLimiter // /auth/refresh calls per client IP per minute
+
+	refreshReuseGrace time.Duration // 0 = strict reuse detection
 }
 
 // NewService wires the customer auth service. limits come from
@@ -57,6 +65,8 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		limits:      limits,
 		verifyFails: newWindowLimiter(limits.OTPVerifyFailsPerIPPerHour, time.Hour),
 		refreshIP:   newWindowLimiter(limits.RefreshPerIPPerMinute, time.Minute),
+
+		refreshReuseGrace: refreshReuseGrace,
 	}
 }
 
@@ -212,10 +222,13 @@ func (s *Service) Refresh(ctx context.Context, refreshTokenStr string) (accessTo
 		return "", "", err
 	}
 	if rotated == nil {
-		if err := s.handleInactiveRefresh(ctx, oldHash); err != nil {
+		rotated, err = s.handleInactiveRefresh(ctx, oldHash, newHash)
+		if err != nil {
 			return "", "", err
 		}
-		return "", "", errRefreshInvalid()
+		if rotated == nil {
+			return "", "", errRefreshInvalid()
+		}
 	}
 
 	accessToken, err = issueAccessToken(s.jwtSecret, rotated.CustomerID, accessTokenTTL)
@@ -225,18 +238,32 @@ func (s *Service) Refresh(ctx context.Context, refreshTokenStr string) (accessTo
 	return accessToken, raw, nil
 }
 
-// handleInactiveRefresh revokes the family of an already-rotated token.
-func (s *Service) handleInactiveRefresh(ctx context.Context, tokenHash string) error {
+// handleInactiveRefresh deals with a token that is no longer active. A
+// token rotated within refreshReuseGrace is a lost-response retry: newHash
+// is issued in the same family, provided the family still has an active
+// token (i.e. the session wasn't logged out or revoked). Any other rotated
+// token is reuse and revokes the whole family. nil, nil means "invalid".
+func (s *Service) handleInactiveRefresh(ctx context.Context, tokenHash, newHash string) (*refreshToken, error) {
 	old, err := s.refresh.lookup(ctx, tokenHash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if old == nil || old.RotatedAt == nil {
-		return nil
+		return nil, nil
+	}
+	if s.refreshReuseGrace > 0 && time.Since(*old.RotatedAt) < s.refreshReuseGrace {
+		ok, err := s.refresh.issueInFamily(ctx, old.CustomerID, old.FamilyID, newHash, time.Now().Add(refreshTokenTTL))
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return old, nil
+		}
+		return nil, nil
 	}
 	slog.WarnContext(ctx, "auth: refresh token reuse detected, revoking the whole token family",
 		"customer_id", old.CustomerID, "family_id", old.FamilyID, "client_ip", httpmw.ClientIPFromContext(ctx))
-	return s.refresh.revokeFamily(ctx, old.FamilyID)
+	return nil, s.refresh.revokeFamily(ctx, old.FamilyID)
 }
 
 // Logout revokes the session the refresh token belongs to (its whole

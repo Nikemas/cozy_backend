@@ -9,9 +9,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/dbtx"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
 // recorder is an orders.Notifier that just counts events.
@@ -302,14 +305,22 @@ func TestOnlineOrderCancelReturnsStock(t *testing.T) {
 	}
 }
 
-// TestAdminStatusFlow checks the admin status UPDATE path. Whether an
-// admin cancel restocks is a business rule being changed separately, so
-// only the status column and transition validation are asserted here.
+// TestAdminStatusFlow checks the admin status UPDATE path as the owner:
+// transition validation, the history rows, and that an admin cancel
+// returns the stock.
 func TestAdminStatusFlow(t *testing.T) {
 	t.Parallel()
 	ctx := ctxT(t)
 	f := newFixture(t, 2, 0)
 	svc, rec := newService()
+
+	owner := &staff.Staff{Phone: "+996555" + uuid.NewString()[:6], Name: "Owner", Role: staff.RoleOwner, IsActive: true}
+	if err := testDB.QueryRowContext(ctx,
+		`INSERT INTO staff (phone, password_hash, name, role) VALUES ($1, 'x', $2, 'owner') RETURNING id`,
+		owner.Phone, owner.Name).Scan(&owner.ID); err != nil {
+		t.Fatalf("insert owner: %v", err)
+	}
+	ctx = staff.NewContextWithStaff(ctx, owner)
 
 	o, err := svc.CreateOrder(ctx, f.CustomerID,
 		[]orders.OrderItemInput{{VariantID: f.VariantA, Quantity: 1}}, nil, strptr(f.PointA))
@@ -331,6 +342,18 @@ func TestAdminStatusFlow(t *testing.T) {
 	}
 	if cancelled.Status != orders.StatusCancelled {
 		t.Errorf("after cancel: status %s", cancelled.Status)
+	}
+	if got := stockQty(t, f.VariantA, f.PointA); got != 2 {
+		t.Errorf("stock after admin cancel = %d, want 2 (restocked)", got)
+	}
+	var historyRows int
+	if err := testDB.QueryRowContext(ctx,
+		`SELECT count(*) FROM order_status_history WHERE order_id = $1 AND actor_staff_id = $2`,
+		o.ID, owner.ID).Scan(&historyRows); err != nil {
+		t.Fatalf("count history: %v", err)
+	}
+	if historyRows != 2 {
+		t.Errorf("staff history rows = %d, want 2 (confirm + cancel)", historyRows)
 	}
 
 	_, err = svc.AdminUpdateStatus(ctx, o.ID, orders.StatusConfirmed)

@@ -198,6 +198,18 @@ func (f *fakeRefreshStore) revokeFamily(_ context.Context, familyID string) erro
 	return nil
 }
 
+func (f *fakeRefreshStore) issueInFamily(_ context.Context, customerID, familyID, hash string, _ time.Time) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, r := range f.byHash {
+		if r.FamilyID == familyID && !r.revoked {
+			f.insert(customerID, familyID, hash)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // active reports whether the raw token would still be accepted.
 func (f *fakeRefreshStore) active(raw string) bool {
 	f.mu.Lock()

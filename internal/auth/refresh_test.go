@@ -64,6 +64,45 @@ func TestRefreshReuseRevokesWholeFamily(t *testing.T) {
 	}
 }
 
+func TestRefreshLostResponseRetryWithinGrace(t *testing.T) {
+	svc := newTestService(newFakeOTPStore(), &fakeSMS{}, testLimits)
+	svc.refreshReuseGrace = time.Minute
+	store := svc.refresh.(*fakeRefreshStore)
+	_, r1 := login(t, svc, "0700123456")
+
+	_, r2, err := svc.Refresh(context.Background(), r1) // response "lost"
+	if err != nil {
+		t.Fatal(err)
+	}
+	access, r3, err := svc.Refresh(context.Background(), r1) // app retries with r1
+	if err != nil || access == "" || r3 == "" || r3 == r2 {
+		t.Fatalf("retry within grace = %q %q %v", access, r3, err)
+	}
+	if !store.active(r2) || !store.active(r3) {
+		t.Error("retry within grace must not revoke the family")
+	}
+}
+
+func TestRefreshRetryWithinGraceAfterLogoutIsInvalid(t *testing.T) {
+	svc := newTestService(newFakeOTPStore(), &fakeSMS{}, testLimits)
+	svc.refreshReuseGrace = time.Minute
+	store := svc.refresh.(*fakeRefreshStore)
+	_, r1 := login(t, svc, "0700123456")
+
+	_, r2, err := svc.Refresh(context.Background(), r1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Logout(context.Background(), r2); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = svc.Refresh(context.Background(), r1)
+	wantAppErr(t, err, http.StatusUnauthorized, "refresh_invalid")
+	if store.active(r2) {
+		t.Error("logged-out session must stay revoked")
+	}
+}
+
 func TestRefreshInvalidTokens(t *testing.T) {
 	svc := newTestService(newFakeOTPStore(), &fakeSMS{}, testLimits)
 	for _, tok := range []string{"", "never-issued"} {

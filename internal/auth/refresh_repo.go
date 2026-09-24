@@ -29,6 +29,9 @@ type refreshStore interface {
 	lookup(ctx context.Context, tokenHash string) (*refreshToken, error)
 	// revokeFamily revokes every still-active token of the family.
 	revokeFamily(ctx context.Context, familyID string) error
+	// issueInFamily stores tokenHash in familyID only if the family still
+	// has an active token; false means the session is gone.
+	issueInFamily(ctx context.Context, customerID, familyID, tokenHash string, expiresAt time.Time) (bool, error)
 }
 
 type refreshRepo struct {
@@ -99,4 +102,20 @@ func (r *refreshRepo) revokeFamily(ctx context.Context, familyID string) error {
 	const q = `UPDATE refresh_tokens SET revoked_at = now() WHERE family_id = $1 AND revoked_at IS NULL`
 	_, err := r.db.ExecContext(ctx, q, familyID)
 	return err
+}
+
+func (r *refreshRepo) issueInFamily(ctx context.Context, customerID, familyID, tokenHash string, expiresAt time.Time) (bool, error) {
+	const q = `
+		INSERT INTO refresh_tokens (customer_id, token_hash, expires_at, family_id)
+		SELECT $1, $2, $3, $4
+		WHERE EXISTS (
+			SELECT 1 FROM refresh_tokens
+			WHERE family_id = $4 AND revoked_at IS NULL AND expires_at > now()
+		)`
+	res, err := r.db.ExecContext(ctx, q, customerID, tokenHash, expiresAt, familyID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
