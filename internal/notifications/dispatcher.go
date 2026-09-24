@@ -87,7 +87,10 @@ type Dispatcher struct {
 	closed bool
 }
 
-var _ orders.Notifier = (*Dispatcher)(nil)
+var (
+	_ orders.Notifier       = (*Dispatcher)(nil)
+	_ orders.CancelNotifier = (*Dispatcher)(nil)
+)
 
 func NewDispatcher(cfg Config) *Dispatcher {
 	if cfg.Push == nil {
@@ -109,6 +112,17 @@ func NewDispatcher(cfg Config) *Dispatcher {
 func (d *Dispatcher) OrderCreated(o orders.Order) {
 	d.goJob("order_created", o.OrderNumber, func(ctx context.Context) {
 		d.sendStaffNewOrder(ctx, o)
+	})
+}
+
+// OrderCancelledByCustomer tells staff (Telegram) that a customer
+// cancelled their order, so nobody keeps packing it.
+func (d *Dispatcher) OrderCancelledByCustomer(o orders.Order) {
+	d.goJob("order_cancelled_by_customer", o.OrderNumber, func(ctx context.Context) {
+		text := staffCancelledMessage(o, d.cfg.AdminBaseURL)
+		if err := d.cfg.Staff.SendStaffMessage(ctx, text); err != nil {
+			slog.Error("notifications: staff cancel message failed", "order_number", o.OrderNumber, "err", err)
+		}
 	})
 }
 

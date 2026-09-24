@@ -114,6 +114,8 @@ type OrderDetailData struct {
 	Items         []OrderDetailItemView
 	TotalLabel    string
 	StatusButtons []StatusButtonView
+	// Order history / money flags (fix/orders-integrity, order_history.go).
+	OrderHistoryData
 }
 
 // ---------- presentation helpers ----------
@@ -525,8 +527,9 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		AddressText:   addressText,
 		Comment:       comment,
 		Items:         items,
-		TotalLabel:    formatSom(o.TotalAmount),
-		StatusButtons: buildStatusButtons(o.Status, role),
+		TotalLabel:       formatSom(o.TotalAmount),
+		StatusButtons:    buildStatusButtons(o.Status, role),
+		OrderHistoryData: buildOrderHistoryData(o),
 	}
 }
 

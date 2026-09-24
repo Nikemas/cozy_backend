@@ -5,6 +5,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 // appConfigResponse is what the Flutter app reads at startup to decide
@@ -15,6 +16,9 @@ type appConfigResponse struct {
 	LatestVersion   string `json:"latest_version"`
 	StoreURLIOS     string `json:"store_url_ios"`
 	StoreURLAndroid string `json:"store_url_android"`
+	// DeliveryFee is the flat delivery charge (som) added to a delivery
+	// order's total_amount (DELIVERY_FEE_SOM). Self-pickup is free.
+	DeliveryFee float64 `json:"delivery_fee"`
 }
 
 // RegisterAppConfigRoutes mounts the public GET /api/v1/app/config.
@@ -28,6 +32,7 @@ func appConfigHandler(cfg *config.Config) apperr.HandlerFunc {
 		LatestVersion:   cfg.AppLatestVersion,
 		StoreURLIOS:     cfg.AppStoreURLIOS,
 		StoreURLAndroid: cfg.AppStoreURLAndroid,
+		DeliveryFee:     orders.CurrentSettings().DeliveryFee,
 	}
 	return func(w http.ResponseWriter, r *http.Request) error {
 		// Short cache: a bumped APP_MIN_VERSION should reach clients within

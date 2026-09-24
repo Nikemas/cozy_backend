@@ -5,11 +5,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 func TestAppConfigEndpoint(t *testing.T) {
+	orders.SetDefaultSettings(orders.Settings{DeliveryFee: 250, MaxOpenOrders: 5, PaymentPendingTTL: time.Hour})
+	t.Cleanup(func() { orders.SetDefaultSettings(orders.DefaultSettings()) })
 	mux := http.NewServeMux()
 	RegisterAppConfigRoutes(mux, &config.Config{
 		AppMinVersion: "1.2.0", AppLatestVersion: "1.3.1",
@@ -25,9 +29,17 @@ func TestAppConfigEndpoint(t *testing.T) {
 	if cc := rec.Header().Get("Cache-Control"); cc != "public, max-age=300" {
 		t.Errorf("Cache-Control = %q", cc)
 	}
-	var got map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+	var raw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&raw); err != nil {
 		t.Fatal(err)
+	}
+	if fee, ok := raw["delivery_fee"].(float64); !ok || fee != 250 {
+		t.Errorf("delivery_fee = %v, want 250 (from DELIVERY_FEE_SOM settings)", raw["delivery_fee"])
+	}
+	delete(raw, "delivery_fee")
+	got := map[string]string{}
+	for k, v := range raw {
+		got[k], _ = v.(string)
 	}
 	want := map[string]string{
 		"min_version": "1.2.0", "latest_version": "1.3.1",

@@ -77,8 +77,12 @@ func staffOrderMessage(o orders.Order, info OrderInfo, adminBaseURL string) stri
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "<b>Новый заказ %s</b>\n", e(o.OrderNumber))
-	fmt.Fprintf(&b, "Сумма: <b>%s</b>\n", formatSom(o.TotalAmount))
-	fmt.Fprintf(&b, "Оплата: %s\n", paymentLabel(o.PaymentMethod))
+	fmt.Fprintf(&b, "Сумма: <b>%s</b>", formatSom(o.TotalAmount))
+	if o.DeliveryFee > 0 {
+		fmt.Fprintf(&b, " (в т.ч. доставка %s)", formatSom(o.DeliveryFee))
+	}
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "Оплата: %s\n", paymentLabel(o))
 
 	if isPickup(o) {
 		where := info.PointName
@@ -127,15 +131,31 @@ func staffOrderMessage(o orders.Order, info OrderInfo, adminBaseURL string) stri
 	return b.String()
 }
 
-func paymentLabel(m orders.PaymentMethod) string {
-	switch m {
+func paymentLabel(o orders.Order) string {
+	switch o.PaymentMethod {
 	case orders.PaymentCashOnDelivery:
 		return "наличными при получении"
 	case orders.PaymentOnlineCard:
+		if o.PaymentStatus != nil && *o.PaymentStatus == orders.PaymentPaid {
+			return "онлайн картой — оплачено"
+		}
 		return "онлайн картой"
 	default:
-		return string(m)
+		return string(o.PaymentMethod)
 	}
+}
+
+// staffCancelledMessage is the Telegram-HTML note that a customer
+// cancelled their order.
+func staffCancelledMessage(o orders.Order, adminBaseURL string) string {
+	e := html.EscapeString
+	var b strings.Builder
+	fmt.Fprintf(&b, "<b>Покупатель отменил заказ %s</b>\n", e(o.OrderNumber))
+	fmt.Fprintf(&b, "Сумма: %s. Товар возвращён на остаток.\n", formatSom(o.TotalAmount))
+	if base := strings.TrimRight(adminBaseURL, "/"); base != "" {
+		fmt.Fprintf(&b, "<a href=\"%s/admin/orders/%s\">Открыть в админке</a>", e(base), e(o.ID))
+	}
+	return b.String()
 }
 
 func nonEmpty(vals ...string) []string {

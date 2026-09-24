@@ -16,7 +16,10 @@ import (
 
 // OnlineOrderCreator is the subset of *orders.Service Service needs.
 type OnlineOrderCreator interface {
-	CreateOnlineOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string, provider string) (*orders.Order, string, error)
+	CreateOnlineOrder(ctx context.Context, in orders.PlaceOrderInput, provider string) (order *orders.Order, paymentID string, created bool, err error)
+	// NotifyOrderPaid sends staff the "new order" message for a paid
+	// online order (held back at creation until the money is in).
+	NotifyOrderPaid(ctx context.Context, orderID string) error
 }
 
 // Service ties orders to the active Provider: it opens a payment for a new
@@ -35,8 +38,11 @@ type OnlineOrderCreator interface {
 //     to retry; there is no "retry payment on the same order" yet.
 //   - Duplicate callbacks are no-ops (payment row locked FOR UPDATE, same
 //     status ⇒ nothing applied), so stock is never returned twice.
-//   - Abandoned payments (no callback ever) keep their reservation until
-//     staff cancel the order — no expiry job yet (see tasks/todo.md).
+//   - Abandoned payments (no callback ever) are cancelled by the expiry
+//     job (ExpirePending / RunPendingExpiry) after PAYMENT_PENDING_TTL,
+//     which returns the stock the same way.
+//   - "paid" arriving for a payment we already failed/cancelled/expired,
+//     or for an order staff cancelled, sets orders.refund_required.
 type Service struct {
 	db            *sql.DB
 	provider      Provider
@@ -56,14 +62,25 @@ func (s *Service) Provider() Provider { return s.provider }
 // the provider and returns the order plus the URL to send the customer to.
 // If the provider fails, the order is cancelled and its stock returned
 // before the error is reported.
-func (s *Service) PlaceOnlineOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string) (*orders.Order, string, error) {
+//
+// created=false is an idempotent replay (in.IdempotencyKey matched an
+// earlier order): no new order or payment is made, and the earlier
+// payment's URL is returned while that payment is still pending.
+func (s *Service) PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInput) (*orders.Order, string, bool, error) {
 	if err := s.provider.Ready(); err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 
-	order, paymentID, err := s.orders.CreateOnlineOrder(ctx, customerID, items, addressID, pickupPointID, s.provider.Name())
+	order, paymentID, created, err := s.orders.CreateOnlineOrder(ctx, in, s.provider.Name())
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
+	}
+	if !created {
+		url, err := s.pendingPaymentURL(ctx, order.ID)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return order, url, false, nil
 	}
 
 	sess, err := s.provider.CreatePayment(ctx, CreateRequest{
@@ -75,8 +92,8 @@ func (s *Service) PlaceOnlineOrder(ctx context.Context, customerID string, items
 		ReturnURL:   s.publicBaseURL + "/order/" + order.OrderNumber + "/done",
 	})
 	if err == nil {
-		const q = `UPDATE payments SET provider_tx_id = $1, updated_at = now() WHERE id = $2`
-		_, err = s.db.ExecContext(ctx, q, sess.ExternalID, paymentID)
+		const q = `UPDATE payments SET provider_tx_id = $1, redirect_url = $2, updated_at = now() WHERE id = $3`
+		_, err = s.db.ExecContext(ctx, q, sess.ExternalID, sess.RedirectURL, paymentID)
 	}
 	if err != nil {
 		slog.Error("payments: opening checkout session failed, cancelling order",
@@ -89,15 +106,38 @@ func (s *Service) PlaceOnlineOrder(ctx context.Context, customerID string, items
 		}
 		var appErr *apperr.AppError
 		if errors.As(err, &appErr) {
-			return nil, "", err
+			return nil, "", false, err
 		}
-		return nil, "", apperr.New(http.StatusBadGateway, "payment_create_failed", "не удалось создать платёж, попробуйте ещё раз")
+		return nil, "", false, apperr.New(http.StatusBadGateway, "payment_create_failed", "не удалось создать платёж, попробуйте ещё раз")
 	}
-	return order, sess.RedirectURL, nil
+	return order, sess.RedirectURL, true, nil
+}
+
+// pendingPaymentURL is the checkout URL of orderID's latest payment while
+// it is still pending, or "" (paid, failed, expired — nothing to open).
+func (s *Service) pendingPaymentURL(ctx context.Context, orderID string) (string, error) {
+	const q = `
+		SELECT status, COALESCE(redirect_url, '') FROM payments
+		WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`
+	var st Status
+	var url string
+	err := s.db.QueryRowContext(ctx, q, orderID).Scan(&st, &url)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if st != StatusPending {
+		return "", nil
+	}
+	return url, nil
 }
 
 // abort marks a still-pending payment failed and cancels its order,
-// returning stock.
+// returning stock. The order's idempotency key is released so the
+// client's retry with the same key places a fresh order instead of
+// replaying this cancelled one.
 func (s *Service) abort(ctx context.Context, paymentID, orderID string) error {
 	return dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
@@ -109,10 +149,10 @@ func (s *Service) abort(ctx context.Context, paymentID, orderID string) error {
 			return nil // a callback already settled it
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE orders SET payment_status = 'failed', updated_at = now() WHERE id = $1`, orderID); err != nil {
+			`UPDATE orders SET payment_status = 'failed', idempotency_key = NULL, updated_at = now() WHERE id = $1`, orderID); err != nil {
 			return err
 		}
-		_, err = orders.CancelUnpaidOrderTx(ctx, tx, orderID)
+		_, err = orders.CancelUnpaidOrderTx(ctx, tx, orderID, "не удалось открыть платёж")
 		return err
 	})
 }
@@ -124,6 +164,7 @@ type CallbackResult struct {
 	Status         Status `json:"status"`          // payment status after handling
 	Applied        bool   `json:"applied"`         // false for duplicates / ignored events
 	OrderCancelled bool   `json:"order_cancelled"` // stock returned
+	RefundRequired bool   `json:"refund_required"` // money arrived for a cancelled order
 }
 
 // transition decides what a callback reporting `to` does to a payment
@@ -187,6 +228,22 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 
 		apply, conflict := transition(current, ev.Status)
 		if conflict {
+			if ev.Status == StatusPaid && isUnpaidFinal(current) {
+				// The bank took the money after we gave up on the payment
+				// (declined/cancelled earlier, or expired by the job) and
+				// already returned the stock: the customer must be refunded.
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE payments SET raw_webhook = $1, updated_at = now() WHERE id = $2`, []byte(raw), res.PaymentID); err != nil {
+					return err
+				}
+				if err := orders.MarkRefundRequiredTx(ctx, tx, res.OrderID); err != nil {
+					return err
+				}
+				res.RefundRequired = true
+				slog.Error("payments: paid callback for an already failed/cancelled payment — order flagged refund_required",
+					"provider", providerName, "payment", res.PaymentID, "order", res.OrderID, "current", current)
+				return nil
+			}
 			slog.Error("payments: contradictory callback ignored — needs manual review",
 				"provider", providerName, "external_id", ev.ExternalID, "payment", res.PaymentID,
 				"current", current, "reported", ev.Status)
@@ -213,13 +270,21 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 			return err
 		}
 		if ev.Status == StatusPaid && orderStatus == orders.StatusCancelled {
-			// Staff cancelled the order while the customer was paying: the
-			// money arrived for goods we no longer hold. Record it, flag it.
-			slog.Error("payments: payment received for a cancelled order — refund needed",
+			// The order was cancelled while the customer was paying: the
+			// money arrived for goods we no longer hold. Flag it for refund.
+			if err := orders.MarkRefundRequiredTx(ctx, tx, res.OrderID); err != nil {
+				return err
+			}
+			res.RefundRequired = true
+			slog.Error("payments: payment received for a cancelled order — flagged refund_required",
 				"payment", res.PaymentID, "order", res.OrderID)
 		}
 		if ev.Status == StatusFailed || ev.Status == StatusCancelled {
-			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID)
+			note := "оплата отклонена"
+			if ev.Status == StatusCancelled {
+				note = "оплата отменена покупателем"
+			}
+			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID, note)
 			if err != nil {
 				return err
 			}
@@ -231,6 +296,13 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 	})
 	if err != nil {
 		return nil, err
+	}
+	if res.Applied && res.Status == StatusPaid && !res.RefundRequired && s.orders != nil {
+		// Now that the money is in, tell staff about the order (cash
+		// orders are announced at creation, online ones only here).
+		if nerr := s.orders.NotifyOrderPaid(context.WithoutCancel(ctx), res.OrderID); nerr != nil {
+			slog.Error("payments: staff notification for paid order failed", "order", res.OrderID, "err", nerr)
+		}
 	}
 	return &res, nil
 }

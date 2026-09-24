@@ -33,6 +33,7 @@
         <div class="cart-line__info">
           <div class="cart-line__name">{{.ProductName}}</div>
           <div class="cart-line__meta">{{.Size}} · {{.Color}}</div>
+          {{if not .Available}}<div class="cart-line__unavailable">{{t "cart.unavailable"}}</div>{{end}}
         </div>
         <div class="stepper">
           <form hx-post="/cart/items/{{.VariantID}}/decrement" hx-target="#cart-page" hx-swap="outerHTML">

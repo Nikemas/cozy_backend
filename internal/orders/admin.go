@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
-	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
 
 // AdminPageSize is the fixed page size for GET /admin/api/orders — this
@@ -76,7 +75,7 @@ func (s *Service) AdminListOrders(ctx context.Context, filter AdminListFilter) (
 
 	limitArgs := append(append([]any{}, args...), AdminPageSize, adminSafeOffset(page))
 	listQuery := fmt.Sprintf(`
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
+		SELECT `+orderColumns+`
 		FROM orders
 		%s
 		ORDER BY created_at DESC
@@ -121,11 +120,24 @@ func adminSafeOffset(page int) int {
 // order. Point-based RBAC (point_staff restricted to their own point) is
 // enforced by the caller (internal/httpapi/admin_orders.go), not here,
 // since this method has no notion of the calling staff member.
+//
+// The admin view also carries the order's status history.
 func (s *Service) AdminGetOrder(ctx context.Context, idOrNumber string) (*Order, error) {
-	q := `
-		SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
-		FROM orders
-		WHERE ` + orderKeyPredicate(idOrNumber, 1)
+	o, err := s.getOrderAnyCustomer(ctx, idOrNumber)
+	if err != nil {
+		return nil, err
+	}
+	hist, err := s.StatusHistory(ctx, o.ID)
+	if err != nil {
+		return nil, err
+	}
+	o.History = hist
+	return o, nil
+}
+
+// getOrderAnyCustomer is AdminGetOrder without the history.
+func (s *Service) getOrderAnyCustomer(ctx context.Context, idOrNumber string) (*Order, error) {
+	q := `SELECT ` + orderColumns + ` FROM orders WHERE ` + orderKeyPredicate(idOrNumber, 1)
 
 	var o Order
 	row := s.db.QueryRowContext(ctx, q, idOrNumber)
@@ -170,58 +182,4 @@ func validStatusTransition(from, to OrderStatus) bool {
 		// (including an unrecognized from value) is invalid.
 		return false
 	}
-}
-
-// AdminUpdateStatus transitions order idOrNumber to newStatus, enforcing
-// validStatusTransition. Returns apperr.NotFound if no such order exists,
-// apperr.BadRequest("invalid_status_transition", ...) if the transition
-// isn't allowed. Point-based RBAC is enforced by the caller, same as
-// AdminGetOrder.
-func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newStatus OrderStatus) (*Order, error) {
-	var o Order
-	var from OrderStatus
-	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		selectQ := `
-			SELECT id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status, total_amount, comment, created_at, updated_at
-			FROM orders
-			WHERE ` + orderKeyPredicate(idOrNumber, 1) + `
-			FOR UPDATE`
-
-		row := tx.QueryRowContext(ctx, selectQ, idOrNumber)
-		if err := scanOrderRow(row, &o); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return apperr.NotFound("order_not_found", "заказ не найден")
-			}
-			return err
-		}
-
-		if !validStatusTransition(o.Status, newStatus) {
-			return apperr.BadRequest("invalid_status_transition",
-				fmt.Sprintf("нельзя перевести заказ из статуса %q в %q", o.Status, newStatus))
-		}
-
-		const updateQ = `
-			UPDATE orders SET status = $1, updated_at = now()
-			WHERE id = $2
-			RETURNING updated_at`
-		if err := tx.QueryRowContext(ctx, updateQ, newStatus, o.ID).Scan(&o.UpdatedAt); err != nil {
-			return err
-		}
-		from = o.Status
-		o.Status = newStatus
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	list := []Order{o}
-	// The status change has committed; loading items is best-effort
-	// enrichment and must not hide that from the caller's notification.
-	itemsErr := s.attachItems(ctx, list)
-	s.notifyStatusChanged(list[0], from)
-	if itemsErr != nil {
-		return nil, itemsErr
-	}
-	return &list[0], nil
 }

@@ -39,6 +39,13 @@
             <i class="ti ti-map-pin"></i> {{t "order.action.track"}}
           </button>
           {{end}}
+          {{if .ShowCancel}}
+          <form method="post" action="/orders/{{.ID}}/cancel" onsubmit="return confirm('{{t "order.action.cancel_confirm"}}')">
+            <button class="btn btn--cancel" type="submit">
+              <i class="ti ti-x"></i> {{t "order.action.cancel"}}
+            </button>
+          </form>
+          {{end}}
           {{if .ShowRepeat}}
           <form method="post" action="/orders/{{.ID}}/repeat">
             <button class="btn btn--repeat" type="submit">

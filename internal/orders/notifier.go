@@ -22,6 +22,13 @@ type Notifier interface {
 	OrderStatusChanged(order Order, from OrderStatus)
 }
 
+// CancelNotifier is an optional extension of Notifier: implementations
+// that also satisfy it are told when a customer cancels their own order,
+// so staff stop packing it.
+type CancelNotifier interface {
+	OrderCancelledByCustomer(order Order)
+}
+
 // notifierHolder wraps a Notifier so atomic.Value always stores one
 // concrete type.
 type notifierHolder struct{ n Notifier }
@@ -74,6 +81,15 @@ func (s *Service) notifyStatusChanged(o Order, from OrderStatus) {
 	}
 	defer recoverNotifier("order_status_changed", o.OrderNumber)
 	n.OrderStatusChanged(o, from)
+}
+
+func (s *Service) notifyCancelledByCustomer(o Order) {
+	cn, ok := s.currentNotifier().(CancelNotifier)
+	if !ok {
+		return
+	}
+	defer recoverNotifier("order_cancelled_by_customer", o.OrderNumber)
+	cn.OrderCancelledByCustomer(o)
 }
 
 func recoverNotifier(event, orderNumber string) {

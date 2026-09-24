@@ -90,6 +90,14 @@ func run() error {
 	notifier := buildNotifications(db, cfg)
 	orders.SetDefaultNotifier(notifier)
 
+	// Order settings (DELIVERY_FEE_SOM, MAX_OPEN_ORDERS_PER_CUSTOMER,
+	// PAYMENT_PENDING_TTL) — process default for every orders.Service.
+	orderSettings, err := orders.SettingsFromEnv()
+	if err != nil {
+		return err
+	}
+	orders.SetDefaultSettings(orderSettings)
+
 	payProvider, err := payments.NewProvider(cfg)
 	if err != nil {
 		return err
@@ -102,6 +110,15 @@ func run() error {
 			slog.Info("payments: mock provider active — online_card orders are paid on a local test page", "checkout", cfg.PaymentsBaseURL()+payments.MockCheckoutPath+"{id}")
 		}
 	}
+
+	// Background expiry of abandoned online payments: cancels the order and
+	// returns stock after PAYMENT_PENDING_TTL. Stopped (and waited for)
+	// before the DB pool closes.
+	expiryCtx, stopExpiry := context.WithCancel(context.Background())
+	expiryDone := payments.RunPendingExpiry(expiryCtx,
+		payments.NewService(db, payProvider, orders.NewService(db), cfg.PaymentsBaseURL()),
+		orderSettings.PaymentPendingTTL, payments.DefaultExpiryInterval)
+	defer func() { stopExpiry(); <-expiryDone }()
 
 	mux := http.NewServeMux()
 	health.Register(mux, 2*time.Second,

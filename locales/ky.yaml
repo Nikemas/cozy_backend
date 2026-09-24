@@ -87,6 +87,8 @@ toast.cart_soon: Себет жакында иштейт
 toast.address_saved: Дарек сакталды
 toast.address_deleted: Дарек өчүрүлдү
 toast.coming_soon: Жакында кошобуз
+toast.order_cancelled: Буйрутма жокко чыгарылды
+toast.order_not_cancellable: Бул буйрутманы жокко чыгарууга болбойт — дүкөн менен байланышыңыз
 
 order.status.placed: Тариздалды
 order.status.confirmed: Ырасталды
@@ -95,6 +97,8 @@ order.status.delivered: Жеткирилди
 order.status.cancelled: Жокко чыгарылды
 order.action.track: Байкоо
 order.action.repeat: Кайталоо
+order.action.cancel: Жокко чыгаруу
+order.action.cancel_confirm: Буйрутманы жокко чыгарасызбы?
 order.item.size_prefix: өлчөм
 order.empty.title: Азырынча буйрутма жок
 order.empty.subtitle: Каталогдон биринчи буйрутманы тариздеңиз
@@ -132,6 +136,8 @@ cart.total: Жыйынтык
 cart.checkout: Буйрутма берүү
 cart.increase: Санын көбөйтүү
 cart.decrease: Санын азайтуу
+cart.unavailable: Азыр жок — себеттен алып салыңыз
+cart.has_unavailable: Себетте азыр жок товарлар бар — алар менен буйрутма берилбейт.
 
 checkout.delivery: Жеткирүү
 checkout.pickup: Өзү алып кетүү
@@ -139,6 +145,9 @@ checkout.no_addresses: Дареги азырынча жок — өзү алып 
 checkout.no_points: Жеткиликтүү дүкөндөр жок.
 checkout.unavailable: Алуу ыкмалары убактылуу жеткиликсиз.
 checkout.place_order: Буйрутма берүү
+checkout.comment: Буйрутмага комментарий
+checkout.comment_placeholder: Мисалы, жеткирүүгө ыңгайлуу убакыт
+checkout.pickup_free: Өзү алып кетүү — акысыз
 
 done.total: Жыйынтык
 done.delivery_window: Курьер жеткирүү убактысын тактоо үчүн байланышат

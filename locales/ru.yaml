@@ -87,6 +87,8 @@ toast.cart_soon: Корзина скоро заработает
 toast.address_saved: Адрес сохранён
 toast.address_deleted: Адрес удалён
 toast.coming_soon: Скоро добавим
+toast.order_cancelled: Заказ отменён
+toast.order_not_cancellable: Этот заказ уже нельзя отменить — свяжитесь с магазином
 
 order.status.placed: Оформлен
 order.status.confirmed: Подтверждён
@@ -95,6 +97,8 @@ order.status.delivered: Доставлен
 order.status.cancelled: Отменён
 order.action.track: Отследить
 order.action.repeat: Повторить
+order.action.cancel: Отменить
+order.action.cancel_confirm: Отменить заказ?
 order.item.size_prefix: размер
 order.empty.title: Пока нет заказов
 order.empty.subtitle: Оформите первый заказ в каталоге
@@ -132,6 +136,8 @@ cart.total: Итого
 cart.checkout: Оформить заказ
 cart.increase: Увеличить количество
 cart.decrease: Уменьшить количество
+cart.unavailable: Нет в наличии — уберите из корзины
+cart.has_unavailable: В корзине есть товары, которых нет в наличии — заказ с ними не оформится.
 
 checkout.delivery: Доставка
 checkout.pickup: Самовывоз
@@ -139,6 +145,9 @@ checkout.no_addresses: У вас пока нет сохранённых адре
 checkout.no_points: Нет доступных точек самовывоза.
 checkout.unavailable: Способы получения заказа временно недоступны.
 checkout.place_order: Оформить заказ
+checkout.comment: Комментарий к заказу
+checkout.comment_placeholder: Например, удобное время доставки
+checkout.pickup_free: Самовывоз — бесплатно
 
 done.total: Итого
 done.delivery_window: Курьер свяжется для уточнения времени доставки
