@@ -210,7 +210,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 	httpapi.RegisterPublicPointsRoutes(mux, db)
 	httpapi.RegisterOrderRoutes(mux, db, authSvc, cfg, ordersSvc, paySvc)
 	httpapi.RegisterPaymentRoutes(mux, paySvc, cfg.PaymentsBaseURL())
-	httpapi.RegisterCustomerRoutes(mux, db, authSvc)
+	httpapi.RegisterCustomerRoutes(mux, db, authSvc, cfg)
 	httpapi.RegisterAppConfigRoutes(mux, cfg)
 }
 

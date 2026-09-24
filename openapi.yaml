@@ -283,8 +283,11 @@ paths:
       tags: [Customer]
       summary: List favorited products
       description: |
-        Returns full `Product` objects (not bare IDs) — the mobile favorites
-        screen needs to render cards directly. A product that's since gone
+        Returns full product objects, newest favorite first — each item has
+        exactly the `GET /api/v1/products/{id}` shape (`images`, `variants`
+        with per-point `stock`), so the app renders the list and opens a
+        product without a request per item. Served with a constant number of
+        queries regardless of list length. A product that's since gone
         inactive/deleted is silently skipped rather than failing the request.
       security: [{ customerBearerAuth: [] }]
       responses:
@@ -294,7 +297,7 @@ paths:
             application/json:
               schema:
                 type: object
-                properties: { items: { type: array, items: { $ref: "#/components/schemas/Product" } } }
+                properties: { items: { type: array, items: { $ref: "#/components/schemas/ProductDetailResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/v1/favorites/{productId}:
