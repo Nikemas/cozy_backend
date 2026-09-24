@@ -209,3 +209,18 @@ filter.price: Цена, сом
 filter.price_from: от
 filter.price_to: до
 filter.apply: Применить
+
+# SEO: titles and meta descriptions (internal/web/seo.go).
+seo.page.title: %s | Cozy
+seo.home.title: Cozy — интернет-магазин обуви в Бишкеке
+seo.home.description: Кроссовки, кеды, ботинки и другая обувь в наличии в магазинах Cozy в Бишкеке. Доставка по городу и бесплатный самовывоз.
+seo.category.title: %s — купить в Бишкеке | Cozy
+seo.category.description: %s в интернет-магазине Cozy: цены, размеры и наличие в магазинах Бишкека. Доставка по городу и самовывоз.
+seo.product.title: %s — купить в Бишкеке | Cozy
+seo.product.description: %s за %s. Размеры, цвета и наличие в магазинах Cozy в Бишкеке. Доставка по городу и самовывоз.
+seo.branches.description: Адреса магазинов Cozy в Бишкеке: где посмотреть и примерить обувь, забрать заказ и построить маршрут.
+seo.page_about.description: Cozy — магазин удобной обуви в Бишкеке: наличие в магазинах, доставка, самовывоз, обмен и возврат 14 дней.
+seo.page_contacts.description: Телефон, мессенджеры, e-mail и режим работы магазина обуви Cozy в Бишкеке.
+seo.page_delivery.description: Условия доставки по Бишкеку, бесплатный самовывоз из магазинов Cozy, способы оплаты, обмен и возврат.
+seo.page_privacy.description: Как интернет-магазин Cozy обрабатывает и защищает персональные данные покупателей.
+seo.page_terms.description: Публичная оферта интернет-магазина обуви Cozy: оформление заказа, оплата, доставка, обмен и возврат.

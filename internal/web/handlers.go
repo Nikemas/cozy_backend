@@ -81,9 +81,13 @@ func toastOOB(msg string) string {
 		html.EscapeString(msg) + `</div></div>`
 }
 
-// resolveLang reads the language cookie Foundation's /lang screen writes,
-// falling back to i18n.DefaultLang.
+// resolveLang picks the page language: an explicit ?lang=ru|ky (the
+// hreflang alternates search engines crawl), else the cookie
+// Foundation's /lang screen writes, else i18n.DefaultLang.
 func (h *handlers) resolveLang(r *http.Request) string {
+	if v := r.URL.Query().Get("lang"); v == i18n.LangRU || v == i18n.LangKY {
+		return v
+	}
 	if c, err := r.Cookie(langCookieName); err == nil {
 		if c.Value == i18n.LangRU || c.Value == i18n.LangKY {
 			return c.Value
@@ -103,6 +107,7 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 		Lang:   h.resolveLang(r),
 		Screen: screen,
 	}
+	h.defaultSEO(r, &data, screen)
 
 	customerID := CustomerID(r)
 	if customerID == "" {
@@ -185,6 +190,12 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	if lang != i18n.LangRU && lang != i18n.LangKY {
 		lang = i18n.DefaultLang
 	}
+	setLangCookie(w, lang)
+	http.Redirect(w, r, "/lang", http.StatusSeeOther)
+	return nil
+}
+
+func setLangCookie(w http.ResponseWriter, lang string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     langCookieName,
 		Value:    lang,
@@ -192,8 +203,21 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 		MaxAge:   int((365 * 24 * time.Hour).Seconds()),
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/lang", http.StatusSeeOther)
-	return nil
+}
+
+// langParam persists an explicit ?lang=ru|ky (e.g. a visitor arriving from
+// a search result's Kyrgyz alternate) into the language cookie, so the
+// rest of their visit — links carry no lang parameter — stays in that
+// language.
+func langParam(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := r.URL.Query().Get("lang"); r.Method == http.MethodGet && (v == i18n.LangRU || v == i18n.LangKY) {
+			if c, err := r.Cookie(langCookieName); err != nil || c.Value != v {
+				setLangCookie(w, v)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // renderProfileAuth renders the current login-flow step: just the

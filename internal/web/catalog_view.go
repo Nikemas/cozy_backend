@@ -17,10 +17,12 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
@@ -121,7 +123,32 @@ func (h *handlers) shop(w http.ResponseWriter, r *http.Request) error {
 	}
 	data.Data = shopData
 	data.SearchQuery = shopData.Query
+	h.shopSEO(r, &data, shopData)
 	return h.render.Render(w, "shop", data)
+}
+
+// shopSEO sets the catalog's title/description/canonical. Filtered and
+// sorted views are canonical to the unfiltered category (page kept);
+// search results aren't indexed at all.
+func (h *handlers) shopSEO(r *http.Request, data *PageData, sd *ShopData) {
+	lang := data.Lang
+	switch {
+	case sd.CategoryName != "":
+		data.SEO.Title = fmt.Sprintf(h.t(lang, "seo.category.title"), sd.CategoryName)
+		data.SEO.Description = fmt.Sprintf(h.t(lang, "seo.category.description"), sd.CategoryName)
+	default:
+		data.SEO.Title = h.t(lang, "seo.home.title")
+		data.SEO.Description = h.t(lang, "seo.home.description")
+		data.SEO.JSONLD = websiteJSONLD(h.siteURL(r))
+	}
+	canonical := sd.BasePath
+	if sd.Page > 1 {
+		canonical += "?page=" + strconv.Itoa(sd.Page)
+	}
+	h.setCanonical(r, data, canonical)
+	if sd.Query != "" {
+		data.NoIndex = true
+	}
 }
 
 func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error) {
@@ -270,6 +297,7 @@ func filterOptions(values []string, selected string) []FilterOption {
 type ProductData struct {
 	Name        string
 	Brand       string
+	Price       float64 // selected variant's price (JSON-LD)
 	PriceText   string
 	Description string // in the visitor's language; "" if none
 
@@ -377,8 +405,52 @@ func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	// One URL per product: an outdated/mistyped slug suffix (e.g. after a
+	// rename) or an upper-case id 301s to the canonical path, query kept.
+	if target, ok := canonicalRedirect(r, pd.ProductPath); ok {
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return nil
+	}
+
 	data.Data = pd
+	h.productSEO(r, &data, pd)
 	return h.render.Render(w, "product", data)
+}
+
+// canonicalRedirect reports where to 301 a request whose path isn't
+// canonicalPath (query preserved). HTMX partial requests are never
+// redirected — they always use the canonical path already.
+func canonicalRedirect(r *http.Request, canonicalPath string) (string, bool) {
+	if r.URL.Path == canonicalPath || isHX(r) {
+		return "", false
+	}
+	if r.URL.RawQuery != "" {
+		return canonicalPath + "?" + r.URL.RawQuery, true
+	}
+	return canonicalPath, true
+}
+
+// productSEO sets the product page's title/description, canonical
+// (without the size/color query), OpenGraph image and JSON-LD Product.
+func (h *handlers) productSEO(r *http.Request, data *PageData, pd *ProductData) {
+	lang := data.Lang
+	name := pd.Name
+	if pd.Brand != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(pd.Brand)) {
+		name = pd.Brand + " " + name
+	}
+	data.SEO.Title = fmt.Sprintf(h.t(lang, "seo.product.title"), name)
+	if pd.Description != "" {
+		data.SEO.Description = truncateText(pd.Description, 160)
+	} else {
+		data.SEO.Description = fmt.Sprintf(h.t(lang, "seo.product.description"), name, pd.PriceText)
+	}
+	h.setCanonical(r, data, pd.ProductPath)
+	data.SEO.OGType = "product"
+	if pd.PhotoURL != "" {
+		data.SEO.OGImage = pd.PhotoURL
+	}
+	data.SEO.JSONLD = productJSONLD(pd, data.SEO.Canonical, pd.Price)
 }
 
 func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, productID string) (*ProductData, error) {
@@ -475,6 +547,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 	return &ProductData{
 		Name:              name,
 		Brand:             stringOr(product.Brand, ""),
+		Price:             price,
 		PriceText:         formatMoney(price),
 		Description:       pickName(stringOr(product.DescriptionRu, ""), stringOr(product.DescriptionKy, ""), lang),
 		HasPhoto:          len(photos) > 0,

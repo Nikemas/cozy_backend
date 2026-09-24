@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -66,6 +67,8 @@ func (h *handlers) renderHTMLError(w http.ResponseWriter, r *http.Request, appEr
 		pd.TitleKey = "error.internal.title"
 	}
 	data.Data = pd
+	data.SEO.Title = fmt.Sprintf(h.t(lang, "seo.page.title"), h.t(lang, pd.TitleKey))
+	data.SEO.Canonical, data.SEO.AltRU, data.SEO.AltKY = "", "", ""
 	if err := h.render.RenderStatus(w, appErr.Status, "error", data); err != nil {
 		slog.ErrorContext(r.Context(), "web: rendering error page failed", "err", err)
 		return false

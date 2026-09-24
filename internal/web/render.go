@@ -90,6 +90,9 @@ type PageData struct {
 	// NoIndex marks pages search engines must not index (errors, private
 	// account screens) — layout.gohtml emits <meta name="robots">.
 	NoIndex bool
+	// SEO backs <title>, meta description, canonical/hreflang, OpenGraph
+	// and JSON-LD (see seo.go).
+	SEO SEOMeta
 }
 
 // Renderer holds one parsed template set per (language, screen) pair,

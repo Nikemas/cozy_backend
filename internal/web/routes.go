@@ -63,7 +63,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		ordersSvc: orders.NewService(db),
 	}
 
-	withSession := WithSession([]byte(cfg.JWTSecret))
+	session := WithSession([]byte(cfg.JWTSecret))
+	withSession := func(next http.Handler) http.Handler { return session(langParam(next)) }
 
 	// The 9 screens (COZY_WEB_DESIGN.md §3).
 	mux.Handle("GET /{$}", withSession(apperr.Wrap(h.shop)))
@@ -121,9 +122,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 
 	// SEO + static assets.
 	mux.Handle("GET /sitemap.xml", apperr.Wrap(h.sitemap))
-	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/static/robots.txt")
-	})
+	mux.HandleFunc("GET /robots.txt", h.robots)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", httpmw.Static("web/static", staticMaxAge)))
 
 	// Catch-all: every URL nothing else matched gets the branded HTML 404
