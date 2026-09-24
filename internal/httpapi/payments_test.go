@@ -234,7 +234,7 @@ func TestMockCheckoutPageRendersPendingButtons(t *testing.T) {
 }
 
 func TestRegisterPaymentRoutesMockPageOnlyForMock(t *testing.T) {
-	for _, p := range []payments.Provider{payments.NewMockProvider("", "tok"), payments.NewBakaiProvider("tok")} {
+	for _, p := range []payments.Provider{payments.NewMockProvider("", "tok"), payments.NewBakaiProvider("", "", "", "", 0, "tok")} {
 		mux := http.NewServeMux()
 		RegisterPaymentRoutes(mux, payments.NewService(nil, p, nil, ""), "")
 		_, pattern := mux.Handler(httptest.NewRequest(http.MethodGet, "/api/v1/payments/mock/checkout/x", nil))

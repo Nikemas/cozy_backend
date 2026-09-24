@@ -105,19 +105,22 @@ func TestMockProviderEmptyTokenIsRandomNotEmpty(t *testing.T) {
 	}
 }
 
-func TestBakaiStubNotConfigured(t *testing.T) {
-	b := NewBakaiProvider("tok")
+func TestBakaiNotConfiguredWithoutAPIToken(t *testing.T) {
+	// BAKAI_API_TOKEN unset (e.g. before the bank has provisioned one):
+	// Ready/CreatePayment report ErrNotConfigured, same as before Bakai's
+	// real client existed, so PlaceOnlineOrder still refuses cleanly
+	// instead of reserving stock behind a payment that can't open.
+	b := NewBakaiProvider("", "", "", "", 0, "tok")
 	if !errors.Is(b.Ready(), ErrNotConfigured) {
-		t.Error("Ready should be ErrNotConfigured")
+		t.Error("Ready should be ErrNotConfigured without an API token")
 	}
 	if _, err := b.CreatePayment(context.Background(), CreateRequest{}); !errors.Is(err, ErrNotConfigured) {
-		t.Error("CreatePayment should be ErrNotConfigured")
+		t.Error("CreatePayment should be ErrNotConfigured without an API token")
 	}
+	// The webhook secret check still runs even though CreatePayLink is
+	// unconfigured — an attacker learns nothing extra from an unauthed callback.
 	if _, err := b.ParseCallback(http.Header{}, nil); appCode(err) != "invalid_webhook_token" {
 		t.Errorf("unauthenticated callback err = %v", err)
-	}
-	if _, err := b.ParseCallback(http.Header{WebhookTokenHeader: []string{"tok"}}, nil); !errors.Is(err, ErrNotConfigured) {
-		t.Errorf("authenticated callback err = %v", err)
 	}
 }
 
@@ -519,7 +522,7 @@ func TestPlaceOnlineOrderHappyPath(t *testing.T) {
 
 func TestPlaceOnlineOrderNotReadyDoesNotCreateOrder(t *testing.T) {
 	creator := &fakeCreator{}
-	svc, _ := newMockService(t, NewBakaiProvider("tok"), creator)
+	svc, _ := newMockService(t, NewBakaiProvider("", "", "", "", 0, "tok"), creator)
 
 	_, _, _, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1"})
 	if !errors.Is(err, ErrNotConfigured) {
@@ -621,7 +624,7 @@ func TestRetryPaymentNotRetryablePassesThrough(t *testing.T) {
 
 func TestRetryPaymentNotReadyTouchesNothing(t *testing.T) {
 	creator := &fakeCreator{}
-	svc, _ := newMockService(t, NewBakaiProvider("tok"), creator)
+	svc, _ := newMockService(t, NewBakaiProvider("", "", "", "", 0, "tok"), creator)
 	if _, err := svc.RetryPayment(context.Background(), "cust-1", "order-1"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("err = %v, want ErrNotConfigured", err)
 	}

@@ -42,6 +42,21 @@ type Config struct {
 
 	BakaiWebhookToken string
 
+	// Outbound Bakai OpenBanking API (only used when PaymentsProvider ==
+	// PaymentsProviderBakai; ported from the Dordoi ERP integration, which
+	// verified the same endpoints against a real payment 2026-06-25).
+	// BakaiAPIToken is the CreatePayLink bearer (single-use merchant creds
+	// exchanged once via POST /Auth/Login — it's an opaque JWE with no
+	// readable expiry and no refresh; re-provision it out of band on 401).
+	BakaiAPIToken string
+	// BakaiQRToken/BakaiAccountNo/BakaiCurrencyID are only needed for the
+	// optional GenerateQR call (a scannable EMVCo QR as an alternative to
+	// the redirect link); leave BakaiQRToken empty to skip it entirely.
+	BakaiQRToken    string
+	BakaiAccountNo  string
+	BakaiCurrencyID int
+	BakaiBaseURL    string
+
 	// PaymentsProvider selects the online-payment gateway: "mock" (local
 	// checkout page that simulates the bank, default outside prod) or
 	// "bakai" (default when APP_ENV=prod; a stub until the bank grants API
@@ -139,6 +154,10 @@ func Load() (*Config, error) {
 		MinIOPublicUseSSL:   getEnv("MINIO_PUBLIC_USE_SSL", getEnv("MINIO_USE_SSL", "false")) == "true",
 
 		BakaiWebhookToken: os.Getenv("BAKAI_WEBHOOK_TOKEN"),
+		BakaiAPIToken:     os.Getenv("BAKAI_API_TOKEN"),
+		BakaiQRToken:      os.Getenv("BAKAI_QR_TOKEN"),
+		BakaiAccountNo:    os.Getenv("BAKAI_ACCOUNT_NO"),
+		BakaiBaseURL:      getEnv("BAKAI_BASE_URL", "https://openbanking-api.bakai.kg"),
 
 		NikitaAPIKey: os.Getenv("NIKITA_API_KEY"),
 		SMSMockOTP:   getEnv("SMS_MOCK_OTP", "false") == "true",
@@ -161,6 +180,9 @@ func Load() (*Config, error) {
 	}
 
 	var err error
+	if cfg.BakaiCurrencyID, err = getEnvInt("BAKAI_CURRENCY_ID", 417); err != nil { // 417 = KGS
+		return nil, err
+	}
 	if cfg.Security, err = loadSecurity(cfg.Env); err != nil {
 		return nil, err
 	}

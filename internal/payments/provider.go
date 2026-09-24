@@ -4,8 +4,8 @@
 // with MockProvider (PAYMENTS_PROVIDER=mock), which issues a local checkout
 // page that can simulate success/failure, so the whole flow — order with
 // payment_method=online_card → payment_url → callback → order paid — is
-// exercisable end to end. BakaiProvider is a stub that reports "not
-// configured" everywhere until the bank's API contract is known.
+// exercisable end to end. BakaiProvider talks to the real bank API once
+// PAYMENTS_PROVIDER=bakai and BAKAI_API_TOKEN/BAKAI_WEBHOOK_TOKEN are set.
 package payments
 
 import (
@@ -95,7 +95,7 @@ func NewProvider(cfg *config.Config) (Provider, error) {
 	case config.PaymentsProviderMock:
 		return NewMockProvider(cfg.PaymentsBaseURL(), cfg.BakaiWebhookToken), nil
 	case config.PaymentsProviderBakai:
-		return NewBakaiProvider(cfg.BakaiWebhookToken), nil
+		return NewBakaiProvider(cfg.BakaiBaseURL, cfg.BakaiAPIToken, cfg.BakaiQRToken, cfg.BakaiAccountNo, cfg.BakaiCurrencyID, cfg.BakaiWebhookToken), nil
 	default:
 		return nil, fmt.Errorf("payments: unknown provider %q", cfg.PaymentsProvider)
 	}

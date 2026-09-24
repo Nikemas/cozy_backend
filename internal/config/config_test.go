@@ -141,6 +141,7 @@ func setProdEnv(t *testing.T) {
 	t.Setenv("MINIO_SECRET_KEY", "sk")
 	t.Setenv("NIKITA_API_KEY", "nikita-key")
 	t.Setenv("BAKAI_WEBHOOK_TOKEN", "a-real-webhook-token")
+	t.Setenv("BAKAI_API_TOKEN", "a-real-paylink-token")
 	t.Setenv("SMS_MOCK_OTP", "")
 	t.Setenv("PAYMENTS_PROVIDER", "")
 }
@@ -172,6 +173,7 @@ func setProdEnvKeepAppEnv(t *testing.T) {
 	t.Setenv("MINIO_SECRET_KEY", "sk")
 	t.Setenv("NIKITA_API_KEY", "nikita-key")
 	t.Setenv("BAKAI_WEBHOOK_TOKEN", "a-real-webhook-token")
+	t.Setenv("BAKAI_API_TOKEN", "a-real-paylink-token")
 }
 
 func TestLoad_JWTSecretRules(t *testing.T) {
@@ -188,7 +190,7 @@ func TestLoad_JWTSecretRules(t *testing.T) {
 }
 
 func TestLoad_ProdRequiresRealSettings(t *testing.T) {
-	for _, key := range []string{"PUBLIC_BASE_URL", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "NIKITA_API_KEY", "BAKAI_WEBHOOK_TOKEN"} {
+	for _, key := range []string{"PUBLIC_BASE_URL", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "NIKITA_API_KEY", "BAKAI_WEBHOOK_TOKEN", "BAKAI_API_TOKEN"} {
 		for _, env := range []string{"staging", "prod"} {
 			setProdEnv(t)
 			t.Setenv("APP_ENV", env)

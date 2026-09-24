@@ -80,8 +80,13 @@ func (c *Config) validate() error {
 	if !c.SMSMockOTP && isPlaceholder(c.NikitaAPIKey) {
 		missing = append(missing, "NIKITA_API_KEY")
 	}
-	if c.PaymentsProvider == PaymentsProviderBakai && isPlaceholder(c.BakaiWebhookToken) {
-		missing = append(missing, "BAKAI_WEBHOOK_TOKEN")
+	if c.PaymentsProvider == PaymentsProviderBakai {
+		if isPlaceholder(c.BakaiWebhookToken) {
+			missing = append(missing, "BAKAI_WEBHOOK_TOKEN")
+		}
+		if isPlaceholder(c.BakaiAPIToken) {
+			missing = append(missing, "BAKAI_API_TOKEN")
+		}
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("APP_ENV=%s requires real values for: %s", c.Env, strings.Join(missing, ", "))
