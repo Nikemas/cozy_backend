@@ -54,7 +54,7 @@ func TestAuditRowVM(t *testing.T) {
 	if vm.EntityURL != "/admin/products/p1" || vm.Staff != "—" || vm.ActionLabel != "Изменение остатка" {
 		t.Errorf("stock vm = %+v", vm)
 	}
-	if vm.DetailsText != "point: Дордой; quantity: 3 → 2" {
+	if vm.DetailsText != "точка: Дордой; количество: 3 → 2" {
 		t.Errorf("details = %q", vm.DetailsText)
 	}
 }

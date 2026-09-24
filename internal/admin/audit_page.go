@@ -302,14 +302,22 @@ func auditRowVM(row audit.Row) AuditRowVM {
 	return vm
 }
 
+// auditDetailLabels names the non-product detail keys.
+var auditDetailLabels = map[string]string{
+	"quantity": "количество", "point": "точка", "is_active": "активен", "name": "название",
+	"address": "адрес", "phone": "телефон", "role": "роль", "size": "размер", "color": "цвет",
+	"sku": "артикул", "price_override": "цена вариации", "count": "количество", "slug": "slug",
+	"sort_order": "порядок", "parent_id": "родитель",
+}
+
 // auditDetailsText renders Details as "field: from → to; field: value",
 // skipping ids already shown elsewhere on the row.
 func auditDetailsText(details map[string]any) string {
 	keys := make([]string, 0, len(details))
 	for k := range details {
 		switch k {
-		case "product_id", "point_id", "bulk":
-			continue
+		case "product_id", "point_id", "bulk", "category_id":
+			continue // ids: already in the summary / entity link
 		}
 		keys = append(keys, k)
 	}
@@ -318,6 +326,8 @@ func auditDetailsText(details map[string]any) string {
 	for _, k := range keys {
 		label := k
 		if l, ok := productFieldLabels[k]; ok {
+			label = l
+		} else if l, ok := auditDetailLabels[k]; ok {
 			label = l
 		}
 		v := details[k]

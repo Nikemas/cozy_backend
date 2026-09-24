@@ -14,7 +14,9 @@
 //     (form[data-confirm], layout.gohtml).
 (function () {
   function init(form) {
-    var id = form.id;
+    // getAttribute, not form.id: the row checkboxes are named "id" and
+    // belong to this form, so form.id resolves to them, not the form's id.
+    var id = form.getAttribute('id');
     var itemSel = 'input.js-bulk-item[form="' + id + '"]';
     var all = document.querySelector('input.js-bulk-all[data-bulk-for="' + id + '"]');
 

@@ -90,9 +90,11 @@ type Log struct {
 // New returns a journal backed by db.
 func New(db *sql.DB) *Log { return &Log{db: db} }
 
+// insertSQL stamps clock_timestamp(), not now(): several entries written
+// in one transaction keep their real order in the journal.
 const insertSQL = `
-	INSERT INTO audit_log (staff_id, action, entity_type, entity_id, summary, details, ip)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	INSERT INTO audit_log (at, staff_id, action, entity_type, entity_id, summary, details, ip)
+	VALUES (clock_timestamp(), $1, $2, $3, $4, $5, $6, $7)`
 
 // insertArgs resolves the acting staff member (staff.FromContext, set by
 // the admin auth gates) and client IP (httpmw.ClientIP) from ctx.
