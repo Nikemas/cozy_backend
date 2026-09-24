@@ -142,3 +142,39 @@ checkout.place_order: Оформить заказ
 
 done.total: Итого
 done.delivery_window: Курьер свяжется для уточнения времени доставки
+
+# Error pages / messages (internal/web/errors.go).
+error.not_found.title: Страница не найдена
+error.not_found.text: Такой страницы нет. Возможно, товар сняли с продажи или ссылка устарела.
+error.unauthorized.title: Нужно войти
+error.unauthorized.text: Войдите в аккаунт, чтобы продолжить.
+error.internal.title: Что-то пошло не так
+error.internal.text: Не удалось выполнить действие. Попробуйте ещё раз чуть позже.
+error.generic.title: Не получилось
+error.generic.text: Проверьте данные и попробуйте ещё раз.
+error.code.rate_limited: Слишком много попыток. Подождите немного и попробуйте снова.
+error.code.bad_request: Некорректный запрос. Обновите страницу и попробуйте снова.
+error.code.unauthorized: Войдите в аккаунт, чтобы продолжить.
+error.code.unauthenticated: Войдите в аккаунт, чтобы продолжить.
+error.code.invalid_phone: Укажите номер в формате +996XXXXXXXXX
+error.code.otp_cooldown: Код уже отправлен. Запросить новый можно чуть позже.
+error.code.otp_rate_limited: Слишком много запросов кода. Попробуйте позже.
+error.code.otp_expired: Код неверный или устарел. Запросите новый.
+error.code.invalid_name: Укажите имя
+error.code.product_not_found: Товар не найден или снят с продажи.
+error.code.variant_required: Выберите размер и цвет
+error.code.variant_not_found: Такого размера или цвета нет в наличии
+error.code.insufficient_stock: Недостаточно товара в наличии
+error.code.invalid_qty: Некорректное количество
+error.code.empty_cart: Корзина пуста
+error.code.empty_order: Нет товаров для заказа
+error.code.address_required: Выберите адрес доставки
+error.code.point_required: Выберите точку самовывоза
+error.code.fulfillment_required: Выберите способ получения
+error.code.invalid_fulfillment: Выберите способ получения: доставка или самовывоз
+error.code.invalid_address: Укажите адрес доставки
+error.code.address_not_found: Адрес не найден
+error.code.address_in_use: Этот адрес использован в заказе, его нельзя удалить
+error.code.pickup_point_not_found: Точка самовывоза не найдена
+error.code.order_not_found: Заказ не найден
+error.code.order_not_cancellable: Этот заказ уже нельзя отменить

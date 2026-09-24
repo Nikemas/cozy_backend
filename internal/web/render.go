@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -28,6 +29,8 @@ var screenPages = map[string]string{
 	// a new screen Task 3 adds per web-plan Task 3 (delivery-address-or-
 	// pickup-point selection, not covered 1:1 by the design canvas).
 	"checkout": "checkout.gohtml",
+	// "error" is the branded 404/500 page (errors.go's renderHTMLError).
+	"error": "error.gohtml",
 }
 
 // layoutPartials are parsed alongside every page: the shared chrome from
@@ -76,6 +79,10 @@ type PageData struct {
 
 	Toast string
 	Data  any
+
+	// NoIndex marks pages search engines must not index (errors, private
+	// account screens) — layout.gohtml emits <meta name="robots">.
+	NoIndex bool
 }
 
 // Renderer holds one parsed template set per (language, screen) pair,
@@ -115,6 +122,14 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 // Render executes the "layout" template for screen using data.Lang,
 // falling back to i18n.DefaultLang if data.Lang isn't recognized.
 func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) error {
+	return rr.RenderStatus(w, http.StatusOK, screen, data)
+}
+
+// RenderStatus is Render with an explicit status code (the error page
+// renders with 404/500). The page is executed into a buffer first, so a
+// template failure mid-page surfaces as an error (and the error page)
+// instead of a half-written 200 response.
+func (rr *Renderer) RenderStatus(w http.ResponseWriter, status int, screen string, data PageData) error {
 	byScreen, ok := rr.tmpl[data.Lang]
 	if !ok {
 		byScreen = rr.tmpl[i18n.DefaultLang]
@@ -124,8 +139,14 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 		return fmt.Errorf("web: no template registered for screen %q", screen)
 	}
 
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, "layout", data); err != nil {
+		return err
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return t.ExecuteTemplate(w, "layout", data)
+	w.WriteHeader(status)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 // T translates key into lang outside of template execution — for handlers

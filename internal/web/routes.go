@@ -121,5 +121,11 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	})
 	mux.Handle("GET /static/", http.StripPrefix("/static/", httpmw.Static("web/static", staticMaxAge)))
 
+	// Catch-all: every URL nothing else matched gets the branded HTML 404
+	// (or the JSON error body under /api/ — apperr.WriteError decides by
+	// path). apperr renders every site-page error through renderHTMLError.
+	mux.Handle("/", withSession(apperr.Wrap(h.notFound)))
+	apperr.SetHTMLRenderer(h.renderHTMLError)
+
 	return nil
 }

@@ -157,7 +157,7 @@ func (h *handlers) favAddToCart(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if err := h.cartRepo.Add(r.Context(), customerID, variants[0].ID, 1); err != nil {
-		msg := errMessage(err)
+		msg := h.errText(lang, err)
 		var appErr *apperr.AppError
 		if errors.As(err, &appErr) && appErr.Status == http.StatusNotImplemented {
 			msg = h.t(lang, "toast.cart_soon")

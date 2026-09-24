@@ -1,0 +1,14 @@
+{{/* Branded error page (404/401/500/...) — rendered by
+     internal/web/errors.go's renderHTMLError for every site-page error,
+     including URLs no route matched. */}}
+{{define "content"}}
+<div class="error-screen">
+  <div class="error-screen__code" aria-hidden="true">{{.Data.Status}}</div>
+  <h1 class="error-screen__title">{{t .Data.TitleKey}}</h1>
+  <p class="error-screen__text">{{.Data.Message}}</p>
+  <div class="error-screen__actions">
+    {{if .Data.ShowLogin}}<a class="btn btn--primary" href="/profile">{{t "sidebar.login"}}</a>{{end}}
+    <a class="btn {{if .Data.ShowLogin}}btn--ghost{{else}}btn--primary{{end}}" href="/">{{t "common.back_home"}}</a>
+  </div>
+</div>
+{{end}}

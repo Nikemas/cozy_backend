@@ -2,7 +2,6 @@ package web
 
 import (
 	"database/sql"
-	"errors"
 	"html"
 	"log/slog"
 	"net/http"
@@ -71,18 +70,6 @@ type ProfileData struct {
 // render a single fragment or the whole layout.
 func isHX(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
-}
-
-// errMessage extracts a human-readable message from err — an
-// *apperr.AppError's Message if there is one, otherwise a generic
-// fallback that never leaks internal error text to a customer-facing
-// page.
-func errMessage(err error) string {
-	var appErr *apperr.AppError
-	if errors.As(err, &appErr) {
-		return appErr.Message
-	}
-	return "Что-то пошло не так, попробуйте ещё раз"
 }
 
 // toastOOB renders msg as an out-of-band HTMX swap targeting
@@ -234,7 +221,7 @@ func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error
 	phone := r.FormValue("phone")
 
 	if err := h.auth.RequestOTP(r.Context(), phone); err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "", Phone: phone, Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "", Phone: phone, Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone})
@@ -256,7 +243,7 @@ func (h *handlers) loginVerifyOTP(w http.ResponseWriter, r *http.Request) error 
 
 	access, _, _, err := h.auth.VerifyOTP(r.Context(), phone, code)
 	if err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	setSessionCookie(w, access, sessionCookieTTL)
@@ -297,7 +284,7 @@ func (h *handlers) loginSetName(w http.ResponseWriter, r *http.Request) error {
 
 	name := r.FormValue("name")
 	if err := h.customers.SetName(r.Context(), customerID, name); err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "name", Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "name", Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	return h.redirectOrHXRedirect(w, r, "/profile")

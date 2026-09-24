@@ -8,7 +8,20 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/css/site.css">
+  {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script>
+    // Let htmx swap 4xx/5xx responses that the server explicitly
+    // retargeted (internal/web/errors.go sends HX-Retarget: #toast-slot
+    // with an error toast), so failed hx-post actions show a message
+    // instead of failing silently.
+    document.addEventListener("htmx:beforeSwap", function (e) {
+      if (e.detail.isError && e.detail.xhr.getResponseHeader("HX-Retarget")) {
+        e.detail.shouldSwap = true;
+        e.detail.isError = false;
+      }
+    });
+  </script>
 </head>
 <body>
 {{template "_header" .}}
@@ -19,13 +32,9 @@
   </main>
 </div>
 {{template "_footer" .}}
+{{/* _toast renders the single #toast-slot mount point: HTMX responses
+     swap one-off toasts into it (hx-target / OOB / HX-Retarget). */}}
 {{template "_toast" .}}
-<!-- Mount point for HTMX POST responses that render a one-off toast
-     fragment (see internal/web/product_actions.go renderToastFragment) —
-     hx-post targets swap their result in here, independent of the
-     server-rendered .Toast above. Task 2's reference pattern; later
-     tasks' hx-post buttons (cart stepper etc.) can reuse the same id. -->
-<div id="toast-slot"></div>
 </body>
 </html>
 {{end}}

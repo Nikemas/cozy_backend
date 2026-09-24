@@ -864,3 +864,11 @@ button, input { font-family: inherit; }
   .branches-map { width: 100%; height: 320px; }
   .order-card__footer { flex-wrap: wrap; }
 }
+
+/* ---- Error page (404/500, internal/web/errors.go) ---- */
+.error-screen { text-align: center; padding: 60px 20px; max-width: 520px; margin: 0 auto; }
+.error-screen__code { font-size: 72px; font-weight: 800; color: var(--cozy-accent-border); line-height: 1; letter-spacing: var(--cozy-tracking-tight); }
+.error-screen__title { font-size: var(--cozy-fs-22); font-weight: 700; margin: 16px 0 8px; }
+.error-screen__text { font-size: var(--cozy-fs-15); color: var(--cozy-ink-2); margin: 0 0 24px; }
+.error-screen__actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.toast--error i { color: var(--cozy-danger); }
