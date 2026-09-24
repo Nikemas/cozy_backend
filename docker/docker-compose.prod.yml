@@ -6,12 +6,37 @@
 # This is distinct from docker/docker-compose.yml (local-dev-only:
 # postgres+minio, no backend/caddy). Secrets live in a server-side .env,
 # never committed — see .env.example for the full variable list.
+#
+# Normally driven by scripts/deploy.sh, which builds the backend image
+# tagged with the git SHA (BACKEND_TAG) and can roll back to the previous
+# tag. Third-party images are pinned to exact versions: bump them
+# deliberately (read the release notes, then change the tag here), never
+# via a surprise `latest` pull on a restart.
+
+# Rotate container logs (json-file driver): without a limit a chatty
+# container fills the VPS disk. 5 x 10 MB per container.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   backend:
+    # Built on the VPS (no registry). deploy.sh sets BACKEND_TAG to the
+    # commit SHA; a plain `docker compose up -d --build` by hand gets
+    # :latest.
+    image: cozy-backend:${BACKEND_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    # Covers HTTP_SHUTDOWN_TIMEOUT (10s default) with margin, so in-flight
+    # requests finish before Docker sends SIGKILL.
+    stop_grace_period: 30s
+    # No healthcheck: the distroless image has no shell/curl to run one.
+    # deploy.sh checks /readyz through Caddy instead.
     env_file: ../.env
     environment:
       DATABASE_URL: postgres://cozy:${POSTGRES_PASSWORD}@postgres:5432/cozy?sslmode=disable
@@ -31,14 +56,26 @@ services:
     volumes:
       - ../secrets:/secrets:ro
     depends_on:
-      - postgres
-      - minio
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
     expose:
       - "8080"
 
   postgres:
+    # Major version pinned; minor updates of 16.x are drop-in. A major
+    # upgrade needs pg_dump/restore (or pg_upgrade), never just a tag bump.
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cozy -d cozy"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     environment:
       POSTGRES_USER: cozy
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -48,9 +85,22 @@ services:
 
   minio:
     # Docker Hub's minio/minio now requires an authenticated pull —
-    # quay.io is MinIO's own public mirror, no login needed.
-    image: quay.io/minio/minio:latest
+    # quay.io is MinIO's own public mirror, no login needed. Pinned to the
+    # release `latest` pointed at in 2026-09 (MinIO has stopped publishing
+    # community images since, so `latest` will not move anyway).
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
+    logging: *default-logging
+    stop_grace_period: 30s
+    # `mc` ships inside the minio image; `mc ready local` is MinIO's own
+    # compose example healthcheck. Informational only (nothing waits on
+    # service_healthy for minio), so a false negative can't block a deploy.
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
@@ -65,8 +115,10 @@ services:
       - "9000"
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
+    logging: *default-logging
+    stop_grace_period: 30s
     ports:
       - "80:80"
       - "443:443"
