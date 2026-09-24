@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -60,5 +61,19 @@ func TestRefreshInvalidIs401WithCode(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"refresh_invalid"`) {
 		t.Errorf("body = %s", rec.Body.String())
+	}
+}
+
+func TestDecodeJSONMapsBodyLimitTo413(t *testing.T) {
+	h := httpmw.LimitBody(16, 16)(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		var v map[string]any
+		return decodeJSON(r, &v)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"phone":"`+strings.Repeat("9", 64)+`"}`))
+	req.ContentLength = -1 // chunked: only the reader can enforce the limit
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413", rec.Code)
 	}
 }

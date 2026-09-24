@@ -5,10 +5,12 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -125,6 +127,10 @@ func verifyOTPResponse(access, refresh string, customer *storefront.Customer) ve
 
 func decodeJSON(r *http.Request, dst any) error {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return httpmw.ErrBodyTooLarge()
+		}
 		return apperr.BadRequest("bad_request", "некорректное тело запроса")
 	}
 	return nil

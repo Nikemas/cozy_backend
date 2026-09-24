@@ -119,12 +119,14 @@ func run() error {
 	// Outermost first: every request gets an ID and its real client IP
 	// (trusted-proxy aware — rate limits and the access log use it), then
 	// is access-logged (after Recover has turned any panic into a 500 it
-	// can log), then hits the CSRF guard and the router.
+	// can log), gets its body size capped, then hits the CSRF guard and
+	// the router.
 	handler := httpmw.Chain(csrf.Protect(mux),
 		httpmw.RequestID,
 		httpmw.ClientIP(cfg.Security.TrustedProxies),
 		httpmw.AccessLog,
 		httpmw.Recover,
+		httpmw.LimitBody(cfg.Security.MaxBodyBytes, cfg.Security.MaxUploadBytes),
 	)
 
 	srv := &http.Server{
