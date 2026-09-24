@@ -20,6 +20,9 @@ type OnlineOrderCreator interface {
 	// NotifyOrderPaid sends staff the "new order" message for a paid
 	// online order (held back at creation until the money is in).
 	NotifyOrderPaid(ctx context.Context, orderID string) error
+	// PrepareRetryPayment opens a new pending payment attempt on the
+	// customer's own order (see orders.Service.PrepareRetryPayment).
+	PrepareRetryPayment(ctx context.Context, customerID, idOrNumber, provider string) (*orders.Order, string, error)
 }
 
 // Service ties orders to the active Provider: it opens a payment for a new
@@ -31,18 +34,28 @@ type OnlineOrderCreator interface {
 //     (orders.CreateOnlineOrder), not when the payment succeeds. Otherwise
 //     two customers could both pay for the last pair.
 //   - paid: nothing happens to stock; the reservation simply stands.
-//   - failed / cancelled (or the provider couldn't even open a session):
-//     the order is cancelled and its stock returned, once, in the same
-//     transaction as the payment update (orders.CancelUnpaidOrderTx) —
-//     only if the order is still 'placed'. The customer places a new order
-//     to retry; there is no "retry payment on the same order" yet.
+//   - failed (declined): the order stays 'placed' with payment_status
+//     failed and its stock reserved, so the customer can pay again on the
+//     same order (RetryPayment, POST /api/v1/orders/{id}/pay).
+//   - cancelled (customer cancelled on the bank page), or the provider
+//     couldn't even open the first session: the order is cancelled and its
+//     stock returned, once, in the same transaction as the payment update
+//     (orders.CancelUnpaidOrderTx) — only if the order is still 'placed'.
+//   - Every retry is a new payments row; the previous pending one is
+//     closed ('cancelled'). A late "paid" for such an earlier attempt is
+//     still accepted while the order is open and unpaid.
 //   - Duplicate callbacks are no-ops (payment row locked FOR UPDATE, same
 //     status ⇒ nothing applied), so stock is never returned twice.
-//   - Abandoned payments (no callback ever) are cancelled by the expiry
-//     job (ExpirePending / RunPendingExpiry) after PAYMENT_PENDING_TTL,
+//   - Abandoned orders (latest attempt still pending, or failed and never
+//     retried) are cancelled by the expiry job (ExpirePending /
+//     RunPendingExpiry) PAYMENT_PENDING_TTL after that latest attempt,
 //     which returns the stock the same way.
-//   - "paid" arriving for a payment we already failed/cancelled/expired,
-//     or for an order staff cancelled, sets orders.refund_required.
+//   - "paid" arriving for an order that is already cancelled or already
+//     paid by another attempt sets orders.refund_required.
+//
+// Lock order: the order row first, then its payments rows — callbacks,
+// retries, the expiry job and cancellations all follow it, so they
+// serialize on the order instead of deadlocking.
 type Service struct {
 	db            *sql.DB
 	provider      Provider
@@ -83,18 +96,7 @@ func (s *Service) PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInpu
 		return order, url, false, nil
 	}
 
-	sess, err := s.provider.CreatePayment(ctx, CreateRequest{
-		PaymentID:   paymentID,
-		OrderID:     order.ID,
-		OrderNumber: order.OrderNumber,
-		Amount:      order.TotalAmount,
-		Currency:    Currency,
-		ReturnURL:   s.publicBaseURL + "/order/" + order.OrderNumber + "/done",
-	})
-	if err == nil {
-		const q = `UPDATE payments SET provider_tx_id = $1, redirect_url = $2, updated_at = now() WHERE id = $3`
-		_, err = s.db.ExecContext(ctx, q, sess.ExternalID, sess.RedirectURL, paymentID)
-	}
+	url, err := s.openSession(ctx, order, paymentID)
 	if err != nil {
 		slog.Error("payments: opening checkout session failed, cancelling order",
 			"provider", s.provider.Name(), "order", order.OrderNumber, "err", err)
@@ -104,13 +106,97 @@ func (s *Service) PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInpu
 			slog.Error("payments: compensating order cancel failed — stock stays reserved",
 				"order", order.OrderNumber, "err", abortErr)
 		}
-		var appErr *apperr.AppError
-		if errors.As(err, &appErr) {
-			return nil, "", false, err
-		}
-		return nil, "", false, apperr.New(http.StatusBadGateway, "payment_create_failed", "не удалось создать платёж, попробуйте ещё раз")
+		return nil, "", false, sessionError(err)
 	}
-	return order, sess.RedirectURL, true, nil
+	return order, url, true, nil
+}
+
+// ReturnPath is where the provider sends the customer back after paying
+// for orderID: the site's result page (internal/web), which shows the
+// payment status and, for app users, links back into the app.
+func ReturnPath(orderID string) string { return "/pay/return/" + orderID }
+
+// ReturnURL is ReturnPath on publicBaseURL (PUBLIC_BASE_URL).
+func (s *Service) ReturnURL(orderID string) string { return s.publicBaseURL + ReturnPath(orderID) }
+
+// openSession asks the provider for a checkout session for payment
+// paymentID of order and stores its external id and URL on the row.
+func (s *Service) openSession(ctx context.Context, order *orders.Order, paymentID string) (string, error) {
+	sess, err := s.provider.CreatePayment(ctx, CreateRequest{
+		PaymentID:   paymentID,
+		OrderID:     order.ID,
+		OrderNumber: order.OrderNumber,
+		Amount:      order.TotalAmount,
+		Currency:    Currency,
+		ReturnURL:   s.ReturnURL(order.ID),
+	})
+	if err != nil {
+		return "", err
+	}
+	const q = `UPDATE payments SET provider_tx_id = $1, redirect_url = $2, updated_at = now() WHERE id = $3`
+	if _, err := s.db.ExecContext(ctx, q, sess.ExternalID, sess.RedirectURL, paymentID); err != nil {
+		return "", err
+	}
+	return sess.RedirectURL, nil
+}
+
+// sessionError is what the customer sees when a checkout session couldn't
+// be opened: the provider's own AppError, else 502 payment_create_failed.
+func sessionError(err error) error {
+	var appErr *apperr.AppError
+	if errors.As(err, &appErr) {
+		return err
+	}
+	return apperr.New(http.StatusBadGateway, "payment_create_failed", "не удалось создать платёж, попробуйте ещё раз")
+}
+
+// RetryPayment opens a new payment attempt on customerID's own online
+// order orderID (UUID or order number) and returns the URL to send the
+// customer to. Only an online_card order that is still 'placed' with a
+// pending or failed payment qualifies (409 payment_not_retryable
+// otherwise); the previous pending attempt is closed. If the provider
+// can't open the session, the new attempt is marked failed — the order
+// stays open for another try (or the expiry job) — and 502
+// payment_create_failed is returned.
+func (s *Service) RetryPayment(ctx context.Context, customerID, orderID string) (string, error) {
+	if err := s.provider.Ready(); err != nil {
+		return "", err
+	}
+	order, paymentID, err := s.orders.PrepareRetryPayment(ctx, customerID, orderID, s.provider.Name())
+	if err != nil {
+		return "", err
+	}
+	url, err := s.openSession(ctx, order, paymentID)
+	if err != nil {
+		slog.Error("payments: opening retry checkout session failed",
+			"provider", s.provider.Name(), "order", order.OrderNumber, "err", err)
+		if ferr := s.failAttempt(context.WithoutCancel(ctx), paymentID, order.ID); ferr != nil {
+			slog.Error("payments: marking the failed retry attempt failed", "order", order.OrderNumber, "err", ferr)
+		}
+		return "", sessionError(err)
+	}
+	return url, nil
+}
+
+// failAttempt marks a retry attempt whose session never opened as failed
+// (the order stays open and retryable).
+func (s *Service) failAttempt(ctx context.Context, paymentID, orderID string) error {
+	return dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := orders.LockOrderTx(ctx, tx, orderID); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx,
+			`UPDATE payments SET status = 'failed', updated_at = now() WHERE id = $1 AND status = 'pending'`, paymentID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil
+		}
+		_, err = tx.ExecContext(ctx,
+			`UPDATE orders SET payment_status = 'failed', updated_at = now() WHERE id = $1 AND status = 'placed'`, orderID)
+		return err
+	})
 }
 
 // pendingPaymentURL is the checkout URL of orderID's latest payment while
@@ -118,7 +204,7 @@ func (s *Service) PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInpu
 func (s *Service) pendingPaymentURL(ctx context.Context, orderID string) (string, error) {
 	const q = `
 		SELECT status, COALESCE(redirect_url, '') FROM payments
-		WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`
+		WHERE order_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`
 	var st Status
 	var url string
 	err := s.db.QueryRowContext(ctx, q, orderID).Scan(&st, &url)
@@ -140,6 +226,9 @@ func (s *Service) pendingPaymentURL(ctx context.Context, orderID string) (string
 // replaying this cancelled one.
 func (s *Service) abort(ctx context.Context, paymentID, orderID string) error {
 	return dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := orders.LockOrderTx(ctx, tx, orderID); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx,
 			`UPDATE payments SET status = 'failed', updated_at = now() WHERE id = $1 AND status = 'pending'`, paymentID)
 		if err != nil {
@@ -191,6 +280,17 @@ func transition(from, to Status) (apply, conflict bool) {
 
 func isUnpaidFinal(s Status) bool { return s == StatusFailed || s == StatusCancelled }
 
+// lateSuccess: a "paid" callback for an attempt that is already failed or
+// cancelled (closed by a retry), while its order is still 'placed' and not
+// paid — accepted rather than refunded, since the order is still waiting
+// for exactly this money.
+func lateSuccess(current, to Status, o *orders.Order) bool {
+	if to != StatusPaid || !isUnpaidFinal(current) || o == nil {
+		return false
+	}
+	return orders.PaymentRetryable(*o)
+}
+
 // HandleCallback authenticates and applies one provider callback for
 // providerName. It is idempotent: the payment row is locked FOR UPDATE and
 // a repeated event is a no-op. The payment update, orders.payment_status
@@ -211,27 +311,41 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 
 	var res CallbackResult
 	err = dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		var current Status
-		var amount float64
-		const lockQ = `
-			SELECT id, order_id, status, amount FROM payments
-			WHERE provider = $1 AND provider_tx_id = $2
-			FOR UPDATE`
-		err := tx.QueryRowContext(ctx, lockQ, providerName, ev.ExternalID).Scan(&res.PaymentID, &res.OrderID, &current, &amount)
+		// payments.order_id never changes, so finding the order unlocked
+		// is safe; then lock the order and the payment, in that order.
+		const findQ = `SELECT id, order_id FROM payments WHERE provider = $1 AND provider_tx_id = $2`
+		err := tx.QueryRowContext(ctx, findQ, providerName, ev.ExternalID).Scan(&res.PaymentID, &res.OrderID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return apperr.NotFound("payment_not_found", "платёж не найден")
 		}
 		if err != nil {
 			return err
 		}
+		order, err := orders.LockOrderTx(ctx, tx, res.OrderID)
+		if err != nil {
+			return err
+		}
+		var current Status
+		var amount float64
+		if err := tx.QueryRowContext(ctx,
+			`SELECT status, amount FROM payments WHERE id = $1 FOR UPDATE`, res.PaymentID).Scan(&current, &amount); err != nil {
+			return err
+		}
 		res.Status = current
 
 		apply, conflict := transition(current, ev.Status)
+		if conflict && lateSuccess(current, ev.Status, order) {
+			// "paid" for an attempt we had closed (replaced by a retry) or
+			// seen declined, while the order is still open and unpaid: the
+			// money is in for this order — take it.
+			apply, conflict = true, false
+		}
 		if conflict {
 			if ev.Status == StatusPaid && isUnpaidFinal(current) {
 				// The bank took the money after we gave up on the payment
-				// (declined/cancelled earlier, or expired by the job) and
-				// already returned the stock: the customer must be refunded.
+				// (order cancelled/expired, stock returned) or for a second
+				// attempt of an order another attempt already paid: the
+				// customer must be refunded.
 				if _, err := tx.ExecContext(ctx,
 					`UPDATE payments SET raw_webhook = $1, updated_at = now() WHERE id = $2`, []byte(raw), res.PaymentID); err != nil {
 					return err
@@ -263,6 +377,15 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 			ev.Status, []byte(raw), res.PaymentID); err != nil {
 			return err
 		}
+		if ev.Status == StatusPaid {
+			// A newer attempt may still be open (late success of an
+			// earlier one): close it so it can't be paid a second time.
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE payments SET status = 'cancelled', updated_at = now() WHERE order_id = $1 AND status = 'pending' AND id <> $2`,
+				res.OrderID, res.PaymentID); err != nil {
+				return err
+			}
+		}
 		var orderStatus orders.OrderStatus
 		if err := tx.QueryRowContext(ctx,
 			`UPDATE orders SET payment_status = $1, updated_at = now() WHERE id = $2 RETURNING status`,
@@ -279,12 +402,10 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 			slog.Error("payments: payment received for a cancelled order — flagged refund_required",
 				"payment", res.PaymentID, "order", res.OrderID)
 		}
-		if ev.Status == StatusFailed || ev.Status == StatusCancelled {
-			note := "оплата отклонена"
-			if ev.Status == StatusCancelled {
-				note = "оплата отменена покупателем"
-			}
-			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID, note)
+		if ev.Status == StatusCancelled {
+			// The customer cancelled on the bank page: give the stock back.
+			// A declined card (failed) keeps the order open for a retry.
+			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID, "оплата отменена покупателем")
 			if err != nil {
 				return err
 			}

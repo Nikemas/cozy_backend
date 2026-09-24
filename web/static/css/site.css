@@ -1021,3 +1021,13 @@ button, input { font-family: inherit; }
 }
 .footer__legal { color: var(--cozy-ink-2); }
 @media (max-width: 860px) { .footer__legal { padding: 0 16px 20px; } }
+
+/* fix/checkout-payments: delivery zone + payment method at checkout, and
+   the online payment result page (pay_return.gohtml). */
+.checkout-zone { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 4px 30px; font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); }
+.checkout-zone select { padding: 9px 10px; border: 0.5px solid var(--cozy-border); border-radius: 10px; background: var(--cozy-surface); color: var(--cozy-ink); font: inherit; font-size: var(--cozy-fs-13); max-width: 360px; }
+.checkout-section-title { font-size: var(--cozy-fs-15); font-weight: 700; color: var(--cozy-ink); margin: 14px 0 2px; }
+.checkout-summary__row--total { font-weight: 700; color: var(--cozy-ink); }
+.pay-status__actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; }
+.pay-status__actions .btn { min-width: 240px; justify-content: center; }
+.pay-status__icon--bad { color: var(--cozy-danger); }

@@ -246,3 +246,29 @@ shop.results.one: товар
 shop.results.few: товар
 shop.results.many: товар
 filter.title: Чыпкалар
+
+# fix/checkout-payments: delivery zones, online payment.
+cart.from_amount: %s баштап
+checkout.zone: Жеткирүү аймагы
+checkout.zone_free: акысыз
+checkout.zone_free_from: %s баштап акысыз
+checkout.payment: Төлөм
+checkout.payment_cash: Алганда накталай же карта менен
+checkout.payment_card: Карта менен онлайн
+checkout.place_and_pay: Төлөөгө өтүү
+screen.pay_return.title: Буйрутманы төлөө
+pay.return.paid: Төлөм өттү
+pay.return.pending: Төлөмдүн тастыкталышын күтүүдөбүз
+pay.return.pending_text: Адатта бул бир нече секунд алат — барак өзү жаңыланат.
+pay.return.timed_out: Банк төлөмдү азырынча тастыктай элек. Баракты бир аздан кийин жаңылаңыз же кайра төлөңүз.
+pay.return.failed: Төлөм өткөн жок
+pay.return.failed_text: Банк төлөмдү четке какты. Буйрутма сакталды — кайра төлөп көрсөңүз болот.
+pay.return.cancelled: Буйрутма жокко чыгарылды
+pay.return.cancelled_text: Төлөм аягына чыккан жок, товарлар кайра сатыкка кайтты. Буйрутманы кайра бериңиз.
+pay.return.retry: Кайра төлөө
+pay.return.refresh: Абалын жаңылоо
+pay.return.back_to_app: Колдонмого кайтуу
+pay.return.app_title: Төлөм аяктады
+pay.return.app_text: Эгер буйрутманы Cozy колдонмосунда төлөсөңүз, ага кайтыңыз — төлөмдүн абалы буйрутмада көрүнөт.
+pay.return.login: Сайтка кирүү
+pay.return.my_orders: Менин буйрутмаларым

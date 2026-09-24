@@ -75,6 +75,7 @@ func paymentCallbackHandler(svc callbackHandler, fixedProvider string) apperr.Ha
 var mockCheckoutTmpl = template.Must(template.New("mock").Parse(`<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+{{if .Result}}<meta http-equiv="refresh" content="2;url={{.ReturnURL}}">{{end}}
 <title>Тестовая оплата — Cozy</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:420px;margin:40px auto;padding:0 16px;color:#222}
@@ -88,7 +89,7 @@ button{display:block;width:100%;padding:14px;margin:10px 0;border:0;border-radiu
 <div class="sum">{{printf "%.2f" .P.Amount}} {{.P.Currency}}</div>
 {{if .Result}}
 <p>Статус оплаты: <b>{{.Result}}</b></p>
-<p><a href="{{.ReturnURL}}">Вернуться в магазин</a></p>
+<p><a href="{{.ReturnURL}}">Вернуться в магазин</a> (автоматически через 2 секунды)</p>
 {{else if eq (print .P.Status) "pending"}}
 <form method="post"><input type="hidden" name="result" value="paid"><button class="pay">Оплатить</button></form>
 <form method="post"><input type="hidden" name="result" value="failed"><button class="fail">Отказ банка</button></form>
@@ -111,8 +112,10 @@ func renderMockCheckout(w http.ResponseWriter, v mockCheckoutView) error {
 	return mockCheckoutTmpl.Execute(w, v)
 }
 
+// mockReturnURL is where the mock "bank" sends the customer back — the
+// same /pay/return/<order_id> page a real provider returns to.
 func mockReturnURL(publicBaseURL string, p *payments.Payment) string {
-	return publicBaseURL + "/order/" + p.OrderNumber + "/done"
+	return publicBaseURL + payments.ReturnPath(p.OrderID)
 }
 
 func mockCheckoutPageHandler(svc mockCheckoutBackend, publicBaseURL string) apperr.HandlerFunc {

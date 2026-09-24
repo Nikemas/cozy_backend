@@ -14,6 +14,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -42,6 +43,10 @@ type handlers struct {
 	// (not cart) to avoid colliding with the /cart screen handler below.
 	cartRepo  *orders.CartRepo
 	ordersSvc *orders.Service
+	zones     *orders.DeliveryZoneRepo
+	// paySvc runs online card payment (checkout, /pay/*); nil when no
+	// provider was configured.
+	paySvc *payments.Service
 }
 
 // t translates key into lang — used by handlers that need a translated

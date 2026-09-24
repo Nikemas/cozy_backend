@@ -1,0 +1,102 @@
+{{/* delivery.gohtml — "Доставка" (fix/checkout-payments): delivery zones,
+     owner only. .Data is admin.deliveryPageData (internal/admin/delivery.go). */}}
+{{define "content"}}
+<div class="admin-screen-narrow">
+  {{with .Data}}
+  <div class="admin-list-toolbar">
+    <div class="admin-list-note">
+      Покупатель выбирает зону при оформлении доставки; стоимость считает сервер: цена зоны, или 0, если сумма товаров не меньше «бесплатно от».
+      {{if .AnyActive}}Самовывоз всегда бесплатный.{{else}}Сейчас нет активных зон — доставка стоит {{.FlatFee}} сом (DELIVERY_FEE_SOM) для всех адресов.{{end}}
+    </div>
+    <button type="button" class="admin-btn admin-btn--primary" onclick="openZoneModal()">+ Добавить зону</button>
+  </div>
+
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+
+  <div class="admin-row-list">
+    {{if not .Rows}}
+      <div class="admin-row-list__empty">Пока нет зон доставки</div>
+    {{end}}
+    {{range .Rows}}
+    <div class="admin-row">
+      <div class="admin-row__icon">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"></path></svg>
+      </div>
+      <div class="admin-row__info">
+        <div class="admin-row__title">{{.NameRu}} <span class="admin-row__subtitle">/ {{.NameKy}}</span></div>
+        <div class="admin-row__subtitle">{{.Fee}} сом{{if .FreeFrom}} · бесплатно от {{.FreeFrom}} сом{{end}} · порядок {{.SortOrder}}</div>
+      </div>
+      <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+              data-id="{{.ID}}" data-name-ru="{{.NameRu}}" data-name-ky="{{.NameKy}}" data-fee="{{.Fee}}"
+              data-free-from="{{.FreeFrom}}" data-sort="{{.SortOrder}}"
+              onclick="openZoneModal(this)" aria-label="Изменить зону «{{.NameRu}}»">Изменить</button>
+      <form method="post" action="/admin/delivery/{{.ID}}/toggle"{{if .IsActive}}
+            data-confirm="Зона «{{.NameRu}}» перестанет предлагаться при оформлении заказа. Уже оформленные заказы не изменятся."
+            data-confirm-title="Деактивировать зону?" data-confirm-label="Деактивировать" data-confirm-danger="1"{{end}}>
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
+      </form>
+      <form method="post" action="/admin/delivery/{{.ID}}/delete"
+            data-confirm="Удалить зону «{{.NameRu}}»? Зону, по которой уже есть заказы, удалить нельзя — только деактивировать."
+            data-confirm-title="Удалить зону?" data-confirm-label="Удалить" data-confirm-danger="1">
+        <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row" aria-label="Удалить зону «{{.NameRu}}»">Удалить</button>
+      </form>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+
+<div id="admin-zone-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-zone-modal-title">
+    <div class="admin-modal__title" id="admin-zone-modal-title">Новая зона доставки</div>
+    <form method="post" action="/admin/delivery" id="admin-zone-form">
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="zone-name-ru">Название (RU)</label>
+          <input id="zone-name-ru" name="name_ru" placeholder="Бишкек" required maxlength="100">
+        </div>
+        <div class="admin-field">
+          <label for="zone-name-ky">Название (KY)</label>
+          <input id="zone-name-ky" name="name_ky" placeholder="Бишкек ш." required maxlength="100">
+        </div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="zone-fee">Стоимость, сом</label>
+          <input id="zone-fee" name="fee" type="number" min="0" max="100000" step="0.01" required>
+        </div>
+        <div class="admin-field">
+          <label for="zone-free-from">Бесплатно от, сом</label>
+          <input id="zone-free-from" name="free_from" type="number" min="0.01" step="0.01" placeholder="не задано">
+        </div>
+        <div class="admin-field">
+          <label for="zone-sort">Порядок</label>
+          <input id="zone-sort" name="sort_order" type="number" value="0">
+        </div>
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeZoneModal()">Отмена</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openZoneModal(btn) {
+  var form = document.getElementById('admin-zone-form');
+  var title = document.getElementById('admin-zone-modal-title');
+  var d = (btn && btn.dataset && btn.dataset.id) ? btn.dataset : null;
+  form.action = d ? '/admin/delivery/' + encodeURIComponent(d.id) : '/admin/delivery';
+  title.textContent = d ? 'Редактировать зону' : 'Новая зона доставки';
+  document.getElementById('zone-name-ru').value = d ? d.nameRu : '';
+  document.getElementById('zone-name-ky').value = d ? d.nameKy : '';
+  document.getElementById('zone-fee').value = d ? d.fee : '';
+  document.getElementById('zone-free-from').value = d ? d.freeFrom : '';
+  document.getElementById('zone-sort').value = d ? d.sort : '0';
+  document.getElementById('admin-zone-modal').style.display = 'flex';
+  document.getElementById('zone-name-ru').focus();
+}
+function closeZoneModal() { document.getElementById('admin-zone-modal').style.display = 'none'; }
+</script>
+{{end}}

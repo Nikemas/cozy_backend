@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
-	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 // productAddToCart backs the product page's "в корзину" button
@@ -42,11 +41,12 @@ func (h *handlers) productAddToCart(w http.ResponseWriter, r *http.Request) erro
 }
 
 // productBuyNow backs the product page's "Заказать сразу" button
-// (POST /product/{slug}/buy) — the design's instant-buy flow, which
-// calls the exact same orders.Service.CreateOrder the regular cart
-// checkout will use once Task 3 lands (web-plan Architecture Decisions).
-// Until then CreateOrder always 501s, handled the same way as the cart
-// button above.
+// (POST /product/{slug}/buy): the selected variant goes into the cart
+// (qty 1 unless it's already there — a second click must not turn into
+// two pairs) and the customer is sent to /checkout, where delivery/pickup,
+// zone and payment are chosen as for any order. It used to call
+// CreateOrder with neither an address nor a pickup point, which always
+// failed with invalid_fulfillment.
 func (h *handlers) productBuyNow(w http.ResponseWriter, r *http.Request) error {
 	productID, ok := ResolveProductID(r.PathValue("slug"))
 	if !ok {
@@ -61,20 +61,31 @@ func (h *handlers) productBuyNow(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-
-	order, err := h.ordersSvc.CreateOrder(r.Context(), customerID, []orders.OrderItemInput{
-		{VariantID: variantID, Quantity: 1},
-	}, nil, nil)
-	if err != nil {
-		if !isNotImplemented(err) {
-			return err
-		}
-		return renderToastFragment(w, h.bundle.T(h.resolveLang(r), "toast.coming_soon"))
+	if err := h.ensureInCart(r.Context(), customerID, variantID); err != nil {
+		return err
 	}
 
-	w.Header().Set("HX-Redirect", "/order/"+order.OrderNumber+"/done")
-	w.WriteHeader(http.StatusOK)
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/checkout")
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+	http.Redirect(w, r, "/checkout", http.StatusSeeOther)
 	return nil
+}
+
+// ensureInCart adds one of variantID to the cart unless it's already in.
+func (h *handlers) ensureInCart(ctx context.Context, customerID, variantID string) error {
+	items, err := h.cartRepo.List(ctx, customerID)
+	if err != nil {
+		return err
+	}
+	for _, it := range items {
+		if it.VariantID == variantID {
+			return nil
+		}
+	}
+	return h.cartRepo.Add(ctx, customerID, variantID, 1)
 }
 
 // resolveSelectedVariant looks up the exact variant a product-page POST

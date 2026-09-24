@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
-	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 const templatesDir = "web/templates"
@@ -32,6 +31,9 @@ var screenPages = map[string]string{
 	"checkout": "checkout.gohtml",
 	// "error" is the branded 404/500 page (errors.go's renderHTMLError).
 	"error": "error.gohtml",
+	// "pay_return" is where the payment provider sends the customer back
+	// (pay_handlers.go).
+	"pay_return": "pay_return.gohtml",
 }
 
 // staticPages are the legal/info pages (/about, /contacts, /delivery,
@@ -146,8 +148,6 @@ func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
 		"inc": func(i int) int { return i + 1 },
 		// money formats a som amount: {{money .Total}} → "7 900 сом".
 		"money": func(v float64) string { return formatAmount(v, bundle.T(lang, "common.currency")) },
-		// deliveryFee is the courier fee orders.Service charges (DELIVERY_FEE_SOM).
-		"deliveryFee": func() float64 { return orders.CurrentSettings().DeliveryFee },
 		// plural picks key.one / key.few / key.many for n (Russian rules;
 		// Kyrgyz nouns don't inflect for number, so ky.yaml repeats the
 		// same word in all three): {{plural .Total "shop.results"}}.

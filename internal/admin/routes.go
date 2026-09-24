@@ -112,6 +112,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("POST /admin/staff/{id}/toggle", ownerOnly(h.staffToggle))
 	mux.HandleFunc("POST /admin/staff/{id}/password", ownerOnly(h.staffResetPassword))
 
+	// Доставка: delivery zones (fee, free-from threshold) — delivery.go.
+	registerDeliveryRoutes(mux, h, orders.NewDeliveryZoneRepo(db), ownerOnly)
+
 	// Task 2 (Товары): list, create/edit form, import — see products.go.
 	// GET /admin/products/new and .../import are registered before the
 	// {id} wildcard routes below, but Go 1.22's ServeMux already prefers a

@@ -4,7 +4,12 @@
   заказ" goes straight to done). Per web-plan Task 3 / Open Questions,
   this is a minimal screen built in the same visual language as the rest
   of the site (see .checkout-option/.lang-option in site.css) rather than
-  a 1:1 design port. No payment step by design (Bakai is out of scope).
+  a 1:1 design port. Payment: cash on delivery, or "card online" when a
+  provider is ready (redirect to its page, back to /pay/return/<id>).
+  Delivery zones (fix/checkout-payments): with active zones a delivery
+  order picks one; each option carries its fee for this cart (computed
+  server-side exactly as orders.Service charges it), and the small script
+  at the bottom only swaps the pre-formatted summary strings.
 */}}
 {{define "content"}}
 <div class="checkout-page">
@@ -13,7 +18,11 @@
   {{if and (not .Data.Addresses) (not .Data.Points)}}
   <p class="muted">{{t "checkout.unavailable"}}</p>
   {{else}}
-  <form method="post" action="/checkout" class="checkout-form" onsubmit="this.querySelector('[type=submit]').disabled=true">
+  {{$d := .Data}}
+  <form method="post" action="/checkout" class="checkout-form" id="checkout-form"
+        onsubmit="this.querySelector('[type=submit]').disabled=true"
+        data-pickup-fee="{{money 0}}" data-pickup-total="{{money $d.ItemsTotal}}"
+        data-flat-fee="{{money $d.DeliveryFee}}" data-flat-total="{{money $d.FlatTotal}}">
     <input type="hidden" name="idempotency_key" value="{{.Data.IdempotencyKey}}">
     <div class="checkout-options">
       <label class="checkout-option{{if .Data.Addresses}} checkout-option--active{{end}}">
@@ -29,6 +38,19 @@
         </label>
         {{end}}
       </div>
+      {{if $d.Zones}}
+      <label class="checkout-zone">
+        <span>{{t "checkout.zone"}}</span>
+        <select name="delivery_zone_id" id="checkout-zone">
+          {{range $i, $z := $d.Zones}}
+          <option value="{{$z.ID}}"{{if eq $i 0}} selected{{end}}
+                  data-fee="{{money $z.Fee}}" data-total="{{money $z.Total}}">
+            {{$z.Name}} — {{if eq $z.Fee 0.0}}{{t "checkout.zone_free"}}{{else}}{{money $z.Fee}}{{end}}{{if and $z.HasFreeFrom (ne $z.Fee 0.0)}} ({{printf (t "checkout.zone_free_from") (money $z.FreeFrom)}}){{end}}
+          </option>
+          {{end}}
+        </select>
+      </label>
+      {{end}}
       {{else}}
       <p class="muted checkout-hint">{{t "checkout.no_addresses"}}</p>
       {{end}}
@@ -51,6 +73,20 @@
       {{end}}
     </div>
 
+    {{if $d.OnlinePayment}}
+    <div class="checkout-options">
+      <div class="checkout-section-title">{{t "checkout.payment"}}</div>
+      <label class="checkout-option">
+        <input type="radio" name="payment_method" value="cash_on_delivery" checked>
+        <span class="checkout-option__title"><i class="ti ti-cash"></i> {{t "checkout.payment_cash"}}</span>
+      </label>
+      <label class="checkout-option">
+        <input type="radio" name="payment_method" value="online_card">
+        <span class="checkout-option__title"><i class="ti ti-credit-card"></i> {{t "checkout.payment_card"}}</span>
+      </label>
+    </div>
+    {{end}}
+
     <label class="checkout-comment">
       <span>{{t "checkout.comment"}}</span>
       <textarea name="comment" rows="3" maxlength="{{.Data.CommentMaxLen}}" placeholder="{{t "checkout.comment_placeholder"}}"></textarea>
@@ -58,12 +94,41 @@
 
     <aside class="checkout-summary">
       <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{money .Data.ItemsTotal}}</span></div>
-      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span>{{money .Data.DeliveryFee}}</span></div>
+      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span id="checkout-fee">{{money $d.InitialFee}}</span></div>
+      <div class="checkout-summary__row checkout-summary__row--total"><span>{{t "cart.total"}}</span><span id="checkout-total">{{money $d.InitialTotal}}</span></div>
       <div class="checkout-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
       {{if .Data.HasUnavailable}}<p class="checkout-hint">{{t "cart.has_unavailable"}}</p>{{end}}
-      <button type="submit" class="btn btn--primary checkout-summary__cta">{{t "checkout.place_order"}}</button>
+      <button type="submit" class="btn btn--primary checkout-summary__cta"
+              data-label-cash="{{t "checkout.place_order"}}" data-label-card="{{t "checkout.place_and_pay"}}">{{t "checkout.place_order"}}</button>
     </aside>
   </form>
+  <script>
+  (function () {
+    var form = document.getElementById('checkout-form');
+    if (!form) return;
+    var zone = document.getElementById('checkout-zone');
+    var fee = document.getElementById('checkout-fee');
+    var total = document.getElementById('checkout-total');
+    var submit = form.querySelector('[type=submit]');
+    function checked(name) {
+      var el = form.querySelector('input[name="' + name + '"]:checked');
+      return el ? el.value : '';
+    }
+    function update() {
+      var src = form.dataset, feeKey = 'pickupFee', totalKey = 'pickupTotal';
+      if (checked('fulfillment') === 'delivery') {
+        if (zone) { src = zone.options[zone.selectedIndex].dataset; feeKey = 'fee'; totalKey = 'total'; }
+        else { feeKey = 'flatFee'; totalKey = 'flatTotal'; }
+      }
+      fee.textContent = src[feeKey];
+      total.textContent = src[totalKey];
+      if (zone) zone.disabled = checked('fulfillment') !== 'delivery';
+      submit.textContent = checked('payment_method') === 'online_card' ? submit.dataset.labelCard : submit.dataset.labelCash;
+    }
+    form.addEventListener('change', update);
+    update();
+  })();
+  </script>
   {{end}}
 </div>
 {{end}}

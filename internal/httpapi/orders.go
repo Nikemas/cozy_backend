@@ -24,9 +24,10 @@ type orderService interface {
 }
 
 // onlineCheckout is the subset of *payments.Service createOrderHandler
-// needs for payment_method = online_card.
+// (payment_method = online_card) and payOrderHandler (retry) need.
 type onlineCheckout interface {
 	PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInput) (*orders.Order, string, bool, error)
+	RetryPayment(ctx context.Context, customerID, orderID string) (string, error)
 }
 
 // cartService is the subset of *orders.CartRepo the cart handlers depend
@@ -72,6 +73,10 @@ func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, 
 	mux.Handle("GET /api/v1/orders", requireCustomer(apperr.Wrap(listOrdersHandler(ordersSvc))))
 	mux.Handle("GET /api/v1/orders/{id}", requireCustomer(apperr.Wrap(getOrderHandler(ordersSvc))))
 	mux.Handle("POST /api/v1/orders/{id}/cancel", requireCustomer(apperr.Wrap(cancelOrderHandler(ordersSvc))))
+	mux.Handle("POST /api/v1/orders/{id}/pay", requireCustomer(apperr.Wrap(payOrderHandler(checkout))))
+
+	// Public: the checkout's delivery-zone picker (no auth needed).
+	mux.Handle("GET /api/v1/delivery-zones", apperr.Wrap(listDeliveryZonesHandler(orders.NewDeliveryZoneRepo(db))))
 
 	mux.Handle("GET /api/v1/cart", requireCustomer(apperr.Wrap(listCartHandler(cartRepo, images, cfg))))
 	mux.Handle("POST /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(addCartItemHandler(cartRepo))))
@@ -98,6 +103,10 @@ type createOrderRequest struct {
 	Items         []orderItemRequest `json:"items"`
 	AddressID     *string            `json:"address_id"`
 	PickupPointID *string            `json:"pickup_point_id"`
+	// DeliveryZoneID is the delivery zone (from GET /api/v1/delivery-zones)
+	// for a delivery order — required while any zone is active; ignored
+	// for pickup. The fee is computed server-side from it.
+	DeliveryZoneID *string `json:"delivery_zone_id"`
 	// PaymentMethod is "cash_on_delivery" (default when omitted, the
 	// pre-Task-S behavior) or "online_card".
 	PaymentMethod string `json:"payment_method"`
@@ -122,6 +131,7 @@ func (req createOrderRequest) toInput(customerID, idempotencyKey string) orders.
 		Items:          items,
 		AddressID:      req.AddressID,
 		PickupPointID:  req.PickupPointID,
+		DeliveryZoneID: req.DeliveryZoneID,
 		Comment:        req.Comment,
 		IdempotencyKey: idempotencyKey,
 	}
@@ -173,6 +183,32 @@ func createdStatus(created bool) int {
 		return http.StatusCreated
 	}
 	return http.StatusOK
+}
+
+// payOrderResponse is the POST /api/v1/orders/{id}/pay body.
+type payOrderResponse struct {
+	PaymentURL string `json:"payment_url"`
+}
+
+// payOrderHandler serves POST /api/v1/orders/{id}/pay: a new payment
+// attempt on the customer's own online_card order that is not cancelled
+// and whose payment is pending or failed — 200 {"payment_url"}; otherwise
+// 409 payment_not_retryable (404 for someone else's order).
+func payOrderHandler(checkout onlineCheckout) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		customerID, ok := auth.CustomerIDFromContext(r.Context())
+		if !ok {
+			return apperr.Unauthorized("unauthenticated", "требуется вход в систему")
+		}
+		if checkout == nil {
+			return payments.ErrNotConfigured
+		}
+		url, err := checkout.RetryPayment(r.Context(), customerID, r.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, payOrderResponse{PaymentURL: url})
+	}
 }
 
 // cancelOrderHandler serves POST /api/v1/orders/{id}/cancel: the customer

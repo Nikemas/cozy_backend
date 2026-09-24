@@ -1,0 +1,60 @@
+{{/*
+  Online payment result: the provider (Bakai / mock checkout) sends the
+  customer back to /pay/return/<order_id>. The owner sees the order's
+  payment status, polled by HTMX until paid/failed (pay_status fragment),
+  and "Оплатить снова" when the payment can be retried. Visitors without a
+  site session (app customers paying in an in-app browser) get only the
+  "back to the app" deep link.
+*/}}
+{{define "content"}}
+<div class="screen-placeholder done-screen pay-return">
+  {{template "pay_status" .}}
+</div>
+{{end}}
+
+{{define "pay_status"}}{{$d := .Data}}
+<div id="pay-status" class="pay-status" aria-live="polite"
+  {{- if $d.Poll}} hx-get="{{$d.PollURL}}" hx-trigger="every {{$d.PollEverySec}}s" hx-swap="outerHTML"{{end}}>
+  {{if $d.Anonymous}}
+    <div class="done-screen__check"><i class="ti ti-credit-card" aria-hidden="true"></i></div>
+    <h1>{{t "pay.return.app_title"}}</h1>
+    <p class="muted">{{t "pay.return.app_text"}}</p>
+  {{else if eq $d.State "paid"}}
+    <div class="done-screen__check"><i class="ti ti-circle-check" aria-hidden="true"></i></div>
+    <h1>{{t "pay.return.paid"}}</h1>
+    <p class="done-screen__number">{{$d.OrderNumber}}</p>
+    <p class="done-screen__total">{{t "done.total"}}: {{money $d.Total}}</p>
+  {{else if eq $d.State "failed"}}
+    <div class="done-screen__check pay-status__icon--bad"><i class="ti ti-circle-x" aria-hidden="true"></i></div>
+    <h1>{{t "pay.return.failed"}}</h1>
+    <p class="done-screen__number">{{$d.OrderNumber}}</p>
+    <p class="muted">{{t "pay.return.failed_text"}}</p>
+  {{else if eq $d.State "cancelled"}}
+    <div class="done-screen__check pay-status__icon--bad"><i class="ti ti-circle-x" aria-hidden="true"></i></div>
+    <h1>{{t "pay.return.cancelled"}}</h1>
+    <p class="done-screen__number">{{$d.OrderNumber}}</p>
+    <p class="muted">{{t "pay.return.cancelled_text"}}</p>
+  {{else}}
+    <div class="done-screen__check"><i class="ti ti-clock" aria-hidden="true"></i></div>
+    <h1>{{t "pay.return.pending"}}</h1>
+    <p class="done-screen__number">{{$d.OrderNumber}}</p>
+    <p class="done-screen__total">{{t "done.total"}}: {{money $d.Total}}</p>
+    <p class="muted">{{if $d.TimedOut}}{{t "pay.return.timed_out"}}{{else}}{{t "pay.return.pending_text"}}{{end}}</p>
+  {{end}}
+
+  <div class="pay-status__actions">
+    {{if $d.Retryable}}
+    <form method="post" action="/pay/{{$d.OrderID}}/retry" onsubmit="this.querySelector('button').disabled=true">
+      <button type="submit" class="btn btn--primary">{{t "pay.return.retry"}}</button>
+    </form>
+    {{end}}
+    {{if $d.TimedOut}}<a class="btn btn--ghost" href="/pay/return/{{$d.OrderID}}">{{t "pay.return.refresh"}}</a>{{end}}
+    {{if $d.ShowAppLink}}<a class="btn {{if $d.Anonymous}}btn--primary{{else}}btn--ghost{{end}}" href="{{$d.AppLink}}">{{t "pay.return.back_to_app"}}</a>{{end}}
+    {{if $d.Anonymous}}
+    <a class="btn btn--ghost" href="/profile">{{t "pay.return.login"}}</a>
+    {{else}}
+    <a class="btn btn--ghost" href="/orders">{{t "pay.return.my_orders"}}</a>
+    {{end}}
+  </div>
+</div>
+{{end}}

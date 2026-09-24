@@ -148,7 +148,7 @@ func TestFirstAllowedPath(t *testing.T) {
 
 func TestNavItemsForRole(t *testing.T) {
 	ownerKeys := navKeys(navItemsForRole(staff.RoleOwner, "orders"))
-	wantOwner := []string{"orders", "products", "stock", "categories", "reports", "broadcasts", "points", "staff"}
+	wantOwner := []string{"orders", "products", "stock", "categories", "reports", "broadcasts", "points", "delivery", "staff"}
 	if !equalStrings(ownerKeys, wantOwner) {
 		t.Errorf("owner nav keys = %v, want %v", ownerKeys, wantOwner)
 	}

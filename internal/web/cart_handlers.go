@@ -37,6 +37,10 @@ type CartPageData struct {
 	DeliveryFee    float64
 	GrandTotal     float64
 	HasUnavailable bool
+	// DeliveryFrom: delivery zones with different prices are active, so
+	// DeliveryFee/GrandTotal are the cheapest option ("от …"); the exact
+	// fee is picked at checkout.
+	DeliveryFrom bool
 }
 
 // cart renders the cart screen. Per web-plan Architecture Decisions
@@ -155,10 +159,35 @@ func (h *handlers) buildCartPageData(ctx context.Context, customerID string) (*C
 		return nil, err
 	}
 	page := cartPageFromLines(lines, orders.CurrentSettings().DeliveryFee)
+	if len(page.Lines) > 0 && h.zones != nil {
+		zones, err := h.zones.ListActive(ctx)
+		if err != nil {
+			return nil, err
+		}
+		applyZoneDelivery(page, zones)
+	}
 	if err := h.attachCartPhotos(ctx, page.Lines); err != nil {
 		return nil, err
 	}
 	return page, nil
+}
+
+// applyZoneDelivery replaces the flat delivery fee with the cheapest
+// active zone's fee for this cart (flagged DeliveryFrom when zones differ).
+// No zones: the flat fee stays.
+func applyZoneDelivery(page *CartPageData, zones []orders.DeliveryZone) {
+	if len(zones) == 0 || len(page.Lines) == 0 {
+		return
+	}
+	minFee, maxFee := zones[0].FeeFor(page.ItemsTotal), zones[0].FeeFor(page.ItemsTotal)
+	for _, z := range zones[1:] {
+		f := z.FeeFor(page.ItemsTotal)
+		minFee = min(minFee, f)
+		maxFee = max(maxFee, f)
+	}
+	page.DeliveryFee = minFee
+	page.GrandTotal = page.ItemsTotal + minFee
+	page.DeliveryFrom = minFee != maxFee
 }
 
 // cartPageFromLines is buildCartPageData's pure part (unit-tested).

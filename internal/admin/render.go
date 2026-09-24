@@ -37,6 +37,7 @@ var screenPages = map[string]string{
 	"points":         "points.gohtml",
 	"staff":          "staff.gohtml",
 	"categories":     "categories.gohtml",
+	"delivery":       "delivery.gohtml",
 	"stock":          "stock.gohtml",      // fix/admin: per-point stock screen (point_staff's catalog view)
 	"broadcasts":     "broadcasts.gohtml", // W2 fix/promo-push: Рассылки (promo push)
 }

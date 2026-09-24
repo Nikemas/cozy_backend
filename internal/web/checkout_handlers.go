@@ -14,6 +14,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/payments"
 )
 
 // AddressView is one row of customer_addresses, read directly by SQL
@@ -38,19 +39,73 @@ type PointView struct {
 }
 
 // CheckoutPageData backs checkout.gohtml. DeliveryFee is what a delivery
-// order adds to ItemsTotal (pickup is free) — the same value
-// orders.Service charges. IdempotencyKey is a fresh token per rendered
-// form: a double click or a resubmit after a network error places one
-// order, not two.
+// order adds to ItemsTotal when no delivery zone is active (pickup is
+// free); with zones, each CheckoutZoneView carries its own fee for this
+// cart — the same values orders.Service charges. IdempotencyKey is a fresh
+// token per rendered form: a double click or a resubmit after a network
+// error places one order, not two.
 type CheckoutPageData struct {
 	Addresses      []AddressView
 	Points         []PointView
+	Zones          []CheckoutZoneView
 	ItemsTotal     float64
 	ItemCount      int
 	DeliveryFee    float64
 	IdempotencyKey string
 	CommentMaxLen  int
 	HasUnavailable bool
+	// OnlinePayment offers "card online" (a payment provider is ready).
+	OnlinePayment bool
+}
+
+// CheckoutZoneView is one delivery zone option, priced for this cart.
+type CheckoutZoneView struct {
+	ID    string
+	Name  string
+	Fee   float64 // what this cart pays for delivery to the zone
+	Total float64 // items + Fee
+	// HasFreeFrom/FreeFrom: items total from which delivery is free.
+	HasFreeFrom bool
+	FreeFrom    float64
+}
+
+// FlatTotal is items + the flat fee (no zones).
+func (d CheckoutPageData) FlatTotal() float64 { return d.ItemsTotal + d.DeliveryFee }
+
+// InitialFee is the delivery row the page first renders: delivery is
+// preselected when the customer has an address (first zone, else the
+// flat fee), otherwise pickup (free).
+func (d CheckoutPageData) InitialFee() float64 {
+	if len(d.Addresses) == 0 {
+		return 0
+	}
+	if len(d.Zones) > 0 {
+		return d.Zones[0].Fee
+	}
+	return d.DeliveryFee
+}
+
+// InitialTotal is items + InitialFee.
+func (d CheckoutPageData) InitialTotal() float64 { return d.ItemsTotal + d.InitialFee() }
+
+// checkoutZones prices each active zone for itemsTotal, with the same
+// DeliveryZone.FeeFor orders.Service charges with.
+func checkoutZones(zones []orders.DeliveryZone, itemsTotal float64, lang string) []CheckoutZoneView {
+	out := make([]CheckoutZoneView, 0, len(zones))
+	for _, z := range zones {
+		v := CheckoutZoneView{ID: z.ID, Name: z.Name(lang), Fee: z.FeeFor(itemsTotal)}
+		v.Total = itemsTotal + v.Fee
+		if z.FreeFrom != nil {
+			v.HasFreeFrom, v.FreeFrom = true, *z.FreeFrom
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// onlinePaymentAvailable reports whether "card online" can be offered.
+func (h *handlers) onlinePaymentAvailable() bool {
+	return h.paySvc != nil && h.paySvc.Provider().Ready() == nil
 }
 
 // DoneData backs done.gohtml.
@@ -92,24 +147,33 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	zones, err := h.zones.ListActive(r.Context())
+	if err != nil {
+		return err
+	}
 
 	data := h.base(r, "checkout")
 	data.Data = CheckoutPageData{
 		Addresses:      addresses,
 		Points:         points,
+		Zones:          checkoutZones(zones, cartPage.ItemsTotal, data.Lang),
 		ItemsTotal:     cartPage.ItemsTotal,
 		ItemCount:      len(items),
-		DeliveryFee:    cartPage.DeliveryFee,
+		DeliveryFee:    orders.CurrentSettings().DeliveryFee,
 		IdempotencyKey: uuid.NewString(),
 		CommentMaxLen:  orders.MaxCommentLen,
 		HasUnavailable: cartPage.HasUnavailable,
+		OnlinePayment:  h.onlinePaymentAvailable(),
 	}
 	return h.render.Render(w, "checkout", data)
 }
 
-// checkoutSubmit creates the order from the customer's current cart and,
-// per the design (no payment step in this MVP — see web-plan Architecture
-// Decisions), goes straight to /order/{orderNumber}/done.
+// checkoutSubmit creates the order from the customer's current cart. Cash
+// on delivery goes straight to /order/{orderNumber}/done; "card online"
+// (payment_method=online_card) creates the order with a pending payment
+// and redirects to the provider's payment page, which returns to
+// /pay/return/{orderID}. The delivery fee is computed server-side from the
+// chosen zone (delivery_zone_id), exactly as the page previewed it.
 //
 // The ordered lines leave the cart in the same transaction as the order
 // (PlaceOrderInput.ClearCart), and the form's idempotency_key makes a
@@ -125,7 +189,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		return apperr.BadRequest("bad_request", "некорректная форма")
 	}
 
-	var addressID, pickupPointID *string
+	var addressID, pickupPointID, zoneID *string
 	switch r.FormValue("fulfillment") {
 	case "delivery":
 		v := r.FormValue("address_id")
@@ -133,6 +197,9 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 			return apperr.BadRequest("address_required", "выберите адрес доставки")
 		}
 		addressID = &v
+		if z := r.FormValue("delivery_zone_id"); z != "" {
+			zoneID = &z
+		}
 	case "pickup":
 		v := r.FormValue("point_id")
 		if v == "" {
@@ -152,7 +219,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		// send it to that order instead of an error.
 		if key := r.FormValue("idempotency_key"); key != "" {
 			if order, ok := h.findOrderByCheckoutKey(r, customerID, key); ok {
-				http.Redirect(w, r, "/order/"+order.OrderNumber+"/done", http.StatusSeeOther)
+				http.Redirect(w, r, orderLandingPath(order), http.StatusSeeOther)
 				return nil
 			}
 		}
@@ -164,21 +231,52 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		inputs[i] = orders.OrderItemInput{VariantID: it.VariantID, Quantity: it.Qty}
 	}
 
-	order, _, err := h.ordersSvc.PlaceOrder(r.Context(), orders.PlaceOrderInput{
+	in := orders.PlaceOrderInput{
 		CustomerID:     customerID,
 		Items:          inputs,
 		AddressID:      addressID,
 		PickupPointID:  pickupPointID,
+		DeliveryZoneID: zoneID,
 		Comment:        r.FormValue("comment"),
 		IdempotencyKey: r.FormValue("idempotency_key"),
 		ClearCart:      true,
-	})
-	if err != nil {
-		return err
 	}
 
-	http.Redirect(w, r, "/order/"+order.OrderNumber+"/done", http.StatusSeeOther)
-	return nil
+	switch orders.PaymentMethod(r.FormValue("payment_method")) {
+	case "", orders.PaymentCashOnDelivery:
+		order, _, err := h.ordersSvc.PlaceOrder(r.Context(), in)
+		if err != nil {
+			return err
+		}
+		http.Redirect(w, r, "/order/"+order.OrderNumber+"/done", http.StatusSeeOther)
+		return nil
+	case orders.PaymentOnlineCard:
+		if h.paySvc == nil {
+			return payments.ErrNotConfigured
+		}
+		order, paymentURL, _, err := h.paySvc.PlaceOnlineOrder(r.Context(), in)
+		if err != nil {
+			return err
+		}
+		if paymentURL == "" {
+			// Idempotent replay of an order whose payment is no longer
+			// pending: show its payment result instead.
+			paymentURL = payments.ReturnPath(order.ID)
+		}
+		http.Redirect(w, r, paymentURL, http.StatusSeeOther)
+		return nil
+	default:
+		return apperr.BadRequest("invalid_payment_method", "неизвестный способ оплаты")
+	}
+}
+
+// orderLandingPath is where a just-placed order is shown: the payment
+// result page for an online order, the "order placed" page otherwise.
+func orderLandingPath(o *orders.Order) string {
+	if o.PaymentMethod == orders.PaymentOnlineCard {
+		return payments.ReturnPath(o.ID)
+	}
+	return "/order/" + o.OrderNumber + "/done"
 }
 
 // findOrderByCheckoutKey finds the order an earlier submit of the same

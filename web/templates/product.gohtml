@@ -98,7 +98,7 @@
   </div>
 
   <div class="product-delivery">
-    <div class="product-delivery__row"><i class="ti ti-truck-delivery" aria-hidden="true"></i> {{t "product.delivery.courier"}} — {{money deliveryFee}}</div>
+    <div class="product-delivery__row"><i class="ti ti-truck-delivery" aria-hidden="true"></i> {{t "product.delivery.courier"}} — {{if .Data.DeliveryFrom}}{{printf (t "cart.from_amount") (money .Data.DeliveryFee)}}{{else}}{{money .Data.DeliveryFee}}{{end}}</div>
     <div class="product-delivery__row"><i class="ti ti-building-store" aria-hidden="true"></i> {{t "product.delivery.pickup"}}</div>
     <div class="product-delivery__row"><i class="ti ti-refresh" aria-hidden="true"></i> {{t "product.delivery.return"}}</div>
     <a class="product-delivery__more" href="/delivery">{{t "product.delivery.more"}}</a>
