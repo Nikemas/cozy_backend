@@ -15,6 +15,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/admin"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/csrf"
 	"github.com/Nikemas/cozy_backend/internal/health"
@@ -128,6 +129,15 @@ func run() error {
 		orderSettings.PaymentPendingTTL, payments.DefaultExpiryInterval)
 	defer func() { stopExpiry(); <-expiryDone }()
 
+	// Promo broadcasts (admin "Рассылки") are sent by this background
+	// worker, batch by batch. On shutdown it finishes and records the batch
+	// in flight, then stops; an unfinished broadcast resumes on restart.
+	broadcastCtx, stopBroadcasts := context.WithCancel(context.Background())
+	broadcastsDone := broadcasts.NewWorker(broadcasts.NewRepo(db), pushSender, broadcasts.WorkerConfig{}).Start(broadcastCtx)
+	// Waited for (bounded by the shutdown timeout) in the shutdown path
+	// below; an early error return just stops it.
+	defer stopBroadcasts()
+
 	mux := http.NewServeMux()
 	health.Register(mux, 2*time.Second,
 		health.DBCheck(db),
@@ -187,6 +197,12 @@ func run() error {
 	// Let in-flight push/Telegram jobs for just-committed orders finish.
 	if nerr := notifier.Shutdown(shutdownCtx); nerr != nil {
 		slog.Warn("notifications: shutdown timed out, some notifications may be lost", "err", nerr)
+	}
+	stopBroadcasts()
+	select {
+	case <-broadcastsDone:
+	case <-shutdownCtx.Done():
+		slog.Warn("broadcasts: worker still finishing a batch at shutdown timeout; it resumes on restart")
 	}
 	return err
 }
