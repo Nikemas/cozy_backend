@@ -10,7 +10,12 @@ func TestWindowLimiter(t *testing.T) {
 	l := newWindowLimiter(2, time.Minute)
 	l.now = func() time.Time { return now }
 
-	if !l.allow("a") || !l.allow("a") || l.allow("a") {
+	for i := 0; i < 2; i++ {
+		if !l.allow("a") {
+			t.Fatalf("event %d should be allowed", i+1)
+		}
+	}
+	if l.allow("a") {
 		t.Fatal("want exactly 2 allowed per window")
 	}
 	if !l.allow("b") {
