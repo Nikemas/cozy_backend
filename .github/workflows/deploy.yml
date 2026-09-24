@@ -1,25 +1,44 @@
 # ---------------------------------------------------------------------------
-# Deploy — every push to main that passes tests is rolled out to the
-# staging VPS (cozy.erpsystemsales.com, see README "Staging-сервер").
+# Deploy — every push to main that passes CI is rolled out to the staging
+# VPS (cozy.erpsystemsales.com, see README "Staging-сервер").
 #
 # How it works: the job SSHes into the server and runs scripts/deploy.sh
 # from the repo checkout there (/opt/cozy). That script fast-forwards the
-# checkout, rebuilds the backend image from source with docker compose,
-# restarts Caddy if its config changed, and waits for /readyz. No container
+# checkout to the tested commit (DEPLOY_REF = github.sha), builds a backend
+# image tagged with that SHA, applies DB migrations, switches the backend to
+# the new image, waits for /readyz and rolls back to the previous image if
+# it never gets healthy. No container
 # registry is involved — the image is built on the VPS, so the server needs
-# nothing beyond git + docker + its own .env.
+# nothing beyond git + docker + curl + its own .env.
+#
+# The gate before deploying is the full CI workflow (ci.yml, called as a
+# reusable workflow): gofmt, vet, unit tests, golangci-lint, migrations
+# up/down/up on a real Postgres and the integration tests.
 #
 # Repo secrets (Settings -> Secrets and variables -> Actions):
 #
-#   DEPLOY_HOST      - VPS hostname or IP (95.215.244.199)
-#   DEPLOY_USER      - SSH user on the VPS (root)
-#   DEPLOY_SSH_KEY   - PRIVATE key of a dedicated deploy keypair (ed25519,
-#                      PEM/OpenSSH text). Its public half must be in that
-#                      user's ~/.ssh/authorized_keys on the VPS. Use a
-#                      separate key generated just for GitHub — never the
-#                      one on a developer laptop.
-#   DEPLOY_PATH      - repo checkout on the VPS (/opt/cozy)
-#   DEPLOY_SSH_PORT  - optional, defaults to 22
+#   DEPLOY_HOST             - VPS hostname or IP (95.215.244.199)
+#   DEPLOY_USER             - SSH user on the VPS. Use a dedicated non-root
+#                             `deploy` user in the `docker` group that owns
+#                             /opt/cozy (README "Пользователь deploy").
+#                             Note: docker group membership is still
+#                             root-equivalent on that host; the point is to
+#                             be able to disable root SSH login and to keep
+#                             the key's blast radius to what deploy needs.
+#   DEPLOY_SSH_KEY          - PRIVATE key of a dedicated deploy keypair
+#                             (ed25519, OpenSSH text). Its public half must be
+#                             in that user's ~/.ssh/authorized_keys on the VPS.
+#                             Generate it just for GitHub — never reuse a
+#                             developer laptop key.
+#   DEPLOY_SSH_FINGERPRINT  - SHA256 fingerprint of the VPS *host* key, e.g.
+#                             "SHA256:AbC...". Without it the action trusts
+#                             any host key (MITM). The Go SSH client used by
+#                             the action prefers the ECDSA host key, so take
+#                             that one (README "Секреты деплоя"):
+#                               ssh-keyscan -t ecdsa HOST | ssh-keygen -lf - | awk '{print $2}'
+#                             Required: the deploy job fails if it is empty.
+#   DEPLOY_PATH             - repo checkout on the VPS (/opt/cozy)
+#   DEPLOY_SSH_PORT         - optional, defaults to 22
 #
 # Third-party actions are pinned to exact version tags (not SHAs) — same
 # reasoning as in ci.yml.
@@ -44,28 +63,15 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: vet & test before deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: go vet
-        run: go vet ./...
-
-      - name: go test
-        run: go test ./...
+  ci:
+    name: CI before deploy
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
 
   deploy:
     name: Deploy to staging over SSH
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
     # Opens an SSH session only; needs no GITHUB_TOKEN scope at all.
     permissions: {}
@@ -73,19 +79,32 @@ jobs:
       name: staging
       url: https://cozy.erpsystemsales.com
     steps:
+      - name: Require the host key fingerprint
+        env:
+          FINGERPRINT: ${{ secrets.DEPLOY_SSH_FINGERPRINT }}
+        run: |
+          if [ -z "$FINGERPRINT" ]; then
+            echo "::error::secret DEPLOY_SSH_FINGERPRINT is not set — refusing to deploy over SSH without host key verification (see the header of .github/workflows/deploy.yml)"
+            exit 1
+          fi
+
       - name: Run scripts/deploy.sh on the VPS
         uses: appleboy/ssh-action@v1.2.5
         env:
           # Forwarded via `envs:` rather than interpolated into `script:`,
           # so the value is not baked into the literal script text.
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          # Deploy exactly the commit CI just tested, not whatever main
+          # points at by the time the SSH session starts.
+          DEPLOY_REF: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_SSH_FINGERPRINT }}
           port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
-          envs: DEPLOY_PATH
-          command_timeout: 15m
+          envs: DEPLOY_PATH,DEPLOY_REF
+          command_timeout: 20m
           script: |
             set -e
             cd "$DEPLOY_PATH"
@@ -93,5 +112,5 @@ jobs:
             # scripts/deploy.sh runs the NEW version, not the one already
             # on disk.
             git fetch -q origin main
-            git checkout -q origin/main -- scripts/deploy.sh
-            bash scripts/deploy.sh
+            git checkout -q "$DEPLOY_REF" -- scripts/deploy.sh
+            DEPLOY_REF="$DEPLOY_REF" bash scripts/deploy.sh

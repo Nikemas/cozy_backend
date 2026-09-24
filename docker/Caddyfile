@@ -23,15 +23,30 @@
 # "Full (strict)"; "Flexible" talks plain HTTP to the origin and loops with
 # Caddy's HTTP->HTTPS redirect.
 #
-# PRODUCTION (pending): cozy.kg block is commented out until the client
-# actually points its DNS here — an unreachable hostname makes Caddy retry
-# ACME issuance forever and spam the logs. To enable: uncomment the block,
-# nothing else changes.
+# PRODUCTION (pending): cozy.kg must NOT be added as another hostname on
+# this stack. Staging and production need separate databases, MinIO
+# buckets, .env secrets (JWT_SECRET, PAYMENTS_PROVIDER=bakai, APP_ENV=prod,
+# no SMS_MOCK_OTP) and deploy cadence — pointing cozy.kg at backend:8080
+# here would serve real customers from the staging database, with staging's
+# mock payments. Production gets its own compose project (own VPS, or at
+# least its own directory + project name + volumes) with its own Caddyfile;
+# see README "Прод (cozy.kg)". Until the client's DNS points at a prod
+# stack, no cozy.kg block exists anywhere (an unreachable hostname makes
+# Caddy retry ACME issuance forever and spam the logs).
 #
 # The bare-IP block is kept as a fallback (self-signed cert, browser
 # warning expected). Caddy routes by SNI, so it only serves connections
 # that name the IP itself.
-
+#
+# Every host imports the snippets below:
+#   security_headers — HSTS, nosniff, anti-framing, Referrer-Policy. The
+#     anti-framing/Referrer-Policy ones use `?` (set only if the backend
+#     didn't send its own), so the app can override them per page.
+#   noindex — staging must never end up in search results next to the
+#     real shop.
+#   backend_proxy — the reverse proxy to the Go backend, retrying the dial
+#     while the container is being recreated during a deploy instead of
+#     answering 502 straight away.
 {
 	# Clients connecting to a bare IP (no domain) typically send no SNI at
 	# all in the TLS ClientHello — without this, Caddy can't pick which
@@ -39,6 +54,47 @@
 	# error" alert. Only affects the bare-IP fallback block below; SNI-based
 	# selection for real hostnames works normally regardless.
 	default_sni 95.215.244.199
+}
+
+(security_headers) {
+	header {
+		# 1 year, this host only. No includeSubDomains/preload: those would
+		# pin every *.erpsystemsales.com host to HTTPS, which is not ours to
+		# decide. Browsers ignore HSTS for IP-literal hosts (bare-IP block).
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+		# Apply after the proxied response's headers are in place.
+		defer
+	}
+	# Defaults only (`?` = set if the response doesn't already carry the
+	# header), one directive each so the backend can override any of them
+	# independently.
+	header ?X-Frame-Options "DENY"
+	header ?Content-Security-Policy "frame-ancestors 'none'"
+	header ?Referrer-Policy "strict-origin-when-cross-origin"
+}
+
+(noindex) {
+	header X-Robots-Tag "noindex, nofollow"
+}
+
+(backend_proxy) {
+	# Admin uploads (product photos, .xlsx import) are the largest bodies
+	# the backend accepts; anything bigger is refused here with 413 before
+	# it reaches Go. The backend enforces its own, tighter per-route limits.
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy backend:8080 {
+		# While deploy.sh recreates the backend container there is briefly
+		# no upstream. Keep retrying the dial for up to 15s instead of
+		# returning 502. Only failed *connections* are retried, so a
+		# request the backend already started processing is never sent
+		# twice.
+		lb_try_duration 15s
+		lb_try_interval 250ms
+	}
 }
 
 # --- staging: site + API + admin ------------------------------------------
@@ -49,24 +105,35 @@
 # compression is handled by the TLS terminator. Not on the media block:
 # product photos are JPEG/PNG/WebP and gain nothing.
 cozy.erpsystemsales.com {
+	import security_headers
+	import noindex
 	encode zstd gzip
-	reverse_proxy backend:8080
+	import backend_proxy
 }
 
 # --- staging: media (MinIO S3 API, public photo GETs from browser/app) -----
+#
+# Only reads are served publicly: uploads go through the backend
+# (POST /admin/api/media/upload -> minio:9000 inside the compose network)
+# and the backend only presigns GET URLs, so nothing legitimate ever writes
+# through this host. Refusing other methods and MinIO's own /minio/* API
+# (admin, health, metrics) keeps a leaked access key from being usable
+# from the internet.
 media.cozy.erpsystemsales.com {
+	import security_headers
+	import noindex
+	@not_read not method GET HEAD
+	respond @not_read 405
+	@minio_api path /minio/*
+	respond @minio_api 404
 	reverse_proxy minio:9000
 }
-
-# --- production: enable once the client's DNS points at this VPS ----------
-# cozy.kg, www.cozy.kg {
-# 	encode zstd gzip
-# 	reverse_proxy backend:8080
-# }
 
 # --- bare-IP fallback -------------------------------------------------------
 95.215.244.199 {
 	tls internal
+	import security_headers
+	import noindex
 	encode zstd gzip
-	reverse_proxy backend:8080
+	import backend_proxy
 }
