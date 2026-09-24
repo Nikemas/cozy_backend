@@ -22,7 +22,8 @@ type Filter struct {
 	From       time.Time // inclusive
 	To         time.Time // exclusive
 	// EntityQuery matches an entity id by prefix (a pasted uuid or its
-	// first characters) or, for orders, an exact order number.
+	// first characters) — for variants and stock also their product's id —
+	// or, for orders, an exact order number.
 	EntityQuery string
 	Page        int // 1-based
 	PageSize    int
@@ -66,7 +67,9 @@ const listWhere = `
 	  AND ($2 = '' OR e.entity_type = $2)
 	  AND ($3::timestamptz IS NULL OR e.at >= $3::timestamptz)
 	  AND ($4::timestamptz IS NULL OR e.at < $4::timestamptz)
-	  AND ($5 = '' OR starts_with(lower(e.entity_id), lower($5)) OR lower(e.details->>'order_number') = lower($5))`
+	  AND ($5 = '' OR starts_with(lower(e.entity_id), lower($5))
+	       OR starts_with(lower(e.details->>'product_id'), lower($5))
+	       OR lower(e.details->>'order_number') = lower($5))`
 
 // filterArgs turns f into listWhere's $1..$5.
 func filterArgs(f Filter) []any {

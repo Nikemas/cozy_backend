@@ -134,25 +134,60 @@ const savepoint = "audit_log_write"
 // together with the action itself. A failing insert is rolled back to a
 // savepoint and logged; tx stays usable and the caller's action proceeds.
 func (l *Log) RecordTx(ctx context.Context, tx *sql.Tx, entries ...Entry) {
-	if l == nil || tx == nil || len(entries) == 0 {
+	if len(entries) == 0 {
 		return
+	}
+	l.RecordTxFunc(ctx, tx, func() ([]Entry, error) { return entries, nil })
+}
+
+// RecordTxFunc is RecordTx for entries that need extra reads to build
+// (names for the summary, etc.): build runs inside the same savepoint as
+// the inserts, so a failing lookup can't abort tx either.
+func (l *Log) RecordTxFunc(ctx context.Context, tx *sql.Tx, build func() ([]Entry, error)) {
+	l.guard(ctx, tx, func() error {
+		entries, err := build()
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if _, err := tx.ExecContext(ctx, insertSQL, insertArgs(ctx, e)...); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// SnapshotTx runs read (a "before" read that only feeds the journal)
+// inside a savepoint of tx and reports whether it succeeded — on failure
+// it is logged and rolled back without aborting tx. With a disabled
+// journal read is not run at all.
+func (l *Log) SnapshotTx(ctx context.Context, tx *sql.Tx, read func() error) bool {
+	return l.guard(ctx, tx, read)
+}
+
+// guard runs fn between SAVEPOINT and RELEASE; an error from fn (or from
+// the savepoint statements) is logged and rolled back to the savepoint.
+func (l *Log) guard(ctx context.Context, tx *sql.Tx, fn func() error) bool {
+	if l == nil || tx == nil {
+		return false
 	}
 	if _, err := tx.ExecContext(ctx, "SAVEPOINT "+savepoint); err != nil {
 		slog.ErrorContext(ctx, "audit: savepoint failed", "err", err)
-		return
+		return false
 	}
-	for _, e := range entries {
-		if _, err := tx.ExecContext(ctx, insertSQL, insertArgs(ctx, e)...); err != nil {
-			slog.ErrorContext(ctx, "audit: write failed", "action", e.Action, "entity_id", e.EntityID, "err", err)
-			if _, rbErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+savepoint); rbErr != nil {
-				slog.ErrorContext(ctx, "audit: rollback to savepoint failed", "err", rbErr)
-			}
-			return
+	if err := fn(); err != nil {
+		slog.ErrorContext(ctx, "audit: journal write failed", "err", err)
+		if _, rbErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+savepoint); rbErr != nil {
+			slog.ErrorContext(ctx, "audit: rollback to savepoint failed", "err", rbErr)
 		}
+		return false
 	}
 	if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT "+savepoint); err != nil {
 		slog.ErrorContext(ctx, "audit: release savepoint failed", "err", err)
+		return false
 	}
+	return true
 }
 
 // Enabled reports whether l actually writes anything — callers use it to
