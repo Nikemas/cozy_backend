@@ -181,3 +181,14 @@ screen.page_delivery.title: Жеткирүү жана төлөө
 screen.page_privacy.title: Купуялык саясаты
 screen.page_terms.title: Коомдук оферта
 footer.nav_label: Дүкөн жөнүндө маалымат
+
+# Product card: gallery, availability, description.
+product.add_to_favorites: Тандалгандарга кошуу
+product.gallery: Товардын сүрөттөрү
+product.photo: Сүрөт
+product.in_stock_at: Дүкөндөрдө бар
+product.stock_available: бар
+product.stock_few: калды
+product.out_of_stock: Бул өлчөм жана түс азыр жок
+product.delivery.more: Жеткирүү жана төлөө жөнүндө кененирээк
+product.description: Сыпаттамасы

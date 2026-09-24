@@ -181,3 +181,14 @@ screen.page_delivery.title: Доставка и оплата
 screen.page_privacy.title: Политика конфиденциальности
 screen.page_terms.title: Публичная оферта
 footer.nav_label: Информация о магазине
+
+# Product card: gallery, availability, description.
+product.add_to_favorites: Добавить в избранное
+product.gallery: Фотографии товара
+product.photo: Фото
+product.in_stock_at: Есть в магазинах
+product.stock_available: в наличии
+product.stock_few: осталось
+product.out_of_stock: Этого размера и цвета сейчас нет в наличии
+product.delivery.more: Подробнее о доставке и оплате
+product.description: Описание

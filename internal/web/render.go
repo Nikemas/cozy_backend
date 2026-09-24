@@ -123,7 +123,7 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 			}
 			files = append(files, filepath.Join(templatesDir, page))
 
-			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).ParseFiles(files...)
+			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).ParseFiles(files...)
 			if err != nil {
 				return nil, fmt.Errorf("web: parsing templates for screen %q (%s): %w", screen, lang, err)
 			}
@@ -132,6 +132,17 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 	}
 
 	return rr, nil
+}
+
+// viewFuncs are the storefront's own template helpers, on top of
+// i18n's "t".
+func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
+	_ = bundle
+	_ = lang
+	return template.FuncMap{
+		// inc turns a 0-based range index into a 1-based label.
+		"inc": func(i int) int { return i + 1 },
+	}
 }
 
 // Render executes the "layout" template for screen using data.Lang,

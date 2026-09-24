@@ -25,6 +25,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/media"
+	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
 // shopPageSize mirrors catalog.DefaultPageSize — kept as its own constant
@@ -254,12 +255,21 @@ func shopPageHref(basePath string, filter catalog.ListFilter, page int) string {
 // ProductData backs product.gohtml (screen "product") and its
 // HTMX-swapped #product-detail fragment (size/color change).
 type ProductData struct {
-	Name      string
-	Brand     string
-	PriceText string
+	Name        string
+	Brand       string
+	PriceText   string
+	Description string // in the visitor's language; "" if none
 
 	HasPhoto bool // see ProductCard.HasPhoto
 	PhotoURL string
+	// Photos is the full gallery for the selected color (first = PhotoURL);
+	// thumbnails switch the main photo client-side.
+	Photos []ProductPhoto
+
+	// InStock reports whether the selected size/color has stock anywhere;
+	// Availability lists the active points of sale that have it.
+	InStock      bool
+	Availability []PointStock
 
 	Sizes  []SizeOption
 	Colors []ColorOption
@@ -272,6 +282,56 @@ type ProductData struct {
 	CartActionURL     string
 	BuyActionURL      string
 	FavoriteActionURL string
+}
+
+// ProductPhoto is one gallery image: the 1200px full variant and its
+// 400px thumbnail (both square, see internal/media/normalize.go).
+type ProductPhoto struct {
+	URL      string
+	ThumbURL string
+}
+
+// PointStock is one point of sale that has the selected variant in stock.
+// Few is set for the last pairs (≤ fewStockThreshold), shown as "осталось N".
+type PointStock struct {
+	Name    string
+	Address string
+	Qty     int
+	Few     bool
+}
+
+// fewStockThreshold is the quantity at or below which a point shows
+// "осталось N" instead of a plain "в наличии".
+const fewStockThreshold = 2
+
+// buildAvailability lists the points (in branches' order — active points
+// only, by name) holding variantID, from the variant's stock rows.
+func buildAvailability(variantID string, stock []catalog.StockEntry, branches []storefront.Branch) []PointStock {
+	if variantID == "" {
+		return nil
+	}
+	qtyByPoint := map[string]int{}
+	for _, s := range stock {
+		if s.VariantID == variantID && s.Quantity > 0 {
+			qtyByPoint[s.PointID] += s.Quantity
+		}
+	}
+	out := []PointStock{}
+	for _, b := range branches {
+		if q := qtyByPoint[b.ID]; q > 0 {
+			out = append(out, PointStock{Name: b.Name, Address: b.Address, Qty: q, Few: q <= fewStockThreshold})
+		}
+	}
+	return out
+}
+
+// buildGallery turns the selected color's images into gallery entries.
+func buildGallery(images []catalog.ProductImage, url func(string) string) []ProductPhoto {
+	out := make([]ProductPhoto, 0, len(images))
+	for _, img := range images {
+		out = append(out, ProductPhoto{URL: url(img.ObjectKey), ThumbURL: url(media.ThumbKey(img.ObjectKey))})
+	}
+	return out
 }
 
 // SizeOption/ColorOption back the size/color picker buttons. Href always
@@ -383,21 +443,32 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		}
 	}
 
-	hasPhoto := false
-	photoURL := ""
-	if productImages, err := h.images.ListByProduct(ctx, product.ID); err != nil {
+	productImages, err := h.images.ListByProduct(ctx, product.ID)
+	if err != nil {
 		return nil, err
-	} else if matched := catalog.ForColor(productImages, selectedColor); len(matched) > 0 {
-		hasPhoto = true
-		photoURL = h.photoURL(matched[0].ObjectKey)
 	}
+	photos := buildGallery(catalog.ForColor(productImages, selectedColor), h.photoURL)
+	photoURL := ""
+	if len(photos) > 0 {
+		photoURL = photos[0].URL
+	}
+
+	branches, err := h.branchRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	availability := buildAvailability(selectedVariantID, stockRows, branches)
 
 	return &ProductData{
 		Name:              name,
 		Brand:             stringOr(product.Brand, ""),
 		PriceText:         formatMoney(price),
-		HasPhoto:          hasPhoto,
+		Description:       pickName(stringOr(product.DescriptionRu, ""), stringOr(product.DescriptionKy, ""), lang),
+		HasPhoto:          len(photos) > 0,
 		PhotoURL:          photoURL,
+		Photos:            photos,
+		InStock:           len(availability) > 0,
+		Availability:      availability,
 		Sizes:             sizeOpts,
 		Colors:            colorOpts,
 		SelectedSize:      selectedSize,
