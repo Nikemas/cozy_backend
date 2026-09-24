@@ -103,7 +103,6 @@ branches.empty: Пока нет доступных точек продаж
 # Task 2 (Catalog: shop + product) keys.
 shop.banner.eyebrow: Обувь для всей семьи
 shop.banner.title: Доставка по Бишкеку и самовывоз из наших магазинов
-shop.results_word: товаров
 shop.empty: Ничего не найдено
 shop.prev: Назад
 shop.next: Дальше
@@ -232,3 +231,9 @@ auth.phone_label: Номер телефона
 auth.code_label: Код из SMS
 address.label_label: Название адреса
 address.text_label: Адрес доставки
+
+# Money and plurals.
+common.currency: сом
+shop.results.one: товар
+shop.results.few: товара
+shop.results.many: товаров

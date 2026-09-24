@@ -31,6 +31,7 @@ type CartLineView struct {
 	Qty         int
 	UnitPrice   float64
 	LineTotal   float64
+	PhotoURL    string // thumbnail; "" → shoe icon (see photos.go)
 }
 
 // CartPageData backs cart.gohtml's authenticated state.
@@ -181,6 +182,9 @@ func (h *handlers) buildCartPageData(ctx context.Context, customerID string) (*C
 		page.Lines = append(page.Lines, l)
 	}
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := h.attachCartPhotos(ctx, page.Lines); err != nil {
 		return nil, err
 	}
 

@@ -43,7 +43,7 @@ func TestStatusViewFallsBackOnUnknownStatus(t *testing.T) {
 	}
 }
 
-func TestFormatSom(t *testing.T) {
+func TestFormatAmount(t *testing.T) {
 	cases := []struct {
 		amount float64
 		want   string
@@ -53,10 +53,11 @@ func TestFormatSom(t *testing.T) {
 		{7900, "7 900 сом"},
 		{1234567, "1 234 567 сом"},
 		{4999.6, "5 000 сом"}, // rounds to nearest whole som
+		{-1500, "-1 500 сом"},
 	}
 	for _, c := range cases {
-		if got := formatSom(c.amount); got != c.want {
-			t.Errorf("formatSom(%v) = %q, want %q", c.amount, got, c.want)
+		if got := formatAmount(c.amount, "сом"); got != c.want {
+			t.Errorf("formatAmount(%v) = %q, want %q", c.amount, got, c.want)
 		}
 	}
 }
@@ -71,7 +72,7 @@ func TestBuildOrderViewsShowsTrackForInFlightAndRepeatForFinished(t *testing.T) 
 			TotalAmount: 3000,
 			CreatedAt:   time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			Items: []orders.OrderItem{
-				{ProductNameSnapshot: "Air Runner", SizeSnapshot: "42", ColorSnapshot: "Чёрный", Quantity: 1},
+				{VariantID: "v1", ProductNameSnapshot: "Air Runner", SizeSnapshot: "42", ColorSnapshot: "Чёрный", Quantity: 1},
 			},
 		},
 		{
@@ -83,7 +84,7 @@ func TestBuildOrderViewsShowsTrackForInFlightAndRepeatForFinished(t *testing.T) 
 		},
 	}
 
-	views := buildOrderViews(list, noop)
+	views := buildOrderViews(list, noop, map[string]string{"v1": "https://m/v1/thumb.jpg"})
 	if len(views) != 2 {
 		t.Fatalf("buildOrderViews returned %d views, want 2", len(views))
 	}
@@ -92,6 +93,12 @@ func TestBuildOrderViewsShowsTrackForInFlightAndRepeatForFinished(t *testing.T) 
 	}
 	if views[1].ShowTrack || !views[1].ShowRepeat {
 		t.Errorf("delivered order: ShowTrack=%v ShowRepeat=%v, want false/true", views[1].ShowTrack, views[1].ShowRepeat)
+	}
+	if got := views[0].Items[0].PhotoURL; got != "https://m/v1/thumb.jpg" {
+		t.Errorf("item PhotoURL = %q, want the variant's thumbnail", got)
+	}
+	if views[1].TotalLabel != "4 700 common.currency" {
+		t.Errorf("TotalLabel = %q", views[1].TotalLabel)
 	}
 	if views[0].DateLabel != "01.01.2026" {
 		t.Errorf("DateLabel = %q, want 01.01.2026", views[0].DateLabel)

@@ -38,7 +38,7 @@
       {{end}}
     </nav>
     <div class="shop-toolbar__right">
-      <div class="shop-count" role="status">{{$d.Total}} {{t "shop.results_word"}}</div>
+      <div class="shop-count" role="status">{{$d.Total}} {{plural $d.Total "shop.results"}}</div>
       <label class="shop-sort">
         <span class="visually-hidden">{{t "shop.sort.label"}}</span>
         <select id="shop-sort" name="sort"

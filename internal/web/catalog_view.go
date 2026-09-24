@@ -209,7 +209,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 			ID:        p.ID,
 			Name:      pickName(p.NameRu, p.NameKy, lang),
 			Brand:     stringOr(p.Brand, ""),
-			PriceText: formatMoney(price),
+			PriceText: formatAmount(price, h.t(lang, "common.currency")),
 			PriceFrom: from,
 			DetailURL: ProductPath(p.ID, p.NameRu),
 		}
@@ -548,7 +548,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		Name:              name,
 		Brand:             stringOr(product.Brand, ""),
 		Price:             price,
-		PriceText:         formatMoney(price),
+		PriceText:         formatAmount(price, h.t(lang, "common.currency")),
 		Description:       pickName(stringOr(product.DescriptionRu, ""), stringOr(product.DescriptionKy, ""), lang),
 		HasPhoto:          len(photos) > 0,
 		PhotoURL:          photoURL,
@@ -604,33 +604,6 @@ func stringOr(p *string, def string) string {
 		return def
 	}
 	return *p
-}
-
-// formatMoney renders a KGS amount the way the design's prototype does —
-// thousands grouped with a space, " сом" suffix, no decimals (mirrors
-// design/Shoebox Web's `money(n)` helper: n.toLocaleString('ru-RU') +
-// ' сом'). Prices are stored as NUMERIC(10,2) but soms aren't split into
-// cents in practice, so this rounds to the nearest whole som.
-func formatMoney(v float64) string {
-	n := int64(math.Round(v))
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	digits := strconv.FormatInt(n, 10)
-
-	var grouped []byte
-	for i := 0; i < len(digits); i++ {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			grouped = append(grouped, ' ')
-		}
-		grouped = append(grouped, digits[i])
-	}
-	out := string(grouped)
-	if neg {
-		out = "-" + out
-	}
-	return out + " сом"
 }
 
 // photoURL builds a direct (non-presigned) URL to objectKey in the

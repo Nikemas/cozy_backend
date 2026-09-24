@@ -103,7 +103,6 @@ branches.empty: Азырынча жеткиликтүү дүкөндөр жок
 # Task 2 (Catalog: shop + product) keys.
 shop.banner.eyebrow: Бүт үй-бүлө үчүн бут кийим
 shop.banner.title: Бишкек боюнча жеткирүү жана дүкөндөрүбүздөн алып кетүү
-shop.results_word: товар
 shop.empty: Эч нерсе табылган жок
 shop.prev: Артка
 shop.next: Кийинки
@@ -232,3 +231,9 @@ auth.phone_label: Телефон номери
 auth.code_label: SMS-код
 address.label_label: Даректин аталышы
 address.text_label: Жеткирүү дареги
+
+# Money and plurals (Kyrgyz nouns don't inflect after numerals).
+common.currency: сом
+shop.results.one: товар
+shop.results.few: товар
+shop.results.many: товар

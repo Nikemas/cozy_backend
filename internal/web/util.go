@@ -1,8 +1,8 @@
 package web
 
 import (
-	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -19,10 +19,34 @@ func maskPhone(phone string) string {
 	return "+" + head + " ••• " + tail
 }
 
-// formatPrice renders a base_price/order total as "3200 сом" — good
-// enough for the MVP fav/profile/address screens; a locale-aware
-// thousands separator can follow once a real currency formatter is
-// needed elsewhere.
-func formatPrice(v float64) string {
-	return fmt.Sprintf("%d сом", int(math.Round(v)))
+// formatAmount renders a KGS amount the way the design's prototype does —
+// thousands grouped with a space, no decimals, then unit (the
+// "common.currency" locale string: "сом" in both RU and KY). Prices are
+// NUMERIC(10,2) but soms aren't split into tyiyns in practice, so this
+// rounds to the nearest whole som. The single money formatter for the
+// site: Go code calls it with the "common.currency" string, templates
+// call {{money}}.
+func formatAmount(v float64, unit string) string {
+	n := int64(math.Round(v))
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	digits := strconv.FormatInt(n, 10)
+
+	var grouped []byte
+	for i := 0; i < len(digits); i++ {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			grouped = append(grouped, ' ')
+		}
+		grouped = append(grouped, digits[i])
+	}
+	out := string(grouped)
+	if neg {
+		out = "-" + out
+	}
+	if unit == "" {
+		return out
+	}
+	return out + " " + unit
 }

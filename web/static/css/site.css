@@ -989,3 +989,10 @@ button, input { font-family: inherit; }
 
 .product-option--unavailable { opacity: 1; color: var(--cozy-ink-3); text-decoration: line-through; }
 .product-option--active.product-option--unavailable { color: var(--cozy-surface); }
+
+/* ---- Product photos in cart / order history / favourites ---- */
+.cart-line__thumb, .order-item__thumb { overflow: hidden; }
+.cart-line__thumb img, .order-item__thumb img { width: 100%; height: 100%; object-fit: contain; background: var(--cozy-surface); display: block; }
+.fav-card__photo img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--cozy-surface); }
+.fav-card__name { display: block; color: inherit; }
+.fav-card__name:hover { color: var(--cozy-accent-ink); }

@@ -24,7 +24,7 @@
       <div class="order-card__items">
         {{range .Items}}
         <div class="order-item">
-          <div class="order-item__thumb"><i class="ti ti-shoe" aria-hidden="true"></i></div>
+          <div class="order-item__thumb">{{if .PhotoURL}}<img src="{{.PhotoURL}}" alt="" width="44" height="44" loading="lazy">{{else}}<i class="ti ti-shoe" aria-hidden="true"></i>{{end}}</div>
           <div class="order-item__title">{{.Title}}</div>
           <div class="order-item__qty muted">×{{.Qty}}</div>
         </div>

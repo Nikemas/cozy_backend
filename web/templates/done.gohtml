@@ -3,7 +3,7 @@
   <div class="done-screen__check"><i class="ti ti-circle-check" aria-hidden="true"></i></div>
   <h1>{{t "screen.done.title"}}</h1>
   {{if .Data.OrderNumber}}<p class="done-screen__number">{{.Data.OrderNumber}}</p>{{end}}
-  <p class="done-screen__total">{{t "done.total"}}: {{printf "%.0f" .Data.Total}} сом</p>
+  <p class="done-screen__total">{{t "done.total"}}: {{money .Data.Total}}</p>
   {{/* TODO(delivery-window): COZY_WEB_DESIGN.md §3.9 hardcodes "сегодня
        18:00—21:00" in the canvas prototype; there's no real delivery-slot
        calculation specified yet (see web-plan Open Questions), so this is

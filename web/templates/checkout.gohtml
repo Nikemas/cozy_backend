@@ -51,7 +51,7 @@
     </div>
 
     <aside class="checkout-summary">
-      <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
+      <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{money .Data.ItemsTotal}}</span></div>
       <button type="submit" class="btn btn--primary checkout-summary__cta">{{t "checkout.place_order"}}</button>
     </aside>
   </form>

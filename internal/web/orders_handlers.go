@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -13,8 +12,9 @@ import (
 
 // OrderItemView backs one line of an order card on orders.gohtml.
 type OrderItemView struct {
-	Title string // e.g. "Размер 42, чёрный"
-	Qty   int
+	Title    string // e.g. "Размер 42, чёрный"
+	Qty      int
+	PhotoURL string // thumbnail; "" → shoe icon
 }
 
 // OrderView backs one order card on orders.gohtml. StatusKey is an i18n
@@ -73,33 +73,12 @@ func statusView(s orders.OrderStatus) orderStatusMeta {
 	}
 }
 
-// formatSom renders amount as "7 900 сом" — thousands grouped with a
-// narrow space, no decimals (order/product prices are whole som per the
-// tech spec's seed data).
-func formatSom(amount float64) string {
-	whole := int64(amount + 0.5)
-	sign := ""
-	if whole < 0 {
-		sign = "-"
-		whole = -whole
-	}
-	digits := strconv.FormatInt(whole, 10)
-
-	var grouped strings.Builder
-	for i, d := range digits {
-		if i != 0 && (len(digits)-i)%3 == 0 {
-			grouped.WriteByte(' ')
-		}
-		grouped.WriteRune(d)
-	}
-	return sign + grouped.String() + " сом"
-}
-
 // buildOrderViews turns Service.ListOrders' result into orders.gohtml's
 // view model. t translates a single i18n key (bound to the request's
 // language) — used for the small bits of item-line copy ("размер ...")
 // that aren't whole static template strings.
-func buildOrderViews(list []orders.Order, t func(string) string) []OrderView {
+// photos maps variant_id → thumbnail URL (see variantPhotos); nil is fine.
+func buildOrderViews(list []orders.Order, t func(string) string, photos map[string]string) []OrderView {
 	views := make([]OrderView, 0, len(list))
 	for _, o := range list {
 		meta := statusView(o.Status)
@@ -110,7 +89,7 @@ func buildOrderViews(list []orders.Order, t func(string) string) []OrderView {
 			if it.SizeSnapshot != "" || it.ColorSnapshot != "" {
 				title = fmt.Sprintf("%s — %s %s, %s", it.ProductNameSnapshot, t("order.item.size_prefix"), it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
 			}
-			items = append(items, OrderItemView{Title: title, Qty: it.Quantity})
+			items = append(items, OrderItemView{Title: title, Qty: it.Quantity, PhotoURL: photos[it.VariantID]})
 		}
 
 		views = append(views, OrderView{
@@ -119,7 +98,7 @@ func buildOrderViews(list []orders.Order, t func(string) string) []OrderView {
 			DateLabel:   o.CreatedAt.Format("02.01.2006"),
 			StatusKey:   meta.Key,
 			StatusClass: meta.Class,
-			TotalLabel:  formatSom(o.TotalAmount),
+			TotalLabel:  formatAmount(o.TotalAmount, t("common.currency")),
 			Items:       items,
 			ShowTrack:   meta.InFlight,
 			ShowRepeat:  !meta.InFlight,
@@ -146,7 +125,17 @@ func (h *handlers) orders(w http.ResponseWriter, r *http.Request) error {
 		list, err := h.ordersSvc.ListOrders(r.Context(), customerID)
 		switch {
 		case err == nil:
-			view.Orders = buildOrderViews(list, t)
+			var variantIDs []string
+			for _, o := range list {
+				for _, it := range o.Items {
+					variantIDs = append(variantIDs, it.VariantID)
+				}
+			}
+			photos, perr := h.variantPhotos(r.Context(), variantIDs)
+			if perr != nil {
+				return perr
+			}
+			view.Orders = buildOrderViews(list, t, photos)
 			view.Empty = len(view.Orders) == 0
 		case isNotImplemented(err):
 			// internal/orders (Task 3) isn't merged yet in this worktree —

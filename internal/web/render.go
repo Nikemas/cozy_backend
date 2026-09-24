@@ -140,11 +140,31 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 // viewFuncs are the storefront's own template helpers, on top of
 // i18n's "t".
 func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
-	_ = bundle
-	_ = lang
 	return template.FuncMap{
 		// inc turns a 0-based range index into a 1-based label.
 		"inc": func(i int) int { return i + 1 },
+		// money formats a som amount: {{money .Total}} → "7 900 сом".
+		"money": func(v float64) string { return formatAmount(v, bundle.T(lang, "common.currency")) },
+		// plural picks key.one / key.few / key.many for n (Russian rules;
+		// Kyrgyz nouns don't inflect for number, so ky.yaml repeats the
+		// same word in all three): {{plural .Total "shop.results"}}.
+		"plural": func(n int, key string) string { return bundle.T(lang, key+"."+pluralForm(n)) },
+	}
+}
+
+// pluralForm is the Russian plural category of n: "one" (1, 21, 101…),
+// "few" (2–4, 22–24…) or "many" (0, 5–20, 25…).
+func pluralForm(n int) string {
+	if n < 0 {
+		n = -n
+	}
+	switch {
+	case n%10 == 1 && n%100 != 11:
+		return "one"
+	case n%10 >= 2 && n%10 <= 4 && (n%100 < 12 || n%100 > 14):
+		return "few"
+	default:
+		return "many"
 	}
 }
 
