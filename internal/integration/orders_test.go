@@ -243,7 +243,7 @@ func TestOnlineOrderCancelReturnsStock(t *testing.T) {
 	f := newFixture(t, 4, 0)
 	svc, _ := newService()
 
-	o, paymentID, err := svc.CreateOnlineOrder(ctx, f.CustomerID,
+	o, paymentID, err := createOnlineOrder(ctx, svc, f.CustomerID,
 		[]orders.OrderItemInput{{VariantID: f.VariantA, Quantity: 3}}, nil, strptr(f.PointA), "mock")
 	if err != nil {
 		t.Fatalf("CreateOnlineOrder: %v", err)
@@ -272,7 +272,7 @@ func TestOnlineOrderCancelReturnsStock(t *testing.T) {
 		var done bool
 		err := dbtx.WithTx(ctx, testDB, func(tx *sql.Tx) error {
 			var err error
-			done, err = orders.CancelUnpaidOrderTx(ctx, tx, o.ID)
+			done, err = cancelUnpaidOrderTx(ctx, tx, o.ID)
 			return err
 		})
 		if err != nil {
