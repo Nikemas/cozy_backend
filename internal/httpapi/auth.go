@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -11,8 +12,23 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
+// authAPI is the subset of *auth.Service the /api/v1/auth/* handlers use,
+// so handler tests can inject a fake.
+type authAPI interface {
+	RequestOTP(ctx context.Context, phone string) error
+	VerifyOTP(ctx context.Context, phone, code string) (access, refresh string, customer *storefront.Customer, err error)
+	Refresh(ctx context.Context, refreshToken string) (access, refresh string, err error)
+	Logout(ctx context.Context, refreshToken string) error
+}
+
+var _ authAPI = (*auth.Service)(nil)
+
 // RegisterAuthRoutes mounts the OTP login flow under /api/v1/auth/*.
 func RegisterAuthRoutes(mux *http.ServeMux, svc *auth.Service) {
+	registerAuthRoutes(mux, svc)
+}
+
+func registerAuthRoutes(mux *http.ServeMux, svc authAPI) {
 	mux.Handle("POST /api/v1/auth/otp/request", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		var req struct {
 			Phone string `json:"phone"`
@@ -59,6 +75,22 @@ func RegisterAuthRoutes(mux *http.ServeMux, svc *auth.Service) {
 		}
 
 		return writeJSON(w, http.StatusOK, tokenPairResponse(access, refresh))
+	}))
+
+	// Logout revokes the refresh token's session. Always 204 — an unknown,
+	// expired or already-revoked token (or an empty/garbled body) is not an
+	// error, so the app can call it unconditionally on sign-out.
+	mux.Handle("POST /api/v1/auth/logout", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		if err := svc.Logout(r.Context(), req.RefreshToken); err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return nil
 	}))
 }
 

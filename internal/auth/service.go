@@ -33,13 +33,14 @@ type customerStore interface {
 
 type Service struct {
 	otp       otpStore
-	refresh   *refreshRepo
+	refresh   refreshStore
 	customers customerStore
 	sms       notify.OTPSender
 	jwtSecret []byte
 
 	limits      config.AuthLimits
 	verifyFails *windowLimiter // wrong OTP codes per client IP per hour
+	refreshIP   *windowLimiter // /auth/refresh calls per client IP per minute
 }
 
 // NewService wires the customer auth service. limits come from
@@ -53,6 +54,7 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		jwtSecret:   jwtSecret,
 		limits:      limits,
 		verifyFails: newWindowLimiter(limits.OTPVerifyFailsPerIPPerHour, time.Hour),
+		refreshIP:   newWindowLimiter(limits.RefreshPerIPPerMinute, time.Minute),
 	}
 }
 
@@ -176,22 +178,77 @@ func (s *Service) VerifyOTP(ctx context.Context, rawPhone, code string) (accessT
 	return accessToken, refreshTokenStr, customer, nil
 }
 
-// Refresh rotates a refresh token: the old one is revoked and a new pair
-// is issued, so a leaked refresh token has a limited window of usefulness.
+func errRefreshInvalid() error {
+	return apperr.Unauthorized("refresh_invalid", "сессия истекла, войдите снова")
+}
+
+// Refresh rotates a refresh token: the presented one is retired and a new
+// pair is issued in the same token family, so a leaked refresh token has a
+// limited window of usefulness.
+//
+// Presenting a token that was ALREADY rotated means two parties hold the
+// same token — the legitimate app and whoever copied it — and we can't
+// tell which is which, so the whole family is revoked and both have to
+// log in again (OAuth 2.0 Security BCP, refresh token reuse detection).
+// Calls are also rate-limited per client IP
+// (AUTH_REFRESH_MAX_PER_IP_PER_MINUTE).
 func (s *Service) Refresh(ctx context.Context, refreshTokenStr string) (accessToken, newRefreshToken string, err error) {
-	existing, err := s.refresh.getActiveByHash(ctx, hashToken(refreshTokenStr))
+	if !s.refreshIP.allow(httpmw.ClientIPFromContext(ctx)) {
+		return "", "", apperr.TooManyRequests("refresh_rate_limited", "слишком много запросов, попробуйте позже")
+	}
+	if refreshTokenStr == "" {
+		return "", "", errRefreshInvalid()
+	}
+
+	oldHash := hashToken(refreshTokenStr)
+	raw, newHash, err := newOpaqueToken()
 	if err != nil {
 		return "", "", err
 	}
-	if existing == nil {
-		return "", "", apperr.Unauthorized("invalid_refresh_token", "недействительный refresh-токен")
-	}
-
-	if err := s.refresh.revoke(ctx, existing.ID); err != nil {
+	rotated, err := s.refresh.rotate(ctx, oldHash, newHash, time.Now().Add(refreshTokenTTL))
+	if err != nil {
 		return "", "", err
 	}
+	if rotated == nil {
+		if err := s.handleInactiveRefresh(ctx, oldHash); err != nil {
+			return "", "", err
+		}
+		return "", "", errRefreshInvalid()
+	}
 
-	return s.issueTokenPair(ctx, existing.CustomerID)
+	accessToken, err = issueAccessToken(s.jwtSecret, rotated.CustomerID, accessTokenTTL)
+	if err != nil {
+		return "", "", err
+	}
+	return accessToken, raw, nil
+}
+
+// handleInactiveRefresh revokes the family of an already-rotated token.
+func (s *Service) handleInactiveRefresh(ctx context.Context, tokenHash string) error {
+	old, err := s.refresh.lookup(ctx, tokenHash)
+	if err != nil {
+		return err
+	}
+	if old == nil || old.RotatedAt == nil {
+		return nil
+	}
+	slog.WarnContext(ctx, "auth: refresh token reuse detected, revoking the whole token family",
+		"customer_id", old.CustomerID, "family_id", old.FamilyID, "client_ip", httpmw.ClientIPFromContext(ctx))
+	return s.refresh.revokeFamily(ctx, old.FamilyID)
+}
+
+// Logout revokes the session the refresh token belongs to (its whole
+// family). Unknown, expired or already-revoked tokens are a no-op, so it
+// is idempotent.
+func (s *Service) Logout(ctx context.Context, refreshTokenStr string) error {
+	if refreshTokenStr == "" {
+		return nil
+	}
+	t, err := s.refresh.lookup(ctx, hashToken(refreshTokenStr))
+	if err != nil || t == nil {
+		return err
+	}
+	return s.refresh.revokeFamily(ctx, t.FamilyID)
 }
 
 func (s *Service) issueTokenPair(ctx context.Context, customerID string) (accessToken, refreshTokenStr string, err error) {

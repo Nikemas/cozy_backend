@@ -121,10 +121,87 @@ var errProviderDown = apperr.New(http.StatusBadGateway, "sms_provider_unreachabl
 func newTestService(otp otpStore, sms *fakeSMS, limits config.AuthLimits) *Service {
 	return &Service{
 		otp:         otp,
+		refresh:     newFakeRefreshStore(),
 		customers:   fakeCustomers{},
 		sms:         sms,
 		jwtSecret:   testJWTSecret,
 		limits:      limits,
 		verifyFails: newWindowLimiter(limits.OTPVerifyFailsPerIPPerHour, time.Hour),
+		refreshIP:   newWindowLimiter(limits.RefreshPerIPPerMinute, time.Minute),
 	}
+}
+
+// fakeRefreshStore is an in-memory refreshStore.
+type fakeRefreshStore struct {
+	mu     sync.Mutex
+	byHash map[string]*fakeRefreshRow
+	nextID int
+}
+
+type fakeRefreshRow struct {
+	refreshToken
+	revoked bool
+}
+
+func newFakeRefreshStore() *fakeRefreshStore {
+	return &fakeRefreshStore{byHash: map[string]*fakeRefreshRow{}}
+}
+
+func (f *fakeRefreshStore) insert(customerID, familyID, hash string) {
+	f.nextID++
+	if familyID == "" {
+		familyID = fmt.Sprintf("fam-%d", f.nextID)
+	}
+	f.byHash[hash] = &fakeRefreshRow{refreshToken: refreshToken{ID: fmt.Sprintf("rt-%d", f.nextID), CustomerID: customerID, FamilyID: familyID}}
+}
+
+func (f *fakeRefreshStore) create(_ context.Context, customerID, hash string, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.insert(customerID, "", hash)
+	return nil
+}
+
+func (f *fakeRefreshStore) rotate(_ context.Context, oldHash, newHash string, _ time.Time) (*refreshToken, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.byHash[oldHash]
+	if !ok || r.revoked {
+		return nil, nil
+	}
+	now := time.Now()
+	r.revoked, r.RotatedAt = true, &now
+	f.insert(r.CustomerID, r.FamilyID, newHash)
+	t := r.refreshToken
+	return &t, nil
+}
+
+func (f *fakeRefreshStore) lookup(_ context.Context, hash string) (*refreshToken, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.byHash[hash]
+	if !ok {
+		return nil, nil
+	}
+	t := r.refreshToken
+	return &t, nil
+}
+
+func (f *fakeRefreshStore) revokeFamily(_ context.Context, familyID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, r := range f.byHash {
+		if r.FamilyID == familyID {
+			r.revoked = true
+		}
+	}
+	return nil
+}
+
+// active reports whether the raw token would still be accepted.
+func (f *fakeRefreshStore) active(raw string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.byHash[hashToken(raw)]
+	return ok && !r.revoked
 }
