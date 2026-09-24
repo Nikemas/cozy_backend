@@ -9,10 +9,47 @@ package reports
 import (
 	"sort"
 	"time"
+	// Embedded IANA tz database: the production image is distroless (no
+	// /usr/share/zoneinfo), so time.LoadLocation would fail without it.
+	_ "time/tzdata"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
+
+// Location is the shop's business timezone. Report day boundaries (the
+// from/to dates, "orders by day") are Bishkek calendar days, not UTC ones —
+// with UTC, everything sold between 00:00 and 06:00 local time landed on
+// the previous day.
+var Location = loadLocation()
+
+func loadLocation() *time.Location {
+	loc, err := time.LoadLocation("Asia/Bishkek")
+	if err != nil {
+		// Unreachable with time/tzdata embedded; Kyrgyzstan is UTC+6
+		// with no DST, so a fixed zone is an exact fallback.
+		return time.FixedZone("+06", 6*60*60)
+	}
+	return loc
+}
+
+// CountsAsSale reports whether an order belongs in sales figures:
+// cancelled orders never do, and an online-card order only once it's
+// actually paid (a pending/failed/cancelled/refunded online payment is no
+// revenue). Cash-on-delivery orders count as soon as they're placed.
+func CountsAsSale(o orders.Order) bool {
+	if o.Status == orders.StatusCancelled {
+		return false
+	}
+	if o.PaymentMethod == orders.PaymentOnlineCard {
+		return o.PaymentStatus != nil && *o.PaymentStatus == orders.PaymentPaid
+	}
+	return true
+}
+
+// SaleConditionSQL is CountsAsSale as a SQL predicate over an orders row
+// aliased "o", for reports aggregated in SQL (brand/category breakdowns).
+const SaleConditionSQL = `o.status <> 'cancelled' AND (o.payment_method <> 'online_card' OR o.payment_status = 'paid')`
 
 // GroupBy selects how SalesReport buckets orders.
 type GroupBy string
@@ -38,10 +75,11 @@ func ParseGroupBy(s string) (GroupBy, error) {
 // dates, no time-of-day or timezone (§8 ТЗ just asks for "a date range").
 const dateLayout = "2006-01-02"
 
-// ParseReportDate parses a "YYYY-MM-DD" query param into a UTC midnight
-// time.Time. A pure function, unit-testable without a database.
+// ParseReportDate parses a "YYYY-MM-DD" query param into midnight of that
+// day in the shop's timezone (Location). A pure function, unit-testable
+// without a database.
 func ParseReportDate(s string) (time.Time, error) {
-	t, err := time.Parse(dateLayout, s)
+	t, err := time.ParseInLocation(dateLayout, s, Location)
 	if err != nil {
 		return time.Time{}, apperr.BadRequest("invalid_date", "дата должна быть в формате YYYY-MM-DD")
 	}
@@ -71,13 +109,11 @@ type Row struct {
 // alphabetical for "product"/"point" — deterministic either way, which
 // matters for JSON/Excel output and for tests).
 //
-// Cancelled orders are excluded entirely — not just from revenue, but from
-// every number in the report (order/item counts too). See the package's
-// Deviations note in tasks/todo.md for why: the brief only spells out
-// "excluded from revenue", but a report row that counts a cancelled order
-// toward order_count/item_count while reporting zero revenue for it reads
-// as a contradiction ("3 orders, $0") rather than useful data, so the
-// simpler, fully-excluded reading was chosen.
+// Orders that aren't sales (CountsAsSale: cancelled, or online-card and not
+// paid) are excluded entirely — not just from revenue, but from every
+// number in the report (order/item counts too): a row counting an order
+// toward order_count while reporting zero revenue for it reads as a
+// contradiction ("3 orders, $0") rather than useful data.
 //
 // pointNames resolves a point_id to a display name for GroupByPoint; a
 // missing or nil entry falls back to the raw point_id (or "unknown" if the
@@ -98,8 +134,9 @@ func AggregateSales(ordersList []orders.Order, groupBy GroupBy, pointNames map[s
 	}
 }
 
+// orderDayKey is the Bishkek calendar day an order was placed on.
 func orderDayKey(o orders.Order) string {
-	return o.CreatedAt.UTC().Format(dateLayout)
+	return o.CreatedAt.In(Location).Format(dateLayout)
 }
 
 func pointKey(o orders.Order, pointNames map[string]string) string {
@@ -124,7 +161,7 @@ func aggregateByOrder(ordersList []orders.Order, keyFn func(orders.Order) string
 	byKey := make(map[string]*acc)
 
 	for _, o := range ordersList {
-		if o.Status == orders.StatusCancelled {
+		if !CountsAsSale(o) {
 			continue
 		}
 		key := keyFn(o)
@@ -157,7 +194,7 @@ func aggregateByItem(ordersList []orders.Order) []Row {
 	byKey := make(map[string]*acc)
 
 	for _, o := range ordersList {
-		if o.Status == orders.StatusCancelled {
+		if !CountsAsSale(o) {
 			continue
 		}
 		for _, it := range o.Items {

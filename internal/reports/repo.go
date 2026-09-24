@@ -3,8 +3,6 @@ package reports
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/orders"
@@ -61,9 +59,10 @@ func (r *Repo) LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Ord
 	return list, nil
 }
 
-// attachItems batch-loads order_items for every order in list — identical
-// query shape to orders.(*Service).attachItems (unexported there, so not
-// reusable directly across packages).
+// attachItems batch-loads order_items for every order in list with one
+// = ANY($1) array parameter — a fixed statement, unlike the former
+// IN ($1..$N) list, which built a new statement per order count and hit
+// Postgres's 65535-parameter limit on a large range.
 func (r *Repo) attachItems(ctx context.Context, list []orders.Order) error {
 	if len(list) == 0 {
 		return nil
@@ -76,20 +75,13 @@ func (r *Repo) attachItems(ctx context.Context, list []orders.Order) error {
 		idxByID[o.ID] = i
 	}
 
-	placeholders := make([]string, len(ids))
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args[i] = id
-	}
-
-	q := fmt.Sprintf(`
+	const q = `
 		SELECT id, order_id, variant_id, product_name_snapshot, size_snapshot, color_snapshot, quantity, price
 		FROM order_items
-		WHERE order_id IN (%s)
-		ORDER BY id`, strings.Join(placeholders, ", "))
+		WHERE order_id = ANY($1)
+		ORDER BY id`
 
-	rows, err := r.db.QueryContext(ctx, q, args...)
+	rows, err := r.db.QueryContext(ctx, q, ids)
 	if err != nil {
 		return err
 	}
@@ -134,4 +126,42 @@ func (r *Repo) PointNames(ctx context.Context) (map[string]string, error) {
 		names[id] = name
 	}
 	return names, rows.Err()
+}
+
+// CategorySales aggregates sold line items by top-level catalog category
+// over [from, to): a product filed under a subcategory counts toward its
+// parent. Only orders that count as sales (SaleConditionSQL) are included;
+// revenue is line price × quantity, like AggregateSales' GroupByProduct.
+// Rows are sorted by revenue, highest first.
+func (r *Repo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, error) {
+	const q = `
+		SELECT COALESCE(parent.name_ru, c.name_ru) AS category,
+		       COUNT(DISTINCT oi.order_id) AS order_count,
+		       COALESCE(SUM(oi.quantity), 0) AS item_count,
+		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
+		FROM order_items oi
+		JOIN orders o ON o.id = oi.order_id
+		JOIN product_variants pv ON pv.id = oi.variant_id
+		JOIN products p ON p.id = pv.product_id
+		JOIN categories c ON c.id = p.category_id
+		LEFT JOIN categories parent ON parent.id = c.parent_id
+		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
+		GROUP BY 1
+		ORDER BY revenue DESC, category`
+
+	rows, err := r.db.QueryContext(ctx, q, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Row
+	for rows.Next() {
+		var row Row
+		if err := rows.Scan(&row.Key, &row.OrderCount, &row.ItemCount, &row.Revenue); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }

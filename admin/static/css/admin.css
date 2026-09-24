@@ -880,3 +880,11 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 @media (max-width: 767px) {
   .admin-filterbar__field, .admin-filterbar__field--grow { flex: 1 1 100%; min-width: 0; }
 }
+
+/* fix/admin: reports custom range + category table. */
+.admin-reports__custom { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.admin-reports__custom[hidden] { display: none; }
+.admin-reports__custom input[type="date"] { height: 40px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); padding: 0 10px; font: inherit; background: var(--admin-surface); color: var(--admin-text); }
+.admin-reports__note { font-size: 12px; color: var(--admin-muted); margin: -6px 0 14px; }
+.admin-category-report { width: 100%; }
+.admin-category-report .admin-brand-bar { min-width: 80px; }

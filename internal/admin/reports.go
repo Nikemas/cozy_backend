@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
@@ -30,6 +31,7 @@ import (
 type reportsBackend interface {
 	LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error)
 	BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
+	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 }
 
 // reportsRepo adapts *reports.Repo (Wave 3, Task O) for this screen,
@@ -56,11 +58,13 @@ func newReportsRepo(db *sql.DB) *reportsRepo {
 // breakdown. Revenue is computed the same way AggregateSales's
 // GroupByProduct does — line price × quantity, not the order's
 // total_amount — so brand rows sum to the same total as the "Топ товаров"
-// rows. Cancelled orders are excluded, same as AggregateSales. Products
+// rows. Only orders that count as sales are included (reports.
+// SaleConditionSQL: not cancelled, online-card only once paid), same as
+// AggregateSales. Products
 // with no brand set (or an all-whitespace one) roll up into a "Без
 // бренда" bucket rather than being dropped.
 func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error) {
-	const q = `
+	q := `
 		SELECT COALESCE(NULLIF(TRIM(p.brand), ''), 'Без бренда') AS brand,
 		       COUNT(DISTINCT oi.order_id) AS order_count,
 		       COALESCE(SUM(oi.quantity), 0) AS item_count,
@@ -69,7 +73,7 @@ func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]rep
 		JOIN orders o ON o.id = oi.order_id
 		JOIN product_variants pv ON pv.id = oi.variant_id
 		JOIN products p ON p.id = pv.product_id
-		WHERE o.created_at >= $1 AND o.created_at < $2 AND o.status <> 'cancelled'
+		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + reports.SaleConditionSQL + `
 		GROUP BY brand
 		ORDER BY revenue DESC`
 
@@ -106,7 +110,12 @@ var reportPeriods = []reportPeriod{
 	{"week", "Последние 7 дней"},
 	{"month", "Текущий месяц"},
 	{"prev_month", "Прошлый месяц"},
+	{"custom", "Произвольный период"},
 }
+
+// maxCustomReportDays caps a custom range (one year) so a typo'd year
+// doesn't load a decade of orders into memory.
+const maxCustomReportDays = 366
 
 func defaultReportPeriod() string { return reportPeriods[0].key }
 
@@ -120,19 +129,21 @@ func isValidReportPeriod(key string) bool {
 }
 
 // reportRange resolves period into a [from, to] calendar-day range, both
-// bounds inclusive UTC midnight, anchored to now. Callers loading orders
-// with it must push "to" one day out first — see reports.Repo.LoadOrders's
-// doc comment, mirrored by loadReportOrders below.
+// bounds inclusive midnights in the shop's timezone (reports.Location —
+// Asia/Bishkek), anchored to now. Callers loading orders with it must push
+// "to" one day out first — see reports.Repo.LoadOrders's doc comment.
 func reportRange(period string, now time.Time) (from, to time.Time) {
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	loc := reports.Location
+	now = now.In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	switch period {
 	case "month":
-		from = time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
+		from = time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, loc)
 		to = today
 	case "prev_month":
-		firstOfThisMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
+		firstOfThisMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, loc)
 		to = firstOfThisMonth.AddDate(0, 0, -1)
-		from = time.Date(to.Year(), to.Month(), 1, 0, 0, 0, 0, time.UTC)
+		from = time.Date(to.Year(), to.Month(), 1, 0, 0, 0, 0, loc)
 	default: // "week"
 		from = today.AddDate(0, 0, -6)
 		to = today
@@ -149,23 +160,61 @@ func reportRange(period string, now time.Time) (from, to time.Time) {
 func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 
-	period := r.URL.Query().Get("period")
+	q := r.URL.Query()
+	period := q.Get("period")
 	if !isValidReportPeriod(period) {
 		period = defaultReportPeriod()
 	}
-	from, to := reportRange(period, time.Now())
+
+	var from, to time.Time
+	var rangeErr string
+	if period == "custom" {
+		var err error
+		from, to, err = parseCustomReportRange(q.Get("from"), q.Get("to"))
+		if err != nil {
+			rangeErr = appErrMessage(err)
+			period = defaultReportPeriod()
+		}
+	}
+	if period != "custom" {
+		from, to = reportRange(period, time.Now())
+	}
 
 	reportData, err := h.buildReportsData(r.Context(), period, from, to)
 	if err != nil {
 		http.Error(w, "не удалось построить отчёт", http.StatusInternalServerError)
 		return
 	}
+	reportData.Custom = period == "custom"
+	reportData.From = from.Format("2006-01-02")
+	reportData.To = to.Format("2006-01-02")
+	reportData.Err = rangeErr
 
 	data := h.shellPageData("reports", "Отчёты", st)
 	data.Data = reportData
 	if err := h.render.Render(w, "reports", data); err != nil {
 		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
 	}
+}
+
+// parseCustomReportRange validates the custom period's from/to dates
+// (YYYY-MM-DD, Bishkek days, from <= to, at most maxCustomReportDays).
+func parseCustomReportRange(fromStr, toStr string) (from, to time.Time, err error) {
+	from, err = reports.ParseReportDate(fromStr)
+	if err != nil {
+		return from, to, err
+	}
+	to, err = reports.ParseReportDate(toStr)
+	if err != nil {
+		return from, to, err
+	}
+	if err := reports.ValidateRange(from, to); err != nil {
+		return from, to, err
+	}
+	if to.Sub(from) > maxCustomReportDays*24*time.Hour {
+		return from, to, apperr.BadRequest("range_too_long", "период не может быть длиннее года")
+	}
+	return from, to, nil
 }
 
 // buildReportsData loads orders for [from, to] (both inclusive from the
@@ -194,6 +243,10 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 	if err != nil {
 		return ReportsData{}, err
 	}
+	categoryRows, err := h.reports.CategorySales(ctx, from, loadTo)
+	if err != nil {
+		return ReportsData{}, err
+	}
 
 	return ReportsData{
 		Periods:     reportPeriodOptions(period),
@@ -203,6 +256,7 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		Bars:        buildBars(dayRows, from, to),
 		TopProducts: buildTopProducts(productRows),
 		TopBrands:   buildTopBrands(brandRows),
+		Categories:  buildCategoryBars(categoryRows),
 	}, nil
 }
 
@@ -223,6 +277,23 @@ type ReportsData struct {
 
 	TopProducts []RankedRow
 	TopBrands   []BrandBar
+	Categories  []CategoryBar
+
+	// Custom-period state: Custom shows the from/to inputs, From/To are
+	// the resolved range (YYYY-MM-DD), Err a rejected custom range.
+	Custom bool
+	From   string
+	To     string
+	Err    string
+}
+
+// CategoryBar is one row of the "По категориям" report.
+type CategoryBar struct {
+	Name     string
+	Sum      string
+	Qty      string
+	Orders   string
+	WidthPct int
 }
 
 // PeriodOption is one <option> in the period <select>.
@@ -397,3 +468,28 @@ func buildTopBrands(brandRows []reports.Row) []BrandBar {
 // formatMoney is defined once for the package in products_view.go (the
 // same KGS thousands-grouped, no-decimals formatting internal/web's own
 // formatMoney uses) — reused here rather than redefined.
+
+// buildCategoryBars shapes reports.Repo.CategorySales' rows (already
+// revenue-sorted) — every category, not capped like the top-5 lists, since
+// a shoe shop has only a handful of top-level categories.
+func buildCategoryBars(rows []reports.Row) []CategoryBar {
+	maxRevenue := 0.0
+	if len(rows) > 0 {
+		maxRevenue = rows[0].Revenue
+	}
+	out := make([]CategoryBar, len(rows))
+	for i, row := range rows {
+		pct := 0
+		if maxRevenue > 0 {
+			pct = int(math.Round(row.Revenue / maxRevenue * 100))
+		}
+		out[i] = CategoryBar{
+			Name:     row.Key,
+			Sum:      formatMoney(row.Revenue),
+			Qty:      fmt.Sprintf("%d шт.", row.ItemCount),
+			Orders:   fmt.Sprintf("%d %s", row.OrderCount, pluralRu(row.OrderCount, "заказ", "заказа", "заказов")),
+			WidthPct: pct,
+		}
+	}
+	return out
+}

@@ -116,8 +116,9 @@ func TestSalesReportJSONHandlerLoadsToExclusiveDayAfterTo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantFrom := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	wantTo := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	// Report days are Bishkek calendar days (reports.Location), not UTC.
+	wantFrom := time.Date(2026, 1, 1, 0, 0, 0, 0, reports.Location)
+	wantTo := time.Date(2026, 2, 1, 0, 0, 0, 0, reports.Location)
 	if !repo.lastFrom.Equal(wantFrom) {
 		t.Errorf("LoadOrders from = %v, want %v", repo.lastFrom, wantFrom)
 	}
