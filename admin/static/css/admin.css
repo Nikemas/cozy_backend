@@ -891,3 +891,22 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-filterbar__dates { display: flex; gap: 12px; flex-wrap: wrap; }
 .admin-filterbar__dates[hidden] { display: none; }
 .admin-orders-table__num a, a.admin-order-card__num { color: inherit; }
+
+/* fix/admin: visible keyboard focus. Several controls above reset
+   outline:none; they get a ring on :focus-visible instead. The ring uses
+   the darker primary (#E56200, >=3:1 on white) — the base orange is too
+   light for a focus indicator. */
+:where(a, button, summary, [tabindex], .admin-chip-btn, .admin-chip-filter):focus-visible {
+  outline: 2px solid var(--admin-primary-hover);
+  outline-offset: 2px;
+}
+.admin-field input:focus-visible,
+.admin-field select:focus-visible,
+.admin-field textarea:focus-visible,
+.admin-header__search input:focus-visible,
+.admin-variant-input:focus-visible,
+.admin-reports__custom input:focus-visible {
+  border-color: var(--admin-primary-hover);
+  box-shadow: 0 0 0 3px rgba(229, 98, 0, 0.35);
+}
+.admin-orders-table tbody tr:focus-within { background: var(--admin-primary-tint); }

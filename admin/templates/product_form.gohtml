@@ -149,7 +149,7 @@
      two size rows with the same color share and edit the same photo set,
      since staff only shoots one set of photos per color, not per size. */}}
 <div id="pf-colorphoto-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--lg">
+  <div class="admin-modal admin-modal--lg" role="dialog" aria-modal="true" aria-labelledby="pf-colorphoto-title">
     <div class="admin-modal__title" id="pf-colorphoto-title">Фото цвета</div>
     <div class="admin-modal__text">Эти фото покажутся покупателю, когда он выберет этот цвет в карточке товара.</div>
     <div id="pf-colorphoto-grid" class="admin-photo-grid" style="margin-top:14px"></div>
@@ -170,8 +170,8 @@
      the design canvas's subModal block (Cozy Admin.dc.html ~747-770).
      Replaces the earlier window.prompt()-chain UI with real fields. */}}
 <div id="pf-category-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая категория</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-category-modal-title">
+    <div class="admin-modal__title" id="pf-category-modal-title">Новая категория</div>
     <div class="admin-field" style="margin-top:18px">
       <label for="pf-newcat-name">Название категории</label>
       <input type="text" id="pf-newcat-name" placeholder="Сандалии" onkeydown="if(event.key==='Enter')pfSaveCategory()">
@@ -185,8 +185,8 @@
 </div>
 
 <div id="pf-subcategory-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая подкатегория</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-subcategory-modal-title">
+    <div class="admin-modal__title" id="pf-subcategory-modal-title">Новая подкатегория</div>
     <div class="admin-modal__text">Например «Классика» или «Спортивные» внутри выбранной категории.</div>
     <div class="admin-field" style="margin-top:14px">
       <label for="pf-newsub-parent">Категория</label>
@@ -205,8 +205,8 @@
 </div>
 
 <div id="pf-brand-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новый бренд</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-brand-modal-title">
+    <div class="admin-modal__title" id="pf-brand-modal-title">Новый бренд</div>
     <div class="admin-field" style="margin-top:18px">
       <label for="pf-newbrand-name">Название бренда</label>
       <input type="text" id="pf-newbrand-name" placeholder="New Balance" onkeydown="if(event.key==='Enter')pfSaveBrand()">

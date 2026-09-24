@@ -55,7 +55,9 @@
     <div class="admin-order-detail__label">Сменить статус</div>
     <div class="admin-order-detail__statusbtns">
       {{range .Data.StatusButtons}}
-      <form method="post" action="/admin/orders/{{$.Data.ID}}/status">
+      <form method="post" action="/admin/orders/{{$.Data.ID}}/status"{{if eq .Value "cancelled"}}
+            data-confirm="Заказ {{$.Data.Number}} будет отменён — это действие необратимо." data-confirm-title="Отменить заказ?"
+            data-confirm-label="Отменить заказ" data-confirm-danger="1"{{end}}>
         <input type="hidden" name="status" value="{{.Value}}">
         <button type="submit" class="admin-status-btn {{.Class}}">{{.Label}}</button>
       </form>
