@@ -87,7 +87,11 @@ func run() error {
 
 	// Must be installed before any orders.Service is constructed/used by
 	// the route registrations below.
-	notifier := buildNotifications(db, cfg)
+	pushSender := buildPushSender(cfg)
+	notifier, err := buildNotifications(db, cfg, pushSender)
+	if err != nil {
+		return err
+	}
 	orders.SetDefaultNotifier(notifier)
 
 	// Order settings (DELIVERY_FEE_SOM, MAX_OPEN_ORDERS_PER_CUSTOMER,
