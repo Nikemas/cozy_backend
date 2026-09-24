@@ -1,8 +1,9 @@
 // staff_page.go implements Task 5's "Сотрудники" screen (GET /admin/staff)
-// plus its two mutations (POST /admin/staff to create, POST
-// /admin/staff/{id}/toggle to flip active/inactive) — design canvas Cozy
-// Admin.dc.html lines 644-664 (list) and 706-741 (staffModal). All three
-// routes are wired under ownerOnly in routes.go.
+// plus its mutations (POST /admin/staff to create, POST
+// /admin/staff/{id}/toggle to flip active/inactive, POST
+// /admin/staff/{id}/password for the owner to set a new password) — design
+// canvas Cozy Admin.dc.html lines 644-664 (list) and 706-741 (staffModal).
+// All routes are wired under ownerOnly in routes.go.
 package admin
 
 import (
@@ -24,6 +25,7 @@ type staffRow struct {
 	RoleClass   string // admin-chip modifier class, see admin.css
 	Scope       string // "Все точки" for owner/manager, the point's name for point_staff
 	ToggleLabel string
+	IsActive    bool // deactivation asks for confirmation, activation doesn't
 }
 
 // roleChipClass picks a role-chip color, design canvas's {{ s.chipStyle }}
@@ -72,6 +74,7 @@ func newStaffRow(s staff.Staff, pointNames map[string]string) staffRow {
 		RoleClass:   roleChipClass(s.Role),
 		Scope:       scope,
 		ToggleLabel: toggleLabel,
+		IsActive:    s.IsActive,
 	}
 }
 
@@ -85,11 +88,21 @@ type staffPageData struct {
 	Rows   []staffRow
 	Points []*points.Point
 	Error  string
+	Notice string
+	// MinPasswordLength drives the password inputs' minlength/placeholder
+	// so the form hint can't drift from the server-side rule.
+	MinPasswordLength int
+}
+
+// staffNotices are the success banners a redirect back to the list can ask
+// for via ?done=... — a fixed map, so the query string can't inject text.
+var staffNotices = map[string]string{
+	"password": "Пароль изменён. Сотрудник выйдет из всех сеансов и войдёт с новым паролем.",
 }
 
 // staffPage handles GET /admin/staff.
 func (h *handlers) staffPage(w http.ResponseWriter, r *http.Request) {
-	h.renderStaffPage(w, r, "")
+	h.renderStaffPageWithNotice(w, r, "", staffNotices[r.URL.Query().Get("done")])
 }
 
 // renderStaffPage re-lists every staff account and every point of sale
@@ -99,6 +112,10 @@ func (h *handlers) staffPage(w http.ResponseWriter, r *http.Request) {
 // this is how the last-owner-invariant conflict from
 // staff.Service.UpdateStaff reaches the page instead of being swallowed.
 func (h *handlers) renderStaffPage(w http.ResponseWriter, r *http.Request, errMsg string) {
+	h.renderStaffPageWithNotice(w, r, errMsg, "")
+}
+
+func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Request, errMsg, notice string) {
 	st, _ := staff.FromContext(r.Context())
 
 	list, err := h.staffSvc.ListStaff(r.Context())
@@ -123,7 +140,7 @@ func (h *handlers) renderStaffPage(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	data := h.shellPageData("staff", "Сотрудники", st)
-	data.Data = staffPageData{Rows: rows, Points: pts, Error: errMsg}
+	data.Data = staffPageData{Rows: rows, Points: pts, Error: errMsg, Notice: notice, MinPasswordLength: staff.MinPasswordLength}
 	if err := h.render.Render(w, "staff", data); err != nil {
 		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
 	}
@@ -206,4 +223,25 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/admin/staff", http.StatusSeeOther)
+}
+
+// staffResetPassword handles POST /admin/staff/{id}/password — the owner
+// sets a new password for a staff member (who forgot theirs, or whose
+// password may have leaked). staff.Service.ResetPassword enforces the
+// minimum length and ends all of that account's sessions.
+func (h *handlers) staffResetPassword(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.renderStaffPage(w, r, "не удалось прочитать форму")
+		return
+	}
+	password := r.FormValue("password")
+	if password != r.FormValue("password_confirm") {
+		h.renderStaffPage(w, r, "пароли не совпадают")
+		return
+	}
+	if err := h.staffSvc.ResetPassword(r.Context(), r.PathValue("id"), password); err != nil {
+		h.renderStaffPage(w, r, appErrMessage(err))
+		return
+	}
+	http.Redirect(w, r, "/admin/staff?done=password", http.StatusSeeOther)
 }

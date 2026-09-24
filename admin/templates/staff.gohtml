@@ -15,7 +15,8 @@
   </div>
 
   {{with $pdata}}
-  {{if .Error}}<div class="admin-form-error">{{.Error}}</div>{{end}}
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+  {{if .Notice}}<div class="admin-form-error" role="status" style="color:var(--admin-text);background:var(--admin-primary-tint)">{{.Notice}}</div>{{end}}
 
   <div class="admin-row-list">
     {{if not .Rows}}
@@ -30,7 +31,11 @@
       </div>
       <span class="admin-chip {{.RoleClass}}">{{.RoleLabel}}</span>
       <div class="admin-row__scope">{{.Scope}}</div>
-      <form method="post" action="/admin/staff/{{.ID}}/toggle">
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+              data-staff-id="{{.ID}}" data-staff-name="{{.Name}}"
+              onclick="openStaffPasswordModal(this)">Сменить пароль</button>
+      <form method="post" action="/admin/staff/{{.ID}}/toggle"
+            {{if .IsActive}}data-confirm="Деактивировать сотрудника «{{.Name}}»? Он сразу потеряет доступ к админке." onsubmit="return confirmStaffAction(this)"{{end}}>
         <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
       </form>
     </div>
@@ -81,8 +86,8 @@
       <div class="admin-field">
         <label for="staff-password">Пароль</label>
         <div class="admin-password-row">
-          <input id="staff-password" name="password" placeholder="Минимум 6 символов" minlength="6" required>
-          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword()">Сгенерировать</button>
+          <input id="staff-password" name="password" placeholder="Минимум {{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}} символов" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
+          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-password')">Сгенерировать</button>
         </div>
       </div>
       <div class="admin-modal__actions">
@@ -92,7 +97,45 @@
     </form>
   </div>
 </div>
+{{/* Owner resets a staff member's password — one modal shared by every
+     row; openStaffPasswordModal() points the form at that row's id. */}}
+<div id="admin-staff-password-modal" class="admin-modal-backdrop" style="display:none" role="dialog" aria-modal="true" aria-labelledby="staff-password-modal-title">
+  <div class="admin-modal">
+    <div class="admin-modal__title" id="staff-password-modal-title">Новый пароль: <span id="staff-password-modal-name"></span></div>
+    <form method="post" id="staff-password-form" action="">
+      <div class="admin-field">
+        <label for="staff-new-password">Новый пароль</label>
+        <div class="admin-password-row">
+          <input id="staff-new-password" name="password" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
+          <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" onclick="generateStaffPassword('staff-new-password', 'staff-new-password-confirm')">Сгенерировать</button>
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="staff-new-password-confirm">Повторите пароль</label>
+        <input id="staff-new-password-confirm" name="password_confirm" minlength="{{if $pdata}}{{$pdata.MinPasswordLength}}{{else}}8{{end}}" maxlength="72" autocomplete="new-password" required>
+      </div>
+      <div class="admin-list-note">Сотрудник выйдет из всех сеансов. Передайте ему новый пароль лично.</div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeStaffPasswordModal()">Отмена</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить пароль</button>
+      </div>
+    </form>
+  </div>
+</div>
 <script>
+function confirmStaffAction(form) { return window.confirm(form.dataset.confirm); }
+function openStaffPasswordModal(btn) {
+  var form = document.getElementById('staff-password-form');
+  form.action = '/admin/staff/' + encodeURIComponent(btn.dataset.staffId) + '/password';
+  form.reset();
+  document.getElementById('staff-password-modal-name').textContent = btn.dataset.staffName;
+  document.getElementById('admin-staff-password-modal').style.display = 'flex';
+  document.getElementById('staff-new-password').focus();
+}
+function closeStaffPasswordModal() { document.getElementById('admin-staff-password-modal').style.display = 'none'; }
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { closeStaffPasswordModal(); closeStaffModal(); }
+});
 function openStaffModal() {
   document.getElementById('admin-staff-modal').style.display = 'flex';
   toggleStaffPointField();
@@ -102,11 +145,19 @@ function toggleStaffPointField() {
   var role = document.getElementById('staff-role').value;
   document.getElementById('staff-point-field').style.display = role === 'point_staff' ? 'flex' : 'none';
 }
+// Generates a 12-character password with the browser's CSPRNG (not
+// Math.random) and shows it in the field(s) so the owner can pass it on.
 function generateStaffPassword() {
   var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var buf = new Uint32Array(12);
+  window.crypto.getRandomValues(buf);
   var pass = '';
-  for (var i = 0; i < 8; i++) { pass += chars.charAt(Math.floor(Math.random() * chars.length)); }
-  document.getElementById('staff-password').value = pass;
+  for (var i = 0; i < buf.length; i++) { pass += chars.charAt(buf[i] % chars.length); }
+  for (var j = 0; j < arguments.length; j++) {
+    var el = document.getElementById(arguments[j]);
+    el.value = pass;
+    el.type = 'text';
+  }
 }
 </script>
 {{end}}

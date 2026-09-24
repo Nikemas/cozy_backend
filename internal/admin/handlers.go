@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/media"
@@ -69,7 +72,15 @@ func (h *handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.staffSvc.Login(r.Context(), phone, password)
 	if err != nil {
-		h.renderLogin(w, PageData{Phone: phone, Err: err.Error()})
+		// appErrMessage shows only the user-facing message of an
+		// *apperr.AppError (wrong credentials, too many attempts) and a
+		// generic text for anything else — a raw err.Error() could leak
+		// SQL/driver details onto an unauthenticated page.
+		var appErr *apperr.AppError
+		if !errors.As(err, &appErr) {
+			slog.ErrorContext(r.Context(), "admin: staff login failed", "err", err)
+		}
+		h.renderLogin(w, PageData{Phone: phone, Err: appErrMessage(err)})
 		return
 	}
 

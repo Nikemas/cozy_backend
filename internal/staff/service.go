@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 )
 
 // sessionTTL is deliberately shorter than the customer refresh-token TTL —
@@ -38,6 +40,7 @@ type sessionStore interface {
 	create(ctx context.Context, staffID, tokenHash string, expiresAt time.Time) error
 	getActiveByHash(ctx context.Context, tokenHash string) (*Session, error)
 	revokeByHash(ctx context.Context, tokenHash string) error
+	revokeAllForStaff(ctx context.Context, staffID string) error
 }
 
 // staffAdmin is the subset of *Repo that Service's admin CRUD methods
@@ -51,6 +54,7 @@ type staffAdmin interface {
 	List(ctx context.Context) ([]Staff, error)
 	Create(ctx context.Context, in StaffCreateInput) (*Staff, error)
 	Update(ctx context.Context, id string, in StaffUpdateInput) (*Staff, error)
+	SetPassword(ctx context.Context, id, passwordHash string) error
 }
 
 // Service implements staff login/logout, session resolution, and (for
@@ -60,16 +64,33 @@ type Service struct {
 	sessions sessionStore
 	admin    staffAdmin
 
-	loginLimiter loginRateLimiter
+	loginLimiter loginRateLimiter  // per phone
+	ipLimiter    *loginRateLimiter // per client IP; nil disables
 }
+
+// defaultLoginIPLimit is the per-IP login budget per loginAttemptWindow
+// when SetLoginIPLimit isn't called (STAFF_LOGIN_MAX_PER_IP).
+const defaultLoginIPLimit = 20
 
 func NewService(db *sql.DB) *Service {
 	repo := NewRepo(db)
 	return &Service{
-		staff:    repo,
-		sessions: newSessionRepo(db),
-		admin:    repo,
+		staff:     repo,
+		sessions:  newSessionRepo(db),
+		admin:     repo,
+		ipLimiter: &loginRateLimiter{limit: defaultLoginIPLimit},
 	}
+}
+
+// SetLoginIPLimit sets how many login attempts one client IP may make per
+// 15 minutes, across all phone numbers (0 disables the per-IP limit).
+// Call once at startup.
+func (s *Service) SetLoginIPLimit(n int) {
+	if n <= 0 {
+		s.ipLimiter = nil
+		return
+	}
+	s.ipLimiter = &loginRateLimiter{limit: n}
 }
 
 // Login checks phone+password against the staff table (bcrypt compare of
@@ -80,12 +101,16 @@ func NewService(db *sql.DB) *Service {
 // login attempt can't be used to enumerate valid phone numbers or find
 // disabled accounts, whether by response content or by timing.
 //
-// Attempts are throttled per phone number (see loginRateLimiter) before
-// any of that: once the budget for a phone is used up within the window,
+// Attempts are throttled per client IP (across all phones, so one IP
+// can't spray passwords over many accounts) and per phone number (see
+// loginRateLimiter) before any of that: once the budget for a phone is used up within the window,
 // Login rejects with apperr.TooManyRequests without touching the database
 // or running bcrypt, so brute-forcing one account's password can't be
 // sped up by parallelizing requests.
 func (s *Service) Login(ctx context.Context, phone, password string) (sessionToken string, err error) {
+	if ip := httpmw.ClientIPFromContext(ctx); s.ipLimiter != nil && ip != "" && !s.ipLimiter.allow(ip) {
+		return "", apperr.TooManyRequests("too_many_attempts", "слишком много попыток входа, попробуйте позже")
+	}
 	if !s.loginLimiter.allow(phone) {
 		return "", apperr.TooManyRequests("too_many_attempts", "слишком много попыток входа, попробуйте позже")
 	}
@@ -215,8 +240,8 @@ func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff,
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, apperr.BadRequest("invalid_name", "имя обязательно")
 	}
-	if in.Password == "" {
-		return nil, apperr.BadRequest("invalid_password", "пароль обязателен")
+	if err := validatePassword(in.Password); err != nil {
+		return nil, err
 	}
 	if err := validateStaffRolePointID(in.Role, in.PointID); err != nil {
 		return nil, err
@@ -256,8 +281,8 @@ func (s *Service) UpdateStaff(ctx context.Context, id string, in UpdateStaffInpu
 		IsActive: in.IsActive,
 	}
 	if in.Password != nil {
-		if *in.Password == "" {
-			return nil, apperr.BadRequest("invalid_password", "пароль не может быть пустым")
+		if err := validatePassword(*in.Password); err != nil {
+			return nil, err
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(*in.Password), bcrypt.DefaultCost)
 		if err != nil {
@@ -267,7 +292,52 @@ func (s *Service) UpdateStaff(ctx context.Context, id string, in UpdateStaffInpu
 		upd.PasswordHash = &h
 	}
 
-	return s.admin.Update(ctx, id, upd)
+	updated, err := s.admin.Update(ctx, id, upd)
+	if err != nil {
+		return nil, err
+	}
+	// A new password or a deactivation ends every open session of the
+	// account right away (a deactivated account is also refused on each
+	// request, but revoking keeps staff_sessions honest).
+	if in.Password != nil || !in.IsActive {
+		if err := s.sessions.revokeAllForStaff(ctx, id); err != nil {
+			return nil, err
+		}
+	}
+	return updated, nil
+}
+
+// ResetPassword sets a new password for a staff account (owner action from
+// the admin staff page) and logs that account out everywhere.
+func (s *Service) ResetPassword(ctx context.Context, id, newPassword string) error {
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if err := s.admin.SetPassword(ctx, id, string(hash)); err != nil {
+		return err
+	}
+	return s.sessions.revokeAllForStaff(ctx, id)
+}
+
+// MinPasswordLength is the minimum staff password length, in characters.
+const MinPasswordLength = 8
+
+// maxPasswordBytes is bcrypt's input limit: longer passwords are rejected
+// by bcrypt.GenerateFromPassword rather than silently truncated.
+const maxPasswordBytes = 72
+
+func validatePassword(p string) error {
+	if utf8.RuneCountInString(p) < MinPasswordLength {
+		return apperr.BadRequest("invalid_password", "пароль должен быть не короче 8 символов")
+	}
+	if len(p) > maxPasswordBytes {
+		return apperr.BadRequest("invalid_password", "пароль слишком длинный (максимум 72 байта)")
+	}
+	return nil
 }
 
 // validateStaffRolePointID enforces §"Business rules" 1: point_id is

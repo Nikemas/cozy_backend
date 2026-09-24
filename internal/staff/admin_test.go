@@ -3,7 +3,9 @@ package staff
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -11,7 +13,7 @@ import (
 )
 
 func newTestAdminService(admin *fakeStaffAdmin) *Service {
-	return &Service{admin: admin}
+	return &Service{admin: admin, sessions: newFakeSessionStore()}
 }
 
 func strPtr(s string) *string { return &s }
@@ -269,3 +271,66 @@ func TestListStaffReturnsAll(t *testing.T) {
 		t.Fatalf("expected 2 staff accounts, got %d", len(list))
 	}
 }
+
+func TestPasswordMinLength(t *testing.T) {
+	manager := &Staff{ID: "s1", Phone: "+996700000001", Name: "Manager", PasswordHash: mustHash(t, "old-pass-1"), Role: RoleManager, IsActive: true}
+	svc := newTestAdminService(newFakeStaffAdmin(manager))
+
+	_, err := svc.CreateStaff(context.Background(), CreateStaffInput{
+		Phone: "+996700000009", Password: "1234567", Name: "Clerk", Role: RoleManager,
+	})
+	assertAppErrCode(t, err, "invalid_password")
+
+	short := "short"
+	_, err = svc.UpdateStaff(context.Background(), "s1", UpdateStaffInput{
+		Name: "Manager", Role: RoleManager, IsActive: true, Password: &short,
+	})
+	assertAppErrCode(t, err, "invalid_password")
+
+	assertAppErrCode(t, svc.ResetPassword(context.Background(), "s1", "1234567"), "invalid_password")
+	assertAppErrCode(t, svc.ResetPassword(context.Background(), "s1", strings.Repeat("я", 40)), "invalid_password") // 80 bytes > bcrypt's 72
+
+	// 8 multi-byte characters is fine.
+	if err := svc.ResetPassword(context.Background(), "s1", "пароль12"); err != nil {
+		t.Fatalf("8-char password rejected: %v", err)
+	}
+}
+
+func TestResetPasswordChangesHashAndRevokesSessions(t *testing.T) {
+	manager := &Staff{ID: "s1", Phone: "+996700000001", Name: "Manager", PasswordHash: mustHash(t, "old-pass-1"), Role: RoleManager, IsActive: true}
+	admin := newFakeStaffAdmin(manager)
+	sessions := newFakeSessionStore()
+	svc := &Service{admin: admin, sessions: sessions}
+	_ = sessions.create(context.Background(), "s1", "h1", time.Now().Add(time.Hour))
+	_ = sessions.create(context.Background(), "other", "h2", time.Now().Add(time.Hour))
+
+	if err := svc.ResetPassword(context.Background(), "s1", "brand-new-pass"); err != nil {
+		t.Fatal(err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.byID["s1"].PasswordHash), []byte("brand-new-pass")); err != nil {
+		t.Error("password hash not updated")
+	}
+	if sessions.byHash["h1"].RevokedAt == nil {
+		t.Error("the account's sessions must be revoked")
+	}
+	if sessions.byHash["h2"].RevokedAt != nil {
+		t.Error("other accounts' sessions must stay")
+	}
+
+	assertAppErrCode(t, svc.ResetPassword(context.Background(), "missing", "brand-new-pass"), "staff_not_found")
+}
+
+func TestDeactivationRevokesSessions(t *testing.T) {
+	manager := &Staff{ID: "s1", Phone: "+996700000001", Name: "Manager", Role: RoleManager, IsActive: true}
+	sessions := newFakeSessionStore()
+	svc := &Service{admin: newFakeStaffAdmin(manager), sessions: sessions}
+	_ = sessions.create(context.Background(), "s1", "h1", time.Now().Add(time.Hour))
+
+	if _, err := svc.UpdateStaff(context.Background(), "s1", UpdateStaffInput{Name: "Manager", Role: RoleManager, IsActive: false}); err != nil {
+		t.Fatal(err)
+	}
+	if sessions.byHash["h1"].RevokedAt == nil {
+		t.Error("deactivation must revoke sessions")
+	}
+}
+

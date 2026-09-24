@@ -199,6 +199,7 @@ func registerAPIRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cf
 // internal/staff.
 func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Client, cfg *config.Config) error {
 	staffSvc := staff.NewService(db)
+	staffSvc.SetLoginIPLimit(cfg.Security.Auth.StaffLoginPerIP)
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc, cfg)
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
