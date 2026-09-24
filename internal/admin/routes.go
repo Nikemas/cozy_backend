@@ -100,6 +100,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// toggle-active. See internal/admin/points_page.go/staff_page.go.
 	mux.HandleFunc("GET /admin/points", ownerOnly(h.pointsPage))
 	mux.HandleFunc("POST /admin/points", ownerOnly(h.pointsCreate))
+	mux.HandleFunc("POST /admin/points/{id}", ownerOnly(h.pointsUpdate))
 	mux.HandleFunc("POST /admin/points/{id}/toggle", ownerOnly(h.pointsToggle))
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.staffPage))
 	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))

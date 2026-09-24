@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -93,4 +94,17 @@ func TestPgErrCodeEmptyForNonPgError(t *testing.T) {
 	if got := pgErrCode(errors.New("boom")); got != "" {
 		t.Errorf("pgErrCode() = %q, want empty", got)
 	}
+}
+
+func TestPointGetByIDNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery(`FROM points_of_sale\s+WHERE id::text = \$1`).WithArgs("nope").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address", "is_active", "created_at"}))
+
+	_, err = NewPointsRepo(db).GetByID(context.Background(), "nope")
+	assertAppErrStatus(t, err, http.StatusNotFound)
 }
