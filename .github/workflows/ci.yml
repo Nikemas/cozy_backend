@@ -10,6 +10,9 @@ name: CI
 on:
   push:
   pull_request:
+  # deploy.yml calls this whole workflow as its gate, so a deploy runs
+  # exactly the same checks (incl. migrations + integration tests).
+  workflow_call:
 
 # Least-privilege default for the GITHUB_TOKEN: this workflow only reads
 # the repo to lint/test it, it never pushes, comments, or touches packages.
@@ -54,3 +57,72 @@ jobs:
           # deliberately alongside the Go version in go.mod.
           version: v2.13.2
           args: --timeout=5m
+
+  migrations-and-integration:
+    name: migrations up/down/up + integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Same major version as docker/docker-compose.prod.yml.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cozy
+          POSTGRES_PASSWORD: cozy
+          POSTGRES_DB: cozy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cozy -d cozy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Same migrate image/version scripts/deploy.sh uses on the server.
+      MIGRATE_IMAGE: migrate/migrate:v4.18.3
+      MIGRATE_DB: postgres://cozy:cozy@localhost:5432/cozy?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: migrate up, down to 0, up again
+        run: |
+          set -euo pipefail
+          migrate() {
+            docker run --rm --network host -v "$PWD/migrations:/migrations:ro" \
+              "$MIGRATE_IMAGE" -path=/migrations -database "$MIGRATE_DB" "$@"
+          }
+          latest="$(ls migrations/*.up.sql | sed -E 's|.*/0*([0-9]+)_.*|\1|' | sort -n | tail -n1)"
+          check_version() {
+            # `migrate version` prints "N" or "N (dirty)" on stderr.
+            v="$(migrate version 2>&1 | tail -n1)"
+            if [ "$v" != "$1" ]; then
+              echo "::error::expected schema version '$1', got '$v'"
+              exit 1
+            fi
+          }
+          echo "::group::up"
+          migrate up
+          check_version "$latest"
+          echo "::endgroup::"
+          echo "::group::down -all"
+          migrate down -all
+          echo "::endgroup::"
+          echo "::group::up again"
+          migrate up
+          check_version "$latest"
+          echo "::endgroup::"
+
+      - name: go vet (integration tag)
+        run: go vet -tags integration ./internal/integration/...
+
+      - name: integration tests
+        env:
+          # The harness creates and drops its own cozy_it_* databases.
+          TEST_DATABASE_URL: postgres://cozy:cozy@localhost:5432/postgres?sslmode=disable
+        run: go test -tags integration -race -count=1 -v ./internal/integration/...
