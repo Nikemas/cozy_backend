@@ -84,6 +84,25 @@ func (r *PointsRepo) List(ctx context.Context) ([]*Point, error) {
 	return points, nil
 }
 
+// GetByID returns one point of sale (active or not). Returns
+// apperr.NotFound if no such point exists.
+func (r *PointsRepo) GetByID(ctx context.Context, id string) (*Point, error) {
+	const q = `
+		SELECT id, name, address, is_active, created_at
+		FROM points_of_sale
+		WHERE id::text = $1`
+
+	var p Point
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.Name, &p.Address, &p.IsActive, &p.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("point_not_found", "точка продаж не найдена")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 // Create inserts a new point of sale and returns the row as stored.
 func (r *PointsRepo) Create(ctx context.Context, in PointInput) (*Point, error) {
 	if err := in.validate(); err != nil {

@@ -1,20 +1,39 @@
 {{/* reports.gohtml — Отчёты (Task 4, Wave 4), replacing Foundation's stub.
      Cozy Admin.dc.html lines 558-618: period select + Excel export, 4 stat
      cards, a per-day CSS bar chart, "Топ товаров" and "По брендам" ranked
-     lists. .Data is a *internal/admin/reports.go's ReportsData, built by
+     lists, plus (fix/admin) a custom date range and "По категориям". .Data is a *internal/admin/reports.go's ReportsData, built by
      handlers.buildReportsData — see that file for how each field here is
      computed from internal/reports.AggregateSales' output. */}}
 {{define "content"}}
 <div class="admin-reports">
   <form method="get" class="admin-reports__toolbar">
-    <select name="period" class="admin-reports__period" onchange="this.form.submit()">
+    <label for="report-period" class="admin-visually-hidden">Период</label>
+    <select id="report-period" name="period" class="admin-reports__period" onchange="reportsPeriodChanged(this)">
       {{range .Data.Periods}}
       <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
       {{end}}
     </select>
+    <span class="admin-reports__custom" id="report-custom"{{if not .Data.Custom}} hidden{{end}}>
+      <label for="report-from">с</label>
+      <input type="date" id="report-from" name="from" value="{{.Data.From}}">
+      <label for="report-to">по</label>
+      <input type="date" id="report-to" name="to" value="{{.Data.To}}">
+      <button type="submit" class="admin-btn admin-btn--secondary">Показать</button>
+    </span>
     <div class="admin-reports__spacer"></div>
     <a class="admin-btn admin-btn--secondary" href="{{.Data.ExportURL}}">Экспорт в Excel</a>
   </form>
+  {{if .Data.Err}}<div class="admin-form-error" role="alert">{{.Data.Err}}</div>{{end}}
+  <div class="admin-reports__note">Дни — по времени Бишкека. В выручку не входят отменённые заказы и онлайн-заказы без подтверждённой оплаты.</div>
+  <script>
+  function reportsPeriodChanged(sel) {
+    var custom = document.getElementById('report-custom');
+    if (sel.value === 'custom') { custom.hidden = false; document.getElementById('report-from').focus(); return; }
+    custom.hidden = true;
+    custom.querySelectorAll('input').forEach(function (i) { i.disabled = true; });
+    sel.form.submit();
+  }
+  </script>
 
   <div class="admin-stat-grid">
     {{range .Data.Stats}}
@@ -69,6 +88,30 @@
       <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
       {{end}}
     </div>
+  </div>
+
+  <div class="admin-reports__card admin-ranked-list">
+    <div class="admin-ranked-list__title">По категориям</div>
+    {{if .Data.Categories}}
+    <table class="admin-table admin-category-report">
+      <thead>
+        <tr><th scope="col">Категория</th><th scope="col">Доля</th><th scope="col">Заказов</th><th scope="col">Продано</th><th scope="col" class="admin-table__num-col">Выручка</th></tr>
+      </thead>
+      <tbody>
+        {{range .Data.Categories}}
+        <tr>
+          <td>{{.Name}}</td>
+          <td><div class="admin-brand-bar" aria-hidden="true"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div></td>
+          <td class="admin-table__muted">{{.Orders}}</td>
+          <td class="admin-table__muted">{{.Qty}}</td>
+          <td class="admin-table__num">{{.Sum}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="admin-ranked-list__empty">Нет продаж за выбранный период</div>
+    {{end}}
   </div>
 </div>
 {{end}}

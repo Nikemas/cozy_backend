@@ -19,6 +19,8 @@ type fakeReportsBackend struct {
 	orders     []orders.Order
 	brandRows  []reports.Row
 	loadErr    error
+
+	categoryRows []reports.Row
 	brandErr   error
 	lastFrom   time.Time
 	lastTo     time.Time
@@ -33,6 +35,10 @@ func (f *fakeReportsBackend) LoadOrders(_ context.Context, from, to time.Time) (
 	return f.orders, nil
 }
 
+func (f *fakeReportsBackend) CategorySales(_ context.Context, _, _ time.Time) ([]reports.Row, error) {
+	return f.categoryRows, nil
+}
+
 func (f *fakeReportsBackend) BrandSales(_ context.Context, _, _ time.Time) ([]reports.Row, error) {
 	f.brandCalls++
 	if f.brandErr != nil {
@@ -44,6 +50,7 @@ func (f *fakeReportsBackend) BrandSales(_ context.Context, _, _ time.Time) ([]re
 // --- reportRange ---
 
 func TestReportRange(t *testing.T) {
+	loc := reports.Location
 	now := time.Date(2026, 9, 15, 14, 30, 0, 0, time.UTC) // a Tuesday mid-September
 
 	cases := []struct {
@@ -51,10 +58,10 @@ func TestReportRange(t *testing.T) {
 		wantFrom time.Time
 		wantTo   time.Time
 	}{
-		{"week", time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)},
-		{"month", time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)},
-		{"prev_month", time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)},
-		{"bogus", time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)}, // falls back to "week"
+		{"week", time.Date(2026, 9, 9, 0, 0, 0, 0, loc), time.Date(2026, 9, 15, 0, 0, 0, 0, loc)},
+		{"month", time.Date(2026, 9, 1, 0, 0, 0, 0, loc), time.Date(2026, 9, 15, 0, 0, 0, 0, loc)},
+		{"prev_month", time.Date(2026, 8, 1, 0, 0, 0, 0, loc), time.Date(2026, 8, 31, 0, 0, 0, 0, loc)},
+		{"bogus", time.Date(2026, 9, 9, 0, 0, 0, 0, loc), time.Date(2026, 9, 15, 0, 0, 0, 0, loc)}, // falls back to "week"
 	}
 	for _, c := range cases {
 		t.Run(c.period, func(t *testing.T) {
@@ -66,6 +73,50 @@ func TestReportRange(t *testing.T) {
 				t.Errorf("to = %v, want %v", to, c.wantTo)
 			}
 		})
+	}
+}
+
+// 20:30 UTC on Sep 15 is already 02:30 on Sep 16 in Bishkek — "today" must
+// be the local day, otherwise the first 6 hours of every day fall into the
+// previous day's report.
+func TestReportRangeUsesBishkekToday(t *testing.T) {
+	now := time.Date(2026, 9, 15, 20, 30, 0, 0, time.UTC)
+	_, to := reportRange("week", now)
+	if want := time.Date(2026, 9, 16, 0, 0, 0, 0, reports.Location); !to.Equal(want) {
+		t.Errorf("to = %v, want %v", to, want)
+	}
+}
+
+func TestParseCustomReportRange(t *testing.T) {
+	if _, _, err := parseCustomReportRange("2026-09-01", "2026-09-30"); err != nil {
+		t.Errorf("valid range: %v", err)
+	}
+	for _, c := range [][2]string{{"2026-09-30", "2026-09-01"}, {"bad", "2026-09-01"}, {"2024-01-01", "2026-01-01"}} {
+		if _, _, err := parseCustomReportRange(c[0], c[1]); err == nil {
+			t.Errorf("parseCustomReportRange(%q, %q) = nil error", c[0], c[1])
+		}
+	}
+}
+
+func TestReportsPageCustomRangeAndCategories(t *testing.T) {
+	backend := &fakeReportsBackend{categoryRows: []reports.Row{{Key: "Мужская обувь", OrderCount: 2, ItemCount: 3, Revenue: 9000}}}
+	st := &staff.Staff{ID: "s1", Name: "Айгерим Б.", Role: staff.RoleOwner, IsActive: true}
+	h := &handlers{render: newTestRenderer(t), reports: backend}
+
+	r := httptest.NewRequest("GET", "/admin/reports?period=custom&from=2026-09-01&to=2026-09-10", nil)
+	r = r.WithContext(staff.NewContextWithStaff(r.Context(), st))
+	w := httptest.NewRecorder()
+	h.reportsPage(w, r)
+
+	if want := time.Date(2026, 9, 1, 0, 0, 0, 0, reports.Location); !backend.lastFrom.Equal(want) {
+		t.Errorf("from = %v, want %v", backend.lastFrom, want)
+	}
+	if want := time.Date(2026, 9, 11, 0, 0, 0, 0, reports.Location); !backend.lastTo.Equal(want) {
+		t.Errorf("to = %v, want %v (exclusive day after)", backend.lastTo, want)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "По категориям") || !strings.Contains(body, "Мужская обувь") || !strings.Contains(body, "9 000 сом") {
+		t.Error("category report not rendered")
 	}
 }
 
@@ -310,9 +361,9 @@ func TestReportsPageInvalidPeriodFallsBackToDefault(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
 	}
-	// "week" is the default period, spanning 7 days ending today.
-	wantFrom := time.Now().UTC()
-	wantFrom = time.Date(wantFrom.Year(), wantFrom.Month(), wantFrom.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -6)
+	// "week" is the default period, spanning 7 Bishkek days ending today.
+	wantFrom := time.Now().In(reports.Location)
+	wantFrom = time.Date(wantFrom.Year(), wantFrom.Month(), wantFrom.Day(), 0, 0, 0, 0, reports.Location).AddDate(0, 0, -6)
 	if !backend.lastFrom.Equal(wantFrom) {
 		t.Errorf("LoadOrders from = %v, want %v (default week period)", backend.lastFrom, wantFrom)
 	}

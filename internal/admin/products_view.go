@@ -81,10 +81,15 @@ type CategoryOptionVM struct {
 	Children []CategoryOptionVM
 }
 
+// VariantRowVM is one row of the form's Вариации matrix: the variant
+// itself plus one stock cell per point of sale (Cells, in StockPoints
+// order). Qty/Badge* reflect the row's total across every point.
 type VariantRowVM struct {
+	Key      string // form row key: the variant id, or "n<N>" for a row added in the browser
 	ID       string
 	Size     string
 	Color    string
+	Cells    []StockCellVM
 	Qty      int
 	BadgeLbl string
 	BadgeFG  string
@@ -125,6 +130,11 @@ type ProductFormData struct {
 	Images     []ImageRowVM
 	ImagesJSON template.JS // Images, marshaled for the form's photo-slot/per-color-photo JS
 	Variants   []VariantRowVM
+
+	// StockPoints are the Вариации matrix's per-point columns (every point
+	// of sale); StockPointsJSON feeds the "+ Добавить вариацию" JS.
+	StockPoints     []StockPointVM
+	StockPointsJSON template.JS
 
 	CanDelete bool
 	Err       string
@@ -367,7 +377,13 @@ func categoryOptionsJSON(options []CategoryOptionVM) template.JS {
 // mirroring categoryOptionsJSON — falls back to "[]" rather than failing
 // the whole page render on a (practically impossible) marshal error.
 func imageRowsJSON(images []ImageRowVM) template.JS {
-	b, err := json.Marshal(images)
+	return marshalJS(images)
+}
+
+// marshalJS marshals v for a <script type="application/json"> block,
+// falling back to "[]" on a (practically impossible) marshal error.
+func marshalJS(v any) template.JS {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return template.JS("[]")
 	}
@@ -428,36 +444,6 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
-}
-
-// parsePrice parses the base-price form field, defaulting to 0 on a blank
-// or unparsable value rather than erroring the whole save — validate() on
-// catalog.ProductInput still rejects a negative price server-side.
-func parsePrice(s string) float64 {
-	s = strings.TrimSpace(strings.ReplaceAll(s, " ", ""))
-	if s == "" {
-		return 0
-	}
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0
-	}
-	return v
-}
-
-// parseQty parses one variant row's "Кол-во (склад)" field, clamping a
-// blank/unparsable/negative value to 0 rather than erroring the whole
-// save.
-func parseQty(s string) int {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 0 {
-		return 0
-	}
-	return n
 }
 
 // formAt returns values[i] or "" if i is out of range — the parallel

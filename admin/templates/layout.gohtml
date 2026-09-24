@@ -43,25 +43,143 @@ function toggleAdminDrawer(open) {
 }
 
 // openConfirmModal/closeConfirmModal drive the shared #admin-confirm-modal
-// partial (_confirm_modal.gohtml) — Tasks 2-5 reuse this instead of each
-// wiring their own modal for "delete this row?"-style prompts. confirmURL,
-// when given, is wired as the confirm button's hx-post target so HTMX
-// performs the actual mutation; omit it and handle the click yourself
-// (e.g. set a plain onclick on #admin-confirm-action) for a non-HTMX
-// confirm action.
-function openConfirmModal(title, text, confirmURL) {
+// partial (_confirm_modal.gohtml). confirmURL, when given, is wired as the
+// confirm button's hx-post target so HTMX performs the actual mutation.
+// opts (optional): {onConfirm: fn, confirmLabel: 'Удалить', danger: true}
+// — onConfirm runs instead of an hx-post (used by form[data-confirm]).
+function openConfirmModal(title, text, confirmURL, opts) {
+  opts = opts || {};
   document.getElementById('admin-confirm-title').textContent = title;
   document.getElementById('admin-confirm-text').textContent = text;
   var btn = document.getElementById('admin-confirm-action');
+  btn.textContent = opts.confirmLabel || 'Подтвердить';
+  btn.className = 'admin-btn ' + (opts.danger ? 'admin-btn--danger' : 'admin-btn--dark');
+  btn.onclick = null;
   if (confirmURL) {
     btn.setAttribute('hx-post', confirmURL);
-    if (window.htmx) { window.htmx.process(btn); }
+  } else {
+    btn.removeAttribute('hx-post');
   }
+  if (window.htmx) { window.htmx.process(btn); }
+  if (typeof opts.onConfirm === 'function') {
+    btn.onclick = function () { btn.disabled = true; opts.onConfirm(); };
+  }
+  btn.disabled = false;
   document.getElementById('admin-confirm-modal').style.display = 'flex';
 }
 function closeConfirmModal() {
   document.getElementById('admin-confirm-modal').style.display = 'none';
 }
+
+// form[data-confirm]: a plain POST form that must be confirmed first
+// (cancel order, deactivate a point, ...). The submit is intercepted and
+// re-issued via form.submit() only after "Подтвердить" in the shared
+// dialog. Attributes: data-confirm (text), data-confirm-title,
+// data-confirm-label, data-confirm-danger.
+document.addEventListener('submit', function (evt) {
+  var form = evt.target;
+  if (!form.matches || !form.matches('form[data-confirm]')) return;
+  evt.preventDefault();
+  openConfirmModal(form.getAttribute('data-confirm-title') || 'Подтвердите действие',
+    form.getAttribute('data-confirm'), null, {
+      confirmLabel: form.getAttribute('data-confirm-label'),
+      danger: form.hasAttribute('data-confirm-danger'),
+      onConfirm: function () { closeConfirmModal(); form.submit(); }
+    });
+}, true);
+
+// Accessible modals. Every .admin-modal-backdrop on any screen is opened
+// and closed by toggling its inline display; this watches for that and,
+// while a modal is open: marks it role=dialog/aria-modal (unless the
+// markup already says so), moves focus into it, keeps Tab/Shift+Tab
+// inside it, and closes it on Esc (via its own Отмена/close button so
+// screen-specific cleanup still runs). On close, focus returns to the
+// element that opened it.
+(function () {
+  var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  var openers = new WeakMap();
+  var stack = [];
+
+  function isOpen(backdrop) { return backdrop.style.display !== 'none' && backdrop.style.display !== ''; }
+  function focusables(root) {
+    return Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE), function (el) {
+      return el.offsetParent !== null || el === document.activeElement;
+    });
+  }
+  function dialogOf(backdrop) { return backdrop.querySelector('.admin-modal') || backdrop; }
+
+  function onOpen(backdrop) {
+    if (stack.indexOf(backdrop) !== -1) return;
+    var dialog = dialogOf(backdrop);
+    if (!dialog.getAttribute('role')) dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    if (!dialog.getAttribute('aria-labelledby')) {
+      var title = dialog.querySelector('.admin-modal__title');
+      if (title) {
+        if (!title.id) title.id = (backdrop.id || 'admin-modal') + '-title';
+        dialog.setAttribute('aria-labelledby', title.id);
+      }
+    }
+    openers.set(backdrop, document.activeElement);
+    stack.push(backdrop);
+    setTimeout(function () {
+      if (!isOpen(backdrop)) return;
+      // Confirm dialogs start on "Отмена" (the safe choice); forms on
+      // their first field.
+      var target = backdrop.id === 'admin-confirm-modal'
+        ? document.getElementById('admin-confirm-cancel')
+        : (dialog.querySelector('[autofocus]') || focusables(dialog)[0]);
+      if (!target) { dialog.setAttribute('tabindex', '-1'); target = dialog; }
+      target.focus();
+    }, 0);
+  }
+
+  function onClose(backdrop) {
+    var i = stack.indexOf(backdrop);
+    if (i === -1) return;
+    stack.splice(i, 1);
+    var opener = openers.get(backdrop);
+    if (opener && document.contains(opener) && typeof opener.focus === 'function') opener.focus();
+  }
+
+  function sync(backdrop) { if (isOpen(backdrop)) { onOpen(backdrop); } else { onClose(backdrop); } }
+
+  function closeTop() {
+    var backdrop = stack[stack.length - 1];
+    if (!backdrop) return;
+    var closer = backdrop.querySelector('[data-modal-close]');
+    if (!closer) {
+      closer = Array.prototype.find.call(backdrop.querySelectorAll('button'), function (b) {
+        return /close\w*\(/i.test(b.getAttribute('onclick') || '');
+      });
+    }
+    if (closer) { closer.click(); } else { backdrop.style.display = 'none'; }
+  }
+
+  document.addEventListener('keydown', function (evt) {
+    var backdrop = stack[stack.length - 1];
+    if (!backdrop) return;
+    if (evt.key === 'Escape') { evt.preventDefault(); closeTop(); return; }
+    if (evt.key !== 'Tab') return;
+    var items = focusables(dialogOf(backdrop));
+    if (!items.length) { evt.preventDefault(); return; }
+    var first = items[0], last = items[items.length - 1];
+    if (!dialogOf(backdrop).contains(document.activeElement)) { evt.preventDefault(); first.focus(); return; }
+    if (evt.shiftKey && document.activeElement === first) { evt.preventDefault(); last.focus(); }
+    else if (!evt.shiftKey && document.activeElement === last) { evt.preventDefault(); first.focus(); }
+  });
+
+  function watch() {
+    var observer = new MutationObserver(function (records) {
+      records.forEach(function (rec) { sync(rec.target); });
+    });
+    document.querySelectorAll('.admin-modal-backdrop').forEach(function (backdrop) {
+      observer.observe(backdrop, { attributes: true, attributeFilter: ['style'] });
+      if (isOpen(backdrop)) onOpen(backdrop);
+    });
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', watch); } else { watch(); }
+})();
 </script>
 </body>
 </html>

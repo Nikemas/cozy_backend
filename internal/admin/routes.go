@@ -53,6 +53,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		stock:      catalog.NewStockRepo(db),
 		media:      mediaClient,
 		cfg:        cfg,
+
+		productStore: newProductStore(db),
+		stockStore:   newStockPageRepo(db),
 	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
@@ -60,9 +63,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("POST /admin/logout", h.logoutSubmit)
 
 	// /admin/no-access only requires being logged in as SOME staff member
-	// — it's the landing page for a role (point_staff, this wave) that
-	// isn't allowed on any of the screens below, not a page with its own
-	// stricter role requirement.
+	// — it's the landing page for a role that isn't allowed on any of the
+	// screens below, not a page with its own stricter role requirement.
 	anyRole := requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff)
 	mux.HandleFunc("GET /admin/no-access", anyRole(h.noAccessPage))
 
@@ -73,9 +75,16 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// per Wave 4 Task 1's acceptance criteria ("RegisterRoutes регистрирует
 	// все 6 путей ... сразу, но с заглушечными хендлерами") — Tasks 2-5
 	// replace stubPage(...) with their real handlers, not these routes.
-	mux.HandleFunc("GET /admin/orders", ownerOrManager(h.ordersListPage))
-	mux.HandleFunc("GET /admin/orders/{id}", ownerOrManager(h.orderDetailPage))
-	mux.HandleFunc("POST /admin/orders/{id}/status", ownerOrManager(h.orderStatusUpdate))
+	// Orders are open to point_staff too, scoped to their own point inside
+	// the handlers (same rule as the JSON API in httpapi/admin_orders.go).
+	mux.HandleFunc("GET /admin/orders", anyRole(h.ordersListPage))
+	mux.HandleFunc("GET /admin/orders/{id}", anyRole(h.orderDetailPage))
+	mux.HandleFunc("POST /admin/orders/{id}/status", anyRole(h.orderStatusUpdate))
+
+	// Остатки: one point's stock, editable. point_staff is pinned to its
+	// own point — see stock_page.go.
+	mux.HandleFunc("GET /admin/stock", anyRole(h.stockPage))
+	mux.HandleFunc("POST /admin/stock", anyRole(h.stockSave))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
 
 	// Категории: list + add/edit modals + delete, same RBAC as products —
@@ -91,6 +100,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// toggle-active. See internal/admin/points_page.go/staff_page.go.
 	mux.HandleFunc("GET /admin/points", ownerOnly(h.pointsPage))
 	mux.HandleFunc("POST /admin/points", ownerOnly(h.pointsCreate))
+	mux.HandleFunc("POST /admin/points/{id}", ownerOnly(h.pointsUpdate))
 	mux.HandleFunc("POST /admin/points/{id}/toggle", ownerOnly(h.pointsToggle))
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.staffPage))
 	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))

@@ -42,6 +42,11 @@ type handlers struct {
 	stock      *catalog.StockRepo
 	media      *media.Client
 	cfg        *config.Config
+
+	// fix/admin (B5): transactional product-form save (product_store.go)
+	// and the per-point Остатки screen (stock_page.go).
+	productStore productSaver
+	stockStore   stockPageStore
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a

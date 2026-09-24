@@ -858,3 +858,61 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
   body.admin-drawer-open .admin-sidebar { display: flex; }
   body.admin-drawer-open .admin-drawer-backdrop { display: block; }
 }
+
+/* fix/admin: per-point stock matrix on the product form. */
+.admin-variants-table__point { white-space: nowrap; }
+.admin-variants-table__inactive { font-weight: 500; color: var(--admin-muted); }
+.admin-variant-input.is-conflict { border-color: #B85C00; background: #FFF3E0; }
+.admin-variant-input.is-invalid { border-color: var(--admin-danger); background: var(--admin-danger-tint); }
+.admin-visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+/* fix/admin: generic filter bar (Остатки, Заказы). */
+.admin-filterbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.admin-filterbar__field { margin: 0; min-width: 160px; }
+.admin-filterbar__field--grow { flex: 1 1 220px; }
+.admin-filterbar__static { align-self: center; font-size: 14px; color: var(--admin-text); }
+@media (max-width: 767px) {
+  .admin-filterbar__field, .admin-filterbar__field--grow { flex: 1 1 100%; min-width: 0; }
+}
+
+/* fix/admin: reports custom range + category table. */
+.admin-reports__custom { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.admin-reports__custom[hidden] { display: none; }
+.admin-reports__custom input[type="date"] { height: 40px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); padding: 0 10px; font: inherit; background: var(--admin-surface); color: var(--admin-text); }
+.admin-reports__note { font-size: 12px; color: var(--admin-muted); margin: -6px 0 14px; }
+.admin-category-report { width: 100%; }
+.admin-category-report .admin-brand-bar { min-width: 80px; }
+.admin-filterbar__dates { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-filterbar__dates[hidden] { display: none; }
+.admin-orders-table__num a, a.admin-order-card__num { color: inherit; }
+
+/* fix/admin: visible keyboard focus. Several controls above reset
+   outline:none; they get a ring on :focus-visible instead. The ring uses
+   the darker primary (#E56200, >=3:1 on white) — the base orange is too
+   light for a focus indicator. */
+:where(a, button, summary, [tabindex], .admin-chip-btn, .admin-chip-filter):focus-visible {
+  outline: 2px solid var(--admin-primary-hover);
+  outline-offset: 2px;
+}
+.admin-field input:focus-visible,
+.admin-field select:focus-visible,
+.admin-field textarea:focus-visible,
+.admin-header__search input:focus-visible,
+.admin-variant-input:focus-visible,
+.admin-reports__custom input:focus-visible {
+  border-color: var(--admin-primary-hover);
+  box-shadow: 0 0 0 3px rgba(229, 98, 0, 0.35);
+}
+.admin-orders-table tbody tr:focus-within { background: var(--admin-primary-tint); }
+
+/* fix/admin: product thumbnails in orders. */
+img.admin-order-detail__thumb-box { display: block; object-fit: cover; background: var(--admin-bg); }
+.admin-orders-table__items { display: inline-flex; align-items: center; gap: 10px; }
+.admin-orders-thumb { display: inline-block; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--admin-bg); flex: none; vertical-align: middle; }
+.admin-order-card__phone .admin-orders-thumb { margin-right: 10px; }

@@ -81,20 +81,28 @@ func TestRequireStaffRoleRedirectsInsufficientRoleToFirstAllowedPage(t *testing.
 	}
 }
 
-func TestRequireStaffRoleRedirectsPointStaffToNoAccess(t *testing.T) {
+// point_staff hitting an owner/manager-only page (e.g. /admin/reports) is
+// sent to its first allowed page — its own point's orders — not a dead end.
+func TestRequireStaffRoleRedirectsPointStaffToOrders(t *testing.T) {
 	resolver := &fakeResolver{st: &staff.Staff{ID: "s1", Role: staff.RolePointStaff, IsActive: true}}
 	handler := requireStaffRole(resolver, staff.RoleOwner, staff.RoleManager)(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not run for point_staff on an owner/manager-only page")
 	})
 
 	rec := httptest.NewRecorder()
-	handler(rec, httptest.NewRequest(http.MethodGet, "/admin/orders", nil))
+	handler(rec, httptest.NewRequest(http.MethodGet, "/admin/reports", nil))
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected %d, got %d", http.StatusSeeOther, rec.Code)
 	}
-	if loc := rec.Header().Get("Location"); loc != noAccessPath {
-		t.Fatalf("expected redirect to %q, got %q", noAccessPath, loc)
+	if loc := rec.Header().Get("Location"); loc != "/admin/orders" {
+		t.Fatalf("expected redirect to /admin/orders, got %q", loc)
+	}
+}
+
+func TestFirstAllowedPathUnknownRoleIsNoAccess(t *testing.T) {
+	if got := firstAllowedPath(staff.Role("auditor")); got != noAccessPath {
+		t.Errorf("firstAllowedPath(unknown) = %q, want %q", got, noAccessPath)
 	}
 }
 
@@ -129,7 +137,7 @@ func TestFirstAllowedPath(t *testing.T) {
 	}{
 		{staff.RoleOwner, "/admin/orders"},
 		{staff.RoleManager, "/admin/orders"},
-		{staff.RolePointStaff, noAccessPath},
+		{staff.RolePointStaff, "/admin/orders"},
 	}
 	for _, c := range cases {
 		if got := firstAllowedPath(c.role); got != c.want {
@@ -140,20 +148,20 @@ func TestFirstAllowedPath(t *testing.T) {
 
 func TestNavItemsForRole(t *testing.T) {
 	ownerKeys := navKeys(navItemsForRole(staff.RoleOwner, "orders"))
-	wantOwner := []string{"orders", "products", "categories", "reports", "points", "staff"}
+	wantOwner := []string{"orders", "products", "stock", "categories", "reports", "points", "staff"}
 	if !equalStrings(ownerKeys, wantOwner) {
 		t.Errorf("owner nav keys = %v, want %v", ownerKeys, wantOwner)
 	}
 
 	managerKeys := navKeys(navItemsForRole(staff.RoleManager, "orders"))
-	wantManager := []string{"orders", "products", "categories", "reports"}
+	wantManager := []string{"orders", "products", "stock", "categories", "reports"}
 	if !equalStrings(managerKeys, wantManager) {
 		t.Errorf("manager nav keys = %v, want %v", managerKeys, wantManager)
 	}
 
 	pointStaffKeys := navKeys(navItemsForRole(staff.RolePointStaff, "orders"))
-	if len(pointStaffKeys) != 0 {
-		t.Errorf("point_staff nav keys = %v, want none", pointStaffKeys)
+	if want := []string{"orders", "stock"}; !equalStrings(pointStaffKeys, want) {
+		t.Errorf("point_staff nav keys = %v, want %v", pointStaffKeys, want)
 	}
 
 	items := navItemsForRole(staff.RoleOwner, "products")

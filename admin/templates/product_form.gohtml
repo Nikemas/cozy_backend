@@ -92,33 +92,38 @@
   <div class="admin-card">
     <div class="admin-card__pad-sm">
       <div class="admin-card__title">Вариации</div>
-      <div class="admin-card__hint">Размер × цвет и количество на складе</div>
+      <div class="admin-card__hint">Размер × цвет и остаток на каждой точке продаж. Сохраняются только изменённые ячейки: если остаток успел измениться (продажа, другой сотрудник), форма покажет актуальное значение вместо перезаписи.</div>
+      {{if not .StockPoints}}<div class="admin-card__hint">Точек продаж пока нет — остатки можно будет указать после создания точки в разделе «Склад и точки».</div>{{end}}
     </div>
     <div class="admin-table-wrap">
       <table class="admin-table admin-variants-table">
         <thead>
           <tr>
-            <th>Размер</th>
-            <th>Цвет</th>
-            <th>Фото цвета</th>
-            <th>Кол-во (склад)</th>
-            <th>Уровень</th>
-            <th></th>
+            <th scope="col">Размер</th>
+            <th scope="col">Цвет</th>
+            <th scope="col">Фото цвета</th>
+            {{range .StockPoints}}
+            <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Inactive}} <span class="admin-variants-table__inactive">(неактивна)</span>{{end}}</th>
+            {{end}}
+            <th scope="col">Всего</th>
+            <th scope="col"><span class="admin-visually-hidden">Удалить</span></th>
           </tr>
         </thead>
         <tbody id="pf-variant-rows">
           {{range .Variants}}
-          <tr class="admin-variant-row">
-            <td><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42"></td>
-            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="Белый"></td>
+          <tr class="admin-variant-row" data-key="{{.Key}}">
+            <td><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="Размер"></td>
+            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="Белый" aria-label="Цвет"></td>
             <td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
               <span class="admin-variant-photo-count">0</span>
             </button></td>
-            <td><input type="number" min="0" name="variant_qty" value="{{.Qty}}" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>
+            {{range .Cells}}
+            <td><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="Остаток: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="Значение обновлено: остаток изменился, пока форма была открыта"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
+            {{end}}
             <td><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
             <td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
             </button></td>
           </tr>
           {{end}}
@@ -144,7 +149,7 @@
      two size rows with the same color share and edit the same photo set,
      since staff only shoots one set of photos per color, not per size. */}}
 <div id="pf-colorphoto-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--lg">
+  <div class="admin-modal admin-modal--lg" role="dialog" aria-modal="true" aria-labelledby="pf-colorphoto-title">
     <div class="admin-modal__title" id="pf-colorphoto-title">Фото цвета</div>
     <div class="admin-modal__text">Эти фото покажутся покупателю, когда он выберет этот цвет в карточке товара.</div>
     <div id="pf-colorphoto-grid" class="admin-photo-grid" style="margin-top:14px"></div>
@@ -165,8 +170,8 @@
      the design canvas's subModal block (Cozy Admin.dc.html ~747-770).
      Replaces the earlier window.prompt()-chain UI with real fields. */}}
 <div id="pf-category-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая категория</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-category-modal-title">
+    <div class="admin-modal__title" id="pf-category-modal-title">Новая категория</div>
     <div class="admin-field" style="margin-top:18px">
       <label for="pf-newcat-name">Название категории</label>
       <input type="text" id="pf-newcat-name" placeholder="Сандалии" onkeydown="if(event.key==='Enter')pfSaveCategory()">
@@ -180,8 +185,8 @@
 </div>
 
 <div id="pf-subcategory-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая подкатегория</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-subcategory-modal-title">
+    <div class="admin-modal__title" id="pf-subcategory-modal-title">Новая подкатегория</div>
     <div class="admin-modal__text">Например «Классика» или «Спортивные» внутри выбранной категории.</div>
     <div class="admin-field" style="margin-top:14px">
       <label for="pf-newsub-parent">Категория</label>
@@ -200,8 +205,8 @@
 </div>
 
 <div id="pf-brand-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новый бренд</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="pf-brand-modal-title">
+    <div class="admin-modal__title" id="pf-brand-modal-title">Новый бренд</div>
     <div class="admin-field" style="margin-top:18px">
       <label for="pf-newbrand-name">Название бренда</label>
       <input type="text" id="pf-newbrand-name" placeholder="New Balance" onkeydown="if(event.key==='Enter')pfSaveBrand()">
@@ -214,6 +219,7 @@
 </div>
 
 <script id="pf-category-tree" type="application/json">{{.CategoriesJSON}}</script>
+<script id="pf-stock-points" type="application/json">{{.StockPointsJSON}}</script>
 
 <script>
 (function () {
@@ -380,9 +386,20 @@
   };
 
   // --- variants ---
+  // Each row carries one stock input per point of sale (see
+  // product_form_parse.go for the qty_<key>_<pointID> / orig_<key>_<pointID>
+  // contract); the badge shows the row's total across every point.
+  var stockPoints = [];
+  try { stockPoints = JSON.parse(document.getElementById('pf-stock-points').textContent || '[]') || []; } catch (e) { stockPoints = []; }
+
   window.pfUpdateBadge = function (input) {
-    var qty = parseInt(input.value, 10) || 0;
-    var badge = input.closest('tr').querySelector('.admin-variant-badge');
+    var row = input.closest('tr');
+    var qty = 0;
+    row.querySelectorAll('.admin-variant-input--qty').forEach(function (el) {
+      var n = parseInt(el.value, 10);
+      if (n > 0) qty += n;
+    });
+    var badge = row.querySelector('.admin-variant-badge');
     var label, fg, bg;
     if (qty === 0) { label = 'Нет в наличии'; fg = '#C62828'; bg = '#FFEBEE'; }
     else if (qty < 5) { label = qty + ' шт'; fg = '#B85C00'; bg = '#FFF3E0'; }
@@ -391,20 +408,57 @@
     badge.style.color = fg;
     badge.style.background = bg;
   };
-  var PHOTO_ROW_TEMPLATE =
-    '<td><input type="hidden" name="variant_id" value=""><input type="text" name="variant_size" class="admin-variant-input" placeholder="42"></td>' +
-    '<td><input type="text" name="variant_color" class="admin-variant-input" placeholder="Белый"></td>' +
-    '<td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button></td>' +
-    '<td><input type="number" min="0" name="variant_qty" value="0" class="admin-variant-input admin-variant-input--qty" onchange="pfUpdateBadge(this)"></td>' +
-    '<td><span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span></td>' +
-    '<td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></td>';
 
+  function el(tag, attrs) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    return node;
+  }
+
+  var newRowSeq = 0;
   window.pfAddVariant = function () {
+    newRowSeq++;
+    var key = 'n' + Date.now().toString(36) + newRowSeq;
     var tbody = document.getElementById('pf-variant-rows');
-    var tr = document.createElement('tr');
-    tr.className = 'admin-variant-row';
-    tr.innerHTML = PHOTO_ROW_TEMPLATE;
+    var tr = el('tr', { 'class': 'admin-variant-row', 'data-key': key });
+
+    var tdSize = el('td');
+    tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_key', value: key }));
+    tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_id', value: '' }));
+    tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': 'Размер' }));
+    tr.appendChild(tdSize);
+
+    var tdColor = el('td');
+    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', 'class': 'admin-variant-input', placeholder: 'Белый', 'aria-label': 'Цвет' }));
+    tr.appendChild(tdColor);
+
+    var tdPhoto = el('td');
+    tdPhoto.innerHTML = '<button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="Фото этого цвета"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button>';
+    tr.appendChild(tdPhoto);
+
+    stockPoints.forEach(function (p) {
+      var td = el('td');
+      var input = el('input', {
+        type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric',
+        name: 'qty_' + key + '_' + p.ID, value: '0',
+        'class': 'admin-variant-input admin-variant-input--qty',
+        'aria-label': 'Остаток: ' + p.Name
+      });
+      input.addEventListener('input', function () { pfUpdateBadge(input); });
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    var tdBadge = el('td');
+    tdBadge.innerHTML = '<span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE">Нет в наличии</span>';
+    tr.appendChild(tdBadge);
+
+    var tdRemove = el('td');
+    tdRemove.innerHTML = '<button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="Удалить вариацию"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    tr.appendChild(tdRemove);
+
     tbody.appendChild(tr);
+    tr.querySelector('input[name="variant_size"]').focus();
   };
 
   window.pfRemoveVariantRow = function (btn) {

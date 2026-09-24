@@ -20,11 +20,14 @@ package admin
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/staff"
@@ -253,21 +256,42 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	stockPoints, err := h.stockPoints(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+
 	options := buildCategoryOptions(tree)
 	data := ProductFormData{
-		Categories:     options,
-		CategoriesJSON: categoryOptionsJSON(options),
-		Brands:         buildBrandOptions(brands),
-		ImagesJSON:     imageRowsJSON(nil),
-		CanDelete:      st.Role == staff.RoleOwner,
+		Categories:      options,
+		CategoriesJSON:  categoryOptionsJSON(options),
+		Brands:          buildBrandOptions(brands),
+		ImagesJSON:      imageRowsJSON(nil),
+		StockPoints:     stockPoints,
+		StockPointsJSON: marshalJS(stockPoints),
+		CanDelete:       st.Role == staff.RoleOwner,
 	}
 	h.renderProductForm(w, st, "Новый товар", data)
 }
 
+// stockPoints returns every point of sale as a Вариации matrix column
+// (inactive ones included, so their stock stays visible and editable).
+func (h *handlers) stockPoints(ctx context.Context) ([]StockPointVM, error) {
+	pts, err := h.pointsRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]StockPointVM, 0, len(pts))
+	for _, p := range pts {
+		out = append(out, StockPointVM{ID: p.ID, Name: p.Name, Inactive: !p.IsActive})
+	}
+	return out, nil
+}
+
 // productEditPage handles GET /admin/products/{id}: the form pre-filled
-// from the product, its variants (with each variant's current total stock
-// summed across every point of sale — see sumStockByVariant), and its
-// existing photos.
+// from the product, its variants with one stock cell per point of sale
+// (see buildVariantRows), and its existing photos.
 func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, _ := staff.FromContext(ctx)
@@ -299,7 +323,11 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		h.renderInternalErr(w, err)
 		return
 	}
-	stockByVariant := sumStockByVariant(stockEntries)
+	stockPoints, err := h.stockPoints(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
 
 	images, err := h.images.ListByProduct(ctx, id)
 	if err != nil {
@@ -315,12 +343,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	topID, subID := resolveTopAndSubIDs(tree, product.CategoryID)
 
-	variantRows := make([]VariantRowVM, len(variants))
-	for i, v := range variants {
-		qty := stockByVariant[v.ID]
-		label, fg, bg := stockChip(qty)
-		variantRows[i] = VariantRowVM{ID: v.ID, Size: v.Size, Color: v.Color, Qty: qty, BadgeLbl: label, BadgeFG: fg, BadgeBG: bg}
-	}
+	variantRows := buildVariantRows(variants, stockEntries, stockPoints)
 
 	imageRows := make([]ImageRowVM, len(images))
 	for i, img := range images {
@@ -348,15 +371,9 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		Variants:       variantRows,
 		CanDelete:      st.Role == staff.RoleOwner,
 	}
+	data.StockPoints = stockPoints
+	data.StockPointsJSON = marshalJS(stockPoints)
 	h.renderProductForm(w, st, "Редактирование товара", data)
-}
-
-func sumStockByVariant(entries []catalog.StockEntry) map[string]int {
-	out := make(map[string]int, len(entries))
-	for _, e := range entries {
-		out[e.VariantID] += e.Quantity
-	}
-	return out
 }
 
 func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, title string, data ProductFormData) {
@@ -378,19 +395,27 @@ func (h *handlers) productUpdate(w http.ResponseWriter, r *http.Request) {
 	h.saveProduct(w, r, r.PathValue("id"))
 }
 
-// saveProduct backs both productCreate and productUpdate: it upserts the
-// product row itself, then its variants (create/update/delete-by-diff) and
-// stock, then its photo set — in that order, so a failure partway through
-// (e.g. an invalid variant) still leaves the product record saved rather
-// than losing the whole submission, and redirects back to the edit page
-// with a toast explaining what didn't apply instead of silently dropping
-// it.
+// productSaver is productStore's Save, as an interface so the handler
+// can be tested with a fake.
+type productSaver interface {
+	Save(ctx context.Context, in productSaveInput) (string, error)
+}
+
+// saveProduct backs both productCreate and productUpdate. The whole
+// submission — product row, variants, per-point stock cells, photos — is
+// parsed and validated first, then written in ONE transaction by
+// productStore.Save: nothing is saved unless everything is. Stock cells
+// are only written where the staff member changed them, each guarded by
+// the value the form was rendered with (see product_store.go), so a stale
+// form can't overwrite a sale that happened while it was open. Any
+// failure re-renders the form with the submitted values and an error
+// instead of a partial save + toast.
 func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID string) {
 	ctx := r.Context()
 	st, _ := staff.FromContext(ctx)
 
 	if err := r.ParseForm(); err != nil {
-		h.rerenderFormOnError(w, r, st, productID, "не удалось прочитать форму")
+		h.rerenderFormOnError(w, r, st, productID, "не удалось прочитать форму", nil)
 		return
 	}
 
@@ -404,35 +429,30 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 		isActive = current.IsActive
 	}
 
-	input := catalog.ProductInput{
-		CategoryID:    r.FormValue("category_id"),
-		NameRu:        r.FormValue("name_ru"),
-		NameKy:        r.FormValue("name_ky"),
-		DescriptionRu: nilIfEmpty(r.FormValue("description_ru")),
-		DescriptionKy: nilIfEmpty(r.FormValue("description_ky")),
-		Brand:         nilIfEmpty(r.FormValue("brand")),
-		BasePrice:     parsePrice(r.FormValue("base_price")),
-		IsActive:      isActive,
-	}
-
-	var product *catalog.Product
-	var err error
-	if productID == "" {
-		product, err = h.products.Create(ctx, input)
-	} else {
-		product, err = h.products.Update(ctx, productID, input)
-	}
+	stockPoints, err := h.stockPoints(ctx)
 	if err != nil {
-		h.rerenderFormOnError(w, r, st, productID, appErrMessage(err))
+		h.renderInternalErr(w, err)
 		return
 	}
 
-	if err := h.saveVariants(ctx, product.ID, r); err != nil {
-		redirectWithToast(w, r, "/admin/products/"+product.ID, "Товар сохранён, но вариации: "+appErrMessage(err))
+	parsed := parseProductForm(r.Form, productID, isActive, stockPoints)
+	if len(parsed.Errs) > 0 {
+		h.rerenderFormOnError(w, r, st, productID, strings.Join(parsed.Errs, ". "), parsed.Rows)
 		return
 	}
-	if err := h.saveImages(ctx, product.ID, r); err != nil {
-		redirectWithToast(w, r, "/admin/products/"+product.ID, "Товар сохранён, но фото: "+appErrMessage(err))
+
+	if _, err := h.productStore.Save(ctx, parsed.Input); err != nil {
+		var conflict *stockConflictError
+		if errors.As(err, &conflict) {
+			markStockConflicts(parsed.Rows, conflict.Cells)
+			h.rerenderFormOnError(w, r, st, productID, stockConflictMessage, parsed.Rows)
+			return
+		}
+		var ae *apperr.AppError
+		if !errors.As(err, &ae) {
+			slog.ErrorContext(ctx, "admin product save failed", "product_id", productID, "err", err)
+		}
+		h.rerenderFormOnError(w, r, st, productID, appErrMessage(err), parsed.Rows)
 		return
 	}
 
@@ -441,15 +461,22 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 
 // rerenderFormOnError redisplays the form with whatever the staff member
 // had just submitted (rebuilt from r.Form, not re-read from the database)
-// plus an error message, instead of losing their input on a validation
-// failure (e.g. an invalid category).
-func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, st *staff.Staff, productID, errMsg string) {
-	tree, err := h.categories.Tree(r.Context())
+// plus an error message, instead of losing their input. rows is the
+// Вариации matrix as parsed from the submission (nil when the form
+// couldn't be parsed at all).
+func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, st *staff.Staff, productID, errMsg string, rows []VariantRowVM) {
+	ctx := r.Context()
+	tree, err := h.categories.Tree(ctx)
 	if err != nil {
 		h.renderInternalErr(w, err)
 		return
 	}
-	brands, err := h.products.DistinctBrands(r.Context())
+	brands, err := h.products.DistinctBrands(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+	stockPoints, err := h.stockPoints(ctx)
 	if err != nil {
 		h.renderInternalErr(w, err)
 		return
@@ -457,22 +484,6 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 
 	categoryID := r.FormValue("category_id")
 	topID, subID := resolveTopAndSubIDs(tree, categoryID)
-
-	sizes := r.Form["variant_size"]
-	colors := r.Form["variant_color"]
-	qtys := r.Form["variant_qty"]
-	ids := r.Form["variant_id"]
-	variantRows := make([]VariantRowVM, 0, len(sizes))
-	for i := range sizes {
-		size := strings.TrimSpace(formAt(sizes, i))
-		color := strings.TrimSpace(formAt(colors, i))
-		if size == "" && color == "" {
-			continue
-		}
-		qty := parseQty(formAt(qtys, i))
-		label, fg, bg := stockChip(qty)
-		variantRows = append(variantRows, VariantRowVM{ID: formAt(ids, i), Size: size, Color: color, Qty: qty, BadgeLbl: label, BadgeFG: fg, BadgeBG: bg})
-	}
 
 	keys := r.Form["image_object_key"]
 	imageColors := r.Form["image_color"]
@@ -487,146 +498,33 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 
 	formOptions := buildCategoryOptions(tree)
 	data := ProductFormData{
-		IsEdit:         productID != "",
-		ProductID:      productID,
-		NameRu:         r.FormValue("name_ru"),
-		NameKy:         r.FormValue("name_ky"),
-		CategoryID:     categoryID,
-		TopCategoryID:  topID,
-		SubCategoryID:  subID,
-		Brand:          r.FormValue("brand"),
-		BasePrice:      r.FormValue("base_price"),
-		DescriptionRu:  r.FormValue("description_ru"),
-		DescriptionKy:  r.FormValue("description_ky"),
-		Categories:     formOptions,
-		CategoriesJSON: categoryOptionsJSON(formOptions),
-		Brands:         buildBrandOptions(brands),
-		Images:         imageRows,
-		ImagesJSON:     imageRowsJSON(imageRows),
-		Variants:       variantRows,
-		CanDelete:      st.Role == staff.RoleOwner,
-		Err:            errMsg,
+		IsEdit:          productID != "",
+		ProductID:       productID,
+		NameRu:          r.FormValue("name_ru"),
+		NameKy:          r.FormValue("name_ky"),
+		CategoryID:      categoryID,
+		TopCategoryID:   topID,
+		SubCategoryID:   subID,
+		Brand:           r.FormValue("brand"),
+		BasePrice:       r.FormValue("base_price"),
+		DescriptionRu:   r.FormValue("description_ru"),
+		DescriptionKy:   r.FormValue("description_ky"),
+		Categories:      formOptions,
+		CategoriesJSON:  categoryOptionsJSON(formOptions),
+		Brands:          buildBrandOptions(brands),
+		Images:          imageRows,
+		ImagesJSON:      imageRowsJSON(imageRows),
+		Variants:        rows,
+		StockPoints:     stockPoints,
+		StockPointsJSON: marshalJS(stockPoints),
+		CanDelete:       st.Role == staff.RoleOwner,
+		Err:             errMsg,
 	}
 	title := "Новый товар"
 	if data.IsEdit {
 		title = "Редактирование товара"
 	}
 	h.renderProductForm(w, st, title, data)
-}
-
-// saveVariants diffs the submitted variant_id[]/variant_size[]/
-// variant_color[]/variant_qty[] arrays against productID's existing
-// variants: a row with a known id is updated, a row with no id (or an id
-// that isn't actually one of this product's variants) is created, and any
-// existing variant whose id wasn't present in the submission at all is
-// deleted — the whole variants table is always submitted as one unit, the
-// same "always submit the full set" approach catalog.ImageRepo.
-// ReplaceForProduct already uses for photos. Each surviving row's quantity
-// is then upserted at the shop's default point of sale (resolveDefaultPointID) —
-// see that function's doc comment for why a single point.
-func (h *handlers) saveVariants(ctx context.Context, productID string, r *http.Request) error {
-	sizes := r.Form["variant_size"]
-	colors := r.Form["variant_color"]
-	qtys := r.Form["variant_qty"]
-	ids := r.Form["variant_id"]
-
-	existing, err := h.variants.ListByProduct(ctx, productID)
-	if err != nil {
-		return err
-	}
-	existingByID := make(map[string]bool, len(existing))
-	for _, v := range existing {
-		existingByID[v.ID] = true
-	}
-
-	pointID, havePoint := h.resolveDefaultPointID(ctx)
-
-	seen := make(map[string]bool, len(sizes))
-	for i := range sizes {
-		size := strings.TrimSpace(formAt(sizes, i))
-		color := strings.TrimSpace(formAt(colors, i))
-		if size == "" && color == "" {
-			continue
-		}
-		qty := parseQty(formAt(qtys, i))
-		in := catalog.VariantInput{Size: size, Color: color}
-
-		id := formAt(ids, i)
-		var variantID string
-		if id != "" && existingByID[id] {
-			if _, err := h.variants.Update(ctx, id, in); err != nil {
-				return err
-			}
-			variantID = id
-		} else {
-			v, err := h.variants.Create(ctx, productID, in)
-			if err != nil {
-				return err
-			}
-			variantID = v.ID
-		}
-		seen[variantID] = true
-
-		if havePoint {
-			if _, err := h.stock.Upsert(ctx, variantID, pointID, qty); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, v := range existing {
-		if !seen[v.ID] {
-			if err := h.variants.Delete(ctx, v.ID); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// resolveDefaultPointID returns the point of sale product-form stock
-// quantities are written against. The design canvas models a single shop
-// with one "Главный склад" point and never exposes a per-point breakdown
-// on the product form itself (just one "Кол-во (склад)" number per
-// variant) — matching that, this picks the first active point of sale
-// (falling back to the first point at all if none are marked active), so
-// the product form doesn't need its own point selector. ok is false (stock
-// upsert skipped, the product/variants themselves still save) only if no
-// point of sale exists yet at all — e.g. a fresh install before Wave 4
-// Task 4 (Точки) has been used to create one.
-func (h *handlers) resolveDefaultPointID(ctx context.Context) (id string, ok bool) {
-	pts, err := h.pointsRepo.List(ctx)
-	if err != nil || len(pts) == 0 {
-		return "", false
-	}
-	for _, p := range pts {
-		if p.IsActive {
-			return p.ID, true
-		}
-	}
-	return pts[0].ID, true
-}
-
-// saveImages replaces productID's full photo set from the submitted
-// image_object_key[]/image_color[] parallel arrays (sort order = submission
-// order) — object keys come from the form's own upload JS (POST
-// /admin/api/media/upload, see product_form.gohtml), never typed in
-// directly. image_color[i] is "" for a
-// general product photo, or the color text a photo was uploaded against in
-// the Вариации table's per-color photo picker.
-func (h *handlers) saveImages(ctx context.Context, productID string, r *http.Request) error {
-	keys := r.Form["image_object_key"]
-	colors := r.Form["image_color"]
-	inputs := make([]catalog.ImageInput, 0, len(keys))
-	for i, k := range keys {
-		k = strings.TrimSpace(k)
-		if k == "" {
-			continue
-		}
-		inputs = append(inputs, catalog.ImageInput{ObjectKey: k, SortOrder: i, Color: nilIfEmpty(formAt(colors, i))})
-	}
-	_, err := h.images.ReplaceForProduct(ctx, productID, inputs)
-	return err
 }
 
 // --- row actions ---

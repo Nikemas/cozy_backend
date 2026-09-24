@@ -4,7 +4,7 @@
 {{define "content"}}
 <div class="admin-screen-narrow">
   <div class="admin-list-toolbar">
-    <div class="admin-list-note">Сейчас все продажи идут с главного склада. Точки можно добавить позже — заказы и остатки привяжутся к ним автоматически.</div>
+    <div class="admin-list-note">Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются.</div>
     <button type="button" class="admin-btn admin-btn--primary" onclick="openPointModal()">+ Добавить точку</button>
   </div>
 
@@ -30,7 +30,12 @@
         <div class="admin-row__subtitle">{{.Address}}</div>
       </div>
       <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
-      <form method="post" action="/admin/points/{{.ID}}/toggle">
+      <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+              data-id="{{.ID}}" data-name="{{.Name}}" data-address="{{.Address}}"
+              onclick="openPointModal(this)" aria-label="Изменить точку «{{.Name}}»">Изменить</button>
+      <form method="post" action="/admin/points/{{.ID}}/toggle"{{if .IsActive}}
+            data-confirm="Точка «{{.Name}}» перестанет показываться покупателям, и на неё нельзя будет оформить самовывоз. История заказов и остатки сохранятся."
+            data-confirm-title="Деактивировать точку?" data-confirm-label="Деактивировать" data-confirm-danger="1"{{end}}>
         <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
       </form>
     </div>
@@ -41,21 +46,22 @@
   {{end}}
 </div>
 
-{{/* Add-point modal — design canvas's pointModal block (lines 684-703).
-     Plain <form method="post">, not HTMX: a full page reload after submit
-     is simplest here and matches how loginSubmit (Foundation) already
-     re-renders/redirects on submit rather than swapping a fragment. */}}
+{{/* Add/edit-point modal — design canvas's pointModal block (lines
+     684-703). One modal for both: openPointModal() with no argument opens
+     it empty (POST /admin/points), with an "Изменить" button it prefills
+     name/address from the button's data-* and posts to /admin/points/{id}.
+     Plain <form method="post">: a full page reload after submit. */}}
 <div id="admin-point-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая точка продаж</div>
-    <form method="post" action="/admin/points">
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-point-modal-title">
+    <div class="admin-modal__title" id="admin-point-modal-title">Новая точка продаж</div>
+    <form method="post" action="/admin/points" id="admin-point-form">
       <div class="admin-field">
         <label for="point-name">Название</label>
-        <input id="point-name" name="name" placeholder="Дордой-Центр" required>
+        <input id="point-name" name="name" placeholder="Дордой-Центр" required maxlength="200">
       </div>
       <div class="admin-field">
         <label for="point-address">Адрес</label>
-        <input id="point-address" name="address" placeholder="ул. Дордой, 1" required>
+        <input id="point-address" name="address" placeholder="ул. Дордой, 1" required maxlength="300">
       </div>
       <div class="admin-modal__actions">
         <button type="button" class="admin-btn admin-btn--secondary" onclick="closePointModal()">Отмена</button>
@@ -65,7 +71,24 @@
   </div>
 </div>
 <script>
-function openPointModal() { document.getElementById('admin-point-modal').style.display = 'flex'; }
+function openPointModal(btn) {
+  var form = document.getElementById('admin-point-form');
+  var title = document.getElementById('admin-point-modal-title');
+  var name = document.getElementById('point-name');
+  var address = document.getElementById('point-address');
+  if (btn && btn.dataset && btn.dataset.id) {
+    form.action = '/admin/points/' + encodeURIComponent(btn.dataset.id);
+    title.textContent = 'Редактировать точку';
+    name.value = btn.dataset.name || '';
+    address.value = btn.dataset.address || '';
+  } else {
+    form.action = '/admin/points';
+    title.textContent = 'Новая точка продаж';
+    name.value = '';
+    address.value = '';
+  }
+  document.getElementById('admin-point-modal').style.display = 'flex';
+}
 function closePointModal() { document.getElementById('admin-point-modal').style.display = 'none'; }
 </script>
 {{end}}

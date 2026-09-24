@@ -21,6 +21,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -60,6 +61,7 @@ type RangeOptionLink struct {
 // card alike (orders.gohtml ranges over the same slice for both).
 type OrderRowView struct {
 	URL          string
+	ThumbURL     string // first item's photo, "" when it has none
 	Number       string
 	DateLabel    string
 	Phone        string
@@ -76,6 +78,20 @@ type OrdersListData struct {
 	StatusChips  []StatusChipLink
 	RangeOptions []RangeOptionLink
 	Rows         []OrderRowView
+
+	// Filter form state (fix/admin): search box, point select (owner/
+	// manager only), custom date range, and notes about ignored filters.
+	Query          string
+	Status         string
+	Range          string
+	From           string
+	To             string
+	CanChoosePoint bool
+	Points         []PointOptionVM
+	Notes          []string
+	Filtered       bool // any filter besides the defaults is active
+	ResetURL       string
+
 	Empty        bool
 	CountLabel   string
 	HasPrev      bool
@@ -86,6 +102,7 @@ type OrdersListData struct {
 
 // OrderDetailItemView backs one row of the "Состав заказа" table.
 type OrderDetailItemView struct {
+	ThumbURL   string // product photo (the variant's color if tagged), "" when none
 	Name       string
 	Variant    string
 	Qty        int
@@ -295,67 +312,75 @@ var orderRangeOptions = []struct {
 	{"7", "Последние 7 дней"},
 	{"30", "Последние 30 дней"},
 	{"all", "Весь период"},
+	{"custom", "Произвольный период"},
 }
 
-// ordersListURL builds /admin/orders?status=...&range=...&page=... for the
-// given filter combination, omitting params at their default value so the
-// common case ("Все"/"Весь период"/page 1) stays a clean /admin/orders.
+// ordersListURL builds /admin/orders?status=...&range=...&page=... —
+// kept for callers that only vary those three; see ordersListParams.URL
+// for the full filter set.
 func ordersListURL(status, rng string, page int) string {
-	q := url.Values{}
-	if status != "" {
-		q.Set("status", status)
-	}
-	if rng != "" && rng != "all" {
-		q.Set("range", rng)
-	}
-	if page > 1 {
-		q.Set("page", strconv.Itoa(page))
-	}
-	if len(q) == 0 {
-		return "/admin/orders"
-	}
-	return "/admin/orders?" + q.Encode()
+	return ordersListParams{Status: status, Range: rng, Page: page}.URL()
 }
 
 // ---------- handlers ----------
 
-// ordersListPage handles GET /admin/orders: status chips + date-range
-// filter (query params), table (desktop, styled by CSS) / cards (mobile,
-// same rows via a @media rule in admin.css), empty state.
+// ordersListPage handles GET /admin/orders: search (order number or
+// customer phone), status chips, point select (owner/manager), preset or
+// custom date range, table (desktop) / cards (mobile), empty state.
+// Invalid filter values are dropped with a note instead of reaching SQL.
 func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
-	st, _ := staff.FromContext(r.Context())
+	ctx := r.Context()
+	st, _ := staff.FromContext(ctx)
 
-	statusParam := r.URL.Query().Get("status")
-	rangeParam := r.URL.Query().Get("range")
-	if rangeParam == "" {
-		rangeParam = "all"
+	params := parseOrdersListParams(r.URL.Query())
+
+	canChoosePoint := st.Role != staff.RolePointStaff
+	var pointOpts []PointOptionVM
+	if canChoosePoint {
+		pts, err := h.pointsRepo.List(ctx)
+		if err != nil {
+			h.renderInternalErr(w, err)
+			return
+		}
+		known := false
+		for _, p := range pts {
+			if p.ID == params.Point {
+				known = true
+			}
+		}
+		if !known {
+			params.Point = ""
+		}
+		pointOpts = append(pointOpts, PointOptionVM{ID: "", Name: "Все точки", Selected: params.Point == ""})
+		for _, p := range pts {
+			pointOpts = append(pointOpts, PointOptionVM{ID: p.ID, Name: p.Name, Selected: p.ID == params.Point})
+		}
+	} else {
+		params.Point = "" // point_staff: forced below, never from the URL
 	}
-	page := 1
-	if v := r.URL.Query().Get("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			page = p
+
+	filter, notes := resolveOrderFilter(&params, time.Now())
+
+	// point_staff only ever sees its own point's orders (the JSON API's
+	// rule, httpapi/admin_orders.go); no point at all fails closed.
+	list := []orders.Order{}
+	total := 0
+	if st.Role != staff.RolePointStaff || st.PointID != nil {
+		if st.Role == staff.RolePointStaff {
+			filter.PointID = st.PointID
+		}
+		var err error
+		list, total, err = h.orderMeta.Search(ctx, filter)
+		if err != nil {
+			h.handleOrdersServiceError(w, err)
+			return
 		}
 	}
 
-	filter := orders.AdminListFilter{Page: page}
-	if statusParam != "" {
-		status := orders.OrderStatus(statusParam)
-		filter.Status = &status
-	}
-	if rangeParam != "all" {
-		if days, err := strconv.Atoi(rangeParam); err == nil && days > 0 {
-			from := time.Now().AddDate(0, 0, -days)
-			filter.From = &from
-		}
-	}
-
-	list, total, err := h.ordersSvc.AdminListOrders(r.Context(), filter)
-	if err != nil {
-		h.handleOrdersServiceError(w, err)
-		return
-	}
-
-	data := h.buildOrdersListView(r.Context(), list, total, statusParam, rangeParam, page)
+	data := h.buildOrdersListViewFor(ctx, list, total, params)
+	data.CanChoosePoint = canChoosePoint
+	data.Points = pointOpts
+	data.Notes = notes
 
 	pageData := h.shellPageData("orders", "Заказы", st)
 	pageData.Data = data
@@ -364,43 +389,51 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// buildOrdersListView turns AdminListOrders' result into OrdersListData.
-// AdminListOrders deliberately returns parent rows only (see its doc
-// comment), so each row's customer phone and item count come from
-// loadOrderListMeta — two batch queries for the whole page. (This used to
-// be a per-row AdminGetOrder + CustomerRepo.GetByID loop; AdminGetOrder's
-// lookup was then an `id::text = $1` scan, so at 50 rows/page
-// that was ~50 sequential scans of orders per page view.)
+// buildOrdersListView is buildOrdersListViewFor with only status/range/
+// page set (kept for existing callers/tests).
 func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order, total int, statusParam, rangeParam string, page int) OrdersListData {
+	return h.buildOrdersListViewFor(ctx, list, total, ordersListParams{Status: statusParam, Range: rangeParam, Page: page})
+}
+
+// buildOrdersListViewFor turns a page of orders into OrdersListData. Each
+// row's customer phone and item count come from loadOrderListMeta — two
+// batch queries for the whole page, not one lookup per row.
+func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Order, total int, p ordersListParams) OrdersListData {
 	chips := make([]StatusChipLink, 0, len(orderStatusFilters))
 	for _, f := range orderStatusFilters {
+		cp := p
+		cp.Status, cp.Page = f.Value, 1
 		chips = append(chips, StatusChipLink{
 			Label:  f.Label,
-			URL:    ordersListURL(f.Value, rangeParam, 1),
+			URL:    cp.URL(),
 			Class:  f.Class,
-			Active: f.Value == statusParam,
+			Active: f.Value == p.Status,
 		})
 	}
 
 	ranges := make([]RangeOptionLink, 0, len(orderRangeOptions))
 	for _, ro := range orderRangeOptions {
+		cp := p
+		cp.Range, cp.Page = ro.Value, 1
 		ranges = append(ranges, RangeOptionLink{
 			Value:    ro.Value,
 			Label:    ro.Label,
-			URL:      ordersListURL(statusParam, ro.Value, 1),
-			Selected: ro.Value == rangeParam,
+			URL:      cp.URL(),
+			Selected: ro.Value == p.Range,
 		})
 	}
 
 	itemCounts, phones := h.loadOrderListMeta(ctx, list)
+	thumbs := h.loadOrderThumbs(ctx, list)
 	rows := make([]OrderRowView, 0, len(list))
 	for _, o := range list {
 		meta := orderStatusMetaFor(o.Status)
 		itemsCount := itemCounts[o.ID]
 		rows = append(rows, OrderRowView{
 			URL:          "/admin/orders/" + o.ID,
+			ThumbURL:     h.photoURL(thumbs[o.ID]),
 			Number:       o.OrderNumber,
-			DateLabel:    o.CreatedAt.Format("02.01.2006"),
+			DateLabel:    o.CreatedAt.In(reports.Location).Format("02.01.2006"),
 			Phone:        phones[o.CustomerID],
 			ItemsCount:   itemsCount,
 			ItemsLabel:   fmt.Sprintf("%d %s", itemsCount, pluralRu(itemsCount, "товар", "товара", "товаров")),
@@ -411,16 +444,26 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 		})
 	}
 
+	prev, next := p, p
+	prev.Page, next.Page = p.Page-1, p.Page+1
 	return OrdersListData{
 		StatusChips:  chips,
 		RangeOptions: ranges,
 		Rows:         rows,
 		Empty:        len(rows) == 0,
 		CountLabel:   fmt.Sprintf("%d %s", total, pluralRu(total, "заказ", "заказа", "заказов")),
-		HasPrev:      page > 1,
-		HasNext:      total > page*orders.AdminPageSize,
-		PrevURL:      ordersListURL(statusParam, rangeParam, page-1),
-		NextURL:      ordersListURL(statusParam, rangeParam, page+1),
+		HasPrev:      p.Page > 1,
+		HasNext:      total > p.Page*orders.AdminPageSize,
+		PrevURL:      prev.URL(),
+		NextURL:      next.URL(),
+
+		Query:    p.Q,
+		Status:   p.Status,
+		Range:    p.Range,
+		From:     p.From,
+		To:       p.To,
+		Filtered: p.Q != "" || p.Status != "" || p.Point != "" || (p.Range != "" && p.Range != "all"),
+		ResetURL: "/admin/orders",
 	}
 }
 
@@ -456,6 +499,32 @@ func (h *handlers) loadOrderListMeta(ctx context.Context, list []orders.Order) (
 	return counts, phones
 }
 
+// loadOrderThumbs batch-loads each listed order's first-item photo (one
+// query per page); a failure only drops the thumbnails.
+func (h *handlers) loadOrderThumbs(ctx context.Context, list []orders.Order) map[string]string {
+	if h.orderMeta == nil || len(list) == 0 {
+		return map[string]string{}
+	}
+	ids := make([]string, len(list))
+	for i, o := range list {
+		ids[i] = o.ID
+	}
+	thumbs, err := h.orderMeta.OrderThumbs(ctx, ids)
+	if err != nil {
+		slog.WarnContext(ctx, "admin orders list: thumbnails lookup failed", "err", err)
+		return map[string]string{}
+	}
+	return thumbs
+}
+
+// photoURL is thumbURL tolerant of an empty key or a nil config (tests).
+func (h *handlers) photoURL(objectKey string) string {
+	if objectKey == "" || h.cfg == nil {
+		return ""
+	}
+	return h.thumbURL(objectKey)
+}
+
 // orderDetailPage handles GET /admin/orders/{id}: full order info, items +
 // total, and the status-change buttons for the order's current status.
 // {id} may be either the order's UUID or its order_number, same dual
@@ -467,6 +536,10 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	order, err := h.ordersSvc.AdminGetOrder(r.Context(), id)
 	if err != nil {
 		h.handleOrdersServiceError(w, err)
+		return
+	}
+	if !staffCanSeeOrder(st, order) {
+		http.Error(w, "заказ не найден", http.StatusNotFound)
 		return
 	}
 
@@ -502,6 +575,19 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 
 	addressText, comment := h.orderDeliveryInfo(ctx, o)
 
+	variantIDs := make([]string, 0, len(o.Items))
+	for _, it := range o.Items {
+		variantIDs = append(variantIDs, it.VariantID)
+	}
+	thumbs := map[string]string{}
+	if h.orderMeta != nil && len(variantIDs) > 0 {
+		if m, err := h.orderMeta.VariantThumbs(ctx, variantIDs); err == nil {
+			thumbs = m
+		} else {
+			slog.WarnContext(ctx, "admin order detail: thumbnails lookup failed", "err", err)
+		}
+	}
+
 	items := make([]OrderDetailItemView, 0, len(o.Items))
 	for _, it := range o.Items {
 		variant := ""
@@ -509,6 +595,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 			variant = fmt.Sprintf("Размер %s, %s", it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
 		}
 		items = append(items, OrderDetailItemView{
+			ThumbURL:   h.photoURL(thumbs[it.VariantID]),
 			Name:       it.ProductNameSnapshot,
 			Variant:    variant,
 			Qty:        it.Quantity,
@@ -519,7 +606,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	return OrderDetailData{
 		ID:            o.ID,
 		Number:        o.OrderNumber,
-		DateLabel:     o.CreatedAt.Format("02.01.2006 15:04"),
+		DateLabel:     o.CreatedAt.In(reports.Location).Format("02.01.2006 15:04"),
 		StatusLabel:   meta.Label,
 		StatusClass:   meta.Class,
 		Phone:         phone,
@@ -596,6 +683,14 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if st.Role == staff.RolePointStaff {
+		order, err := h.ordersSvc.AdminGetOrder(r.Context(), id)
+		if err != nil || !staffCanSeeOrder(st, order) {
+			http.Error(w, "заказ не найден", http.StatusNotFound)
+			return
+		}
+	}
+
 	if _, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus); err != nil {
 		msg := "не удалось изменить статус"
 		var appErr *apperr.AppError
@@ -607,6 +702,20 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, detailURL, http.StatusSeeOther)
+}
+
+// staffCanSeeOrder is the point-based RBAC rule for one order: owner and
+// manager see every order, point_staff only orders of its own point (an
+// order with no point, or a point_staff with none, is hidden) — the same
+// rule httpapi/admin_orders.go enforces for the JSON API.
+func staffCanSeeOrder(st *staff.Staff, o *orders.Order) bool {
+	if st == nil || o == nil {
+		return false
+	}
+	if st.Role != staff.RolePointStaff {
+		return true
+	}
+	return st.PointID != nil && o.PointID != nil && *st.PointID == *o.PointID
 }
 
 // handleOrdersServiceError translates an error from *orders.Service into

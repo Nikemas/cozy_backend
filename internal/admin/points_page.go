@@ -1,6 +1,7 @@
 // points_page.go implements Task 5's "Точки продаж" screen (GET
-// /admin/points) plus its two mutations (POST /admin/points to create,
-// POST /admin/points/{id}/toggle to flip active/inactive) — design canvas
+// /admin/points) plus its mutations (POST /admin/points to create, POST
+// /admin/points/{id} to edit name/address, POST /admin/points/{id}/toggle
+// to flip active/inactive) — design canvas
 // Cozy Admin.dc.html lines 620-642 (list) and 684-703 (pointModal). All
 // three routes are wired under ownerOnly in routes.go.
 package admin
@@ -20,6 +21,7 @@ type pointRow struct {
 	ID          string
 	Name        string
 	Address     string
+	IsActive    bool
 	ChipLabel   string
 	ChipClass   string // admin-chip modifier class, see admin.css
 	ToggleLabel string
@@ -32,7 +34,7 @@ type pointRow struct {
 // inactive reuses the neutral grey of the "placed" order-status chip
 // (#8A8A86/#EDEDEB) — see admin.css's .admin-chip--active/--inactive.
 func newPointRow(p *points.Point) pointRow {
-	row := pointRow{ID: p.ID, Name: p.Name, Address: p.Address}
+	row := pointRow{ID: p.ID, Name: p.Name, Address: p.Address, IsActive: p.IsActive}
 	if p.IsActive {
 		row.ChipLabel = "Активна"
 		row.ChipClass = "admin-chip--active"
@@ -106,27 +108,44 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
 }
 
+// pointsUpdate handles POST /admin/points/{id} — the edit modal (name +
+// address). The active flag is left as it is; that's the toggle's job.
+func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := r.ParseForm(); err != nil {
+		h.renderPointsPage(w, r, "не удалось прочитать форму")
+		return
+	}
+
+	current, err := h.pointsRepo.GetByID(r.Context(), id)
+	if err != nil {
+		h.renderPointsPage(w, r, appErrMessage(err))
+		return
+	}
+
+	in := points.PointInput{
+		Name:     strings.TrimSpace(r.FormValue("name")),
+		Address:  strings.TrimSpace(r.FormValue("address")),
+		IsActive: current.IsActive,
+	}
+	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
+		h.renderPointsPage(w, r, appErrMessage(err))
+		return
+	}
+
+	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
+}
+
 // pointsToggle handles POST /admin/points/{id}/toggle — the row's "toggle
-// active" button. PointsRepo has no dedicated toggle method, so per the
-// task brief this re-submits the point's own Name/Address unchanged with
+// active" button (deactivation goes through a confirm dialog, see
+// points.gohtml). Re-submits the point's own Name/Address unchanged with
 // IsActive flipped via PointsRepo.Update.
 func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	list, err := h.pointsRepo.List(r.Context())
+	target, err := h.pointsRepo.GetByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, "не удалось загрузить точки продаж", http.StatusInternalServerError)
-		return
-	}
-	var target *points.Point
-	for _, p := range list {
-		if p.ID == id {
-			target = p
-			break
-		}
-	}
-	if target == nil {
-		h.renderPointsPage(w, r, "точка продаж не найдена")
+		h.renderPointsPage(w, r, appErrMessage(err))
 		return
 	}
 

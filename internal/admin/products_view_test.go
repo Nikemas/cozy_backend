@@ -283,36 +283,54 @@ func TestNilIfEmpty(t *testing.T) {
 
 func TestParsePrice(t *testing.T) {
 	cases := []struct {
-		in   string
-		want float64
+		in      string
+		want    float64
+		wantErr bool
 	}{
-		{"4500", 4500},
-		{"4 500", 4500},
-		{"", 0},
-		{"not a number", 0},
-		{"99.5", 99.5},
+		{"4500", 4500, false},
+		{"4 500", 4500, false},
+		{"99.5", 99.5, false},
+		{"99,5", 99.5, false},
+		{"", 0, true},
+		{"not a number", 0, true},
+		{"-1", 0, true},
 	}
 	for _, c := range cases {
-		if got := parsePrice(c.in); got != c.want {
+		got, err := parsePrice(c.in)
+		if (err != nil) != c.wantErr {
+			t.Errorf("parsePrice(%q) err = %v, wantErr %v", c.in, err, c.wantErr)
+			continue
+		}
+		if got != c.want {
 			t.Errorf("parsePrice(%q) = %v, want %v", c.in, got, c.want)
 		}
 	}
 }
 
-func TestParseQty(t *testing.T) {
+// An invalid quantity must be a form error — it used to be clamped to 0
+// silently, zeroing the stock of whatever cell had a typo.
+func TestParseStockQty(t *testing.T) {
 	cases := []struct {
-		in   string
-		want int
+		in      string
+		want    int
+		wantErr bool
 	}{
-		{"12", 12},
-		{"", 0},
-		{"-5", 0},
-		{"abc", 0},
-		{"0", 0},
+		{"12", 12, false},
+		{" 0 ", 0, false},
+		{"", 0, true},
+		{"-5", 0, true},
+		{"abc", 0, true},
+		{"1.5", 0, true},
+		{"100001", 0, true},
 	}
 	for _, c := range cases {
-		if got := parseQty(c.in); got != c.want {
-			t.Errorf("parseQty(%q) = %v, want %v", c.in, got, c.want)
+		got, err := parseStockQty(c.in)
+		if (err != nil) != c.wantErr {
+			t.Errorf("parseStockQty(%q) err = %v, wantErr %v", c.in, err, c.wantErr)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("parseStockQty(%q) = %v, want %v", c.in, got, c.want)
 		}
 	}
 }
@@ -327,21 +345,6 @@ func TestFormAt(t *testing.T) {
 	}
 	if got := formAt(values, -1); got != "" {
 		t.Errorf("formAt(-1) = %q, want empty", got)
-	}
-}
-
-func TestSumStockByVariant(t *testing.T) {
-	entries := []catalog.StockEntry{
-		{VariantID: "v1", PointID: "p1", Quantity: 3},
-		{VariantID: "v1", PointID: "p2", Quantity: 4},
-		{VariantID: "v2", PointID: "p1", Quantity: 0},
-	}
-	got := sumStockByVariant(entries)
-	if got["v1"] != 7 {
-		t.Errorf("sumStockByVariant[v1] = %d, want 7", got["v1"])
-	}
-	if got["v2"] != 0 {
-		t.Errorf("sumStockByVariant[v2] = %d, want 0", got["v2"])
 	}
 }
 

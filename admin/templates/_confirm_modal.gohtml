@@ -11,11 +11,11 @@
      modal. */}}
 {{define "_confirm_modal"}}
 <div id="admin-confirm-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal">
+  <div class="admin-modal" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-text">
     <div class="admin-modal__title" id="admin-confirm-title"></div>
     <div class="admin-modal__text" id="admin-confirm-text"></div>
     <div class="admin-modal__actions">
-      <button type="button" class="admin-btn admin-btn--secondary" onclick="closeConfirmModal()">Отмена</button>
+      <button type="button" class="admin-btn admin-btn--secondary" id="admin-confirm-cancel" data-modal-close onclick="closeConfirmModal()">Отмена</button>
       <button type="button" id="admin-confirm-action" class="admin-btn admin-btn--dark">Подтвердить</button>
     </div>
   </div>

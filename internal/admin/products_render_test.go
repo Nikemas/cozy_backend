@@ -1,11 +1,23 @@
 package admin
 
 import (
+	"context"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+
+	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
+
+var testStockPoints = []StockPointVM{{ID: "pt1", Name: "Главный склад"}, {ID: "pt2", Name: "Дордой", Inactive: true}}
 
 // TestRenderProductsListExecutes exercises products.gohtml with a
 // realistic *ProductsPageData (list with rows, chips, empty state) — the
@@ -111,10 +123,13 @@ func TestRenderProductFormExecutes(t *testing.T) {
 			Brand: "Nike", BasePrice: "4500", DescriptionRu: "Описание", DescriptionKy: "Баяны",
 			Categories: categories, CategoriesJSON: categoryOptionsJSON(categories),
 			Images: []ImageRowVM{{ObjectKey: "products/a.jpg", URL: "http://localhost:9000/cozy-media/products/a.jpg"}},
-			Variants: []VariantRowVM{
-				{ID: "v1", Size: "42", Color: "Белый", Qty: 12, BadgeLbl: "12 шт", BadgeFG: "#2E7D32", BadgeBG: "#E8F5E9"},
-				{ID: "v2", Size: "43", Color: "Чёрный", Qty: 0, BadgeLbl: "Нет в наличии", BadgeFG: "#C62828", BadgeBG: "#FFEBEE"},
-			},
+			Variants: buildVariantRows(
+				[]catalog.Variant{{ID: "v1", Size: "42", Color: "Белый"}, {ID: "v2", Size: "43", Color: "Чёрный"}},
+				[]catalog.StockEntry{{VariantID: "v1", PointID: "pt1", Quantity: 12}},
+				testStockPoints,
+			),
+			StockPoints:     testStockPoints,
+			StockPointsJSON: marshalJS(testStockPoints),
 			CanDelete: true,
 		}},
 		{"with error", ProductFormData{
@@ -159,5 +174,117 @@ func TestRenderProductImportExecutes(t *testing.T) {
 	}
 	if w.Code != 200 {
 		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
+
+// fakeSaver records whether the handler reached the transactional save.
+type fakeSaver struct {
+	called bool
+	in     productSaveInput
+	err    error
+}
+
+func (f *fakeSaver) Save(_ context.Context, in productSaveInput) (string, error) {
+	f.called = true
+	f.in = in
+	return "p-new", f.err
+}
+
+func expectFormLookups(mock sqlmock.Sqlmock) {
+	pointsRows := func() *sqlmock.Rows {
+		return sqlmock.NewRows([]string{"id", "name", "address", "is_active", "created_at"}).
+			AddRow("pA", "Главный склад", "ул. 1", true, time.Now())
+	}
+	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
+	mock.ExpectQuery(`FROM categories`).WillReturnRows(sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).
+		AddRow("cat1", nil, "Мужская", "Эркек", "men", 0))
+	mock.ExpectQuery(`SELECT DISTINCT brand FROM products`).WillReturnRows(sqlmock.NewRows([]string{"brand"}))
+	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
+}
+
+func newProductFormHandlers(t *testing.T, saver productSaver) (*handlers, sqlmock.Sqlmock) {
+	t.Helper()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return &handlers{
+		render:       newTestRenderer(t),
+		categories:   catalog.NewCategoryRepo(db),
+		products:     catalog.NewProductRepo(db),
+		pointsRepo:   points.NewPointsRepo(db),
+		productStore: saver,
+		cfg:          &config.Config{},
+	}, mock
+}
+
+func postProductForm(h *handlers, form url.Values) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodPost, "/admin/products", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	owner := &staff.Staff{ID: "s1", Name: "Айгерим Б.", Role: staff.RoleOwner, IsActive: true}
+	r = r.WithContext(staff.NewContextWithStaff(r.Context(), owner))
+	w := httptest.NewRecorder()
+	h.productCreate(w, r)
+	return w
+}
+
+// An invalid quantity re-renders the form with an error; nothing is saved.
+func TestSaveProductInvalidQtyDoesNotSave(t *testing.T) {
+	saver := &fakeSaver{}
+	h, mock := newProductFormHandlers(t, saver)
+	expectFormLookups(mock)
+
+	form := url.Values{
+		"category_id": {"cat1"}, "name_ru": {"Nike"}, "name_ky": {"Nike"}, "base_price": {"4500"},
+		"variant_key": {"n1"}, "variant_id": {""}, "variant_size": {"42"}, "variant_color": {"Белый"},
+		"qty_n1_pA": {"пять"},
+	}
+	w := postProductForm(h, form)
+
+	if saver.called {
+		t.Fatal("Save called despite an invalid quantity")
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "admin-form-error") || !strings.Contains(body, "целым числом") {
+		t.Errorf("form error not rendered; body excerpt: %.300s", body)
+	}
+	if !strings.Contains(body, `value="пять"`) || !strings.Contains(body, "is-invalid") {
+		t.Error("submitted value / invalid mark not kept on re-render")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// A stock conflict re-renders the form with the fresh value in the
+// conflicting cell (and as its new orig), so a resubmit can succeed.
+func TestSaveProductConflictRerendersWithCurrentValue(t *testing.T) {
+	saver := &fakeSaver{err: &stockConflictError{Cells: []stockConflict{{RowKey: "v1", PointID: "pA", Current: 1, Exists: true}}}}
+	h, mock := newProductFormHandlers(t, saver)
+	expectFormLookups(mock)
+
+	form := url.Values{
+		"category_id": {"cat1"}, "name_ru": {"Nike"}, "name_ky": {"Nike"}, "base_price": {"4500"},
+		"variant_key": {"v1"}, "variant_id": {"v1"}, "variant_size": {"42"}, "variant_color": {"Белый"},
+		"qty_v1_pA": {"9"}, "orig_v1_pA": {"3"},
+	}
+	w := postProductForm(h, form)
+
+	if !saver.called || len(saver.in.Stock) != 1 || saver.in.Stock[0].Qty != 9 {
+		t.Fatalf("saver input = %+v", saver.in)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Остаток изменился") {
+		t.Error("conflict message not rendered")
+	}
+	if !strings.Contains(body, `name="qty_v1_pA" value="1"`) || !strings.Contains(body, `name="orig_v1_pA" value="1"`) {
+		t.Error("conflicting cell not refreshed to the current value")
+	}
+	if !strings.Contains(body, "is-conflict") {
+		t.Error("conflicting cell not highlighted")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
 	}
 }

@@ -43,8 +43,8 @@
 
 {{/* Create modal. */}}
 <div id="admin-category-create-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Новая категория</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-create-title">
+    <div class="admin-modal__title" id="admin-category-create-title">Новая категория</div>
     <form method="post" action="/admin/categories">
       <div class="admin-field-row">
         <div class="admin-field">
@@ -86,8 +86,8 @@
      has no per-row named modal to render here (there could be dozens of
      categories). */}}
 <div id="admin-category-edit-modal" class="admin-modal-backdrop" style="display:none">
-  <div class="admin-modal admin-modal--md">
-    <div class="admin-modal__title">Редактировать категорию</div>
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-edit-title">
+    <div class="admin-modal__title" id="admin-category-edit-title">Редактировать категорию</div>
     <form method="post" id="admin-category-edit-form">
       <div class="admin-field-row">
         <div class="admin-field">
