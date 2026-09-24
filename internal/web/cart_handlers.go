@@ -9,17 +9,8 @@ import (
 	"strconv"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
-
-// deliveryFeeSomFlat is a flat placeholder shown on the cart summary
-// before checkout — COZY_WEB_DESIGN.md §4 lists `deliveryPrice` (default
-// 200) as an editable canvas prop, not a computed value. It's display-only
-// here: orders.Service.CreateOrder's total_amount is the sum of item
-// prices only, no delivery line, so nothing about checkout actually
-// depends on this number being exact.
-// TODO(delivery-fee): replace with real zone/distance-based pricing once
-// that's specified — out of scope for this MVP checkout.
-const deliveryFeeSomFlat = 200
 
 // CartLineView is one row of the cart screen: a cart_items row enriched
 // with the product/variant info CartItem itself doesn't carry.
@@ -31,14 +22,22 @@ type CartLineView struct {
 	Qty         int
 	UnitPrice   float64
 	LineTotal   float64
+	// Available is false when the product was deactivated or no store has
+	// Qty pairs of it; checkout will refuse the order naming this line.
+	Available bool
 }
 
-// CartPageData backs cart.gohtml's authenticated state.
+// CartPageData backs cart.gohtml's authenticated state. DeliveryFee /
+// GrandTotal are what a delivery order will actually be charged
+// (orders.Settings.DeliveryFee, the same value orders.Service adds to
+// total_amount); self-pickup is free, which DeliveryLabel says.
 type CartPageData struct {
-	Lines         []CartLineView
-	ItemsTotal    float64
-	DeliveryLabel string
-	GrandTotal    float64
+	Lines          []CartLineView
+	ItemsTotal     float64
+	DeliveryFee    float64
+	DeliveryLabel  string
+	GrandTotal     float64
+	HasUnavailable bool
 }
 
 // cart renders the cart screen. Per web-plan Architecture Decisions
@@ -148,45 +147,41 @@ func (h *handlers) renderCartFragment(w http.ResponseWriter, r *http.Request) er
 	return h.render.RenderPartial(w, "cart", "cart_page", data)
 }
 
-// buildCartPageData enriches customerID's cart_items with the product
-// name/size/color/price a cart line needs to display — data CartRepo.List
-// alone doesn't carry (its CartItem is deliberately just the bare
-// cart_items row, per Task 1's frozen contract). Queries product_variants/
-// products directly rather than going through internal/catalog, which
-// only exposes per-product/per-ID accessors, not a batch-by-cart lookup.
+// buildCartPageData loads customerID's cart with product/variant data in
+// one query (orders.CartRepo.ListDetailed) and computes the summary with
+// the same delivery fee orders.Service charges.
 func (h *handlers) buildCartPageData(ctx context.Context, customerID string) (*CartPageData, error) {
-	const q = `
-		SELECT ci.variant_id, ci.qty, pv.size, pv.color, p.name_ru,
-		       COALESCE(pv.price_override, p.base_price)
-		FROM cart_items ci
-		JOIN product_variants pv ON pv.id = ci.variant_id
-		JOIN products p ON p.id = pv.product_id
-		WHERE ci.customer_id = $1
-		ORDER BY ci.created_at`
-
-	rows, err := h.db.QueryContext(ctx, q, customerID)
+	lines, err := h.cartRepo.ListDetailed(ctx, customerID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	return cartPageFromLines(lines, orders.CurrentSettings().DeliveryFee), nil
+}
 
+// cartPageFromLines is buildCartPageData's pure part (unit-tested).
+func cartPageFromLines(lines []orders.CartLine, deliveryFee float64) *CartPageData {
 	page := &CartPageData{Lines: []CartLineView{}}
-	for rows.Next() {
-		var l CartLineView
-		if err := rows.Scan(&l.VariantID, &l.Qty, &l.Size, &l.Color, &l.ProductName, &l.UnitPrice); err != nil {
-			return nil, err
+	for _, cl := range lines {
+		l := CartLineView{
+			VariantID:   cl.VariantID,
+			ProductName: cl.ProductName,
+			Size:        cl.Size,
+			Color:       cl.Color,
+			Qty:         cl.Qty,
+			UnitPrice:   cl.Price,
+			LineTotal:   cl.Price * float64(cl.Qty),
+			Available:   cl.Available(),
 		}
-		l.LineTotal = l.UnitPrice * float64(l.Qty)
+		if !l.Available {
+			page.HasUnavailable = true
+		}
 		page.ItemsTotal += l.LineTotal
 		page.Lines = append(page.Lines, l)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	if len(page.Lines) > 0 {
-		page.DeliveryLabel = fmt.Sprintf("%d сом", deliveryFeeSomFlat)
-		page.GrandTotal = page.ItemsTotal + deliveryFeeSomFlat
+		page.DeliveryFee = deliveryFee
+		page.DeliveryLabel = fmt.Sprintf("%s (самовывоз — бесплатно)", formatSom(deliveryFee))
+		page.GrandTotal = page.ItemsTotal + deliveryFee
 	}
-	return page, nil
+	return page
 }

@@ -6,8 +6,11 @@ package web
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
+
+	"github.com/google/uuid"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
@@ -34,12 +37,20 @@ type PointView struct {
 	Address string
 }
 
-// CheckoutPageData backs checkout.gohtml.
+// CheckoutPageData backs checkout.gohtml. DeliveryFee is what a delivery
+// order adds to ItemsTotal (pickup is free) — the same value
+// orders.Service charges. IdempotencyKey is a fresh token per rendered
+// form: a double click or a resubmit after a network error places one
+// order, not two.
 type CheckoutPageData struct {
-	Addresses  []AddressView
-	Points     []PointView
-	ItemsTotal float64
-	ItemCount  int
+	Addresses      []AddressView
+	Points         []PointView
+	ItemsTotal     float64
+	ItemCount      int
+	DeliveryFee    float64
+	IdempotencyKey string
+	CommentMaxLen  int
+	HasUnavailable bool
 }
 
 // DoneData backs done.gohtml.
@@ -84,10 +95,14 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 
 	data := h.base(r, "checkout")
 	data.Data = CheckoutPageData{
-		Addresses:  addresses,
-		Points:     points,
-		ItemsTotal: cartPage.ItemsTotal,
-		ItemCount:  len(items),
+		Addresses:      addresses,
+		Points:         points,
+		ItemsTotal:     cartPage.ItemsTotal,
+		ItemCount:      len(items),
+		DeliveryFee:    cartPage.DeliveryFee,
+		IdempotencyKey: uuid.NewString(),
+		CommentMaxLen:  orders.MaxCommentLen,
+		HasUnavailable: cartPage.HasUnavailable,
 	}
 	return h.render.Render(w, "checkout", data)
 }
@@ -95,6 +110,11 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 // checkoutSubmit creates the order from the customer's current cart and,
 // per the design (no payment step in this MVP — see web-plan Architecture
 // Decisions), goes straight to /order/{orderNumber}/done.
+//
+// The ordered lines leave the cart in the same transaction as the order
+// (PlaceOrderInput.ClearCart), and the form's idempotency_key makes a
+// double submit land on the first order's done page instead of placing a
+// second order.
 func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error {
 	customerID := CustomerID(r)
 	if customerID == "" {
@@ -128,6 +148,14 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	if len(items) == 0 {
+		// A resubmit of an already-placed checkout finds the cart empty;
+		// send it to that order instead of an error.
+		if key := r.FormValue("idempotency_key"); key != "" {
+			if order, ok := h.findOrderByCheckoutKey(r, customerID, key); ok {
+				http.Redirect(w, r, "/order/"+order.OrderNumber+"/done", http.StatusSeeOther)
+				return nil
+			}
+		}
 		return apperr.BadRequest("empty_cart", "корзина пуста")
 	}
 
@@ -136,22 +164,52 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		inputs[i] = orders.OrderItemInput{VariantID: it.VariantID, Quantity: it.Qty}
 	}
 
-	order, err := h.ordersSvc.CreateOrder(r.Context(), customerID, inputs, addressID, pickupPointID)
+	order, _, err := h.ordersSvc.PlaceOrder(r.Context(), orders.PlaceOrderInput{
+		CustomerID:     customerID,
+		Items:          inputs,
+		AddressID:      addressID,
+		PickupPointID:  pickupPointID,
+		Comment:        r.FormValue("comment"),
+		IdempotencyKey: r.FormValue("idempotency_key"),
+		ClearCart:      true,
+	})
 	if err != nil {
 		return err
 	}
 
-	// Best-effort: the order is already placed and stock already
-	// decremented at this point, so a failure to clear a cart line
-	// shouldn't fail the checkout the customer is watching complete — it
-	// just leaves a stale line they can remove manually later.
-	for _, it := range items {
-		if err := h.cartRepo.Remove(r.Context(), customerID, it.VariantID); err != nil {
-			slog.Warn("web: failed to clear cart item after order", "customer_id", customerID, "variant_id", it.VariantID, "err", err)
-		}
-	}
-
 	http.Redirect(w, r, "/order/"+order.OrderNumber+"/done", http.StatusSeeOther)
+	return nil
+}
+
+// findOrderByCheckoutKey finds the order an earlier submit of the same
+// checkout form (same idempotency_key) already placed.
+func (h *handlers) findOrderByCheckoutKey(r *http.Request, customerID, key string) (*orders.Order, bool) {
+	order, err := h.ordersSvc.FindByIdempotencyKey(r.Context(), customerID, key)
+	if err != nil {
+		slog.Warn("web: checkout replay lookup failed", "customer_id", customerID, "err", err)
+		return nil, false
+	}
+	return order, order != nil
+}
+
+// cancelOrder backs the "Отменить" button on the site's order list: the
+// customer cancels their own order while it's still 'placed' (and not
+// paid online) — orders.Service.CancelByCustomer returns the stock.
+func (h *handlers) cancelOrder(w http.ResponseWriter, r *http.Request) error {
+	customerID := CustomerID(r)
+	if customerID == "" {
+		http.Redirect(w, r, "/profile", http.StatusSeeOther)
+		return nil
+	}
+	if _, err := h.ordersSvc.CancelByCustomer(r.Context(), customerID, r.PathValue("orderID")); err != nil {
+		var appErr *apperr.AppError
+		if errors.As(err, &appErr) && appErr.Code == "order_not_cancellable" {
+			http.Redirect(w, r, "/orders?cancel=failed", http.StatusSeeOther)
+			return nil
+		}
+		return err
+	}
+	http.Redirect(w, r, "/orders?cancel=done", http.StatusSeeOther)
 	return nil
 }
 

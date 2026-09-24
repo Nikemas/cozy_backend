@@ -36,6 +36,8 @@ type OrderView struct {
 	// cancelled) get "Повторить" to re-add their items to the cart.
 	ShowTrack  bool
 	ShowRepeat bool
+	// ShowCancel: the customer may still cancel (placed, not paid online).
+	ShowCancel bool
 }
 
 // OrdersData backs orders.gohtml.
@@ -123,6 +125,7 @@ func buildOrderViews(list []orders.Order, t func(string) string) []OrderView {
 			Items:       items,
 			ShowTrack:   meta.InFlight,
 			ShowRepeat:  !meta.InFlight,
+			ShowCancel:  orders.CustomerCanCancel(o),
 		})
 	}
 	return views
@@ -163,6 +166,12 @@ func (h *handlers) orders(w http.ResponseWriter, r *http.Request) error {
 		data.Toast = t("toast.repeat_added")
 	case "soon":
 		data.Toast = t("toast.repeat_soon")
+	}
+	switch r.URL.Query().Get("cancel") {
+	case "done":
+		data.Toast = t("toast.order_cancelled")
+	case "failed":
+		data.Toast = t("toast.order_not_cancellable")
 	}
 
 	data.Data = view

@@ -13,7 +13,8 @@
   {{if and (not .Data.Addresses) (not .Data.Points)}}
   <p class="muted">{{t "checkout.unavailable"}}</p>
   {{else}}
-  <form method="post" action="/checkout" class="checkout-form">
+  <form method="post" action="/checkout" class="checkout-form" onsubmit="this.querySelector('[type=submit]').disabled=true">
+    <input type="hidden" name="idempotency_key" value="{{.Data.IdempotencyKey}}">
     <div class="checkout-options">
       <label class="checkout-option{{if .Data.Addresses}} checkout-option--active{{end}}">
         <input type="radio" name="fulfillment" value="delivery"{{if .Data.Addresses}} checked{{end}}{{if not .Data.Addresses}} disabled{{end}}>
@@ -50,8 +51,16 @@
       {{end}}
     </div>
 
+    <label class="checkout-comment">
+      <span>{{t "checkout.comment"}}</span>
+      <textarea name="comment" rows="3" maxlength="{{.Data.CommentMaxLen}}" placeholder="{{t "checkout.comment_placeholder"}}"></textarea>
+    </label>
+
     <aside class="checkout-summary">
       <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
+      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span>{{printf "%.0f" .Data.DeliveryFee}} сом</span></div>
+      <div class="checkout-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
+      {{if .Data.HasUnavailable}}<p class="checkout-hint">{{t "cart.has_unavailable"}}</p>{{end}}
       <button type="submit" class="btn btn--primary checkout-summary__cta">{{t "checkout.place_order"}}</button>
     </aside>
   </form>

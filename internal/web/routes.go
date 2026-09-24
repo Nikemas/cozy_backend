@@ -81,6 +81,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /profile", withSession(apperr.Wrap(h.profile)))
 	mux.Handle("GET /orders", withSession(apperr.Wrap(h.orders)))
 	mux.Handle("POST /orders/{orderID}/repeat", withSession(apperr.Wrap(h.repeatOrder)))
+	mux.Handle("POST /orders/{orderID}/cancel", withSession(apperr.Wrap(h.cancelOrder)))
 	mux.Handle("GET /branches", withSession(apperr.Wrap(h.branches)))
 	mux.Handle("GET /lang", withSession(apperr.Wrap(h.langScreen)))
 	mux.Handle("POST /lang", withSession(apperr.Wrap(h.setLang)))
