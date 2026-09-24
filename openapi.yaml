@@ -386,6 +386,14 @@ paths:
         registered to a different customer (app reinstall, account switch on
         the same device), ownership moves to the current customer rather
         than erroring.
+
+        Pushes sent to a registered token (title/body in the customer's
+        `lang`, see `CustomerProfile`), FCM `data` payload:
+        - order status: `{"type":"order_status","order_id":"<uuid>","status":"<status>"}`,
+          Android channel `orders`;
+        - promo broadcast (admin "Рассылки", only while `promo_push` is on):
+          `{"type":"promo","link":"<path>"}` where `link` is `/product/<id>`,
+          `/catalog?category=<id>` or `""` (just open the app); default channel.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
