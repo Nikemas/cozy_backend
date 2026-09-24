@@ -53,6 +53,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		stock:      catalog.NewStockRepo(db),
 		media:      mediaClient,
 		cfg:        cfg,
+
+		productStore: newProductStore(db),
 	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
