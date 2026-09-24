@@ -149,7 +149,7 @@ func (h *handlers) addressCreate(w http.ResponseWriter, r *http.Request) error {
 	in := storefront.AddressInput{Label: &label, AddressText: addressText, IsDefault: isDefault}
 	if _, err := h.addressRepo.Create(r.Context(), customerID, in); err != nil {
 		return h.renderAddressPanel(w, r, customerID, &AddressFormData{
-			Label: label, AddressText: addressText, IsDefault: isDefault, Error: errMessage(err),
+			Label: label, AddressText: addressText, IsDefault: isDefault, Error: h.errText(h.resolveLang(r), err),
 		})
 	}
 
@@ -178,7 +178,7 @@ func (h *handlers) addressUpdate(w http.ResponseWriter, r *http.Request) error {
 	in := storefront.AddressInput{Label: &label, AddressText: addressText, IsDefault: isDefault}
 	if _, err := h.addressRepo.Update(r.Context(), customerID, id, in); err != nil {
 		return h.renderAddressPanel(w, r, customerID, &AddressFormData{
-			ID: id, Label: label, AddressText: addressText, IsDefault: isDefault, Error: errMessage(err),
+			ID: id, Label: label, AddressText: addressText, IsDefault: isDefault, Error: h.errText(h.resolveLang(r), err),
 		})
 	}
 

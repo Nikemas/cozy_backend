@@ -92,12 +92,12 @@ type OrdersListData struct {
 	Filtered       bool // any filter besides the defaults is active
 	ResetURL       string
 
-	Empty        bool
-	CountLabel   string
-	HasPrev      bool
-	HasNext      bool
-	PrevURL      string
-	NextURL      string
+	Empty      bool
+	CountLabel string
+	HasPrev    bool
+	HasNext    bool
+	PrevURL    string
+	NextURL    string
 }
 
 // OrderDetailItemView backs one row of the "Состав заказа" table.
@@ -604,16 +604,16 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	}
 
 	return OrderDetailData{
-		ID:            o.ID,
-		Number:        o.OrderNumber,
-		DateLabel:     o.CreatedAt.In(reports.Location).Format("02.01.2006 15:04"),
-		StatusLabel:   meta.Label,
-		StatusClass:   meta.Class,
-		Phone:         phone,
-		PaymentLabel:  paymentLabel(o.PaymentMethod, o.PaymentStatus),
-		AddressText:   addressText,
-		Comment:       comment,
-		Items:         items,
+		ID:               o.ID,
+		Number:           o.OrderNumber,
+		DateLabel:        o.CreatedAt.In(reports.Location).Format("02.01.2006 15:04"),
+		StatusLabel:      meta.Label,
+		StatusClass:      meta.Class,
+		Phone:            phone,
+		PaymentLabel:     paymentLabel(o.PaymentMethod, o.PaymentStatus),
+		AddressText:      addressText,
+		Comment:          comment,
+		Items:            items,
 		TotalLabel:       formatSom(o.TotalAmount),
 		StatusButtons:    buildStatusButtons(o.Status, role),
 		OrderHistoryData: buildOrderHistoryData(o),

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/media"
 )
 
 // FavoriteCard is one tile in fav.gohtml's grid.
@@ -14,6 +15,8 @@ type FavoriteCard struct {
 	Brand     string
 	Name      string
 	Price     string
+	PhotoURL  string // thumbnail; "" → shoe icon
+	DetailURL string
 }
 
 // FavData backs fav.gohtml's content.
@@ -55,6 +58,10 @@ func (h *handlers) loadFavoriteCards(ctx context.Context, customerID, lang strin
 	if err != nil {
 		return nil, err
 	}
+	images, err := h.images.PrimaryForProducts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 
 	cards := make([]FavoriteCard, 0, len(ids))
 	for _, id := range ids {
@@ -70,12 +77,17 @@ func (h *handlers) loadFavoriteCards(ctx context.Context, customerID, lang strin
 		if lang == "ky" {
 			name = p.NameKy
 		}
-		cards = append(cards, FavoriteCard{
+		card := FavoriteCard{
 			ProductID: p.ID,
 			Brand:     brand,
 			Name:      name,
-			Price:     formatPrice(p.BasePrice),
-		})
+			Price:     formatAmount(p.BasePrice, h.t(lang, "common.currency")),
+			DetailURL: ProductPath(p.ID, p.NameRu),
+		}
+		if img, ok := images[p.ID]; ok {
+			card.PhotoURL = h.photoURL(media.ThumbKey(img.ObjectKey))
+		}
+		cards = append(cards, card)
 	}
 	return cards, nil
 }
@@ -157,7 +169,7 @@ func (h *handlers) favAddToCart(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if err := h.cartRepo.Add(r.Context(), customerID, variants[0].ID, 1); err != nil {
-		msg := errMessage(err)
+		msg := h.errText(lang, err)
 		var appErr *apperr.AppError
 		if errors.As(err, &appErr) && appErr.Status == http.StatusNotImplemented {
 			msg = h.t(lang, "toast.cart_soon")

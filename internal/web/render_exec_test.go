@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
@@ -45,9 +46,9 @@ func TestRenderCartExecutes(t *testing.T) {
 			Lines: []CartLineView{
 				{VariantID: "v1", ProductName: "Air Max", Size: "42", Color: "Черный", Qty: 2, UnitPrice: 5000, LineTotal: 10000},
 			},
-			ItemsTotal:    10000,
-			DeliveryLabel: "200 сом",
-			GrandTotal:    10200,
+			ItemsTotal:  10000,
+			DeliveryFee: 200,
+			GrandTotal:  10200,
 		}}},
 	}
 
@@ -75,9 +76,9 @@ func TestRenderCartFragmentExecutes(t *testing.T) {
 		Lines: []CartLineView{
 			{VariantID: "v1", ProductName: "Air Max", Size: "42", Color: "Черный", Qty: 1, UnitPrice: 5000, LineTotal: 5000},
 		},
-		ItemsTotal:    5000,
-		DeliveryLabel: "200 сом",
-		GrandTotal:    5200,
+		ItemsTotal:  5000,
+		DeliveryFee: 200,
+		GrandTotal:  5200,
 	}}
 
 	w := httptest.NewRecorder()
@@ -137,5 +138,37 @@ func TestRenderDoneExecutes(t *testing.T) {
 	}
 	if w.Code != 200 {
 		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestPluralForm(t *testing.T) {
+	cases := map[int]string{0: "many", 1: "one", 2: "few", 4: "few", 5: "many", 11: "many", 12: "many", 14: "many", 21: "one", 22: "few", 25: "many", 101: "one", 111: "many"}
+	for n, want := range cases {
+		if got := pluralForm(n); got != want {
+			t.Errorf("pluralForm(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+// TestRenderCartShowsPhotosAndLocalizedMoney: cart lines show the product
+// photo (not the shoe placeholder) and amounts go through {{money}}.
+func TestRenderCartShowsPhotosAndLocalizedMoney(t *testing.T) {
+	rr := newTestRenderer(t)
+	data := PageData{Lang: i18n.LangKY, Screen: "cart", Authed: true, Data: &CartPageData{
+		Lines: []CartLineView{
+			{VariantID: "v1", ProductName: "Air", Size: "42", Color: "Ак", Qty: 2, UnitPrice: 4500, LineTotal: 9000, PhotoURL: "https://m/v1/thumb.jpg"},
+			{VariantID: "v2", ProductName: "Boot", Size: "40", Color: "Кара", Qty: 1, UnitPrice: 12000, LineTotal: 12000},
+		},
+		ItemsTotal: 21000, DeliveryFee: 200, GrandTotal: 21200,
+	}}
+	w := httptest.NewRecorder()
+	if err := rr.Render(w, "cart", data); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	body := w.Body.String()
+	for _, want := range []string{`src="https://m/v1/thumb.jpg"`, "ti-shoe", "9 000 сом", "21 200 сом"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("cart missing %q", want)
+		}
 	}
 }

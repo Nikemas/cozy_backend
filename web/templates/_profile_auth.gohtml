@@ -9,11 +9,12 @@
 
   {{if eq .Data.Step "otp"}}
     <p class="muted">{{t "auth.enter_code"}} {{.Data.Phone}}</p>
-    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    {{if .Data.Error}}<p class="form-error" role="alert">{{.Data.Error}}</p>{{end}}
     <form class="form-stack" hx-post="/login/otp/verify" hx-target="#auth-card" hx-swap="outerHTML"
           method="post" action="/login/otp/verify">
       <input type="hidden" name="phone" value="{{.Data.Phone}}">
-      <input type="text" name="code" inputmode="numeric" placeholder="0000" maxlength="8" required autofocus>
+      <label class="field-label" for="auth-code">{{t "auth.code_label"}}</label>
+      <input type="text" id="auth-code" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="0000" maxlength="8" required autofocus>
       <button type="submit" class="btn btn--primary">{{t "auth.confirm"}}</button>
     </form>
     <form class="auth-card__resend" hx-post="/login/otp/request" hx-target="#auth-card" hx-swap="outerHTML"
@@ -23,17 +24,19 @@
     </form>
   {{else if eq .Data.Step "name"}}
     <p class="muted">{{t "auth.enter_name"}}</p>
-    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    {{if .Data.Error}}<p class="form-error" role="alert">{{.Data.Error}}</p>{{end}}
     <form class="form-stack" hx-post="/login/name" hx-target="#auth-card" hx-swap="outerHTML"
           method="post" action="/login/name">
-      <input type="text" name="name" placeholder="{{t "auth.name_placeholder"}}" required autofocus>
+      <label class="field-label" for="auth-name">{{t "auth.name_placeholder"}}</label>
+      <input type="text" id="auth-name" name="name" autocomplete="given-name" placeholder="{{t "auth.name_placeholder"}}" required autofocus>
       <button type="submit" class="btn btn--primary">{{t "auth.save_name"}}</button>
     </form>
   {{else}}
-    {{if .Data.Error}}<p class="form-error">{{.Data.Error}}</p>{{end}}
+    {{if .Data.Error}}<p class="form-error" role="alert">{{.Data.Error}}</p>{{end}}
     <form class="form-stack" hx-post="/login/otp/request" hx-target="#auth-card" hx-swap="outerHTML"
           method="post" action="/login/otp/request">
-      <input type="tel" name="phone" placeholder="{{t "auth.phone_placeholder"}}" required>
+      <label class="field-label" for="auth-phone">{{t "auth.phone_label"}}</label>
+      <input type="tel" id="auth-phone" name="phone" autocomplete="tel" placeholder="{{t "auth.phone_placeholder"}}" required>
       <button type="submit" class="btn btn--primary">{{t "auth.get_code"}}</button>
     </form>
   {{end}}

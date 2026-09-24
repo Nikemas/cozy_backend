@@ -29,7 +29,7 @@
     <div class="cart-lines">
       {{range .Data.Lines}}
       <div class="cart-line">
-        <div class="cart-line__thumb"><i class="ti ti-shoe"></i></div>
+        <div class="cart-line__thumb">{{if .PhotoURL}}<img src="{{.PhotoURL}}" alt="" width="56" height="56" loading="lazy">{{else}}<i class="ti ti-shoe" aria-hidden="true"></i>{{end}}</div>
         <div class="cart-line__info">
           <div class="cart-line__name">{{.ProductName}}</div>
           <div class="cart-line__meta">{{.Size}} · {{.Color}}</div>
@@ -46,16 +46,17 @@
             <button type="submit" class="stepper__btn" aria-label="{{t "cart.increase"}}"><i class="ti ti-plus"></i></button>
           </form>
         </div>
-        <div class="cart-line__sum">{{printf "%.0f" .LineTotal}} сом</div>
+        <div class="cart-line__sum">{{money .LineTotal}}</div>
       </div>
       {{end}}
     </div>
 
     <aside class="cart-summary">
       <div class="cart-summary__title">{{t "cart.summary"}}</div>
-      <div class="cart-summary__row"><span>{{t "cart.items_total"}}</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
-      <div class="cart-summary__row"><span>{{t "cart.delivery"}}</span><span>{{.Data.DeliveryLabel}}</span></div>
-      <div class="cart-summary__row cart-summary__row--total"><span>{{t "cart.total"}}</span><span>{{printf "%.0f" .Data.GrandTotal}} сом</span></div>
+      <div class="cart-summary__row"><span>{{t "cart.items_total"}}</span><span>{{money .Data.ItemsTotal}}</span></div>
+      <div class="cart-summary__row"><span>{{t "cart.delivery"}}</span><span>{{money .Data.DeliveryFee}}</span></div>
+      <div class="cart-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
+      <div class="cart-summary__row cart-summary__row--total"><span>{{t "cart.total"}}</span><span>{{money .Data.GrandTotal}}</span></div>
       <a class="btn btn--primary cart-summary__cta" href="/checkout">{{t "cart.checkout"}}</a>
     </aside>
   </div>

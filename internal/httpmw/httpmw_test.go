@@ -68,7 +68,7 @@ func TestAppErrBodyCarriesRequestID(t *testing.T) {
 	h := RequestID(apperr.Wrap(func(http.ResponseWriter, *http.Request) error {
 		return apperr.NotFound("nope", "not here")
 	}))
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/x", nil)
 	req.Header.Set(reqid.Header, "rid-7")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -123,7 +123,7 @@ func TestRecoverReturnsAppErr500(t *testing.T) {
 		panic("boom")
 	}), RequestID, AccessLog, Recover)
 
-	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/x", nil)
 	req.Header.Set(reqid.Header, "rid-panic")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

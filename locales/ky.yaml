@@ -17,18 +17,12 @@ sidebar.orders: Буйрутмалар
 sidebar.favorites: Тандалгандар
 sidebar.categories: Категориялар
 sidebar.category.all: Баары
-sidebar.category.women: Аялдар
-sidebar.category.men: Эркектер
-sidebar.style: Стиль
-sidebar.brand: Бренд
-sidebar.price: Баасы чейин
 sidebar.reset: Чыпкаларды тазалоо
 
 footer.rights: © Cozy. Бардык укуктар корголгон.
 footer.branches: Филиалдар
 footer.legal: "ЖК Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир."
 
-common.soon: Жакында
 common.back_home: Башкы бетке
 
 screen.shop.title: Каталог
@@ -106,21 +100,19 @@ order.empty.cta: Каталогго
 order.number_prefix: Буйрутма
 
 branches.title: Филиалдар
-branches.you_are_here: Сиз бул жердесиз
 branches.route: Маршрут
 branches.empty: Азырынча жеткиликтүү дүкөндөр жок
 
 # Task 2 (Catalog: shop + product) keys.
-shop.banner.eyebrow: Жаңы коллекция
-shop.banner.title: Кроссовкаларга 30% чейин арзандатуу
-shop.results_word: товар
+shop.banner.eyebrow: Бүт үй-бүлө үчүн бут кийим
+shop.banner.title: Бишкек боюнча жеткирүү жана дүкөндөрүбүздөн алып кетүү
 shop.empty: Эч нерсе табылган жок
 shop.prev: Артка
 shop.next: Кийинки
 
 product.size: Өлчөм
 product.color: Түс
-product.delivery.courier: Бишкек боюнча жеткирүү — 200 сом, 1 күн
+product.delivery.courier: Бишкек боюнча 1 күндө жеткирүү
 product.delivery.pickup: Филиалдан алуу — акысыз
 product.delivery.return: Алмаштыруу жана кайтаруу 14 күн
 product.unavailable: Бул өлчөм/түс азырынча жок
@@ -151,3 +143,106 @@ checkout.pickup_free: Өзү алып кетүү — акысыз
 
 done.total: Жыйынтык
 done.delivery_window: Курьер жеткирүү убактысын тактоо үчүн байланышат
+
+# Error pages / messages (internal/web/errors.go).
+error.not_found.title: Барак табылган жок
+error.not_found.text: Мындай барак жок. Балким, товар сатуудан алынган же шилтеме эскирген.
+error.unauthorized.title: Кирүү керек
+error.unauthorized.text: Улантуу үчүн аккаунтка кириңиз.
+error.internal.title: Бир нерсе туура эмес болду
+error.internal.text: Аракетти аткаруу мүмкүн болбоду. Бир аздан кийин кайра аракет кылыңыз.
+error.generic.title: Болбой калды
+error.generic.text: Маалыматтарды текшерип, кайра аракет кылыңыз.
+error.code.rate_limited: Аракеттер өтө көп. Бир аз күтүп, кайра аракет кылыңыз.
+error.code.bad_request: Туура эмес суроо. Баракты жаңылап, кайра аракет кылыңыз.
+error.code.unauthorized: Улантуу үчүн аккаунтка кириңиз.
+error.code.unauthenticated: Улантуу үчүн аккаунтка кириңиз.
+error.code.invalid_phone: Номерди +996XXXXXXXXX форматында жазыңыз
+error.code.otp_cooldown: Код жиберилди. Жаңы кодду бир аздан кийин сурай аласыз.
+error.code.otp_rate_limited: Код өтө көп суралды. Кийинчерээк аракет кылыңыз.
+error.code.otp_expired: Код туура эмес же эскирген. Жаңы код сураңыз.
+error.code.invalid_name: Атыңызды жазыңыз
+error.code.product_not_found: Товар табылган жок же сатуудан алынган.
+error.code.variant_required: Өлчөмдү жана түстү тандаңыз
+error.code.variant_not_found: Мындай өлчөм же түс азыр жок
+error.code.insufficient_stock: Товар жетиштүү эмес
+error.code.invalid_qty: Саны туура эмес
+error.code.empty_cart: Себет бош
+error.code.empty_order: Буйрутма үчүн товар жок
+error.code.address_required: Жеткирүү дарегин тандаңыз
+error.code.point_required: Алып кетүүчү дүкөндү тандаңыз
+error.code.fulfillment_required: Алуу ыкмасын тандаңыз
+error.code.invalid_fulfillment: Алуу ыкмасын тандаңыз: жеткирүү же өзү алып кетүү
+error.code.invalid_address: Жеткирүү дарегин жазыңыз
+error.code.address_not_found: Дарек табылган жок
+error.code.address_in_use: Бул дарек буйрутмада колдонулган, аны өчүрүүгө болбойт
+error.code.pickup_point_not_found: Алып кетүүчү дүкөн табылган жок
+error.code.order_not_found: Буйрутма табылган жок
+error.code.order_not_cancellable: Бул буйрутманы мындан ары жокко чыгарууга болбойт
+
+# Legal/info pages (web/templates/pages/*) and footer.
+screen.page_about.title: Дүкөн жөнүндө
+screen.page_contacts.title: Байланыш
+screen.page_delivery.title: Жеткирүү жана төлөө
+screen.page_privacy.title: Купуялык саясаты
+screen.page_terms.title: Коомдук оферта
+footer.nav_label: Дүкөн жөнүндө маалымат
+
+# Product card: gallery, availability, description.
+product.add_to_favorites: Тандалгандарга кошуу
+product.gallery: Товардын сүрөттөрү
+product.photo: Сүрөт
+product.in_stock_at: Дүкөндөрдө бар
+product.stock_available: бар
+product.stock_few: калды
+product.out_of_stock: Бул өлчөм жана түс азыр жок
+product.delivery.more: Жеткирүү жана төлөө жөнүндө кененирээк
+product.description: Сыпаттамасы
+
+# Shop filters and sorting.
+shop.heading: Бут кийим каталогу
+shop.search_results: Издөө жыйынтыктары
+shop.price_from: %sдон
+shop.sort.label: Иреттөө
+shop.sort.newest: Адегенде жаңылары
+shop.sort.price_asc: Адегенде арзандары
+shop.sort.price_desc: Адегенде кымбаттары
+filter.size: Өлчөм
+filter.color: Түс
+filter.any: Баары
+filter.availability: Бар болушу
+filter.in_stock: Бар болгондор гана
+filter.price: Баасы, сом
+filter.price_from: эң аз
+filter.price_to: эң көп
+filter.apply: Колдонуу
+
+# SEO: titles and meta descriptions (internal/web/seo.go).
+seo.page.title: %s | Cozy
+seo.home.title: Cozy — Бишкектеги бут кийим интернет-дүкөнү
+seo.home.description: Cozy дүкөндөрүндө кроссовкалар, кеддер, ботинкалар жана башка бут кийимдер бар. Бишкек боюнча жеткирүү жана акысыз алып кетүү.
+seo.category.title: %s — Бишкектен сатып алуу | Cozy
+seo.category.description: Cozy интернет-дүкөнүндө %s: баалар, өлчөмдөр жана Бишкектеги дүкөндөрдө бар болушу. Жеткирүү жана өзү алып кетүү.
+seo.product.title: %s — Бишкектен сатып алуу | Cozy
+seo.product.description: %s — %s. Өлчөмдөр, түстөр жана Бишкектеги Cozy дүкөндөрүндө бар болушу. Жеткирүү жана өзү алып кетүү.
+seo.branches.description: Бишкектеги Cozy дүкөндөрүнүн даректери: бут кийимди көрүп, кийип көрүү, буйрутманы алуу жана маршрут түзүү.
+seo.page_about.description: Cozy — Бишкектеги ыңгайлуу бут кийим дүкөнү: дүкөндөрдө бар, жеткирүү, өзү алып кетүү, 14 күндүн ичинде алмаштыруу жана кайтаруу.
+seo.page_contacts.description: Бишкектеги Cozy бут кийим дүкөнүнүн телефону, мессенджерлери, e-mail дареги жана иш убактысы.
+seo.page_delivery.description: Бишкек боюнча жеткирүүнүн шарттары, Cozy дүкөндөрүнөн акысыз алып кетүү, төлөө ыкмалары, алмаштыруу жана кайтаруу.
+seo.page_privacy.description: Cozy интернет-дүкөнү сатып алуучулардын жеке маалыматтарын кантип иштетет жана коргойт.
+seo.page_terms.description: Cozy бут кийим интернет-дүкөнүнүн коомдук офертасы: буйрутма берүү, төлөө, жеткирүү, алмаштыруу жана кайтаруу.
+
+# Accessibility labels.
+a11y.skip_to_content: Мазмунга өтүү
+a11y.main_nav: Негизги меню
+auth.phone_label: Телефон номери
+auth.code_label: SMS-код
+address.label_label: Даректин аталышы
+address.text_label: Жеткирүү дареги
+
+# Money and plurals (Kyrgyz nouns don't inflect after numerals).
+common.currency: сом
+shop.results.one: товар
+shop.results.few: товар
+shop.results.many: товар
+filter.title: Чыпкалар

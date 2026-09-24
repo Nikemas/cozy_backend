@@ -4,28 +4,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cozy — {{t (printf "screen.%s.title" .Screen)}}</title>
+  <title>{{.SEO.Title}}</title>
+  {{if .SEO.Description}}<meta name="description" content="{{.SEO.Description}}">{{end}}
+  {{if .SEO.Canonical}}<link rel="canonical" href="{{.SEO.Canonical}}">{{end}}
+  {{if .SEO.AltRU}}
+  <link rel="alternate" hreflang="ru" href="{{.SEO.AltRU}}">
+  <link rel="alternate" hreflang="ky" href="{{.SEO.AltKY}}">
+  <link rel="alternate" hreflang="x-default" href="{{.SEO.AltRU}}">
+  {{end}}
+  <meta property="og:site_name" content="Cozy">
+  <meta property="og:type" content="{{.SEO.OGType}}">
+  <meta property="og:title" content="{{.SEO.Title}}">
+  {{if .SEO.Description}}<meta property="og:description" content="{{.SEO.Description}}">{{end}}
+  {{if .SEO.Canonical}}<meta property="og:url" content="{{.SEO.Canonical}}">{{end}}
+  {{if .SEO.OGImage}}<meta property="og:image" content="{{.SEO.OGImage}}">{{end}}
+  <meta property="og:locale" content="{{.SEO.OGLocale}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" sizes="64x64" href="/static/img/logo-64.png">
+  <meta name="theme-color" content="#FF7A1A">
+  {{if .SEO.JSONLD}}<script type="application/ld+json">{{.SEO.JSONLD}}</script>{{end}}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/css/site.css">
-  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
+  {{/* htmx pinned to an exact file with Subresource Integrity: if the CDN
+       ever serves different bytes the browser refuses to run them. */}}
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous" defer></script>
+  <script>
+    // Let htmx swap 4xx/5xx responses that the server explicitly
+    // retargeted (internal/web/errors.go sends HX-Retarget: #toast-slot
+    // with an error toast), so failed hx-post actions show a message
+    // instead of failing silently.
+    document.addEventListener("htmx:beforeSwap", function (e) {
+      if (e.detail.isError && e.detail.xhr.getResponseHeader("HX-Retarget")) {
+        e.detail.shouldSwap = true;
+        e.detail.isError = false;
+      }
+    });
+  </script>
 </head>
 <body>
+<a class="skip-link" href="#main">{{t "a11y.skip_to_content"}}</a>
 {{template "_header" .}}
-<div class="page">
+<div class="page page--{{.Screen}}">
   {{template "_aside_filters" .}}
-  <main class="main">
+  <main class="main" id="main" tabindex="-1">
     {{template "content" .}}
   </main>
 </div>
 {{template "_footer" .}}
+{{/* _toast renders the single #toast-slot mount point: HTMX responses
+     swap one-off toasts into it (hx-target / OOB / HX-Retarget). */}}
 {{template "_toast" .}}
-<!-- Mount point for HTMX POST responses that render a one-off toast
-     fragment (see internal/web/product_actions.go renderToastFragment) —
-     hx-post targets swap their result in here, independent of the
-     server-rendered .Toast above. Task 2's reference pattern; later
-     tasks' hx-post buttons (cart stepper etc.) can reuse the same id. -->
-<div id="toast-slot"></div>
 </body>
 </html>
 {{end}}

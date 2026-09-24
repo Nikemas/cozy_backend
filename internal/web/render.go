@@ -1,12 +1,14 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 const templatesDir = "web/templates"
@@ -28,7 +30,16 @@ var screenPages = map[string]string{
 	// a new screen Task 3 adds per web-plan Task 3 (delivery-address-or-
 	// pickup-point selection, not covered 1:1 by the design canvas).
 	"checkout": "checkout.gohtml",
+	// "error" is the branded 404/500 page (errors.go's renderHTMLError).
+	"error": "error.gohtml",
 }
+
+// staticPages are the legal/info pages (/about, /contacts, /delivery,
+// /privacy, /terms). Their long-form copy doesn't fit the flat
+// one-line-per-key locales/*.yaml, so each has one content file per
+// language: web/templates/pages/<name>.<lang>.gohtml, registered as
+// screen "page_<name>".
+var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms"}
 
 // layoutPartials are parsed alongside every page: the shared chrome from
 // COZY_WEB_DESIGN.md §2 (header/aside/footer/toast), plus Task 4's
@@ -76,6 +87,13 @@ type PageData struct {
 
 	Toast string
 	Data  any
+
+	// NoIndex marks pages search engines must not index (errors, private
+	// account screens) — layout.gohtml emits <meta name="robots">.
+	NoIndex bool
+	// SEO backs <title>, meta description, canonical/hreflang, OpenGraph
+	// and JSON-LD (see seo.go).
+	SEO SEOMeta
 }
 
 // Renderer holds one parsed template set per (language, screen) pair,
@@ -94,14 +112,22 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
 		rr.tmpl[lang] = map[string]*template.Template{}
 
+		pages := make(map[string]string, len(screenPages)+len(staticPages))
 		for screen, page := range screenPages {
+			pages[screen] = page
+		}
+		for _, name := range staticPages {
+			pages["page_"+name] = filepath.Join("pages", name+"."+lang+".gohtml")
+		}
+
+		for screen, page := range pages {
 			files := make([]string, 0, len(layoutPartials)+1)
 			for _, p := range layoutPartials {
 				files = append(files, filepath.Join(templatesDir, p))
 			}
 			files = append(files, filepath.Join(templatesDir, page))
 
-			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).ParseFiles(files...)
+			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).ParseFiles(files...)
 			if err != nil {
 				return nil, fmt.Errorf("web: parsing templates for screen %q (%s): %w", screen, lang, err)
 			}
@@ -112,9 +138,50 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 	return rr, nil
 }
 
+// viewFuncs are the storefront's own template helpers, on top of
+// i18n's "t".
+func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
+	return template.FuncMap{
+		// inc turns a 0-based range index into a 1-based label.
+		"inc": func(i int) int { return i + 1 },
+		// money formats a som amount: {{money .Total}} → "7 900 сом".
+		"money": func(v float64) string { return formatAmount(v, bundle.T(lang, "common.currency")) },
+		// deliveryFee is the courier fee orders.Service charges (DELIVERY_FEE_SOM).
+		"deliveryFee": func() float64 { return orders.CurrentSettings().DeliveryFee },
+		// plural picks key.one / key.few / key.many for n (Russian rules;
+		// Kyrgyz nouns don't inflect for number, so ky.yaml repeats the
+		// same word in all three): {{plural .Total "shop.results"}}.
+		"plural": func(n int, key string) string { return bundle.T(lang, key+"."+pluralForm(n)) },
+	}
+}
+
+// pluralForm is the Russian plural category of n: "one" (1, 21, 101…),
+// "few" (2–4, 22–24…) or "many" (0, 5–20, 25…).
+func pluralForm(n int) string {
+	if n < 0 {
+		n = -n
+	}
+	switch {
+	case n%10 == 1 && n%100 != 11:
+		return "one"
+	case n%10 >= 2 && n%10 <= 4 && (n%100 < 12 || n%100 > 14):
+		return "few"
+	default:
+		return "many"
+	}
+}
+
 // Render executes the "layout" template for screen using data.Lang,
 // falling back to i18n.DefaultLang if data.Lang isn't recognized.
 func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) error {
+	return rr.RenderStatus(w, http.StatusOK, screen, data)
+}
+
+// RenderStatus is Render with an explicit status code (the error page
+// renders with 404/500). The page is executed into a buffer first, so a
+// template failure mid-page surfaces as an error (and the error page)
+// instead of a half-written 200 response.
+func (rr *Renderer) RenderStatus(w http.ResponseWriter, status int, screen string, data PageData) error {
 	byScreen, ok := rr.tmpl[data.Lang]
 	if !ok {
 		byScreen = rr.tmpl[i18n.DefaultLang]
@@ -124,8 +191,14 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 		return fmt.Errorf("web: no template registered for screen %q", screen)
 	}
 
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, "layout", data); err != nil {
+		return err
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return t.ExecuteTemplate(w, "layout", data)
+	w.WriteHeader(status)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 // T translates key into lang outside of template execution — for handlers

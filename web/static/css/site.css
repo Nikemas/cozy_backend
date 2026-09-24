@@ -585,26 +585,6 @@ button, input { font-family: inherit; }
   font-size: var(--cozy-fs-13);
   font-weight: 700;
 }
-.branches-map__legend {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  background: var(--cozy-surface);
-  border-radius: var(--cozy-r-10);
-  padding: 8px 12px;
-  font-size: var(--cozy-fs-12);
-  color: var(--cozy-ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: var(--cozy-shadow-chip);
-}
-.branches-map__legend-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--cozy-geo);
-  display: inline-block;
-}
-
 .branches-list { flex: 1; min-width: 0; }
 .branch-card {
   border: 0.5px solid var(--cozy-border);
@@ -629,8 +609,7 @@ button, input { font-family: inherit; }
 .branch-card__info { flex: 1; min-width: 0; }
 .branch-card__name { font-size: 14.5px; font-weight: 700; color: var(--cozy-ink); margin-bottom: 3px; }
 .branch-card__address { font-size: 12.5px; color: var(--cozy-ink-2); margin-bottom: 2px; }
-.branch-card__footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
-.branch-card__distance { font-size: 12.5px; font-weight: 700; color: var(--cozy-accent); }
+.branch-card__footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 10px; }
 .branch-card__route {
   border: none;
   background: var(--cozy-accent-bg);
@@ -811,19 +790,42 @@ button, input { font-family: inherit; }
 .aside__pill--active { background: var(--cozy-accent-bg); color: var(--cozy-accent-ink); }
 
 /* ---- Product screen (COZY_WEB_DESIGN.md §3.2, Task 2) ---- */
-.product-page { max-width: 640px; margin: 0 auto; }
+.product-page { max-width: 1040px; margin: 0 auto; }
+.product-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.product-gallery { position: sticky; top: 84px; }
 .product-photo {
-  background: var(--cozy-accent-bg); border-radius: 20px; padding: 36px;
-  display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 24px;
+  background: var(--cozy-accent-bg); border-radius: 20px; padding: 24px;
+  display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 12px;
+  aspect-ratio: 1;
 }
-.product-photo img { width: 100%; max-width: 360px; height: 230px; object-fit: contain; }
+.product-photo img { width: 100%; height: 100%; object-fit: contain; border-radius: var(--cozy-r-12); }
+.product-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.product-thumb { width: 68px; height: 68px; padding: 0; border: 1.5px solid var(--cozy-border); border-radius: var(--cozy-r-10); background: var(--cozy-surface); cursor: pointer; overflow: hidden; }
+.product-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.product-thumb--active { border-color: var(--cozy-accent); }
+.product-stock { margin-bottom: 20px; }
+.product-stock .product-section-title i { color: var(--cozy-accent-ink); }
+.product-stock__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.product-stock__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 8px 12px; background: var(--cozy-surface); border: 0.5px solid var(--cozy-border); border-radius: var(--cozy-r-10); }
+.product-stock__name { font-weight: 700; }
+.product-stock__addr { color: var(--cozy-ink-2); }
+.product-stock__qty { color: var(--cozy-ink); font-weight: 600; white-space: nowrap; }
+.product-stock__qty--few { color: var(--cozy-accent-ink); }
+.product-stock__none { font-size: 13.5px; color: var(--cozy-ink-2); }
+.product-delivery__more { font-size: var(--cozy-fs-13); color: var(--cozy-accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.product-description { margin-top: 28px; }
+.product-description__text { font-size: var(--cozy-fs-15); line-height: 1.6; color: var(--cozy-ink); white-space: pre-line; }
+@media (max-width: 900px) {
+  .product-detail { grid-template-columns: 1fr; gap: 20px; }
+  .product-gallery { position: static; }
+}
 .product-photo__fav {
   position: absolute; top: 16px; right: 16px; width: 42px; height: 42px;
   border: none; border-radius: 50%; background: var(--cozy-surface);
   display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--cozy-ink-4); font-size: 20px;
 }
 .product-meta__brand { font-size: var(--cozy-fs-13); color: var(--cozy-ink-3); margin-bottom: 5px; }
-.product-meta__name { font-size: 26px; font-weight: 700; color: var(--cozy-ink); margin-bottom: 10px; letter-spacing: -0.01em; }
+.product-meta__name { font-size: 26px; font-weight: 700; color: var(--cozy-ink); margin: 0 0 10px; letter-spacing: -0.01em; line-height: 1.25; }
 .product-meta__price { font-size: 24px; font-weight: 700; color: var(--cozy-accent); margin-bottom: 26px; }
 
 .product-section-title { font-size: var(--cozy-fs-14); font-weight: 600; color: var(--cozy-ink); margin-bottom: 10px; }
@@ -864,3 +866,158 @@ button, input { font-family: inherit; }
   .branches-map { width: 100%; height: 320px; }
   .order-card__footer { flex-wrap: wrap; }
 }
+
+/* ---- Error page (404/500, internal/web/errors.go) ---- */
+.error-screen { text-align: center; padding: 60px 20px; max-width: 520px; margin: 0 auto; }
+.error-screen__code { font-size: 72px; font-weight: 800; color: var(--cozy-accent-border); line-height: 1; letter-spacing: var(--cozy-tracking-tight); }
+.error-screen__title { font-size: var(--cozy-fs-22); font-weight: 700; margin: 16px 0 8px; }
+.error-screen__text { font-size: var(--cozy-fs-15); color: var(--cozy-ink-2); margin: 0 0 24px; }
+.error-screen__actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.toast--error i { color: var(--cozy-danger); }
+
+/* ---- Legal/info pages (web/templates/pages/*) ---- */
+.static-page { max-width: 760px; background: var(--cozy-surface); border: 0.5px solid var(--cozy-border); border-radius: var(--cozy-r-18); padding: 28px 32px; line-height: 1.6; font-size: var(--cozy-fs-15); color: var(--cozy-ink); }
+.static-page h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; line-height: 1.25; }
+.static-page h2 { font-size: var(--cozy-fs-17); font-weight: 700; margin: 26px 0 8px; display: flex; align-items: center; gap: 8px; }
+.static-page h2 i { color: var(--cozy-accent-ink); font-size: 20px; }
+.static-page p, .static-page ul { margin: 0 0 12px; }
+.static-page ul { padding-left: 22px; }
+.static-page li { margin-bottom: 6px; }
+.static-page a:not(.btn) { color: var(--cozy-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.static-page__meta { color: var(--cozy-ink-2); font-size: var(--cozy-fs-13); }
+.static-page mark.fill { background: var(--cozy-accent-bg-2); color: var(--cozy-ink); padding: 0 3px; border-radius: 3px; }
+.static-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 16px 0 8px; }
+.static-contacts__item { display: flex; gap: 12px; align-items: flex-start; background: var(--cozy-surface-2); border-radius: var(--cozy-r-14); padding: 14px; }
+.static-contacts__item i { font-size: 22px; color: var(--cozy-accent-ink); }
+.static-contacts__label { font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); font-weight: 700; margin-bottom: 2px; }
+.footer__links { flex-wrap: wrap; }
+@media (max-width: 700px) { .static-page { padding: 20px 16px; } }
+
+/* ---- Shop filters + sort (aside form #shop-filters, toolbar select) ---- */
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.aside__filters { display: flex; flex-direction: column; gap: 16px; }
+.aside__fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+.aside__fieldset .aside__title { padding: 0; }
+.chip-radio { position: relative; display: inline-flex; cursor: pointer; }
+.chip-radio input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chip-radio span {
+  border: 0.5px solid var(--cozy-border); background: var(--cozy-surface-2); color: var(--cozy-ink);
+  padding: 7px 12px; border-radius: var(--cozy-r-pill); font-size: 12.5px; font-weight: 600;
+}
+.chip-radio input:checked + span { background: var(--cozy-ink); border-color: var(--cozy-ink); color: var(--cozy-surface); }
+.chip-radio input:focus-visible + span { outline: 2px solid var(--cozy-accent-ink); outline-offset: 2px; }
+.aside__price { display: flex; gap: 8px; }
+.aside__price-field { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); }
+.aside__price-field input {
+  width: 100%; border: 0.5px solid var(--cozy-border); background: var(--cozy-surface-2); border-radius: var(--cozy-r-10);
+  padding: 9px 10px; font-size: var(--cozy-fs-14); color: var(--cozy-ink); font-family: inherit;
+}
+.aside__filter-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.aside__apply { padding: 9px 14px; }
+.shop-title { font-size: var(--cozy-fs-22); font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
+.shop-toolbar__right { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.shop-sort select {
+  border: 0.5px solid var(--cozy-border); background: var(--cozy-surface); border-radius: var(--cozy-r-10);
+  padding: 8px 10px; font-size: var(--cozy-fs-13); color: var(--cozy-ink); font-family: inherit; cursor: pointer;
+}
+.shop-empty__reset { margin-top: 14px; }
+
+/* ==== Accessibility (WCAG 2.1 AA) overrides ====
+   Kept as one block at the end so the design-derived rules above stay
+   readable and this can be reviewed against the design in one place.
+   --cozy-accent-aa is the darkest-needed shade of the brand orange for
+   white text (4.5:1 on #C85000); propose adding it to
+   design-system/tokens.css. */
+:root {
+  --cozy-accent-aa:       #C85000;
+  --cozy-accent-aa-hover: #A84300;
+  --cozy-focus:           #1A1A1A;
+}
+
+/* Visible keyboard focus everywhere (the rules above remove outlines on
+   inputs); mouse clicks don't show it thanks to :focus-visible. */
+:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 2px; }
+.search:focus-within { border-color: var(--cozy-ink-2); box-shadow: 0 0 0 2px var(--cozy-accent-border); }
+.search input:focus-visible { outline: none; }
+.form-stack input:focus-visible,
+.address-form textarea:focus-visible,
+.aside__price-field input:focus-visible,
+.shop-sort select:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 1px; border-color: var(--cozy-ink-2); }
+
+/* Skip link: first focusable element, visible only on focus. */
+.skip-link { position: absolute; left: 12px; top: -48px; z-index: 50; background: var(--cozy-ink); color: var(--cozy-surface); padding: 10px 14px; border-radius: var(--cozy-r-10); font-size: var(--cozy-fs-14); font-weight: 700; }
+.skip-link:focus { top: 12px; }
+
+/* Field labels (previously placeholder-only inputs). */
+.field-label { font-size: var(--cozy-fs-13); font-weight: 600; color: var(--cozy-ink-2); margin-bottom: -6px; }
+
+/* White text on brand orange: 2.6:1 → 4.5:1+. */
+.btn--primary,
+.product-option--active,
+.icon-btn .badge { background: var(--cozy-accent-aa); }
+.product-option--active { border-color: var(--cozy-accent-aa); }
+.btn--primary:hover { background: var(--cozy-accent-aa-hover); }
+
+/* Orange text on white/light backgrounds → accent-ink (≈5:1). */
+.nav__link--active,
+.link-btn,
+.aside__reset,
+.shop-pager__link,
+.shop-banner__eyebrow,
+.branch-card__route,
+.icon-btn--active { color: var(--cozy-accent-ink); }
+/* Large price text needs 3:1 — accent-strong gives 3.25:1. */
+.product-meta__price { color: var(--cozy-accent-strong); }
+
+/* Secondary text: #999 (2.8:1) → #666 (5.7:1). */
+.muted,
+.aside__title,
+.aside__account-phone,
+.aside__link-count,
+.cart-line__meta,
+.cart-summary__title,
+.orders-empty,
+.profile-card__phone,
+.profile-stat__label,
+.profile-menu__item--disabled,
+.fav-card__brand,
+.shop-count,
+.shop-empty,
+.product-card__brand,
+.shop-pager__page,
+.product-meta__brand { color: var(--cozy-ink-2); }
+
+.product-option--unavailable { opacity: 1; color: var(--cozy-ink-3); text-decoration: line-through; }
+.product-option--active.product-option--unavailable { color: var(--cozy-surface); }
+
+/* ---- Product photos in cart / order history / favourites ---- */
+.cart-line__thumb, .order-item__thumb { overflow: hidden; }
+.cart-line__thumb img, .order-item__thumb img { width: 100%; height: 100%; object-fit: contain; background: var(--cozy-surface); display: block; }
+.fav-card__photo img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--cozy-surface); }
+.fav-card__name { display: block; color: inherit; }
+.fav-card__name:hover { color: var(--cozy-accent-ink); }
+
+/* ---- Phones: less chrome before the content ---- */
+.aside__filters-summary { display: none; }
+@media (max-width: 860px) {
+  .page:not(.page--shop) .aside { display: none; }
+  .page--shop .aside__login,
+  .page--shop #aside-categories { display: none; }
+  .aside__filters-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--cozy-fs-14); font-weight: 700; list-style: none; }
+  .aside__filters-summary::-webkit-details-marker { display: none; }
+  .aside__filters-wrap[open] .aside__filters-summary { margin-bottom: 14px; }
+  .aside__filters-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cozy-accent-aa); display: inline-block; }
+}
+@media (max-width: 860px) {
+  .page { align-items: stretch; }
+  .main { width: 100%; }
+  .shop-banner { padding: 20px; }
+  .shop-banner__title { font-size: var(--cozy-fs-19); }
+  .shop-banner svg { display: none; }
+  .shop-toolbar__right { flex-wrap: wrap; justify-content: flex-end; }
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .product-card { padding: 10px; }
+  .product-card__thumb { height: 130px; }
+}
+.footer__legal { color: var(--cozy-ink-2); }
+@media (max-width: 860px) { .footer__legal { padding: 0 16px 20px; } }

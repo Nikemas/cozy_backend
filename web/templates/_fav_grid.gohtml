@@ -6,18 +6,18 @@
   {{if .Data.Items}}
     {{range .Data.Items}}
     <div class="fav-card">
-      <div class="fav-card__photo"><i class="ti ti-shoe"></i></div>
+      <a class="fav-card__photo" href="{{.DetailURL}}" tabindex="-1" aria-hidden="true">{{if .PhotoURL}}<img src="{{.PhotoURL}}" alt="" width="400" height="400" loading="lazy">{{else}}<i class="ti ti-shoe"></i>{{end}}</a>
       <div class="fav-card__body">
         {{if .Brand}}<div class="fav-card__brand">{{.Brand}}</div>{{end}}
-        <div class="fav-card__name">{{.Name}}</div>
+        <a class="fav-card__name" href="{{.DetailURL}}">{{.Name}}</a>
         <div class="fav-card__price">{{.Price}}</div>
       </div>
       <div class="fav-card__actions">
         <button type="button" class="btn btn--ghost" hx-delete="/favorites/{{.ProductID}}" hx-target="#fav-grid" hx-swap="outerHTML">
-          <i class="ti ti-heart-off"></i> {{t "fav.remove"}}
+          <i class="ti ti-heart-off" aria-hidden="true"></i> {{t "fav.remove"}}
         </button>
         <button type="button" class="btn btn--primary" hx-post="/favorites/{{.ProductID}}/cart" hx-swap="none">
-          <i class="ti ti-shopping-cart"></i> {{t "fav.add_to_cart"}}
+          <i class="ti ti-shopping-cart" aria-hidden="true"></i> {{t "fav.add_to_cart"}}
         </button>
       </div>
     </div>

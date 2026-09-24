@@ -6,9 +6,11 @@
 <form class="address-form form-stack" hx-target="#address-panel" hx-swap="outerHTML"
       hx-post="{{if .ID}}/addresses/{{.ID}}{{else}}/addresses{{end}}"
       method="post" action="{{if .ID}}/addresses/{{.ID}}{{else}}/addresses{{end}}">
-  {{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
-  <input type="text" name="label" placeholder="{{t "address.label_placeholder"}}" value="{{.Label}}">
-  <textarea name="address_text" placeholder="{{t "address.text_placeholder"}}" required rows="2">{{.AddressText}}</textarea>
+  {{if .Error}}<p class="form-error" role="alert">{{.Error}}</p>{{end}}
+  <label class="field-label" for="address-label-{{.ID}}">{{t "address.label_label"}}</label>
+  <input type="text" id="address-label-{{.ID}}" name="label" placeholder="{{t "address.label_placeholder"}}" value="{{.Label}}">
+  <label class="field-label" for="address-text-{{.ID}}">{{t "address.text_label"}}</label>
+  <textarea id="address-text-{{.ID}}" name="address_text" placeholder="{{t "address.text_placeholder"}}" autocomplete="street-address" required rows="2">{{.AddressText}}</textarea>
   <label class="aside__checkbox">
     <input type="checkbox" name="is_default" {{if .IsDefault}}checked{{end}}> {{t "address.set_default"}}
   </label>

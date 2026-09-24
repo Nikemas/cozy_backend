@@ -17,18 +17,12 @@ sidebar.orders: Заказы
 sidebar.favorites: Избранное
 sidebar.categories: Категории
 sidebar.category.all: Все
-sidebar.category.women: Женское
-sidebar.category.men: Мужское
-sidebar.style: Стиль
-sidebar.brand: Бренд
-sidebar.price: Цена до
 sidebar.reset: Сбросить фильтры
 
 footer.rights: © Cozy. Все права защищены.
 footer.branches: Филиалы
 footer.legal: "ИП Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарынская область, г. Нарын, ул. Ленина 134, кв. 4."
 
-common.soon: Скоро
 common.back_home: На главную
 
 screen.shop.title: Каталог
@@ -106,21 +100,19 @@ order.empty.cta: В каталог
 order.number_prefix: Заказ
 
 branches.title: Филиалы
-branches.you_are_here: Вы здесь
 branches.route: Маршрут
 branches.empty: Пока нет доступных точек продаж
 
 # Task 2 (Catalog: shop + product) keys.
-shop.banner.eyebrow: Новая коллекция
-shop.banner.title: Скидки до 30% на кроссовки
-shop.results_word: товаров
+shop.banner.eyebrow: Обувь для всей семьи
+shop.banner.title: Доставка по Бишкеку и самовывоз из наших магазинов
 shop.empty: Ничего не найдено
 shop.prev: Назад
 shop.next: Дальше
 
 product.size: Размер
 product.color: Цвет
-product.delivery.courier: Доставка по Бишкеку — 200 сом, 1 день
+product.delivery.courier: Доставка по Бишкеку за 1 день
 product.delivery.pickup: Забрать в филиале — бесплатно
 product.delivery.return: Обмен и возврат 14 дней
 product.unavailable: Этого размера/цвета сейчас нет в наличии
@@ -151,3 +143,106 @@ checkout.pickup_free: Самовывоз — бесплатно
 
 done.total: Итого
 done.delivery_window: Курьер свяжется для уточнения времени доставки
+
+# Error pages / messages (internal/web/errors.go).
+error.not_found.title: Страница не найдена
+error.not_found.text: Такой страницы нет. Возможно, товар сняли с продажи или ссылка устарела.
+error.unauthorized.title: Нужно войти
+error.unauthorized.text: Войдите в аккаунт, чтобы продолжить.
+error.internal.title: Что-то пошло не так
+error.internal.text: Не удалось выполнить действие. Попробуйте ещё раз чуть позже.
+error.generic.title: Не получилось
+error.generic.text: Проверьте данные и попробуйте ещё раз.
+error.code.rate_limited: Слишком много попыток. Подождите немного и попробуйте снова.
+error.code.bad_request: Некорректный запрос. Обновите страницу и попробуйте снова.
+error.code.unauthorized: Войдите в аккаунт, чтобы продолжить.
+error.code.unauthenticated: Войдите в аккаунт, чтобы продолжить.
+error.code.invalid_phone: Укажите номер в формате +996XXXXXXXXX
+error.code.otp_cooldown: Код уже отправлен. Запросить новый можно чуть позже.
+error.code.otp_rate_limited: Слишком много запросов кода. Попробуйте позже.
+error.code.otp_expired: Код неверный или устарел. Запросите новый.
+error.code.invalid_name: Укажите имя
+error.code.product_not_found: Товар не найден или снят с продажи.
+error.code.variant_required: Выберите размер и цвет
+error.code.variant_not_found: Такого размера или цвета нет в наличии
+error.code.insufficient_stock: Недостаточно товара в наличии
+error.code.invalid_qty: Некорректное количество
+error.code.empty_cart: Корзина пуста
+error.code.empty_order: Нет товаров для заказа
+error.code.address_required: Выберите адрес доставки
+error.code.point_required: Выберите точку самовывоза
+error.code.fulfillment_required: Выберите способ получения
+error.code.invalid_fulfillment: Выберите способ получения: доставка или самовывоз
+error.code.invalid_address: Укажите адрес доставки
+error.code.address_not_found: Адрес не найден
+error.code.address_in_use: Этот адрес использован в заказе, его нельзя удалить
+error.code.pickup_point_not_found: Точка самовывоза не найдена
+error.code.order_not_found: Заказ не найден
+error.code.order_not_cancellable: Этот заказ уже нельзя отменить
+
+# Legal/info pages (web/templates/pages/*) and footer.
+screen.page_about.title: О магазине
+screen.page_contacts.title: Контакты
+screen.page_delivery.title: Доставка и оплата
+screen.page_privacy.title: Политика конфиденциальности
+screen.page_terms.title: Публичная оферта
+footer.nav_label: Информация о магазине
+
+# Product card: gallery, availability, description.
+product.add_to_favorites: Добавить в избранное
+product.gallery: Фотографии товара
+product.photo: Фото
+product.in_stock_at: Есть в магазинах
+product.stock_available: в наличии
+product.stock_few: осталось
+product.out_of_stock: Этого размера и цвета сейчас нет в наличии
+product.delivery.more: Подробнее о доставке и оплате
+product.description: Описание
+
+# Shop filters and sorting.
+shop.heading: Каталог обуви
+shop.search_results: Результаты поиска
+shop.price_from: от %s
+shop.sort.label: Сортировка
+shop.sort.newest: Сначала новые
+shop.sort.price_asc: Сначала дешевле
+shop.sort.price_desc: Сначала дороже
+filter.size: Размер
+filter.color: Цвет
+filter.any: Любой
+filter.availability: Наличие
+filter.in_stock: Только в наличии
+filter.price: Цена, сом
+filter.price_from: от
+filter.price_to: до
+filter.apply: Применить
+
+# SEO: titles and meta descriptions (internal/web/seo.go).
+seo.page.title: %s | Cozy
+seo.home.title: Cozy — интернет-магазин обуви в Бишкеке
+seo.home.description: Кроссовки, кеды, ботинки и другая обувь в наличии в магазинах Cozy в Бишкеке. Доставка по городу и бесплатный самовывоз.
+seo.category.title: %s — купить в Бишкеке | Cozy
+seo.category.description: %s в интернет-магазине Cozy: цены, размеры и наличие в магазинах Бишкека. Доставка по городу и самовывоз.
+seo.product.title: %s — купить в Бишкеке | Cozy
+seo.product.description: %s за %s. Размеры, цвета и наличие в магазинах Cozy в Бишкеке. Доставка по городу и самовывоз.
+seo.branches.description: Адреса магазинов Cozy в Бишкеке: где посмотреть и примерить обувь, забрать заказ и построить маршрут.
+seo.page_about.description: Cozy — магазин удобной обуви в Бишкеке: наличие в магазинах, доставка, самовывоз, обмен и возврат 14 дней.
+seo.page_contacts.description: Телефон, мессенджеры, e-mail и режим работы магазина обуви Cozy в Бишкеке.
+seo.page_delivery.description: Условия доставки по Бишкеку, бесплатный самовывоз из магазинов Cozy, способы оплаты, обмен и возврат.
+seo.page_privacy.description: Как интернет-магазин Cozy обрабатывает и защищает персональные данные покупателей.
+seo.page_terms.description: Публичная оферта интернет-магазина обуви Cozy: оформление заказа, оплата, доставка, обмен и возврат.
+
+# Accessibility labels.
+a11y.skip_to_content: Перейти к содержимому
+a11y.main_nav: Основное меню
+auth.phone_label: Номер телефона
+auth.code_label: Код из SMS
+address.label_label: Название адреса
+address.text_label: Адрес доставки
+
+# Money and plurals.
+common.currency: сом
+shop.results.one: товар
+shop.results.few: товара
+shop.results.many: товаров
+filter.title: Фильтры

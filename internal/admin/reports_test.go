@@ -16,15 +16,15 @@ import (
 // database involved, mirrors fakeSalesRepo in
 // internal/httpapi/admin_reports_test.go.
 type fakeReportsBackend struct {
-	orders     []orders.Order
-	brandRows  []reports.Row
-	loadErr    error
+	orders    []orders.Order
+	brandRows []reports.Row
+	loadErr   error
 
 	categoryRows []reports.Row
-	brandErr   error
-	lastFrom   time.Time
-	lastTo     time.Time
-	brandCalls int
+	brandErr     error
+	lastFrom     time.Time
+	lastTo       time.Time
+	brandCalls   int
 }
 
 func (f *fakeReportsBackend) LoadOrders(_ context.Context, from, to time.Time) ([]orders.Order, error) {

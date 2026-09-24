@@ -333,4 +333,3 @@ func TestDeactivationRevokesSessions(t *testing.T) {
 		t.Error("deactivation must revoke sessions")
 	}
 }
-

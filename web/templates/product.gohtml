@@ -7,28 +7,56 @@
 <div class="product-page">
   {{template "_product_detail" .}}
 </div>
+<script>
+  // Gallery: a thumbnail click swaps the main photo in place (no server
+  // round trip). Delegated on document so it survives HTMX swaps of
+  // #product-detail on size/color change.
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest(".product-thumb");
+    if (!btn) return;
+    var main = document.getElementById("product-main-photo");
+    if (main) main.src = btn.dataset.photo;
+    document.querySelectorAll(".product-thumb").forEach(function (el) {
+      el.classList.toggle("product-thumb--active", el === btn);
+      if (el === btn) { el.setAttribute("aria-current", "true"); } else { el.removeAttribute("aria-current"); }
+    });
+  });
+</script>
 {{end}}
 
 {{define "_product_detail"}}
 {{$d := .Data}}
 <div id="product-detail" class="product-detail">
-  <div class="product-photo">
-    <button class="product-photo__fav" type="button" aria-label="{{t "nav.favorites"}}"
-            hx-post="{{$d.FavoriteActionURL}}" hx-target="#toast-slot" hx-swap="innerHTML">
-      <i class="ti ti-heart"></i>
-    </button>
-    {{if $d.HasPhoto}}
-    <img src="{{$d.PhotoURL}}" alt="{{$d.Name}}">
-    {{else}}
-    <svg width="260" height="160" viewBox="0 0 100 60" aria-hidden="true">
-      <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
-      <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="2.5" stroke-linecap="round"/>
-    </svg>
+  <div class="product-gallery">
+    <div class="product-photo">
+      <button class="product-photo__fav" type="button" aria-label="{{t "product.add_to_favorites"}}"
+              hx-post="{{$d.FavoriteActionURL}}" hx-target="#toast-slot" hx-swap="innerHTML">
+        <i class="ti ti-heart" aria-hidden="true"></i>
+      </button>
+      {{if $d.HasPhoto}}
+      <img id="product-main-photo" src="{{$d.PhotoURL}}" alt="{{$d.Name}}" width="1200" height="1200" fetchpriority="high">
+      {{else}}
+      <svg width="260" height="160" viewBox="0 0 100 60" aria-hidden="true">
+        <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
+        <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      {{end}}
+    </div>
+    {{if gt (len $d.Photos) 1}}
+    <div class="product-thumbs" role="group" aria-label="{{t "product.gallery"}}">
+      {{range $i, $p := $d.Photos}}
+      <button type="button" class="product-thumb{{if eq $i 0}} product-thumb--active{{end}}" data-photo="{{$p.URL}}"
+              aria-label="{{t "product.photo"}} {{inc $i}}"{{if eq $i 0}} aria-current="true"{{end}}>
+        <img src="{{$p.ThumbURL}}" alt="" width="400" height="400" loading="lazy">
+      </button>
+      {{end}}
+    </div>
     {{end}}
   </div>
 
+  <div class="product-info">
   {{if $d.Brand}}<div class="product-meta__brand">{{$d.Brand}}</div>{{end}}
-  <div class="product-meta__name">{{$d.Name}}</div>
+  <h1 class="product-meta__name">{{$d.Name}}</h1>
   <div class="product-meta__price">{{$d.PriceText}}</div>
 
   {{if $d.Sizes}}
@@ -36,7 +64,7 @@
   <div class="product-options">
     {{range $d.Sizes}}
     <a class="product-option{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
-       href="{{.Href}}"
+       href="{{.Href}}"{{if .Selected}} aria-current="true"{{end}}
        hx-get="{{.Href}}" hx-target="#product-detail" hx-select="#product-detail" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
     {{end}}
   </div>
@@ -47,16 +75,33 @@
   <div class="product-options">
     {{range $d.Colors}}
     <a class="product-option product-option--color{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
-       href="{{.Href}}"
+       href="{{.Href}}"{{if .Selected}} aria-current="true"{{end}}
        hx-get="{{.Href}}" hx-target="#product-detail" hx-select="#product-detail" hx-swap="outerHTML" hx-push-url="true">{{.Label}}</a>
     {{end}}
   </div>
   {{end}}
 
+  <div class="product-stock" aria-live="polite">
+    {{if $d.InStock}}
+    <div class="product-section-title"><i class="ti ti-circle-check" aria-hidden="true"></i> {{t "product.in_stock_at"}}</div>
+    <ul class="product-stock__list">
+      {{range $d.Availability}}
+      <li class="product-stock__row">
+        <span><span class="product-stock__name">{{.Name}}</span> <span class="product-stock__addr">{{.Address}}</span></span>
+        <span class="product-stock__qty{{if .Few}} product-stock__qty--few{{end}}">{{if .Few}}{{t "product.stock_few"}} {{.Qty}}{{else}}{{t "product.stock_available"}}{{end}}</span>
+      </li>
+      {{end}}
+    </ul>
+    {{else if $d.SelectedVariantID}}
+    <div class="product-stock__none">{{t "product.out_of_stock"}}</div>
+    {{end}}
+  </div>
+
   <div class="product-delivery">
-    <div class="product-delivery__row"><i class="ti ti-truck-delivery"></i> {{t "product.delivery.courier"}}</div>
-    <div class="product-delivery__row"><i class="ti ti-building-store"></i> {{t "product.delivery.pickup"}}</div>
-    <div class="product-delivery__row"><i class="ti ti-refresh"></i> {{t "product.delivery.return"}}</div>
+    <div class="product-delivery__row"><i class="ti ti-truck-delivery" aria-hidden="true"></i> {{t "product.delivery.courier"}} — {{money deliveryFee}}</div>
+    <div class="product-delivery__row"><i class="ti ti-building-store" aria-hidden="true"></i> {{t "product.delivery.pickup"}}</div>
+    <div class="product-delivery__row"><i class="ti ti-refresh" aria-hidden="true"></i> {{t "product.delivery.return"}}</div>
+    <a class="product-delivery__more" href="/delivery">{{t "product.delivery.more"}}</a>
   </div>
 
   {{if not $d.SelectedVariantID}}
@@ -66,15 +111,23 @@
   <form class="product-actions">
     <input type="hidden" name="size" value="{{$d.SelectedSize}}">
     <input type="hidden" name="color" value="{{$d.SelectedColor}}">
-    <button type="button" class="product-actions__cart" {{if not $d.SelectedVariantID}}disabled{{end}}
+    <button type="button" class="product-actions__cart" {{if not $d.InStock}}disabled{{end}}
             hx-post="{{$d.CartActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
             aria-label="{{t "product.add_to_cart"}}">
-      <i class="ti ti-shopping-cart-plus"></i>
+      <i class="ti ti-shopping-cart-plus" aria-hidden="true"></i>
     </button>
-    <button type="button" class="btn btn--primary product-actions__buy" {{if not $d.SelectedVariantID}}disabled{{end}}
+    <button type="button" class="btn btn--primary product-actions__buy" {{if not $d.InStock}}disabled{{end}}
             hx-post="{{$d.BuyActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML">
       {{t "product.buy_now"}} · {{$d.PriceText}}
     </button>
   </form>
+
+  {{if $d.Description}}
+  <div class="product-description">
+    <h2 class="product-section-title">{{t "product.description"}}</h2>
+    <div class="product-description__text">{{$d.Description}}</div>
+  </div>
+  {{end}}
+  </div>
 </div>
 {{end}}

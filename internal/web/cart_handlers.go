@@ -4,7 +4,6 @@ package web
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -25,17 +24,17 @@ type CartLineView struct {
 	// Available is false when the product was deactivated or no store has
 	// Qty pairs of it; checkout will refuse the order naming this line.
 	Available bool
+	PhotoURL  string // thumbnail; "" → shoe icon (see photos.go)
 }
 
 // CartPageData backs cart.gohtml's authenticated state. DeliveryFee /
 // GrandTotal are what a delivery order will actually be charged
 // (orders.Settings.DeliveryFee, the same value orders.Service adds to
-// total_amount); self-pickup is free, which DeliveryLabel says.
+// total_amount); self-pickup is free (checkout.pickup_free).
 type CartPageData struct {
 	Lines          []CartLineView
 	ItemsTotal     float64
 	DeliveryFee    float64
-	DeliveryLabel  string
 	GrandTotal     float64
 	HasUnavailable bool
 }
@@ -155,7 +154,11 @@ func (h *handlers) buildCartPageData(ctx context.Context, customerID string) (*C
 	if err != nil {
 		return nil, err
 	}
-	return cartPageFromLines(lines, orders.CurrentSettings().DeliveryFee), nil
+	page := cartPageFromLines(lines, orders.CurrentSettings().DeliveryFee)
+	if err := h.attachCartPhotos(ctx, page.Lines); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 // cartPageFromLines is buildCartPageData's pure part (unit-tested).
@@ -180,7 +183,6 @@ func cartPageFromLines(lines []orders.CartLine, deliveryFee float64) *CartPageDa
 	}
 	if len(page.Lines) > 0 {
 		page.DeliveryFee = deliveryFee
-		page.DeliveryLabel = fmt.Sprintf("%s (самовывоз — бесплатно)", formatSom(deliveryFee))
 		page.GrandTotal = page.ItemsTotal + deliveryFee
 	}
 	return page

@@ -57,8 +57,8 @@
     </label>
 
     <aside class="checkout-summary">
-      <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{printf "%.0f" .Data.ItemsTotal}} сом</span></div>
-      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span>{{printf "%.0f" .Data.DeliveryFee}} сом</span></div>
+      <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{money .Data.ItemsTotal}}</span></div>
+      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span>{{money .Data.DeliveryFee}}</span></div>
       <div class="checkout-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
       {{if .Data.HasUnavailable}}<p class="checkout-hint">{{t "cart.has_unavailable"}}</p>{{end}}
       <button type="submit" class="btn btn--primary checkout-summary__cta">{{t "checkout.place_order"}}</button>

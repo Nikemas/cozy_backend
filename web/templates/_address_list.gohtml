@@ -35,7 +35,7 @@
     {{template "_address_form" .Data.Form}}
   {{else}}
     <button type="button" class="btn btn--primary" hx-get="/addresses/new" hx-target="#address-panel" hx-swap="outerHTML">
-      <i class="ti ti-plus"></i> {{t "address.add"}}
+      <i class="ti ti-plus" aria-hidden="true"></i> {{t "address.add"}}
     </button>
   {{end}}
 </div>

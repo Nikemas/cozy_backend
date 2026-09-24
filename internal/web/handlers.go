@@ -2,7 +2,6 @@ package web
 
 import (
 	"database/sql"
-	"errors"
 	"html"
 	"log/slog"
 	"net/http"
@@ -73,18 +72,6 @@ func isHX(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
 }
 
-// errMessage extracts a human-readable message from err — an
-// *apperr.AppError's Message if there is one, otherwise a generic
-// fallback that never leaks internal error text to a customer-facing
-// page.
-func errMessage(err error) string {
-	var appErr *apperr.AppError
-	if errors.As(err, &appErr) {
-		return appErr.Message
-	}
-	return "Что-то пошло не так, попробуйте ещё раз"
-}
-
 // toastOOB renders msg as an out-of-band HTMX swap targeting
 // "toast-slot" (see _toast.gohtml) — any HTMX handler can append this
 // after its main fragment to pop a toast without the caller having to
@@ -94,9 +81,13 @@ func toastOOB(msg string) string {
 		html.EscapeString(msg) + `</div></div>`
 }
 
-// resolveLang reads the language cookie Foundation's /lang screen writes,
-// falling back to i18n.DefaultLang.
+// resolveLang picks the page language: an explicit ?lang=ru|ky (the
+// hreflang alternates search engines crawl), else the cookie
+// Foundation's /lang screen writes, else i18n.DefaultLang.
 func (h *handlers) resolveLang(r *http.Request) string {
+	if v := r.URL.Query().Get("lang"); v == i18n.LangRU || v == i18n.LangKY {
+		return v
+	}
 	if c, err := r.Cookie(langCookieName); err == nil {
 		if c.Value == i18n.LangRU || c.Value == i18n.LangKY {
 			return c.Value
@@ -116,6 +107,7 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 		Lang:   h.resolveLang(r),
 		Screen: screen,
 	}
+	h.defaultSEO(r, &data, screen)
 
 	customerID := CustomerID(r)
 	if customerID == "" {
@@ -198,6 +190,12 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	if lang != i18n.LangRU && lang != i18n.LangKY {
 		lang = i18n.DefaultLang
 	}
+	setLangCookie(w, lang)
+	http.Redirect(w, r, "/lang", http.StatusSeeOther)
+	return nil
+}
+
+func setLangCookie(w http.ResponseWriter, lang string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     langCookieName,
 		Value:    lang,
@@ -205,8 +203,21 @@ func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 		MaxAge:   int((365 * 24 * time.Hour).Seconds()),
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/lang", http.StatusSeeOther)
-	return nil
+}
+
+// langParam persists an explicit ?lang=ru|ky (e.g. a visitor arriving from
+// a search result's Kyrgyz alternate) into the language cookie, so the
+// rest of their visit — links carry no lang parameter — stays in that
+// language.
+func langParam(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := r.URL.Query().Get("lang"); r.Method == http.MethodGet && (v == i18n.LangRU || v == i18n.LangKY) {
+			if c, err := r.Cookie(langCookieName); err != nil || c.Value != v {
+				setLangCookie(w, v)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // renderProfileAuth renders the current login-flow step: just the
@@ -234,7 +245,7 @@ func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error
 	phone := r.FormValue("phone")
 
 	if err := h.auth.RequestOTP(r.Context(), phone); err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "", Phone: phone, Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "", Phone: phone, Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone})
@@ -256,7 +267,7 @@ func (h *handlers) loginVerifyOTP(w http.ResponseWriter, r *http.Request) error 
 
 	access, _, _, err := h.auth.VerifyOTP(r.Context(), phone, code)
 	if err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	setSessionCookie(w, access, sessionCookieTTL)
@@ -297,7 +308,7 @@ func (h *handlers) loginSetName(w http.ResponseWriter, r *http.Request) error {
 
 	name := r.FormValue("name")
 	if err := h.customers.SetName(r.Context(), customerID, name); err != nil {
-		return h.renderProfileAuth(w, r, ProfileData{Step: "name", Error: errMessage(err)})
+		return h.renderProfileAuth(w, r, ProfileData{Step: "name", Error: h.errText(h.resolveLang(r), err)})
 	}
 
 	return h.redirectOrHXRedirect(w, r, "/profile")

@@ -21,9 +21,6 @@ func TestCartPageFromLinesUsesChargedDeliveryFee(t *testing.T) {
 	if !page.Lines[0].Available || page.Lines[1].Available || !page.HasUnavailable {
 		t.Errorf("availability flags wrong: %+v", page)
 	}
-	if page.DeliveryLabel == "" {
-		t.Error("delivery label must be set")
-	}
 
 	empty := cartPageFromLines(nil, 250)
 	if empty.GrandTotal != 0 || empty.DeliveryFee != 0 || empty.Lines == nil {
@@ -37,7 +34,7 @@ func TestBuildOrderViewsShowCancelOnlyForPlacedUnpaid(t *testing.T) {
 		{ID: "a", Status: orders.StatusPlaced, PaymentMethod: orders.PaymentCashOnDelivery},
 		{ID: "b", Status: orders.StatusConfirmed, PaymentMethod: orders.PaymentCashOnDelivery},
 		{ID: "c", Status: orders.StatusPlaced, PaymentMethod: orders.PaymentOnlineCard, PaymentStatus: &paid},
-	}, func(k string) string { return k })
+	}, func(k string) string { return k }, nil)
 	if !views[0].ShowCancel || views[1].ShowCancel || views[2].ShowCancel {
 		t.Errorf("ShowCancel = %v/%v/%v, want true/false/false", views[0].ShowCancel, views[1].ShowCancel, views[2].ShowCancel)
 	}

@@ -130,7 +130,7 @@ func TestRenderProductFormExecutes(t *testing.T) {
 			),
 			StockPoints:     testStockPoints,
 			StockPointsJSON: marshalJS(testStockPoints),
-			CanDelete: true,
+			CanDelete:       true,
 		}},
 		{"with error", ProductFormData{
 			Categories: categories, CategoriesJSON: categoryOptionsJSON(categories),

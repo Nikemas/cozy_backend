@@ -41,14 +41,98 @@ const DefaultPageSize = 20
 // CategoryRepo.ResolveID for the id-or-slug `category` param.
 type ListFilter struct {
 	CategoryID string
-	Size       string
-	Color      string
-	PriceMin   *float64
-	PriceMax   *float64
-	Query      string
-	Sort       string
-	Page       int // 1-based
-	PageSize   int
+	// CategoryIDs, when non-empty, matches any of these categories (the
+	// storefront passes a category plus its subcategories); it takes
+	// precedence over CategoryID.
+	CategoryIDs []string
+	Size        string
+	Color       string
+	PriceMin    *float64
+	PriceMax    *float64
+	Query       string
+	Sort        string
+	// InStock keeps only products with a variant (matching Size/Color,
+	// when set) that has quantity > 0 at an active point of sale.
+	InStock  bool
+	Page     int // 1-based
+	PageSize int
+}
+
+// minPriceExpr/maxPriceExpr are a product's effective price range: the
+// cheapest/dearest variant price (price_override, else base_price), or
+// base_price for a product with no variants. Price filters and sorting use
+// these rather than bare base_price, so a variant's price_override counts.
+const (
+	minPriceExpr = `COALESCE((SELECT MIN(COALESCE(pv.price_override, products.base_price))
+		FROM product_variants pv WHERE pv.product_id = products.id), products.base_price)`
+	maxPriceExpr = `COALESCE((SELECT MAX(COALESCE(pv.price_override, products.base_price))
+		FROM product_variants pv WHERE pv.product_id = products.id), products.base_price)`
+)
+
+// buildListConditions turns filter into List's WHERE fragments and their
+// positional args — a pure function so the query shape is unit-testable
+// without a database.
+func buildListConditions(filter ListFilter) ([]string, []any) {
+	conditions := []string{"is_active = true"}
+	var args []any
+
+	switch {
+	case len(filter.CategoryIDs) > 0:
+		args = append(args, filter.CategoryIDs)
+		conditions = append(conditions, fmt.Sprintf("category_id = ANY($%d)", len(args)))
+	case filter.CategoryID != "":
+		args = append(args, filter.CategoryID)
+		conditions = append(conditions, fmt.Sprintf("category_id = $%d", len(args)))
+	}
+	// A product matches a price range if some variant's effective price
+	// can fall in it: its cheapest price is <= max and its dearest >= min.
+	if filter.PriceMin != nil {
+		args = append(args, *filter.PriceMin)
+		conditions = append(conditions, fmt.Sprintf("%s >= $%d", maxPriceExpr, len(args)))
+	}
+	if filter.PriceMax != nil {
+		args = append(args, *filter.PriceMax)
+		conditions = append(conditions, fmt.Sprintf("%s <= $%d", minPriceExpr, len(args)))
+	}
+	if filter.Query != "" {
+		args = append(args, "%"+filter.Query+"%")
+		idx := len(args)
+		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d OR brand ILIKE $%d)", idx, idx, idx))
+	}
+	if filter.Size != "" || filter.Color != "" || filter.InStock {
+		variantConds := []string{"product_variants.product_id = products.id"}
+		if filter.Size != "" {
+			args = append(args, filter.Size)
+			variantConds = append(variantConds, fmt.Sprintf("size = $%d", len(args)))
+		}
+		if filter.Color != "" {
+			args = append(args, filter.Color)
+			variantConds = append(variantConds, fmt.Sprintf("color = $%d", len(args)))
+		}
+		if filter.InStock {
+			variantConds = append(variantConds, `EXISTS (SELECT 1 FROM stock
+				JOIN points_of_sale ON points_of_sale.id = stock.point_id AND points_of_sale.is_active
+				WHERE stock.variant_id = product_variants.id AND stock.quantity > 0)`)
+		}
+		conditions = append(conditions, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM product_variants WHERE %s)", strings.Join(variantConds, " AND "),
+		))
+	}
+
+	return conditions, args
+}
+
+// listOrderBy maps ListFilter.Sort to List's ORDER BY clause (id last for
+// a stable order across pages).
+func listOrderBy(sort string) string {
+	switch sort {
+	case SortPriceAsc:
+		return minPriceExpr + " ASC, id"
+	case SortPriceDesc:
+		return minPriceExpr + " DESC, id"
+	default:
+		return "created_at DESC, id"
+	}
 }
 
 type ProductRepo struct {
@@ -71,42 +155,7 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 		pageSize = DefaultPageSize
 	}
 
-	conditions := []string{"is_active = true"}
-	var args []any
-
-	if filter.CategoryID != "" {
-		args = append(args, filter.CategoryID)
-		conditions = append(conditions, fmt.Sprintf("category_id = $%d", len(args)))
-	}
-	if filter.PriceMin != nil {
-		args = append(args, *filter.PriceMin)
-		conditions = append(conditions, fmt.Sprintf("base_price >= $%d", len(args)))
-	}
-	if filter.PriceMax != nil {
-		args = append(args, *filter.PriceMax)
-		conditions = append(conditions, fmt.Sprintf("base_price <= $%d", len(args)))
-	}
-	if filter.Query != "" {
-		args = append(args, "%"+filter.Query+"%")
-		idx := len(args)
-		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d)", idx, idx))
-	}
-	if filter.Size != "" || filter.Color != "" {
-		var variantConds []string
-		variantConds = append(variantConds, "product_variants.product_id = products.id")
-		if filter.Size != "" {
-			args = append(args, filter.Size)
-			variantConds = append(variantConds, fmt.Sprintf("size = $%d", len(args)))
-		}
-		if filter.Color != "" {
-			args = append(args, filter.Color)
-			variantConds = append(variantConds, fmt.Sprintf("color = $%d", len(args)))
-		}
-		conditions = append(conditions, fmt.Sprintf(
-			"EXISTS (SELECT 1 FROM product_variants WHERE %s)", strings.Join(variantConds, " AND "),
-		))
-	}
-
+	conditions, args := buildListConditions(filter)
 	where := "WHERE " + strings.Join(conditions, " AND ")
 
 	var total int
@@ -115,15 +164,7 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 		return nil, 0, err
 	}
 
-	orderBy := "created_at DESC"
-	switch filter.Sort {
-	case SortPriceAsc:
-		orderBy = "base_price ASC"
-	case SortPriceDesc:
-		orderBy = "base_price DESC"
-	case SortNewest, "":
-		orderBy = "created_at DESC"
-	}
+	orderBy := listOrderBy(filter.Sort)
 
 	limitArgs := append(append([]any{}, args...), pageSize, safeOffset(page, pageSize))
 	listQuery := fmt.Sprintf(`
