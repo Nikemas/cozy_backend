@@ -1270,18 +1270,38 @@ paths:
   /admin/products/import:
     post:
       tags: [Admin — Import]
-      summary: Bulk product import from CSV or Excel
+      summary: Bulk product import from CSV or Excel (with dry run)
       description: |
-        Deliberately **not** under `/admin/api/` — matches §8 of the ТЗ
-        exactly. Format is detected from the filename extension and/or
-        `Content-Type` and rejected with 400 before any parsing is attempted.
-        A syntactically broken file (unparseable CSV/XLSX) fails the whole
-        request with 400; a per-row validation problem (missing field, bad
-        price, unknown category, ...) does NOT abort the batch — it's
-        collected into `errors` and the next row is processed. A stock-upsert
-        failure for one of a row's optional `stock:<pointId>` columns is
-        recorded as a warning-style row error but still counts the row as
-        imported, since the product/variant itself was created successfully.
+        Deliberately **not** under `/admin/api/` — matches §8 of the ТЗ.
+        Owner/manager only. Format is detected from the filename extension
+        and/or `Content-Type` and rejected with 400 before any parsing.
+
+        **Rows → products.** Rows are grouped into models: by the article
+        column (`model_code` / «Артикул») when present, otherwise by
+        brand + name + category. One model = one product; each row with
+        size + color is one variant. The first non-empty value of each
+        product field in the model wins; `price` of the first row is the
+        base price, a row whose `price` differs gets it as `price_override`
+        (an explicit `price_override` column wins).
+
+        **Re-import updates, never duplicates.** A product is matched by
+        article, then by any of its rows' SKUs, then by brand + name +
+        category; a variant by SKU, then by size + color (case-insensitive
+        color). Matched rows update name/category/base price/description
+        (empty optional cells keep stored text), variant price override,
+        and stock at the target point. `is_active` is never changed.
+
+        **Atomicity.** Each model is written in one transaction; a model
+        with any invalid row (or a DB conflict) is not imported at all —
+        the failing row is `error`, its other rows `skipped`; other models
+        are unaffected. `dry_run=1` runs the same checks (including DB
+        lookups/constraints, in a rolled-back transaction) and writes
+        nothing.
+
+        Prices: non-negative decimals only (`4990`, `4 990`, `4990,50`);
+        NaN/Inf/negative/exponent values are row errors. Quantities:
+        non-negative integers. Required columns (else 400
+        `missing_columns`): name_ru, category, price.
       security: [{ staffSessionCookie: [] }]
       requestBody:
         required: true
@@ -1294,12 +1314,65 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: ".csv or .xlsx, columns (by header name, case-insensitive): name_ru, name_ky, category (slug or UUID), price, optionally brand/description_ru/description_ky/size/color/sku/price_override/stock:<pointId>."
+                  description: |
+                    .csv (`,` or `;`) or .xlsx (first sheet). Headers are case-insensitive; English key or Russian caption:
+                    model_code|Артикул, name_ru|Название*, name_ky|Название (KY), category|Категория* (UUID, slug or RU/KY name),
+                    brand|Бренд, price|Цена*, price_override|Цена варианта, size|Размер, color|Цвет, sku|SKU|Штрихкод,
+                    quantity|Остаток (stock at `point_id`), description_ru|Описание, description_ky|Описание (KY),
+                    stock:<pointId> (stock at that point). Unknown columns are ignored.
+                dry_run:
+                  type: string
+                  enum: ["1", "0", "true", "false"]
+                  description: "`1`/`true` = validate and report only, write nothing."
+                point_id:
+                  type: string
+                  format: uuid
+                  description: Active point of sale for the `quantity` column. Default — the oldest active point.
       responses:
-        "200": { description: "Import finished (possibly with per-row errors — check `errors`, not just the HTTP status).", content: { application/json: { schema: { $ref: "#/components/schemas/ImportResult" } } } }
+        "200": { description: "Import (or dry run) finished — check `summary`/`rows`, not just the HTTP status.", content: { application/json: { schema: { $ref: "#/components/schemas/ImportResult" } } } }
         "400":
-          description: "`missing_file`, `unsupported_format`, or `invalid_multipart` — the whole file was rejected before any row was processed."
+          description: "`missing_file`, `unsupported_format`, `invalid_multipart`, `invalid_csv`, `invalid_xlsx`, `empty_file`, `missing_columns`, `duplicate_column` or `invalid_point` — nothing was processed."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/products/import/template:
+    get:
+      tags: [Admin — Import]
+      summary: Download the .xlsx import template
+      description: Sheets «Товары» (headers + example rows), «Инструкция» and «Категории» (current categories). Owner/manager only.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: The template workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/products/import/points:
+    get:
+      tags: [Admin — Import]
+      summary: Active points of sale for the import stock target
+      description: The first one is the default `point_id`. Owner/manager only.
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        "200":
+          description: Active points, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        address: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -1839,8 +1912,34 @@ components:
         row: { type: integer, description: "1-based, counting the header as row 1 — matches what an admin sees opening the file in a spreadsheet app." }
         message: { type: string }
 
+    ImportRowResult:
+      type: object
+      properties:
+        row: { type: integer, description: "Spreadsheet row number (header = 1)." }
+        status: { type: string, enum: [created, updated, skipped, error], description: "In a dry run — what would happen. `skipped` = valid row of a model that failed on another row." }
+        model: { type: string, description: "Article, or product name when there is none." }
+        size: { type: string }
+        color: { type: string }
+        sku: { type: string }
+        message: { type: string, description: "Reason, for error/skipped." }
+
     ImportResult:
       type: object
       properties:
-        imported: { type: integer }
-        errors: { type: array, items: { $ref: "#/components/schemas/RowError" } }
+        dry_run: { type: boolean }
+        point_id: { type: string, format: uuid, nullable: true, description: "Where the quantity column went; null if unused." }
+        summary:
+          type: object
+          properties:
+            rows: { type: integer, description: "Non-blank data rows." }
+            created: { type: integer }
+            updated: { type: integer }
+            skipped: { type: integer }
+            errors: { type: integer }
+            products_created: { type: integer }
+            products_updated: { type: integer }
+            variants_created: { type: integer }
+            variants_updated: { type: integer }
+        rows: { type: array, items: { $ref: "#/components/schemas/ImportRowResult" } }
+        imported: { type: integer, description: "Legacy: products created + updated." }
+        errors: { type: array, items: { $ref: "#/components/schemas/RowError" }, description: "Legacy: error and skipped rows." }
