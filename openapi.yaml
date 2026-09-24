@@ -58,10 +58,15 @@ paths:
       tags: [Auth]
       summary: Request an SMS OTP code
       description: |
-        Validates the phone number, rate-limits it (max one request per 60s,
-        5 per hour), then asks Nikita SMSPro to text a one-time code. Always
-        returns 200 regardless of whether the phone belongs to an existing
-        customer, so the response can't be used to enumerate customers.
+        Validates the phone number, rate-limits the request, then asks Nikita
+        SMSPro to text a one-time code. Always returns 200 regardless of
+        whether the phone belongs to an existing customer, so the response
+        can't be used to enumerate customers.
+
+        Limits, checked atomically under a per-phone lock:
+        - per phone: one request per 60 s (`otp_cooldown`), 5 per hour (`otp_rate_limited`);
+        - per client IP: `OTP_MAX_PER_IP_PER_HOUR` per hour, default 30 (`otp_rate_limited`);
+        - all phones together: `OTP_MAX_PER_DAY` per rolling 24 h, default 1000 (`otp_daily_limit`).
       requestBody:
         required: true
         content:
@@ -86,8 +91,12 @@ paths:
         "400":
           description: Malformed phone number.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
         "429":
-          description: Resend cooldown (`otp_cooldown`) or hourly cap (`otp_rate_limited`) hit.
+          description: |
+            `otp_cooldown` (60 s per phone), `otp_rate_limited` (phone or IP
+            hourly cap) or `otp_daily_limit` (global SMS ceiling — SMS login is
+            temporarily unavailable for everyone).
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "502":
           description: Nikita SMSPro unreachable or returned an unexpected status.
@@ -103,8 +112,15 @@ paths:
       description: |
         Verifies the code against the active OTP transaction for the phone.
         On success, gets-or-creates the customer record and issues an access
-        token (JWT, 15 min TTL) and a refresh token (opaque, 30 days TTL,
-        stored server-side hashed for revocation).
+        token (JWT HS256, 15 min TTL) and a refresh token (opaque, 30 days TTL,
+        stored server-side hashed), plus the customer's profile so the app
+        needs no extra `GET /api/v1/customer` right after login.
+
+        Each sent code allows `OTP_VERIFY_MAX_ATTEMPTS` attempts (default 5);
+        the last wrong one burns the code (`otp_attempts_exceeded`, request a
+        new code). Wrong codes are also counted per client IP
+        (`OTP_VERIFY_MAX_FAILS_PER_IP_PER_HOUR`, default 30). A code logs in
+        only once.
       requestBody:
         required: true
         content:
@@ -118,16 +134,34 @@ paths:
       responses:
         "200":
           description: Verified — token pair issued.
-          content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
+          content: { application/json: { schema: { $ref: "#/components/schemas/VerifyOTPResponse" } } }
         "400":
-          description: Malformed phone, or `otp_expired`/`otp_invalid` from Nikita SMSPro.
+          description: Malformed phone, or `otp_expired` (no active code — expired, used or burned) / `otp_invalid` (wrong code).
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "429":
+          description: "`otp_attempts_exceeded` — too many wrong codes for this code or from this IP."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: Nikita SMSPro unreachable.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /api/v1/auth/refresh:
     post:
       tags: [Auth]
       summary: Rotate a refresh token for a new token pair
-      description: The old refresh token is revoked; a new access+refresh pair is issued.
+      description: |
+        The presented refresh token is retired atomically and a new
+        access+refresh pair is issued in the same session ("token family").
+
+        **Reuse detection:** presenting a refresh token that was already
+        rotated revokes the whole family — every token of that login — and
+        answers 401 `refresh_invalid`; the app must log in again. The client
+        must therefore never send the same refresh token twice (serialize
+        refreshes; don't retry a refresh whose response was lost with the old
+        token — log in again instead).
+
+        Rate-limited per client IP (`AUTH_REFRESH_MAX_PER_IP_PER_MINUTE`,
+        default 120). A 429 is NOT a reason to log the user out.
       requestBody:
         required: true
         content:
@@ -142,8 +176,31 @@ paths:
           description: New token pair issued.
           content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
         "401":
-          description: "`invalid_refresh_token` — unknown, expired, or already-revoked token."
+          description: "`refresh_invalid` — unknown, expired, revoked (logout, account deleted) or reused token."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "429":
+          description: "`refresh_rate_limited` — retry later, keep the session."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out — revoke a refresh token's session
+      description: |
+        Revokes the refresh token's whole session (token family). No access
+        token needed. Idempotent: always 204, also for an unknown, expired or
+        already-revoked token or an empty body. Call `DELETE /api/v1/devices`
+        (with the access token) before this to stop pushes to the device.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204": { description: Logged out (or nothing to do). }
 
   # ------------------------------------------------------------- Catalog ---
   /api/v1/categories:
@@ -343,6 +400,109 @@ paths:
           description: Invalid `platform`.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Customer]
+      summary: Unregister an FCM device token
+      description: |
+        Removes the token if it belongs to the current customer (call it on
+        logout, before `POST /api/v1/auth/logout`). Idempotent: 204 also when
+        the token is unknown, belongs to someone else, or is empty.
+        `fcm_token` is accepted as an alias of `token`.
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "204": { description: Unregistered (or nothing to do). }
+        "400":
+          description: Body is not JSON.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/customer:
+    get:
+      tags: [Customer]
+      summary: The logged-in customer's profile
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "200":
+          description: Profile.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CustomerProfile" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`customer_not_found`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    put:
+      tags: [Customer]
+      summary: Update the logged-in customer's name
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, example: "Айбек" }
+      responses:
+        "200":
+          description: Updated profile.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CustomerProfile" } } }
+        "400":
+          description: "`invalid_name` — blank name."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Customer]
+      summary: Delete the logged-in customer's account
+      description: |
+        Account deletion (App Store / Google Play requirement). In one
+        transaction: deletes the cart, favorites, device tokens and saved
+        addresses (addresses referenced by past orders are kept, without their
+        label, as part of the order record); revokes all refresh tokens; and
+        anonymizes the customer (phone and name removed). Orders are kept for
+        accounting. The phone number can register again as a new customer.
+        The current access token stays technically valid until it expires
+        (≤15 min) — the app should drop both tokens right away.
+
+        Refused with 409 `has_active_orders` while any order is not yet
+        `delivered` or `cancelled`. Repeating the call is a no-op (204).
+      security: [{ customerBearerAuth: [] }]
+      responses:
+        "204": { description: Account deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: "`has_active_orders` — finish or cancel the orders first."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/points:
+    get:
+      tags: [Catalog]
+      summary: Points of sale (self-pickup locations)
+      description: "Public, unauthenticated; served with `Cache-Control: public, max-age=60`."
+      responses:
+        "200":
+          description: Active points of sale.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        address: { type: string }
 
   /api/v1/app/config:
     get:
@@ -517,6 +677,9 @@ paths:
               schema: { type: string, example: "staff_session=...; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200" }
         "401":
           description: "`invalid_credentials` — wrong password, unknown phone, or deactivated staff (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "429":
+          description: "`too_many_attempts` — 5 attempts per phone, or `STAFF_LOGIN_MAX_PER_IP` (default 20) per client IP, per 15 min."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /admin/api/logout:
@@ -1206,6 +1369,12 @@ components:
     Conflict:
       description: Blocked by a foreign-key reference (e.g. still in use elsewhere).
       content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    BodyTooLarge:
+      description: |
+        `body_too_large` — request body over `MAX_BODY_BYTES` (default 1 MiB;
+        multipart uploads: `MAX_UPLOAD_BYTES`, default 25 MiB). Applies to
+        every endpoint.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   schemas:
     ErrorResponse:
@@ -1220,6 +1389,21 @@ components:
       properties:
         access_token: { type: string, description: "JWT, 15 min TTL." }
         refresh_token: { type: string, description: "Opaque token, 30 day TTL." }
+
+    VerifyOTPResponse:
+      type: object
+      properties:
+        access_token: { type: string, description: "JWT, 15 min TTL." }
+        refresh_token: { type: string, description: "Opaque token, 30 day TTL." }
+        customer: { $ref: "#/components/schemas/CustomerProfile" }
+
+    CustomerProfile:
+      type: object
+      required: [id, phone]
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string, example: "+996700123456" }
+        name: { type: string, description: "Omitted until the customer sets it." }
 
     Category:
       type: object
@@ -1517,7 +1701,7 @@ components:
       required: [phone, password, name, role]
       properties:
         phone: { type: string }
-        password: { type: string, format: password }
+        password: { type: string, format: password, minLength: 8, maxLength: 72, description: "8 characters to 72 bytes (`invalid_password`)." }
         name: { type: string }
         role: { type: string, enum: [owner, manager, point_staff] }
         point_id: { type: string, format: uuid, nullable: true, description: "Required for point_staff, forbidden otherwise." }
@@ -1530,7 +1714,7 @@ components:
         role: { type: string, enum: [owner, manager, point_staff] }
         point_id: { type: string, format: uuid, nullable: true }
         is_active: { type: boolean }
-        password: { type: string, format: password, nullable: true, description: "Omit to leave unchanged; empty string is rejected." }
+        password: { type: string, format: password, nullable: true, minLength: 8, maxLength: 72, description: "Omit to leave unchanged; 8 characters to 72 bytes. A new password or is_active=false ends all of the account's sessions." }
 
     SalesReportResponse:
       type: object
