@@ -44,11 +44,42 @@
         {{end}}
       </tbody>
     </table>
+    {{if .Data.DeliveryFeeLabel}}
+    <div class="admin-order-detail__total">
+      <span>Доставка</span>
+      <span>{{.Data.DeliveryFeeLabel}}</span>
+    </div>
+    {{end}}
     <div class="admin-order-detail__total">
       <span>Итого</span>
       <span class="admin-order-detail__total-sum">{{.Data.TotalLabel}}</span>
     </div>
   </div>
+
+  {{/* История статусов + флаг возврата — блок fix/orders-integrity. */}}
+  {{if .Data.RefundRequired}}
+  <div class="admin-card admin-card--pad admin-order-detail__refund" role="alert">
+    <div class="admin-order-detail__label">Нужен возврат денег</div>
+    <div class="admin-order-detail__sub">Заказ оплачен онлайн, но отменён — верните деньги покупателю через банк.</div>
+  </div>
+  {{end}}
+  {{if .Data.History}}
+  <div class="admin-card admin-card--pad admin-order-detail__history">
+    <div class="admin-order-detail__label">История статусов</div>
+    <table>
+      <tbody>
+        {{range .Data.History}}
+        <tr>
+          <td>{{.DateLabel}}</td>
+          <td>{{if .FromLabel}}{{.FromLabel}} → {{end}}{{.ToLabel}}</td>
+          <td>{{.Actor}}</td>
+          <td>{{.Note}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
 
   {{if .Data.StatusButtons}}
   <div class="admin-card admin-card--pad">
