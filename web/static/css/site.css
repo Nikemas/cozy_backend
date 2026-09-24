@@ -280,6 +280,13 @@ button, input { font-family: inherit; }
 }
 .footer__links { display: flex; gap: 18px; }
 .footer__links a:hover { color: var(--cozy-accent); }
+.footer__legal {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 0 32px 20px;
+  font-size: var(--cozy-fs-13);
+  color: var(--cozy-ink-3);
+}
 
 /* ---- Toast (COZY_WEB_DESIGN.md §2) ---- */
 .toast {
