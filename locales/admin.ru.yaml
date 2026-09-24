@@ -1,0 +1,344 @@
+# Cozy admin panel — Russian strings (fix/admin-i18n).
+# Flat "key: value" pairs only (internal/i18n's loader is a small YAML
+# subset: no nesting, lists or multi-line values). Every key must also
+# exist in admin.ky.yaml — TestAdminLocaleKeySetsMatch checks it.
+# Values with %s/%d are fmt.Sprintf formats ({{tf}} / tr.F).
+# Plurals: <base>.one / .few / .many (tr.Plural).
+
+# Shell: common buttons, navigation, roles, language switch, login
+admin.common.cancel: Отмена
+admin.common.confirm: Подтвердить
+admin.common.confirm_title: Подтвердите действие
+admin.common.save: Сохранить
+admin.common.delete: Удалить
+admin.common.edit: Редактировать
+admin.common.change: Изменить
+admin.common.add: Добавить
+admin.common.find: Найти
+admin.common.reset: Сбросить
+admin.common.prev: Назад
+admin.common.next: Дальше
+admin.common.done: Готово
+admin.common.search: Поиск
+admin.common.all: Все
+admin.common.activate: Активировать
+admin.common.deactivate: Деактивировать
+admin.common.logout: Выйти
+admin.common.menu: Меню
+admin.common.back: Назад
+admin.common.actions: Действия
+admin.common.generate: Сгенерировать
+admin.common.point_of_sale: Точка продаж
+admin.common.all_points: Все точки
+admin.common.from: С
+admin.common.to: По
+admin.common.period: Период
+admin.common.nothing_found: Ничего не нашлось
+admin.common.name: Название
+admin.common.address: Адрес
+admin.common.size: Размер
+admin.common.color: Цвет
+admin.common.stock: Остаток
+admin.common.status: Статус
+admin.common.category: Категория
+admin.common.inactive_suffix: (неактивна)
+admin.nav.orders: Заказы
+admin.nav.products: Товары
+admin.nav.stock: Остатки
+admin.nav.categories: Категории
+admin.nav.reports: Отчёты
+admin.nav.points: Склад и точки
+admin.nav.staff: Сотрудники
+admin.role.owner: Владелец
+admin.role.manager: Менеджер
+admin.role.point_staff: Кладовщик
+admin.lang.label: Язык интерфейса
+admin.lang.ru_title: Русский
+admin.lang.ky_title: Кыргызча
+admin.login.title: Вход
+admin.login.phone: Номер телефона
+admin.login.password: Пароль
+admin.login.show_password: Показать пароль
+admin.login.submit: Войти
+admin.login.hint: Доступ выдаёт владелец магазина
+admin.no_access.title: Нет доступа
+admin.no_access.text: У вашей роли пока нет доступа к админ-панели.
+
+# Orders: list, detail, statuses, payment, history
+admin.status.placed: Оформлен
+admin.status.confirmed: Подтверждён
+admin.status.courier_assigned: Передан курьеру
+admin.status.delivered: Доставлен
+admin.status.cancelled: Отменён
+admin.payment.cod: При получении
+admin.payment.online: Онлайн
+admin.payment.paid: Онлайн, оплачено
+admin.payment.pending: Онлайн, ожидает оплаты
+admin.payment.failed: Онлайн, оплата не прошла
+admin.payment.cancelled: Онлайн, оплата отменена
+admin.payment.refunded: Онлайн, возврат
+admin.range.last7: Последние 7 дней
+admin.range.last30: Последние 30 дней
+admin.range.all: Весь период
+admin.range.custom: Произвольный период
+admin.orders.search_placeholder: № заказа или телефон
+admin.orders.status_filter: Статус заказа
+admin.orders.empty_filtered_title: Ничего не найдено
+admin.orders.empty_title: Пока нет заказов
+admin.orders.empty_filtered_text: Попробуйте изменить поиск или фильтры
+admin.orders.empty_text: Новые заказы появятся здесь
+admin.orders.col_number: № заказа
+admin.orders.col_date: Дата
+admin.orders.col_customer: Покупатель
+admin.orders.col_items: Товаров
+admin.orders.col_total: Сумма
+admin.orders.col_payment: Оплата
+admin.orders.note_bad_status: Неизвестный статус — показаны заказы во всех статусах
+admin.orders.note_bad_from: Дата «с» не распознана
+admin.orders.note_bad_to: Дата «по» не распознана
+admin.orders.note_from_after_to: Дата «с» позже даты «по»
+admin.order.title: Заказ %s
+admin.order.delivery: Доставка
+admin.order.comment: Комментарий
+admin.order.items: Состав заказа
+admin.order.total: Итого
+admin.order.item_variant: Размер %s, %s
+admin.order.pickup_at: "Самовывоз: %s, %s"
+admin.order.refund_title: Нужен возврат денег
+admin.order.refund_text: Заказ оплачен онлайн, но отменён — верните деньги покупателю через банк.
+admin.order.history: История статусов
+admin.order.change_status: Сменить статус
+admin.order.cancel_confirm_text: Заказ %s будет отменён — это действие необратимо.
+admin.order.cancel_confirm_title: Отменить заказ?
+admin.order.cancel_confirm_label: Отменить заказ
+admin.order.status_change_failed: не удалось изменить статус
+admin.history.actor_customer: покупатель
+admin.history.actor_system: система
+admin.history.actor_staff: сотрудник
+
+# Categories and points of sale
+admin.common.name_ru: Название (рус.)
+admin.common.name_ky: Название (кырг.)
+admin.categories.add: Добавить категорию
+admin.categories.empty: Пока нет категорий
+admin.categories.delete_title: Удалить категорию?
+admin.categories.delete_text: "«%s» будет удалена. Если на неё ссылаются товары или подкатегории, удаление будет отклонено."
+admin.categories.new_title: Новая категория
+admin.categories.edit_title: Редактировать категорию
+admin.categories.sort_order: Порядок
+admin.categories.parent: Родительская категория
+admin.categories.no_parent: — нет (корневая) —
+admin.categories.load_failed: не удалось загрузить категории
+admin.points.note: Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются.
+admin.points.add: Добавить точку
+admin.points.empty: Пока нет точек продаж
+admin.points.edit_aria: Изменить точку «%s»
+admin.points.deactivate_text: Точка «%s» перестанет показываться покупателям, и на неё нельзя будет оформить самовывоз. История заказов и остатки сохранятся.
+admin.points.deactivate_title: Деактивировать точку?
+admin.points.new_title: Новая точка продаж
+admin.points.edit_title: Редактировать точку
+admin.points.active: Активна
+admin.points.inactive: Неактивна
+admin.points.load_failed: не удалось загрузить точки продаж
+
+# Staff
+admin.staff.add: Добавить сотрудника
+admin.staff.empty: Пока нет сотрудников
+admin.staff.change_password: Сменить пароль
+admin.staff.deactivate_confirm: Деактивировать сотрудника «%s»? Он сразу потеряет доступ к админке.
+admin.staff.new_title: Новый сотрудник
+admin.staff.name: Имя
+admin.staff.phone: Телефон
+admin.staff.role: Роль
+admin.staff.password_min: Минимум %d символов
+admin.staff.new_password: Новый пароль
+admin.staff.repeat_password: Повторите пароль
+admin.staff.password_note: Сотрудник выйдет из всех сеансов. Передайте ему новый пароль лично.
+admin.staff.save_password: Сохранить пароль
+admin.staff.point_not_found: точка не найдена
+admin.staff.notice_password: Пароль изменён. Сотрудник выйдет из всех сеансов и войдёт с новым паролем.
+admin.staff.load_failed: не удалось загрузить сотрудников
+admin.staff.passwords_mismatch: пароли не совпадают
+
+# Stock, quantities, reports
+admin.stock.search_placeholder: Название, бренд или артикул
+admin.stock.empty_text: Попробуйте другое название
+admin.stock.caption: Остатки на точке «%s»
+admin.stock.col_product: Товар
+admin.stock.col_level: Уровень
+admin.stock.save_changes: Сохранить изменения
+admin.stock.no_point_assigned: Вы не привязаны к точке продаж — обратитесь к владельцу.
+admin.stock.own_point_missing: Ваша точка продаж не найдена — обратитесь к владельцу.
+admin.stock.no_points: Точек продаж пока нет — создайте первую в разделе «Склад и точки».
+admin.stock.err_invalid_qty: "Некорректное количество: %s. Ничего не сохранено."
+admin.stock.err_conflict: Остаток изменился, пока вы редактировали форму (продажа или другой сотрудник). Подсвеченные ячейки обновлены до текущих значений — проверьте их и сохраните ещё раз. Ничего не сохранено.
+admin.stock.no_changes: Изменений нет
+admin.stock.saved: "Сохранено: %s"
+admin.stock.out_of_stock: Нет в наличии
+admin.stock.pcs: "%d шт"
+admin.qty.err_empty: пустое количество
+admin.qty.err_not_int: количество должно быть целым числом
+admin.qty.err_negative: количество не может быть отрицательным
+admin.qty.err_too_big: слишком большое количество
+admin.price.err_empty: укажите цену
+admin.price.err_not_number: цена должна быть числом
+admin.price.err_negative: цена не может быть отрицательной
+admin.range.this_month: Текущий месяц
+admin.range.prev_month: Прошлый месяц
+admin.reports.from: с
+admin.reports.to: по
+admin.reports.show: Показать
+admin.reports.export: Экспорт в Excel
+admin.reports.note: Дни — по времени Бишкека. В выручку не входят отменённые заказы и онлайн-заказы без подтверждённой оплаты.
+admin.reports.sales_by_day: Продажи по дням
+admin.reports.top_products: Топ товаров
+admin.reports.no_sales: Нет продаж за выбранный период
+admin.reports.by_brand: По брендам
+admin.reports.by_category: По категориям
+admin.reports.col_share: Доля
+admin.reports.col_orders: Заказов
+admin.reports.col_sold: Продано
+admin.reports.revenue: Выручка
+admin.reports.orders: Заказы
+admin.reports.avg_check: Средний чек
+admin.reports.items_sold: Продано товаров
+admin.reports.for_period: за период
+admin.reports.per_order: на заказ
+admin.reports.pcs: "%d шт."
+admin.reports.build_failed: не удалось построить отчёт
+
+# Products: list, form, import
+admin.points.address_placeholder: ул. Дордой, 1
+admin.products.import: Импорт
+admin.products.add: Добавить товар
+admin.products.subcategory: Подкатегория
+admin.products.empty_text: Попробуйте другое название или категорию
+admin.products.col_photo: Фото
+admin.products.col_price: Цена
+admin.products.col_variants: Вариаций
+admin.products.delete_title: Удалить товар?
+admin.products.delete_text: "«%s» будет удалён и перестанет отображаться в каталоге."
+admin.products.page_size: Строк на странице
+admin.product.new_title: Новый товар
+admin.product.edit_title: Редактирование товара
+admin.product.active: Активен
+admin.product.inactive: Неактивен
+admin.product.toast_saved: Товар сохранён
+admin.product.toast_deactivated: Товар деактивирован
+admin.product.toast_activated: Товар активирован
+admin.product.toast_deleted: Товар удалён
+admin.product.new_short: Новая
+admin.product.no_subcategory: Без подкатегории
+admin.product.brand: Бренд
+admin.product.base_price: Базовая цена, сом
+admin.product.description_ru: Описание (рус.)
+admin.product.description_ky: Описание (кырг.)
+admin.product.description_placeholder: Короткое описание модели, материал, особенности
+admin.product.photos: Фотографии
+admin.product.photos_hint: Первое фото — главное. JPEG, PNG или WEBP до 10 МБ, меньшая сторона от 600 px — фото автоматически приводится к белому квадрату.
+admin.product.add_photo: Добавить фото
+admin.product.variants: Вариации
+admin.product.variants_hint: "Размер × цвет и остаток на каждой точке продаж. Сохраняются только изменённые ячейки: если остаток успел измениться (продажа, другой сотрудник), форма покажет актуальное значение вместо перезаписи."
+admin.product.no_points_hint: Точек продаж пока нет — остатки можно будет указать после создания точки в разделе «Склад и точки».
+admin.product.color_photos: Фото цвета
+admin.product.color_photos_of: Фото цвета «%s»
+admin.product.color_photos_hint: Эти фото покажутся покупателю, когда он выберет этот цвет в карточке товара.
+admin.product.this_color_photos: Фото этого цвета
+admin.product.total: Всего
+admin.product.color_placeholder: Белый
+admin.product.conflict_cell: "Значение обновлено: остаток изменился, пока форма была открыта"
+admin.product.remove_variant: Удалить вариацию
+admin.product.add_variant: Добавить вариацию
+admin.product.category_name: Название категории
+admin.product.category_placeholder: Сандалии
+admin.product.new_subcategory: Новая подкатегория
+admin.product.subcategory_hint: Например «Классика» или «Спортивные» внутри выбранной категории.
+admin.product.subcategory_name: Название подкатегории
+admin.product.subcategory_placeholder: Классика
+admin.product.new_brand: Новый бренд
+admin.product.brand_name: Название бренда
+admin.product.enter_name: Введите название
+admin.product.category_create_failed: Не удалось создать категорию
+admin.product.subcategory_create_failed: Не удалось создать подкатегорию
+admin.product.main_photo: Главное
+admin.product.max_photos: Максимум %d фото
+admin.product.file_too_big: Файл больше 10 МБ
+admin.product.upload_offline: "Не удалось загрузить фото: нет связи с сервером"
+admin.product.upload_failed: Не удалось загрузить фото
+admin.product.color_first: Сначала укажите цвет вариации
+admin.product.price_label: Цена
+admin.product.err_duplicate_row: Форма повреждена (повтор строки вариации) — обновите страницу
+admin.product.err_size_color: У каждой вариации должны быть размер и цвет
+admin.product.err_stock_cell: "Остаток %s / %s, «%s»: %s"
+admin.product.err_stale_form: форма повреждена — обновите страницу
+admin.product.err_stale_form_banner: Форма повреждена — обновите страницу
+admin.import.title: Импорт товаров
+admin.import.drop: Перетащите Excel или CSV файл сюда
+admin.import.or: или
+admin.import.choose: Выберите файл
+admin.import.failed: Ошибка импорта
+admin.import.imported: Импортировано
+admin.import.skipped: Пропущено с ошибками
+admin.import.row: Строка
+admin.import.run_failed: Не удалось выполнить импорт
+
+# Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
+admin.err.generic: произошла ошибка, попробуйте ещё раз
+admin.err.form: не удалось прочитать форму
+admin.err.render: ошибка рендеринга страницы
+admin.err.internal: внутренняя ошибка
+admin.apperr.invalid_credentials: неверный телефон или пароль
+admin.apperr.too_many_attempts: слишком много попыток входа, попробуйте позже
+admin.apperr.invalid_phone: укажите номер в формате +996XXXXXXXXX
+admin.apperr.invalid_name: имя обязательно
+admin.apperr.invalid_address: адрес обязателен
+admin.apperr.phone_taken: этот номер телефона уже используется
+admin.apperr.last_owner: нельзя понизить или деактивировать последнего владельца
+admin.apperr.staff_not_found: сотрудник не найден
+admin.apperr.invalid_role: неизвестная роль
+admin.apperr.invalid_password: пароль должен быть не короче 8 символов
+admin.apperr.point_id_required: point_id обязателен для роли point_staff
+admin.apperr.point_id_forbidden: point_id должен быть пустым для роли owner/manager
+admin.apperr.point_not_found: точка продаж не найдена
+admin.apperr.invalid_point_id: точка продаж не найдена
+admin.apperr.point_in_use: "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"
+admin.apperr.category_not_found: категория не найдена
+admin.apperr.category_in_use: "нельзя удалить категорию: на неё ссылаются товары или подкатегории"
+admin.apperr.category_slug_taken: категория с таким slug уже существует
+admin.apperr.invalid_parent_id: родительская категория не найдена
+admin.apperr.invalid_slug: slug обязателен
+admin.apperr.invalid_name_ru: укажите название на русском
+admin.apperr.invalid_name_ky: укажите название на кыргызском
+admin.apperr.invalid_category_id: выберите категорию
+admin.apperr.invalid_base_price: цена не может быть отрицательной
+admin.apperr.invalid_variant: у каждой вариации должны быть размер и цвет
+admin.apperr.invalid_object_key: object_key обязателен
+admin.apperr.product_not_found: товар не найден
+admin.apperr.variant_not_found: вариация не найдена
+admin.apperr.variant_in_use: "нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0"
+admin.apperr.variant_exists: "вариации повторяются: такой размер и цвет уже есть в таблице"
+admin.apperr.invalid_quantity: количество не может быть отрицательным
+admin.apperr.invalid_variant_or_point: вариация или точка продаж не найдена — обновите страницу
+admin.apperr.order_not_found: заказ не найден
+admin.apperr.cancel_forbidden: только владелец может отменить заказ
+admin.apperr.forbidden: недостаточно прав для этого действия
+admin.apperr.invalid_status_transition: нельзя перевести заказ в этот статус
+admin.apperr.payment_not_completed: заказ с онлайн-оплатой можно подтвердить только после оплаты
+admin.apperr.invalid_date: дата должна быть в формате YYYY-MM-DD
+admin.apperr.invalid_range: дата начала не может быть позже даты окончания
+admin.apperr.range_too_long: период не может быть длиннее года
+admin.plural.product.one: товар
+admin.plural.product.few: товара
+admin.plural.product.many: товаров
+admin.plural.order.one: заказ
+admin.plural.order.few: заказа
+admin.plural.order.many: заказов
+admin.plural.variant.one: вариация
+admin.plural.variant.few: вариации
+admin.plural.variant.many: вариаций
+admin.plural.position.one: позиция
+admin.plural.position.few: позиции
+admin.plural.position.many: позиций
+admin.plural.row.one: строка
+admin.plural.row.few: строки
+admin.plural.row.many: строк

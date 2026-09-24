@@ -1,0 +1,341 @@
+# Cozy admin panel — Kyrgyz strings (fix/admin-i18n).
+# Same keys as admin.ru.yaml (TestAdminLocaleKeySetsMatch). Kyrgyz nouns
+# don't change after a numeral, so plural .one/.few/.many are equal.
+
+# Shell: common buttons, navigation, roles, language switch, login
+admin.common.cancel: Жокко чыгаруу
+admin.common.confirm: Ырастоо
+admin.common.confirm_title: Аракетти ырастаңыз
+admin.common.save: Сактоо
+admin.common.delete: Өчүрүү
+admin.common.edit: Түзөтүү
+admin.common.change: Өзгөртүү
+admin.common.add: Кошуу
+admin.common.find: Издөө
+admin.common.reset: Тазалоо
+admin.common.prev: Артка
+admin.common.next: Кийинки
+admin.common.done: Даяр
+admin.common.search: Издөө
+admin.common.all: Баары
+admin.common.activate: Активдештирүү
+admin.common.deactivate: Активсиздештирүү
+admin.common.logout: Чыгуу
+admin.common.menu: Меню
+admin.common.back: Артка
+admin.common.actions: Аракеттер
+admin.common.generate: Түзүү
+admin.common.point_of_sale: Сатуу жайы
+admin.common.all_points: Бардык сатуу жайлары
+admin.common.from: Башталышы
+admin.common.to: Аягы
+admin.common.period: Мезгил
+admin.common.nothing_found: Эч нерсе табылган жок
+admin.common.name: Аталышы
+admin.common.address: Дареги
+admin.common.size: Өлчөм
+admin.common.color: Түс
+admin.common.stock: Калдык
+admin.common.status: Абалы
+admin.common.category: Категория
+admin.common.inactive_suffix: (активдүү эмес)
+admin.nav.orders: Буйрутмалар
+admin.nav.products: Товарлар
+admin.nav.stock: Калдыктар
+admin.nav.categories: Категориялар
+admin.nav.reports: Отчеттор
+admin.nav.points: Кампа жана сатуу жайлары
+admin.nav.staff: Кызматкерлер
+admin.role.owner: Ээси
+admin.role.manager: Менеджер
+admin.role.point_staff: Кампачы
+admin.lang.label: Интерфейстин тили
+admin.lang.ru_title: Орусча
+admin.lang.ky_title: Кыргызча
+admin.login.title: Кирүү
+admin.login.phone: Телефон номери
+admin.login.password: Сырсөз
+admin.login.show_password: Сырсөздү көрсөтүү
+admin.login.submit: Кирүү
+admin.login.hint: Кирүү укугун дүкөндүн ээси берет
+admin.no_access.title: Кирүү укугу жок
+admin.no_access.text: Сиздин ролуңузга азырынча админ-панелге кирүү укугу жок.
+
+# Orders: list, detail, statuses, payment, history
+admin.status.placed: Тариздалды
+admin.status.confirmed: Ырасталды
+admin.status.courier_assigned: Курьерге берилди
+admin.status.delivered: Жеткирилди
+admin.status.cancelled: Жокко чыгарылды
+admin.payment.cod: Алганда төлөө
+admin.payment.online: Онлайн
+admin.payment.paid: Онлайн, төлөндү
+admin.payment.pending: Онлайн, төлөм күтүлүүдө
+admin.payment.failed: Онлайн, төлөм өткөн жок
+admin.payment.cancelled: Онлайн, төлөм жокко чыгарылды
+admin.payment.refunded: Онлайн, акча кайтарылды
+admin.range.last7: Акыркы 7 күн
+admin.range.last30: Акыркы 30 күн
+admin.range.all: Бардык мезгил
+admin.range.custom: Каалаган мезгил
+admin.orders.search_placeholder: Буйрутма № же телефон
+admin.orders.status_filter: Буйрутманын абалы
+admin.orders.empty_filtered_title: Эч нерсе табылган жок
+admin.orders.empty_title: Азырынча буйрутма жок
+admin.orders.empty_filtered_text: Издөөнү же чыпкаларды өзгөртүп көрүңүз
+admin.orders.empty_text: Жаңы буйрутмалар ушул жерде көрүнөт
+admin.orders.col_number: Буйрутма №
+admin.orders.col_date: Күнү
+admin.orders.col_customer: Сатып алуучу
+admin.orders.col_items: Товарлар
+admin.orders.col_total: Сумма
+admin.orders.col_payment: Төлөм
+admin.orders.note_bad_status: Белгисиз абал — бардык абалдагы буйрутмалар көрсөтүлдү
+admin.orders.note_bad_from: Башталыш күнү таанылган жок
+admin.orders.note_bad_to: Аяктоо күнү таанылган жок
+admin.orders.note_from_after_to: Башталыш күнү аяктоо күнүнөн кеч
+admin.order.title: "%s буйрутмасы"
+admin.order.delivery: Жеткирүү
+admin.order.comment: Комментарий
+admin.order.items: Буйрутманын курамы
+admin.order.total: Жыйынтык
+admin.order.item_variant: Өлчөмү %s, %s
+admin.order.pickup_at: "Өзү алып кетүү: %s, %s"
+admin.order.refund_title: Акчаны кайтаруу керек
+admin.order.refund_text: Буйрутма онлайн төлөнгөн, бирок жокко чыгарылган — акчаны сатып алуучуга банк аркылуу кайтарыңыз.
+admin.order.history: Абалдардын тарыхы
+admin.order.change_status: Абалын өзгөртүү
+admin.order.cancel_confirm_text: "%s буйрутмасы жокко чыгарылат — бул аракетти кайтарууга болбойт."
+admin.order.cancel_confirm_title: Буйрутманы жокко чыгарасызбы?
+admin.order.cancel_confirm_label: Буйрутманы жокко чыгаруу
+admin.order.status_change_failed: абалын өзгөртүү мүмкүн болбоду
+admin.history.actor_customer: сатып алуучу
+admin.history.actor_system: система
+admin.history.actor_staff: кызматкер
+
+# Categories and points of sale
+admin.common.name_ru: Аталышы (орусча)
+admin.common.name_ky: Аталышы (кыргызча)
+admin.categories.add: Категория кошуу
+admin.categories.empty: Азырынча категория жок
+admin.categories.delete_title: Категорияны өчүрөсүзбү?
+admin.categories.delete_text: "«%s» өчүрүлөт. Эгер ага товарлар же ички категориялар шилтеме кылса, өчүрүү четке кагылат."
+admin.categories.new_title: Жаңы категория
+admin.categories.edit_title: Категорияны түзөтүү
+admin.categories.sort_order: Тартиби
+admin.categories.parent: Негизги категория
+admin.categories.no_parent: — жок (башкы) —
+admin.categories.load_failed: категорияларды жүктөө мүмкүн болбоду
+admin.points.note: Калдыктар ар бир сатуу жайы боюнча өзүнчө эсептелет (товардын карточкасы, «Калдыктар» бөлүмү). Активсиздештирилген сатуу жайы сатып алуучуларга көрсөтүлбөйт, бирок анын буйрутмалар тарыхы жана калдыктары сакталат.
+admin.points.add: Сатуу жайын кошуу
+admin.points.empty: Азырынча сатуу жайлары жок
+admin.points.edit_aria: "«%s» сатуу жайын өзгөртүү"
+admin.points.deactivate_text: "«%s» сатуу жайы сатып алуучуларга көрсөтүлбөй калат жана андан өзү алып кетүүгө буйрутма берүүгө болбойт. Буйрутмалар тарыхы жана калдыктар сакталат."
+admin.points.deactivate_title: Сатуу жайын активсиздештиресизби?
+admin.points.new_title: Жаңы сатуу жайы
+admin.points.edit_title: Сатуу жайын түзөтүү
+admin.points.active: Активдүү
+admin.points.inactive: Активдүү эмес
+admin.points.load_failed: сатуу жайларын жүктөө мүмкүн болбоду
+
+# Staff
+admin.staff.add: Кызматкер кошуу
+admin.staff.empty: Азырынча кызматкерлер жок
+admin.staff.change_password: Сырсөздү алмаштыруу
+admin.staff.deactivate_confirm: "«%s» кызматкерин активсиздештиресизби? Ал админкага кирүү укугун дароо жоготот."
+admin.staff.new_title: Жаңы кызматкер
+admin.staff.name: Аты
+admin.staff.phone: Телефон
+admin.staff.role: Ролу
+admin.staff.password_min: Кеминде %d белги
+admin.staff.new_password: Жаңы сырсөз
+admin.staff.repeat_password: Сырсөздү кайталаңыз
+admin.staff.password_note: Кызматкер бардык сеанстардан чыгарылат. Жаңы сырсөздү ага өзүңүз жеке бериңиз.
+admin.staff.save_password: Сырсөздү сактоо
+admin.staff.point_not_found: сатуу жайы табылган жок
+admin.staff.notice_password: Сырсөз алмаштырылды. Кызматкер бардык сеанстардан чыгарылат жана жаңы сырсөз менен кирет.
+admin.staff.load_failed: кызматкерлерди жүктөө мүмкүн болбоду
+admin.staff.passwords_mismatch: сырсөздөр дал келбейт
+
+# Stock, quantities, reports
+admin.stock.search_placeholder: Аталышы, бренд же артикул
+admin.stock.empty_text: Башка аталышты байкап көрүңүз
+admin.stock.caption: "«%s» сатуу жайындагы калдыктар"
+admin.stock.col_product: Товар
+admin.stock.col_level: Деңгээли
+admin.stock.save_changes: Өзгөртүүлөрдү сактоо
+admin.stock.no_point_assigned: Сиз эч бир сатуу жайына бекитилген эмессиз — ээсине кайрылыңыз.
+admin.stock.own_point_missing: Сиздин сатуу жайыңыз табылган жок — ээсине кайрылыңыз.
+admin.stock.no_points: Азырынча сатуу жайлары жок — биринчисин «Кампа жана сатуу жайлары» бөлүмүндө түзүңүз.
+admin.stock.err_invalid_qty: "Саны туура эмес: %s. Эч нерсе сакталган жок."
+admin.stock.err_conflict: Сиз форманы түзөтүп жатканда калдык өзгөрдү (сатуу же башка кызматкер). Белгиленген уячалар учурдагы маанилерге жаңыланды — текшерип, кайра сактаңыз. Эч нерсе сакталган жок.
+admin.stock.no_changes: Өзгөртүү жок
+admin.stock.saved: "Сакталды: %s"
+admin.stock.out_of_stock: Жок
+admin.stock.pcs: "%d даана"
+admin.qty.err_empty: саны көрсөтүлгөн эмес
+admin.qty.err_not_int: саны бүтүн сан болушу керек
+admin.qty.err_negative: саны терс болбошу керек
+admin.qty.err_too_big: саны өтө чоң
+admin.price.err_empty: баасын көрсөтүңүз
+admin.price.err_not_number: баасы сан болушу керек
+admin.price.err_negative: баасы терс болбошу керек
+admin.range.this_month: Учурдагы ай
+admin.range.prev_month: Өткөн ай
+admin.reports.from: башталышы
+admin.reports.to: аягы
+admin.reports.show: Көрсөтүү
+admin.reports.export: Excel'ге экспорттоо
+admin.reports.note: Күндөр Бишкек убактысы боюнча. Кирешеге жокко чыгарылган буйрутмалар жана төлөмү ырасталбаган онлайн-буйрутмалар кирбейт.
+admin.reports.sales_by_day: Күндөр боюнча сатуулар
+admin.reports.top_products: Эң көп сатылган товарлар
+admin.reports.no_sales: Тандалган мезгилде сатуу болгон жок
+admin.reports.by_brand: Бренддер боюнча
+admin.reports.by_category: Категориялар боюнча
+admin.reports.col_share: Үлүшү
+admin.reports.col_orders: Буйрутмалар
+admin.reports.col_sold: Сатылды
+admin.reports.revenue: Киреше
+admin.reports.orders: Буйрутмалар
+admin.reports.avg_check: Орточо чек
+admin.reports.items_sold: Сатылган товарлар
+admin.reports.for_period: мезгил ичинде
+admin.reports.per_order: бир буйрутмага
+admin.reports.pcs: "%d даана"
+admin.reports.build_failed: отчетту түзүү мүмкүн болбоду
+
+# Products: list, form, import
+admin.points.address_placeholder: Дордой көч., 1
+admin.products.import: Импорт
+admin.products.add: Товар кошуу
+admin.products.subcategory: Ички категория
+admin.products.empty_text: Башка аталышты же категорияны байкап көрүңүз
+admin.products.col_photo: Сүрөт
+admin.products.col_price: Баасы
+admin.products.col_variants: Вариациялар
+admin.products.delete_title: Товарды өчүрөсүзбү?
+admin.products.delete_text: "«%s» өчүрүлөт жана каталогдо көрүнбөй калат."
+admin.products.page_size: Беттеги саптар
+admin.product.new_title: Жаңы товар
+admin.product.edit_title: Товарды түзөтүү
+admin.product.active: Активдүү
+admin.product.inactive: Активдүү эмес
+admin.product.toast_saved: Товар сакталды
+admin.product.toast_deactivated: Товар активсиздештирилди
+admin.product.toast_activated: Товар активдештирилди
+admin.product.toast_deleted: Товар өчүрүлдү
+admin.product.new_short: Жаңы
+admin.product.no_subcategory: Ички категориясыз
+admin.product.brand: Бренд
+admin.product.base_price: Негизги баасы, сом
+admin.product.description_ru: Сыпаттамасы (орусча)
+admin.product.description_ky: Сыпаттамасы (кыргызча)
+admin.product.description_placeholder: Моделдин кыскача сыпаттамасы, материалы, өзгөчөлүктөрү
+admin.product.photos: Сүрөттөр
+admin.product.photos_hint: Биринчи сүрөт — негизги. JPEG, PNG же WEBP, 10 МБ чейин, кыска жагы 600 px дан кем эмес — сүрөт автоматтык түрдө ак квадратка келтирилет.
+admin.product.add_photo: Сүрөт кошуу
+admin.product.variants: Вариациялар
+admin.product.variants_hint: "Өлчөм × түс жана ар бир сатуу жайындагы калдык. Өзгөртүлгөн уячалар гана сакталат: эгер калдык ошол убакта өзгөрүп калса (сатуу, башка кызматкер), форма аны кайра жазбай, учурдагы маанини көрсөтөт."
+admin.product.no_points_hint: Азырынча сатуу жайлары жок — калдыктарды «Кампа жана сатуу жайлары» бөлүмүндө сатуу жайын түзгөндөн кийин көрсөтсөңүз болот.
+admin.product.color_photos: Түстүн сүрөттөрү
+admin.product.color_photos_of: "«%s» түсүнүн сүрөттөрү"
+admin.product.color_photos_hint: Сатып алуучу товардын карточкасынан ушул түстү тандаганда бул сүрөттөр көрсөтүлөт.
+admin.product.this_color_photos: Ушул түстүн сүрөттөрү
+admin.product.total: Бардыгы
+admin.product.color_placeholder: Ак
+admin.product.conflict_cell: "Маани жаңыланды: форма ачык турганда калдык өзгөрдү"
+admin.product.remove_variant: Вариацияны өчүрүү
+admin.product.add_variant: Вариация кошуу
+admin.product.category_name: Категориянын аталышы
+admin.product.category_placeholder: Сандалдар
+admin.product.new_subcategory: Жаңы ички категория
+admin.product.subcategory_hint: Мисалы, тандалган категориянын ичинде «Классика» же «Спорттук».
+admin.product.subcategory_name: Ички категориянын аталышы
+admin.product.subcategory_placeholder: Классика
+admin.product.new_brand: Жаңы бренд
+admin.product.brand_name: Бренддин аталышы
+admin.product.enter_name: Аталышын жазыңыз
+admin.product.category_create_failed: Категорияны түзүү мүмкүн болбоду
+admin.product.subcategory_create_failed: Ички категорияны түзүү мүмкүн болбоду
+admin.product.main_photo: Негизги
+admin.product.max_photos: Эң көп %d сүрөт
+admin.product.file_too_big: Файл 10 МБдан чоң
+admin.product.upload_offline: "Сүрөттү жүктөө мүмкүн болбоду: сервер менен байланыш жок"
+admin.product.upload_failed: Сүрөттү жүктөө мүмкүн болбоду
+admin.product.color_first: Адегенде вариациянын түсүн көрсөтүңүз
+admin.product.price_label: Баасы
+admin.product.err_duplicate_row: Форма бузулган (вариациянын сабы кайталанган) — баракты жаңылаңыз
+admin.product.err_size_color: Ар бир вариациянын өлчөмү жана түсү болушу керек
+admin.product.err_stock_cell: "Калдык %s / %s, «%s»: %s"
+admin.product.err_stale_form: форма бузулган — баракты жаңылаңыз
+admin.product.err_stale_form_banner: Форма бузулган — баракты жаңылаңыз
+admin.import.title: Товарларды импорттоо
+admin.import.drop: Excel же CSV файлды ушул жерге сүйрөп келиңиз
+admin.import.or: же
+admin.import.choose: Файл тандаңыз
+admin.import.failed: Импорттоодо ката кетти
+admin.import.imported: Импорттолду
+admin.import.skipped: Ката менен өткөрүлүп жиберилди
+admin.import.row: Сап
+admin.import.run_failed: Импорттоо мүмкүн болбоду
+
+# Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
+admin.err.generic: ката кетти, кайра аракет кылыңыз
+admin.err.form: форманы окуу мүмкүн болбоду
+admin.err.render: баракты көрсөтүүдө ката кетти
+admin.err.internal: ички ката
+admin.apperr.invalid_credentials: телефон же сырсөз туура эмес
+admin.apperr.too_many_attempts: кирүү аракеттери өтө көп, кийинчерээк аракет кылыңыз
+admin.apperr.invalid_phone: номерди +996XXXXXXXXX форматында жазыңыз
+admin.apperr.invalid_name: аты (аталышы) көрсөтүлүшү керек
+admin.apperr.invalid_address: дареги көрсөтүлүшү керек
+admin.apperr.phone_taken: бул телефон номери колдонулуп жатат
+admin.apperr.last_owner: акыркы ээсинин ролун төмөндөтүүгө же аны активсиздештирүүгө болбойт
+admin.apperr.staff_not_found: кызматкер табылган жок
+admin.apperr.invalid_role: белгисиз роль
+admin.apperr.invalid_password: сырсөз кеминде 8 белгиден турушу керек жана 72 байттан ашпашы керек
+admin.apperr.point_id_required: кампачы үчүн сатуу жайын тандаңыз
+admin.apperr.point_id_forbidden: ээси жана менеджер үчүн сатуу жайы көрсөтүлбөйт
+admin.apperr.point_not_found: сатуу жайы табылган жок
+admin.apperr.invalid_point_id: сатуу жайы табылган жок
+admin.apperr.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"
+admin.apperr.category_not_found: категория табылган жок
+admin.apperr.category_in_use: "категорияны өчүрүүгө болбойт: ага товарлар же ички категориялар шилтеме кылат"
+admin.apperr.category_slug_taken: мындай slug менен категория бар
+admin.apperr.invalid_parent_id: негизги категория туура эмес же табылган жок
+admin.apperr.invalid_slug: slug көрсөтүлүшү керек
+admin.apperr.invalid_name_ru: орусча аталышын жазыңыз
+admin.apperr.invalid_name_ky: кыргызча аталышын жазыңыз
+admin.apperr.invalid_category_id: категорияны тандаңыз
+admin.apperr.invalid_base_price: баасы терс болбошу керек
+admin.apperr.invalid_variant: ар бир вариациянын өлчөмү жана түсү болушу керек
+admin.apperr.invalid_object_key: сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
+admin.apperr.product_not_found: товар табылган жок
+admin.apperr.variant_not_found: вариация табылган жок
+admin.apperr.variant_in_use: "вариацияны өчүрүүгө болбойт: ал боюнча буйрутмалар бар — калдыгын 0 кылыңыз"
+admin.apperr.variant_exists: "вариациялар кайталанат: мындай өлчөм жана түс таблицада бар"
+admin.apperr.invalid_quantity: саны терс болбошу керек
+admin.apperr.invalid_variant_or_point: вариация же сатуу жайы табылган жок — баракты жаңылаңыз
+admin.apperr.order_not_found: буйрутма табылган жок
+admin.apperr.cancel_forbidden: буйрутманы ээси гана жокко чыгара алат
+admin.apperr.forbidden: бул аракет үчүн укук жетишсиз
+admin.apperr.invalid_status_transition: буйрутманы бул абалга өткөрүүгө болбойт
+admin.apperr.payment_not_completed: онлайн-төлөмдүү буйрутманы төлөнгөндөн кийин гана ырастоого болот
+admin.apperr.invalid_date: күнү YYYY-MM-DD форматында болушу керек
+admin.apperr.invalid_range: башталыш күнү аяктоо күнүнөн кеч болбошу керек
+admin.apperr.range_too_long: мезгил бир жылдан узун болбошу керек
+admin.plural.product.one: товар
+admin.plural.product.few: товар
+admin.plural.product.many: товар
+admin.plural.order.one: буйрутма
+admin.plural.order.few: буйрутма
+admin.plural.order.many: буйрутма
+admin.plural.variant.one: вариация
+admin.plural.variant.few: вариация
+admin.plural.variant.many: вариация
+admin.plural.position.one: позиция
+admin.plural.position.few: позиция
+admin.plural.position.many: позиция
+admin.plural.row.one: сап
+admin.plural.row.few: сап
+admin.plural.row.many: сап

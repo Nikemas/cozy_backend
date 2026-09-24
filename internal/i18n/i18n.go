@@ -10,7 +10,10 @@ import (
 	"bufio"
 	"fmt"
 	"html/template"
+	"io"
+	"io/fs"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -47,6 +50,51 @@ func Load(dir string) (*Bundle, error) {
 	return b, nil
 }
 
+// LoadFS reads one file per supported language from fsys, named by
+// nameFormat with the language code substituted for its single %s (e.g.
+// "admin.%s.yaml" -> admin.ru.yaml, admin.ky.yaml). It is how the admin
+// panel loads its own key set (locales/admin.*.yaml, embedded by package
+// locales) separately from the storefront's ru.yaml/ky.yaml, so the two
+// surfaces never edit the same locale file.
+func LoadFS(fsys fs.FS, nameFormat string) (*Bundle, error) {
+	b := &Bundle{langs: map[string]map[string]string{}}
+	for _, lang := range []string{LangRU, LangKY} {
+		name := fmt.Sprintf(nameFormat, lang)
+		f, err := fsys.Open(name)
+		if err != nil {
+			return nil, fmt.Errorf("i18n: loading %s: %w", name, err)
+		}
+		m, err := parse(f)
+		_ = f.Close()
+		if err != nil {
+			return nil, fmt.Errorf("i18n: parsing %s: %w", name, err)
+		}
+		b.langs[lang] = m
+	}
+	return b, nil
+}
+
+// Has reports whether key has a translation in lang itself (no fallback).
+func (b *Bundle) Has(lang, key string) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	_, ok := b.langs[lang][key]
+	return ok
+}
+
+// Keys returns lang's keys, sorted — for tests that check two languages
+// define exactly the same key set.
+func (b *Bundle) Keys(lang string) []string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	keys := make([]string, 0, len(b.langs[lang]))
+	for k := range b.langs[lang] {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // T returns the translation for key in lang, falling back to DefaultLang
 // and then to the raw key so a missing translation never breaks a page —
 // it just shows the key, which is easy to spot during review.
@@ -81,9 +129,12 @@ func parseFile(path string) (map[string]string, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
+	return parse(f)
+}
 
+func parse(r io.Reader) (map[string]string, error) {
 	m := map[string]string{}
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(r)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
