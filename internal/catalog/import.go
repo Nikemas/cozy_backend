@@ -364,10 +364,23 @@ func parseCSVRows(r io.Reader) ([]importRow, error) {
 	return rows, nil
 }
 
+// xlsxUnzipSizeLimit / xlsxUnzipXMLSizeLimit cap how much an uploaded
+// .xlsx (a zip) may decompress to — in total, and per worksheet XML kept
+// in memory. excelize's defaults (16 GiB total) would let a few-MB "zip
+// bomb" exhaust memory/disk; a real product import is far below 64 MiB
+// unpacked. Variables so tests can lower them.
+var (
+	xlsxUnzipSizeLimit    int64 = 64 << 20
+	xlsxUnzipXMLSizeLimit int64 = 16 << 20
+)
+
 // parseXLSXRows reads r as an .xlsx workbook, using its first sheet: the
 // first row is the header row (line 1), every subsequent row a data row.
 func parseXLSXRows(r io.Reader) ([]importRow, error) {
-	f, err := excelize.OpenReader(r)
+	f, err := excelize.OpenReader(r, excelize.Options{
+		UnzipSizeLimit:    xlsxUnzipSizeLimit,
+		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
+	})
 	if err != nil {
 		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать Excel-файл: "+err.Error())
 	}
