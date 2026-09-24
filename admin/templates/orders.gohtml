@@ -55,6 +55,7 @@ function ordersRangeChanged(sel) {
 </script>
 
 {{range .Data.Notes}}<div class="admin-form-error" role="status">{{.}}</div>{{end}}
+<script src="/admin/static/js/bulk.js" defer></script>
 
 <div class="admin-orders-filters">
   <div class="admin-orders-chips" role="group" aria-label="Статус заказа">
@@ -74,10 +75,23 @@ function ordersRangeChanged(sel) {
     <div class="admin-empty__text">{{if .Data.Filtered}}Попробуйте изменить поиск или фильтры{{else}}Новые заказы появятся здесь{{end}}</div>
   </div>
   {{else}}
+  {{/* fix/admin-ops: bulk status bar, shown by bulk.js once a row is checked. */}}
+  <form method="post" action="{{.Data.BulkURL}}" id="orders-bulk" class="admin-bulkbar" data-bulk hidden>
+    <input type="hidden" name="back" value="{{.Data.ReturnURL}}">
+    <span class="admin-bulkbar__count">Выбрано: <span class="js-bulk-count">0</span></span>
+    <label class="admin-visually-hidden" for="orders-bulk-status">Новый статус</label>
+    <select id="orders-bulk-status" name="status">
+      <option value="">Новый статус…</option>
+      {{range .Data.BulkStatuses}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+    </select>
+    <button type="button" class="admin-btn admin-btn--dark" data-bulk-action="" data-bulk-requires="status"
+      data-bulk-title="Сменить статус заказов?" data-bulk-confirm="Статус «{value}» будет установлен выбранным заказам ({n}). Заказы, для которых такой переход недопустим, останутся без изменений — список появится после применения.">Применить</button>
+  </form>
   <div class="admin-orders-table">
     <table>
       <thead>
         <tr>
+          <th class="admin-orders-table__check"><input type="checkbox" class="js-bulk-all" data-bulk-for="orders-bulk" aria-label="Выбрать все заказы на странице"></th>
           <th>№ заказа</th>
           <th>Дата</th>
           <th>Покупатель</th>
@@ -90,6 +104,7 @@ function ordersRangeChanged(sel) {
       <tbody>
         {{range .Data.Rows}}
         <tr onclick="location.href='{{.URL}}'">
+          <td class="admin-orders-table__check" onclick="event.stopPropagation()"><input type="checkbox" class="js-bulk-item" form="orders-bulk" name="id" value="{{.ID}}" aria-label="Выбрать заказ {{.Number}}"></td>
           <td class="admin-orders-table__num"><a href="{{.URL}}">{{.Number}}</a></td>
           <td class="admin-orders-table__muted">{{.DateLabel}}</td>
           <td class="admin-orders-table__phone">{{.Phone}}</td>

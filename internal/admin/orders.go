@@ -60,6 +60,7 @@ type RangeOptionLink struct {
 // OrderRowView backs one row of the order list, desktop table and mobile
 // card alike (orders.gohtml ranges over the same slice for both).
 type OrderRowView struct {
+	ID           string // fix/admin-ops: bulk-select checkbox value
 	URL          string
 	ThumbURL     string // first item's photo, "" when it has none
 	Number       string
@@ -98,6 +99,11 @@ type OrdersListData struct {
 	HasNext    bool
 	PrevURL    string
 	NextURL    string
+
+	// fix/admin-ops: bulk status bar (orders_bulk.go).
+	BulkStatuses []BulkStatusOption
+	BulkURL      string
+	ReturnURL    string
 }
 
 // OrderDetailItemView backs one row of the "Состав заказа" table.
@@ -380,9 +386,13 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	data := h.buildOrdersListViewFor(ctx, list, total, params)
 	data.CanChoosePoint = canChoosePoint
 	data.Points = pointOpts
-	data.Notes = notes
+	data.Notes = append(notes, r.URL.Query()["bulk_fail"]...)
+	data.BulkStatuses = bulkStatusOptions(st.Role)
+	data.BulkURL = "/admin/orders/bulk-status"
+	data.ReturnURL = r.URL.RequestURI()
 
 	pageData := h.shellPageData("orders", "Заказы", st)
+	pageData.Toast = r.URL.Query().Get("toast")
 	pageData.Data = data
 	if err := h.render.Render(w, "orders", pageData); err != nil {
 		http.Error(w, "ошибка рендеринга страницы", http.StatusInternalServerError)
@@ -430,6 +440,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 		meta := orderStatusMetaFor(o.Status)
 		itemsCount := itemCounts[o.ID]
 		rows = append(rows, OrderRowView{
+			ID:           o.ID,
 			URL:          "/admin/orders/" + o.ID,
 			ThumbURL:     h.photoURL(thumbs[o.ID]),
 			Number:       o.OrderNumber,
