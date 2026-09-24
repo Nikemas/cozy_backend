@@ -60,9 +60,14 @@ type StatusChange struct {
 var ErrNotCancellable = apperr.Conflict("order_not_cancellable",
 	"заказ уже нельзя отменить — свяжитесь с магазином")
 
-// orderColumns is the column list every scanOrderRow caller selects.
+// orderColumns is the column list every scanOrderRow caller selects —
+// always FROM orders without an alias (the delivery-zone subqueries refer
+// to orders.delivery_zone_id; scalar subqueries rather than a join so the
+// list also works under SELECT ... FOR UPDATE).
 const orderColumns = `id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status,
-	total_amount, delivery_fee, refund_required, comment, created_at, updated_at`
+	total_amount, delivery_fee, refund_required, comment, created_at, updated_at, delivery_zone_id,
+	(SELECT z.name_ru FROM delivery_zones z WHERE z.id = orders.delivery_zone_id),
+	(SELECT z.name_ky FROM delivery_zones z WHERE z.id = orders.delivery_zone_id)`
 
 // staffActor derives the acting staff member from ctx (put there by
 // staff.RequireRole / the admin auth gate).

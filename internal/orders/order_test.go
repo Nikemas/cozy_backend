@@ -144,7 +144,7 @@ func TestCreateOrderPickupHappyPath(t *testing.T) {
 	expectOrderPrologue(mock, 0)
 	expectPickupLine(mock, testVar1, 5000, 10, 2)
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		10000.0, 0.0, nil, nil})
+		10000.0, 0.0, nil, nil, nil})
 	mock.ExpectCommit()
 
 	pickupID := "point-1"
@@ -179,6 +179,9 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 	expectOrderPrologue(mock, -1) // cap disabled → no count query
 	mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
 		WithArgs("addr-1", "cust-1").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	// No active delivery zone → the flat fee applies.
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM delivery_zones WHERE is_active)")).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
 		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "42", "Черный", nil, "Air Max", 5000.0, true))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM points_of_sale WHERE is_active = true")).
@@ -189,7 +192,7 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 		WithArgs(testVar1, "point-1").WillReturnRows(sqlmock.NewRows([]string{"quantity"}).AddRow(3))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE stock SET quantity")).WillReturnResult(sqlmock.NewResult(0, 1))
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", "addr-1", "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		5250.0, 250.0, "позвоните за час", nil})
+		5250.0, 250.0, "позвоните за час", nil, nil})
 	mock.ExpectCommit()
 
 	addr := "addr-1"

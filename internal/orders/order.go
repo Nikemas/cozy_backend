@@ -58,6 +58,9 @@ type Order struct {
 	// DeliveryFee is the delivery charge included in TotalAmount (0 for
 	// self-pickup and for orders placed before delivery was charged).
 	DeliveryFee float64 `json:"delivery_fee"`
+	// DeliveryZone is the zone the delivery fee was charged for; null for
+	// pickup and for delivery orders placed while no zone was active.
+	DeliveryZone *OrderDeliveryZone `json:"delivery_zone"`
 	// RefundRequired: money was taken for an order that ended up cancelled
 	// — staff must refund it through the bank.
 	RefundRequired bool        `json:"refund_required"`
@@ -137,6 +140,10 @@ type PlaceOrderInput struct {
 	Items         []OrderItemInput
 	AddressID     *string // delivery address, XOR PickupPointID
 	PickupPointID *string
+	// DeliveryZoneID is the delivery zone (delivery orders only; ignored
+	// for pickup). Required while at least one zone is active; the fee is
+	// then the zone's, else Settings.DeliveryFee.
+	DeliveryZoneID *string
 	// Comment is the customer's note to the store (≤ MaxCommentLen runes;
 	// blank is stored as NULL).
 	Comment string
@@ -207,6 +214,7 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 
 	var order Order
 	var replayID string
+	var zone *DeliveryZone
 	err = dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		// One order at a time per customer: serializes the idempotency
 		// lookup and the open-orders count against a concurrent double
@@ -234,6 +242,11 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 			if err := verifyAddressOwnership(ctx, tx, customerID, *addressID); err != nil {
 				return err
 			}
+			z, err := resolveDeliveryZoneTx(ctx, tx, in.DeliveryZoneID)
+			if err != nil {
+				return err
+			}
+			zone = z
 		}
 
 		fulfillmentPointID := ""
@@ -317,17 +330,22 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 				Price:               snap.Price,
 			})
 		}
-		order.DeliveryFee = settings.DeliveryFeeFor(addressID != nil)
+		order.DeliveryFee = deliveryFee(settings, addressID != nil, zone, itemsTotal)
 		order.TotalAmount = roundSom(itemsTotal + order.DeliveryFee)
+		var zoneID *string
+		if zone != nil {
+			zoneID = &zone.ID
+			order.DeliveryZone = &OrderDeliveryZone{ID: zone.ID, NameRu: zone.NameRu, NameKy: zone.NameKy}
+		}
 
 		const insertOrderQ = `
 			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, payment_status,
-				total_amount, delivery_fee, comment, idempotency_key)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				total_amount, delivery_fee, comment, idempotency_key, delivery_zone_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			RETURNING id, created_at, updated_at`
 		err = tx.QueryRowContext(ctx, insertOrderQ,
 			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.PaymentStatus,
-			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey,
+			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey, zoneID,
 		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return err
@@ -572,9 +590,17 @@ func scanOrder(rows *sql.Rows, o *Order) error {
 }
 
 func scanOrderRow(row rowScanner, o *Order) error {
-	return row.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
+	var zoneID, zoneRu, zoneKy sql.NullString
+	if err := row.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
 		&o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.TotalAmount, &o.DeliveryFee, &o.RefundRequired,
-		&o.Comment, &o.CreatedAt, &o.UpdatedAt)
+		&o.Comment, &o.CreatedAt, &o.UpdatedAt, &zoneID, &zoneRu, &zoneKy); err != nil {
+		return err
+	}
+	o.DeliveryZone = nil
+	if zoneID.Valid {
+		o.DeliveryZone = &OrderDeliveryZone{ID: zoneID.String, NameRu: zoneRu.String, NameKy: zoneKy.String}
+	}
+	return nil
 }
 
 // attachItems batch-loads order_items for every order in list and appends
