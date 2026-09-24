@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/media"
@@ -47,6 +48,12 @@ type handlers struct {
 	// and the per-point Остатки screen (stock_page.go).
 	productStore productSaver
 	stockStore   stockPageStore
+
+	// fix/admin-ops (W5): audit journal (nil-safe: a nil *audit.Log
+	// records nothing) and the products list's bulk/per-point queries.
+	audit      *audit.Log
+	auditList  auditLister
+	productOps productOpsBackend
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a

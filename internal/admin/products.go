@@ -123,11 +123,20 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 
 	categoryIDs, activeTop, activeSub := resolveCategoryFilter(tree, catSlug, subSlug)
 
+	// fix/admin-ops: stock column/filter for one chosen point of sale.
+	pts, err := h.pointsRepo.List(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+	pointSel := resolveProductsPoint(pts, query.Get("point"), query.Get("oos") == "1")
+
 	products, total, err := h.products.ListForAdmin(ctx, catalog.AdminListFilter{
-		CategoryIDs: categoryIDs,
-		Query:       q,
-		Page:        page,
-		PageSize:    pageSize,
+		CategoryIDs:       categoryIDs,
+		Query:             q,
+		OutOfStockAtPoint: pointSel.oosPointID(),
+		Page:              page,
+		PageSize:          pageSize,
 	})
 	if err != nil {
 		h.renderInternalErr(w, err)
@@ -154,10 +163,21 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		h.renderInternalErr(w, err)
 		return
 	}
+	var pointStock map[string]int
+	if pointSel.ID != "" && h.productOps != nil {
+		pointStock, err = h.productOps.StockAtPoint(ctx, pointSel.ID, productIDs)
+		if err != nil {
+			h.renderInternalErr(w, err)
+			return
+		}
+	}
 
 	rows := make([]ProductRowVM, len(products))
 	for i, p := range products {
 		rows[i] = h.buildProductRow(p, tree, images, variantCounts, stockTotals)
+		if pointStock != nil {
+			rows[i].PointStockLabel, rows[i].PointStockFG, rows[i].PointStockBG = stockChip(pointStock[p.ID])
+		}
 	}
 
 	pageCount := (total + pageSize - 1) / pageSize
@@ -168,9 +188,9 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 	data := ProductsPageData{
 		CanEdit:       true, // route is already ownerOrManager-gated; see routes.go
 		CanDelete:     st.Role == staff.RoleOwner,
-		CategoryChips: buildCategoryChips(tree, activeTop, q),
+		CategoryChips: withPointParams(buildCategoryChips(tree, activeTop, q), pointSel),
 		ShowSubs:      activeTop != nil && len(activeTop.Children) > 0,
-		SubChips:      buildSubChips(activeTop, activeSub, q),
+		SubChips:      withPointParams(buildSubChips(activeTop, activeSub, q), pointSel),
 		Products:      rows,
 		Empty:         len(rows) == 0,
 		CountLabel:    countLabel(total),
@@ -180,6 +200,16 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		PageCount:     pageCount,
 		NewURL:        "/admin/products/new",
 		ImportURL:     "/admin/products/import",
+
+		CatSlug:        catSlug,
+		SubSlug:        subSlug,
+		PointOptions:   pointSel.Options,
+		PointID:        pointSel.ID,
+		PointName:      pointSel.Name,
+		OutOfStockOnly: pointSel.OOS,
+		BulkURL:        "/admin/products/bulk",
+		ReturnURL:      r.URL.RequestURI(),
+		BulkCategories: flatCategoryOptions(tree),
 	}
 
 	pageData := h.productsShellData("products", "Товары", st)
@@ -558,6 +588,7 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
 		return
 	}
+	h.auditProductActive(ctx, id, product.NameRu, !product.IsActive)
 
 	toast := "Товар деактивирован"
 	if !product.IsActive {
@@ -586,6 +617,7 @@ func (h *handlers) productDelete(w http.ResponseWriter, r *http.Request) {
 		redirectWithToast(w, r, "/admin/products", appErrMessage(err))
 		return
 	}
+	h.auditProductDeleted(r.Context(), id)
 	redirectWithToast(w, r, "/admin/products", "Товар удалён")
 }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
@@ -34,6 +35,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	if err != nil {
 		return err
 	}
+	auditLog := audit.New(db)
 
 	h := &handlers{
 		staffSvc: staffSvc,
@@ -55,8 +57,12 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		media:      mediaClient,
 		cfg:        cfg,
 
-		productStore: newProductStore(db),
-		stockStore:   newStockPageRepo(db),
+		productStore: &productStore{db: db, audit: auditLog},
+		stockStore:   &stockPageRepo{db: db, audit: auditLog},
+
+		audit:      auditLog,
+		auditList:  auditLog,
+		productOps: &productOpsStore{db: db, audit: auditLog},
 	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)
@@ -81,6 +87,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/orders", anyRole(h.ordersListPage))
 	mux.HandleFunc("GET /admin/orders/{id}", anyRole(h.orderDetailPage))
 	mux.HandleFunc("POST /admin/orders/{id}/status", anyRole(h.orderStatusUpdate))
+	// fix/admin-ops: bulk status change from the list (same RBAC per order).
+	mux.HandleFunc("POST /admin/orders/bulk-status", anyRole(h.orderBulkStatus))
 
 	// Остатки: one point's stock, editable. point_staff is pinned to its
 	// own point — see stock_page.go.
@@ -114,6 +122,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 
 	// Доставка: delivery zones (fee, free-from threshold) — delivery.go.
 	registerDeliveryRoutes(mux, h, orders.NewDeliveryZoneRepo(db), ownerOnly)
+	// fix/admin-ops: audit journal (owner only) — see audit_page.go.
+	mux.HandleFunc("GET /admin/audit", ownerOnly(h.auditPage))
 
 	// Task 2 (Товары): list, create/edit form, import — see products.go.
 	// GET /admin/products/new and .../import are registered before the
@@ -126,6 +136,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/products/{id}", ownerOrManager(h.productEditPage))
 	mux.HandleFunc("POST /admin/products/{id}", ownerOrManager(h.productUpdate))
 	mux.HandleFunc("POST /admin/products/{id}/toggle-active", ownerOrManager(h.productToggleActive))
+	// fix/admin-ops: bulk activate/deactivate/move-to-category.
+	mux.HandleFunc("POST /admin/products/bulk", ownerOrManager(h.productsBulk))
 	// Удалить (per the design's canDelete) is owner-only, unlike every
 	// other product write above — see productDelete's doc comment for why
 	// it maps to the same soft-delete as "Деактивировать" under the hood.

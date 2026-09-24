@@ -29,6 +29,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/dbtx"
 )
@@ -100,9 +101,12 @@ func (e *stockConflictError) Error() string {
 const stockConflictMessage = "Остаток изменился, пока вы редактировали форму (продажа или другой сотрудник). " +
 	"Подсвеченные ячейки обновлены до текущих значений — проверьте их и сохраните ещё раз. Ничего не сохранено."
 
-// productStore runs the transactional product-form save.
+// productStore runs the transactional product-form save. audit (nil =
+// no journal) records the product/variant/stock changes in the same
+// transaction — see audit_hooks.go.
 type productStore struct {
-	db *sql.DB
+	db    *sql.DB
+	audit *audit.Log
 }
 
 func newProductStore(db *sql.DB) *productStore { return &productStore{db: db} }
@@ -146,6 +150,18 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 
 	var productID string
 	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		var oldProduct *productSnapshot
+		var oldVariants map[string]variantSnapshot
+		if in.ProductID != "" && s.audit.Enabled() {
+			s.audit.SnapshotTx(ctx, tx, func() (err error) {
+				if oldProduct, err = loadProductSnapshotTx(ctx, tx, in.ProductID); err != nil {
+					return err
+				}
+				oldVariants, err = loadVariantSnapshotsTx(ctx, tx, in.ProductID)
+				return err
+			})
+		}
+
 		id, err := upsertProductTx(ctx, tx, in.ProductID, in.Product)
 		if err != nil {
 			return err
@@ -161,7 +177,18 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 			return err
 		}
 
-		return replaceImagesTx(ctx, tx, productID, in.Images)
+		if err := replaceImagesTx(ctx, tx, productID, in.Images); err != nil {
+			return err
+		}
+
+		if s.audit.Enabled() {
+			s.audit.RecordTxFunc(ctx, tx, func() ([]audit.Entry, error) {
+				entries := productSaveEntries(productID, in, oldProduct, oldVariants, idByKey)
+				stockEntries, err := stockEntriesTx(ctx, tx, idByKey, in.Stock)
+				return append(entries, stockEntries...), err
+			})
+		}
+		return nil
 	})
 	if err != nil {
 		return "", err

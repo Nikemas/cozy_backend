@@ -1067,6 +1067,15 @@ paths:
         set stock at their own point (`staff.point_id`) — a `point_staff`
         member targeting a different point gets `403 forbidden` even though
         `RequireRole` itself let the role through.
+
+        **Optimistic concurrency.** Send `expected_quantity` — the quantity
+        the client last saw (a missing stock row counts as 0) — and the
+        write only happens if the stored value still equals it; otherwise
+        `409 stock_conflict` with `current_quantity`, nothing written.
+        Without `expected_quantity` the value is written as is (legacy
+        behaviour; clients editing stock interactively should always send
+        it). Every change is recorded in the admin audit journal
+        (old → new).
       security: [{ staffSessionCookie: [] }]
       parameters:
         - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1078,13 +1087,33 @@ paths:
             schema:
               type: object
               required: [quantity]
-              properties: { quantity: { type: integer, minimum: 0 } }
+              properties:
+                quantity: { type: integer, minimum: 0 }
+                expected_quantity:
+                  type: integer
+                  minimum: 0
+                  description: Optional. The quantity the client last saw; mismatch → 409.
+            example: { quantity: 7, expected_quantity: 5 }
       responses:
         "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/StockEntry" } } } }
+        "400":
+          description: Negative quantity/expected_quantity, or unknown variant/point (`invalid_variant_or_point`).
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
           description: Insufficient role, or `point_staff` targeting a point other than their own.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: The stored quantity no longer equals `expected_quantity`; nothing was written.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, current_quantity]
+                properties:
+                  code: { type: string, enum: [stock_conflict] }
+                  message: { type: string }
+                  current_quantity: { type: integer, description: Quantity stored now (0 if no stock row). }
 
   # --------------------------------------------------------- Admin/Media ---
   /admin/api/media/upload:
@@ -1323,11 +1352,17 @@ paths:
         product, but its `order_count` still dedupes by order id). An empty
         range or no matching orders returns a valid report with zero rows,
         not an error.
+
+        `category` groups sold line items by top-level catalog category (a
+        product in a subcategory counts toward its parent), with the same
+        sale rules as the admin HTML report's "По категориям" block
+        (cancelled orders and unpaid online orders excluded); rows are
+        sorted by revenue, highest first.
       security: [{ staffSessionCookie: [] }]
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-01" }
         - { name: to, in: query, required: true, schema: { type: string, format: date }, example: "2026-09-15" }
-        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point, category] } }
       responses:
         "200": { description: Aggregated report., content: { application/json: { schema: { $ref: "#/components/schemas/SalesReportResponse" } } } }
         "400": { description: "`from`/`to` malformed, `from > to`, or invalid `group_by`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
@@ -1343,10 +1378,10 @@ paths:
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date } }
-        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point] } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [day, product, point, category] } }
       responses:
         "200":
-          description: "`.xlsx` workbook, `Content-Disposition: attachment; filename=\"sales_report.xlsx\"`."
+          description: "`.xlsx` workbook, `Content-Disposition: attachment; filename=\"sales_report.xlsx\"` (`sales_by_category.xlsx` for `group_by=category`)."
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
@@ -2009,13 +2044,13 @@ components:
       properties:
         from: { type: string, format: date }
         to: { type: string, format: date }
-        group_by: { type: string, enum: [day, product, point] }
+        group_by: { type: string, enum: [day, product, point, category] }
         rows: { type: array, items: { $ref: "#/components/schemas/SalesRow" } }
 
     SalesRow:
       type: object
       properties:
-        key: { type: string, description: "Date, product name, or point name, depending on group_by." }
+        key: { type: string, description: "Date, product name, point name, or category name, depending on group_by." }
         order_count: { type: integer }
         item_count: { type: integer }
         revenue: { type: number, format: double }
