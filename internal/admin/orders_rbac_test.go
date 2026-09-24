@@ -56,8 +56,8 @@ func requestAs(method, target string, st *staff.Staff, body url.Values) *http.Re
 }
 
 func TestOrdersListPointStaffIsScopedToOwnPoint(t *testing.T) {
-	svc := &fakeOrdersSvc{}
-	h := &handlers{render: newTestRenderer(t), ordersSvc: svc}
+	meta := &fakeOrderListMeta{}
+	h := &handlers{render: newTestRenderer(t), orderMeta: meta}
 
 	// Even an explicit ?point= for another point is overridden.
 	w := httptest.NewRecorder()
@@ -66,19 +66,22 @@ func TestOrdersListPointStaffIsScopedToOwnPoint(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	if svc.listFilter == nil || svc.listFilter.PointID == nil || *svc.listFilter.PointID != "mine" {
-		t.Fatalf("filter = %+v, want PointID forced to the staff member's point", svc.listFilter)
+	if meta.searchFilter == nil || meta.searchFilter.PointID == nil || *meta.searchFilter.PointID != "mine" {
+		t.Fatalf("filter = %+v, want PointID forced to the staff member's point", meta.searchFilter)
+	}
+	if strings.Contains(w.Body.String(), `id="orders-point"`) {
+		t.Error("point_staff must not get the point selector")
 	}
 }
 
 func TestOrdersListPointStaffWithoutPointFailsClosed(t *testing.T) {
-	svc := &fakeOrdersSvc{}
-	h := &handlers{render: newTestRenderer(t), ordersSvc: svc}
+	meta := &fakeOrderListMeta{}
+	h := &handlers{render: newTestRenderer(t), orderMeta: meta}
 
 	w := httptest.NewRecorder()
 	h.ordersListPage(w, requestAs(http.MethodGet, "/admin/orders", pointStaff(nil), nil))
 
-	if svc.listFilter != nil {
+	if meta.searchFilter != nil {
 		t.Fatal("orders were queried for a point_staff with no point")
 	}
 	if w.Code != http.StatusOK {

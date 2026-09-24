@@ -888,3 +888,6 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-reports__note { font-size: 12px; color: var(--admin-muted); margin: -6px 0 14px; }
 .admin-category-report { width: 100%; }
 .admin-category-report .admin-brand-bar { min-width: 80px; }
+.admin-filterbar__dates { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-filterbar__dates[hidden] { display: none; }
+.admin-orders-table__num a, a.admin-order-card__num { color: inherit; }

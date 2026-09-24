@@ -56,6 +56,14 @@ type fakeOrderListMeta struct {
 	countCalls, phoneCalls int
 	phoneIDs               []string
 	err                    error
+
+	searchFilter *orderSearchFilter
+	searchResult []orders.Order
+}
+
+func (f *fakeOrderListMeta) Search(_ context.Context, filter orderSearchFilter) ([]orders.Order, int, error) {
+	f.searchFilter = &filter
+	return f.searchResult, len(f.searchResult), nil
 }
 
 func (f *fakeOrderListMeta) ItemCounts(_ context.Context, ids []string) (map[string]int, error) {

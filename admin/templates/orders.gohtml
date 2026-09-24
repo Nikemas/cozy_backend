@@ -1,5 +1,6 @@
 {{/* orders.gohtml — Заказы list (Cozy Admin.dc.html lines 405-497): status
-     chips + date-range filter, desktop table / mobile cards (same .Rows,
+     chips + date-range filter (fix/admin: + search by number/phone, point
+     select, custom range), desktop table / mobile cards (same .Rows,
      switched by the @media rule on .admin-orders-table/.admin-orders-cards
      in admin.css), empty state. Data is internal/admin/orders.go's
      OrdersListData. No client-side skeleton loading — the page only
@@ -8,17 +9,59 @@
 {{define "content"}}
 <h1>Заказы</h1>
 
+<form method="get" action="/admin/orders" class="admin-filterbar" role="search" id="orders-filter">
+  {{if .Data.Status}}<input type="hidden" name="status" value="{{.Data.Status}}">{{end}}
+  <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
+    <label for="orders-q">Поиск</label>
+    <input type="search" id="orders-q" name="q" value="{{.Data.Query}}" placeholder="№ заказа или телефон" maxlength="100">
+  </div>
+  {{if .Data.CanChoosePoint}}
+  <div class="admin-field admin-filterbar__field">
+    <label for="orders-point">Точка продаж</label>
+    <select id="orders-point" name="point" onchange="this.form.submit()">
+      {{range .Data.Points}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  {{end}}
+  <div class="admin-field admin-filterbar__field">
+    <label for="orders-range">Период</label>
+    <select id="orders-range" name="range" onchange="ordersRangeChanged(this)">
+      {{range .Data.RangeOptions}}
+      <option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div class="admin-filterbar__dates" id="orders-dates"{{if ne .Data.Range "custom"}} hidden{{end}}>
+    <div class="admin-field admin-filterbar__field">
+      <label for="orders-from">С</label>
+      <input type="date" id="orders-from" name="from" value="{{.Data.From}}">
+    </div>
+    <div class="admin-field admin-filterbar__field">
+      <label for="orders-to">По</label>
+      <input type="date" id="orders-to" name="to" value="{{.Data.To}}">
+    </div>
+  </div>
+  <button type="submit" class="admin-btn admin-btn--secondary">Найти</button>
+  {{if .Data.Filtered}}<a href="{{.Data.ResetURL}}" class="admin-btn admin-btn--secondary">Сбросить</a>{{end}}
+</form>
+<script>
+function ordersRangeChanged(sel) {
+  var dates = document.getElementById('orders-dates');
+  if (sel.value === 'custom') { dates.hidden = false; document.getElementById('orders-from').focus(); return; }
+  dates.hidden = true;
+  dates.querySelectorAll('input').forEach(function (i) { i.disabled = true; });
+  sel.form.submit();
+}
+</script>
+
+{{range .Data.Notes}}<div class="admin-form-error" role="status">{{.}}</div>{{end}}
+
 <div class="admin-orders-filters">
-  <div class="admin-orders-chips">
+  <div class="admin-orders-chips" role="group" aria-label="Статус заказа">
     {{range .Data.StatusChips}}
-    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}">{{.Label}}</a>
+    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
     {{end}}
   </div>
-  <select class="admin-orders-range" onchange="if(this.value) location.href=this.value">
-    {{range .Data.RangeOptions}}
-    <option value="{{.URL}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>
-    {{end}}
-  </select>
 </div>
 
 <div class="admin-card">
@@ -27,8 +70,8 @@
     <div class="admin-empty__icon">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12"></path></svg>
     </div>
-    <div class="admin-empty__title">Пока нет заказов</div>
-    <div class="admin-empty__text">По выбранным фильтрам ничего не найдено</div>
+    <div class="admin-empty__title">{{if .Data.Filtered}}Ничего не найдено{{else}}Пока нет заказов{{end}}</div>
+    <div class="admin-empty__text">{{if .Data.Filtered}}Попробуйте изменить поиск или фильтры{{else}}Новые заказы появятся здесь{{end}}</div>
   </div>
   {{else}}
   <div class="admin-orders-table">
@@ -47,7 +90,7 @@
       <tbody>
         {{range .Data.Rows}}
         <tr onclick="location.href='{{.URL}}'">
-          <td class="admin-orders-table__num">{{.Number}}</td>
+          <td class="admin-orders-table__num"><a href="{{.URL}}">{{.Number}}</a></td>
           <td class="admin-orders-table__muted">{{.DateLabel}}</td>
           <td class="admin-orders-table__phone">{{.Phone}}</td>
           <td>{{.ItemsCount}}</td>
@@ -64,7 +107,7 @@
     {{range .Data.Rows}}
     <div class="admin-order-card" onclick="location.href='{{.URL}}'">
       <div class="admin-order-card__top">
-        <div class="admin-order-card__num">{{.Number}}</div>
+        <a href="{{.URL}}" class="admin-order-card__num">{{.Number}}</a>
         <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>
       </div>
       <div class="admin-order-card__phone">{{.Phone}}</div>

@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"database/sql"
+
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 // orderListMeta batch-loads the per-row extras the order list shows
@@ -17,6 +19,8 @@ type orderListMeta interface {
 	ItemCounts(ctx context.Context, orderIDs []string) (map[string]int, error)
 	// CustomerPhones returns customer_id -> phone.
 	CustomerPhones(ctx context.Context, customerIDs []string) (map[string]string, error)
+	// Search is the list page's filtered query (orders_search.go).
+	Search(ctx context.Context, f orderSearchFilter) ([]orders.Order, int, error)
 }
 
 type orderListMetaRepo struct {

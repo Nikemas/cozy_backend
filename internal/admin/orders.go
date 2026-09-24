@@ -21,6 +21,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -76,6 +77,20 @@ type OrdersListData struct {
 	StatusChips  []StatusChipLink
 	RangeOptions []RangeOptionLink
 	Rows         []OrderRowView
+
+	// Filter form state (fix/admin): search box, point select (owner/
+	// manager only), custom date range, and notes about ignored filters.
+	Query          string
+	Status         string
+	Range          string
+	From           string
+	To             string
+	CanChoosePoint bool
+	Points         []PointOptionVM
+	Notes          []string
+	Filtered       bool // any filter besides the defaults is active
+	ResetURL       string
+
 	Empty        bool
 	CountLabel   string
 	HasPrev      bool
@@ -293,79 +308,75 @@ var orderRangeOptions = []struct {
 	{"7", "Последние 7 дней"},
 	{"30", "Последние 30 дней"},
 	{"all", "Весь период"},
+	{"custom", "Произвольный период"},
 }
 
-// ordersListURL builds /admin/orders?status=...&range=...&page=... for the
-// given filter combination, omitting params at their default value so the
-// common case ("Все"/"Весь период"/page 1) stays a clean /admin/orders.
+// ordersListURL builds /admin/orders?status=...&range=...&page=... —
+// kept for callers that only vary those three; see ordersListParams.URL
+// for the full filter set.
 func ordersListURL(status, rng string, page int) string {
-	q := url.Values{}
-	if status != "" {
-		q.Set("status", status)
-	}
-	if rng != "" && rng != "all" {
-		q.Set("range", rng)
-	}
-	if page > 1 {
-		q.Set("page", strconv.Itoa(page))
-	}
-	if len(q) == 0 {
-		return "/admin/orders"
-	}
-	return "/admin/orders?" + q.Encode()
+	return ordersListParams{Status: status, Range: rng, Page: page}.URL()
 }
 
 // ---------- handlers ----------
 
-// ordersListPage handles GET /admin/orders: status chips + date-range
-// filter (query params), table (desktop, styled by CSS) / cards (mobile,
-// same rows via a @media rule in admin.css), empty state.
+// ordersListPage handles GET /admin/orders: search (order number or
+// customer phone), status chips, point select (owner/manager), preset or
+// custom date range, table (desktop) / cards (mobile), empty state.
+// Invalid filter values are dropped with a note instead of reaching SQL.
 func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
-	st, _ := staff.FromContext(r.Context())
+	ctx := r.Context()
+	st, _ := staff.FromContext(ctx)
 
-	statusParam := r.URL.Query().Get("status")
-	rangeParam := r.URL.Query().Get("range")
-	if rangeParam == "" {
-		rangeParam = "all"
-	}
-	page := 1
-	if v := r.URL.Query().Get("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			page = p
+	params := parseOrdersListParams(r.URL.Query())
+
+	canChoosePoint := st.Role != staff.RolePointStaff
+	var pointOpts []PointOptionVM
+	if canChoosePoint {
+		pts, err := h.pointsRepo.List(ctx)
+		if err != nil {
+			h.renderInternalErr(w, err)
+			return
 		}
+		known := false
+		for _, p := range pts {
+			if p.ID == params.Point {
+				known = true
+			}
+		}
+		if !known {
+			params.Point = ""
+		}
+		pointOpts = append(pointOpts, PointOptionVM{ID: "", Name: "Все точки", Selected: params.Point == ""})
+		for _, p := range pts {
+			pointOpts = append(pointOpts, PointOptionVM{ID: p.ID, Name: p.Name, Selected: p.ID == params.Point})
+		}
+	} else {
+		params.Point = "" // point_staff: forced below, never from the URL
 	}
 
-	filter := orders.AdminListFilter{Page: page}
-	if statusParam != "" {
-		status := orders.OrderStatus(statusParam)
-		filter.Status = &status
-	}
-	if rangeParam != "all" {
-		if days, err := strconv.Atoi(rangeParam); err == nil && days > 0 {
-			from := time.Now().AddDate(0, 0, -days)
-			filter.From = &from
-		}
-	}
+	filter, notes := resolveOrderFilter(&params, time.Now())
 
 	// point_staff only ever sees its own point's orders (the JSON API's
 	// rule, httpapi/admin_orders.go); no point at all fails closed.
-	var list []orders.Order
-	var total int
-	if st.Role == staff.RolePointStaff && st.PointID == nil {
-		list = []orders.Order{}
-	} else {
+	list := []orders.Order{}
+	total := 0
+	if st.Role != staff.RolePointStaff || st.PointID != nil {
 		if st.Role == staff.RolePointStaff {
 			filter.PointID = st.PointID
 		}
 		var err error
-		list, total, err = h.ordersSvc.AdminListOrders(r.Context(), filter)
+		list, total, err = h.orderMeta.Search(ctx, filter)
 		if err != nil {
 			h.handleOrdersServiceError(w, err)
 			return
 		}
 	}
 
-	data := h.buildOrdersListView(r.Context(), list, total, statusParam, rangeParam, page)
+	data := h.buildOrdersListViewFor(ctx, list, total, params)
+	data.CanChoosePoint = canChoosePoint
+	data.Points = pointOpts
+	data.Notes = notes
 
 	pageData := h.shellPageData("orders", "Заказы", st)
 	pageData.Data = data
@@ -374,31 +385,37 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// buildOrdersListView turns AdminListOrders' result into OrdersListData.
-// AdminListOrders deliberately returns parent rows only (see its doc
-// comment), so each row's customer phone and item count come from
-// loadOrderListMeta — two batch queries for the whole page. (This used to
-// be a per-row AdminGetOrder + CustomerRepo.GetByID loop; AdminGetOrder's
-// lookup was then an `id::text = $1` scan, so at 50 rows/page
-// that was ~50 sequential scans of orders per page view.)
+// buildOrdersListView is buildOrdersListViewFor with only status/range/
+// page set (kept for existing callers/tests).
 func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order, total int, statusParam, rangeParam string, page int) OrdersListData {
+	return h.buildOrdersListViewFor(ctx, list, total, ordersListParams{Status: statusParam, Range: rangeParam, Page: page})
+}
+
+// buildOrdersListViewFor turns a page of orders into OrdersListData. Each
+// row's customer phone and item count come from loadOrderListMeta — two
+// batch queries for the whole page, not one lookup per row.
+func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Order, total int, p ordersListParams) OrdersListData {
 	chips := make([]StatusChipLink, 0, len(orderStatusFilters))
 	for _, f := range orderStatusFilters {
+		cp := p
+		cp.Status, cp.Page = f.Value, 1
 		chips = append(chips, StatusChipLink{
 			Label:  f.Label,
-			URL:    ordersListURL(f.Value, rangeParam, 1),
+			URL:    cp.URL(),
 			Class:  f.Class,
-			Active: f.Value == statusParam,
+			Active: f.Value == p.Status,
 		})
 	}
 
 	ranges := make([]RangeOptionLink, 0, len(orderRangeOptions))
 	for _, ro := range orderRangeOptions {
+		cp := p
+		cp.Range, cp.Page = ro.Value, 1
 		ranges = append(ranges, RangeOptionLink{
 			Value:    ro.Value,
 			Label:    ro.Label,
-			URL:      ordersListURL(statusParam, ro.Value, 1),
-			Selected: ro.Value == rangeParam,
+			URL:      cp.URL(),
+			Selected: ro.Value == p.Range,
 		})
 	}
 
@@ -410,7 +427,7 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 		rows = append(rows, OrderRowView{
 			URL:          "/admin/orders/" + o.ID,
 			Number:       o.OrderNumber,
-			DateLabel:    o.CreatedAt.Format("02.01.2006"),
+			DateLabel:    o.CreatedAt.In(reports.Location).Format("02.01.2006"),
 			Phone:        phones[o.CustomerID],
 			ItemsCount:   itemsCount,
 			ItemsLabel:   fmt.Sprintf("%d %s", itemsCount, pluralRu(itemsCount, "товар", "товара", "товаров")),
@@ -421,16 +438,26 @@ func (h *handlers) buildOrdersListView(ctx context.Context, list []orders.Order,
 		})
 	}
 
+	prev, next := p, p
+	prev.Page, next.Page = p.Page-1, p.Page+1
 	return OrdersListData{
 		StatusChips:  chips,
 		RangeOptions: ranges,
 		Rows:         rows,
 		Empty:        len(rows) == 0,
 		CountLabel:   fmt.Sprintf("%d %s", total, pluralRu(total, "заказ", "заказа", "заказов")),
-		HasPrev:      page > 1,
-		HasNext:      total > page*orders.AdminPageSize,
-		PrevURL:      ordersListURL(statusParam, rangeParam, page-1),
-		NextURL:      ordersListURL(statusParam, rangeParam, page+1),
+		HasPrev:      p.Page > 1,
+		HasNext:      total > p.Page*orders.AdminPageSize,
+		PrevURL:      prev.URL(),
+		NextURL:      next.URL(),
+
+		Query:    p.Q,
+		Status:   p.Status,
+		Range:    p.Range,
+		From:     p.From,
+		To:       p.To,
+		Filtered: p.Q != "" || p.Status != "" || p.Point != "" || (p.Range != "" && p.Range != "all"),
+		ResetURL: "/admin/orders",
 	}
 }
 
@@ -533,7 +560,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	return OrderDetailData{
 		ID:            o.ID,
 		Number:        o.OrderNumber,
-		DateLabel:     o.CreatedAt.Format("02.01.2006 15:04"),
+		DateLabel:     o.CreatedAt.In(reports.Location).Format("02.01.2006 15:04"),
 		StatusLabel:   meta.Label,
 		StatusClass:   meta.Class,
 		Phone:         phone,
