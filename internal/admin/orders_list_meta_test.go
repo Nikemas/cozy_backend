@@ -61,6 +61,25 @@ type fakeOrderListMeta struct {
 	searchResult []orders.Order
 }
 
+func (f *fakeOrderListMeta) VariantThumbs(_ context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, id := range ids {
+		out[id] = "products/" + id + ".jpg"
+	}
+	return out, f.err
+}
+
+func (f *fakeOrderListMeta) OrderThumbs(_ context.Context, ids []string) (map[string]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := map[string]string{}
+	for _, id := range ids {
+		out[id] = "products/order-" + id + ".jpg"
+	}
+	return out, nil
+}
+
 func (f *fakeOrderListMeta) Search(_ context.Context, filter orderSearchFilter) ([]orders.Order, int, error) {
 	f.searchFilter = &filter
 	return f.searchResult, len(f.searchResult), nil

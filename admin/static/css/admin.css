@@ -910,3 +910,9 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
   box-shadow: 0 0 0 3px rgba(229, 98, 0, 0.35);
 }
 .admin-orders-table tbody tr:focus-within { background: var(--admin-primary-tint); }
+
+/* fix/admin: product thumbnails in orders. */
+img.admin-order-detail__thumb-box { display: block; object-fit: cover; background: var(--admin-bg); }
+.admin-orders-table__items { display: inline-flex; align-items: center; gap: 10px; }
+.admin-orders-thumb { display: inline-block; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--admin-bg); flex: none; vertical-align: middle; }
+.admin-order-card__phone .admin-orders-thumb { margin-right: 10px; }

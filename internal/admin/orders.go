@@ -61,6 +61,7 @@ type RangeOptionLink struct {
 // card alike (orders.gohtml ranges over the same slice for both).
 type OrderRowView struct {
 	URL          string
+	ThumbURL     string // first item's photo, "" when it has none
 	Number       string
 	DateLabel    string
 	Phone        string
@@ -101,6 +102,7 @@ type OrdersListData struct {
 
 // OrderDetailItemView backs one row of the "Состав заказа" table.
 type OrderDetailItemView struct {
+	ThumbURL   string // product photo (the variant's color if tagged), "" when none
 	Name       string
 	Variant    string
 	Qty        int
@@ -420,12 +422,14 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 	}
 
 	itemCounts, phones := h.loadOrderListMeta(ctx, list)
+	thumbs := h.loadOrderThumbs(ctx, list)
 	rows := make([]OrderRowView, 0, len(list))
 	for _, o := range list {
 		meta := orderStatusMetaFor(o.Status)
 		itemsCount := itemCounts[o.ID]
 		rows = append(rows, OrderRowView{
 			URL:          "/admin/orders/" + o.ID,
+			ThumbURL:     h.photoURL(thumbs[o.ID]),
 			Number:       o.OrderNumber,
 			DateLabel:    o.CreatedAt.In(reports.Location).Format("02.01.2006"),
 			Phone:        phones[o.CustomerID],
@@ -493,6 +497,32 @@ func (h *handlers) loadOrderListMeta(ctx context.Context, list []orders.Order) (
 	return counts, phones
 }
 
+// loadOrderThumbs batch-loads each listed order's first-item photo (one
+// query per page); a failure only drops the thumbnails.
+func (h *handlers) loadOrderThumbs(ctx context.Context, list []orders.Order) map[string]string {
+	if h.orderMeta == nil || len(list) == 0 {
+		return map[string]string{}
+	}
+	ids := make([]string, len(list))
+	for i, o := range list {
+		ids[i] = o.ID
+	}
+	thumbs, err := h.orderMeta.OrderThumbs(ctx, ids)
+	if err != nil {
+		slog.WarnContext(ctx, "admin orders list: thumbnails lookup failed", "err", err)
+		return map[string]string{}
+	}
+	return thumbs
+}
+
+// photoURL is thumbURL tolerant of an empty key or a nil config (tests).
+func (h *handlers) photoURL(objectKey string) string {
+	if objectKey == "" || h.cfg == nil {
+		return ""
+	}
+	return h.thumbURL(objectKey)
+}
+
 // orderDetailPage handles GET /admin/orders/{id}: full order info, items +
 // total, and the status-change buttons for the order's current status.
 // {id} may be either the order's UUID or its order_number, same dual
@@ -543,6 +573,19 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 
 	addressText, comment := h.orderDeliveryInfo(ctx, o)
 
+	variantIDs := make([]string, 0, len(o.Items))
+	for _, it := range o.Items {
+		variantIDs = append(variantIDs, it.VariantID)
+	}
+	thumbs := map[string]string{}
+	if h.orderMeta != nil && len(variantIDs) > 0 {
+		if m, err := h.orderMeta.VariantThumbs(ctx, variantIDs); err == nil {
+			thumbs = m
+		} else {
+			slog.WarnContext(ctx, "admin order detail: thumbnails lookup failed", "err", err)
+		}
+	}
+
 	items := make([]OrderDetailItemView, 0, len(o.Items))
 	for _, it := range o.Items {
 		variant := ""
@@ -550,6 +593,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 			variant = fmt.Sprintf("Размер %s, %s", it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
 		}
 		items = append(items, OrderDetailItemView{
+			ThumbURL:   h.photoURL(thumbs[it.VariantID]),
 			Name:       it.ProductNameSnapshot,
 			Variant:    variant,
 			Qty:        it.Quantity,

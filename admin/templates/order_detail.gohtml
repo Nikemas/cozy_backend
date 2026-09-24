@@ -33,7 +33,7 @@
       <tbody>
         {{range .Data.Items}}
         <tr>
-          <td class="admin-order-detail__thumb"><div class="admin-order-detail__thumb-box"></div></td>
+          <td class="admin-order-detail__thumb">{{if .ThumbURL}}<img class="admin-order-detail__thumb-box" src="{{.ThumbURL}}" alt="" width="52" height="52" loading="lazy">{{else}}<div class="admin-order-detail__thumb-box"></div>{{end}}</td>
           <td>
             <div class="admin-order-detail__item-name">{{.Name}}</div>
             <div class="admin-order-detail__item-variant">{{.Variant}}</div>

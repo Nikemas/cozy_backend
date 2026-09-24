@@ -93,7 +93,7 @@ function ordersRangeChanged(sel) {
           <td class="admin-orders-table__num"><a href="{{.URL}}">{{.Number}}</a></td>
           <td class="admin-orders-table__muted">{{.DateLabel}}</td>
           <td class="admin-orders-table__phone">{{.Phone}}</td>
-          <td>{{.ItemsCount}}</td>
+          <td><span class="admin-orders-table__items">{{if .ThumbURL}}<img class="admin-orders-thumb" src="{{.ThumbURL}}" alt="" width="36" height="36" loading="lazy">{{else}}<span class="admin-orders-thumb"></span>{{end}}{{.ItemsCount}}</span></td>
           <td class="admin-orders-table__sum">{{.TotalLabel}}</td>
           <td class="admin-orders-table__muted">{{.PaymentLabel}}</td>
           <td><span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span></td>
@@ -110,7 +110,7 @@ function ordersRangeChanged(sel) {
         <a href="{{.URL}}" class="admin-order-card__num">{{.Number}}</a>
         <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>
       </div>
-      <div class="admin-order-card__phone">{{.Phone}}</div>
+      <div class="admin-order-card__phone">{{if .ThumbURL}}<img class="admin-orders-thumb" src="{{.ThumbURL}}" alt="" width="36" height="36" loading="lazy">{{end}}{{.Phone}}</div>
       <div class="admin-order-card__meta">
         <span>{{.DateLabel}}</span>
         <span>{{.ItemsLabel}}</span>
