@@ -27,6 +27,30 @@ func registerCustomerProfileRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth
 
 	mux.Handle("GET /api/v1/customer", authSvc.RequireCustomer(apperr.Wrap(getCustomerProfileHandler(customers))))
 	mux.Handle("PUT /api/v1/customer", authSvc.RequireCustomer(apperr.Wrap(updateCustomerProfileHandler(customers))))
+	mux.Handle("DELETE /api/v1/customer", authSvc.RequireCustomer(apperr.Wrap(deleteCustomerHandler(authSvc))))
+}
+
+// customerDeleter is the subset of *auth.Service DELETE /api/v1/customer
+// needs.
+type customerDeleter interface {
+	DeleteCustomer(ctx context.Context, customerID string) error
+}
+
+// deleteCustomerHandler deletes the authenticated customer's account:
+// 204 on success, 409 has_active_orders while an order is in progress —
+// see auth.Service.DeleteCustomer for what is removed vs anonymized.
+func deleteCustomerHandler(svc customerDeleter) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		customerID, ok := auth.CustomerIDFromContext(r.Context())
+		if !ok {
+			return apperr.Unauthorized("unauthenticated", "требуется вход в систему")
+		}
+		if err := svc.DeleteCustomer(r.Context(), customerID); err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return nil
+	}
 }
 
 // customerProfileResponse is the JSON shape of the authenticated customer's

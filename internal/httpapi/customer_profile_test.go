@@ -135,3 +135,31 @@ func TestUpdateCustomerProfileHandlerPropagatesBlankNameError(t *testing.T) {
 		t.Errorf("body = %s, want invalid_name error code", rec.Body.String())
 	}
 }
+
+type fakeCustomerDeleter struct {
+	got string
+	err error
+}
+
+func (f *fakeCustomerDeleter) DeleteCustomer(_ context.Context, id string) error {
+	f.got = id
+	return f.err
+}
+
+func TestDeleteCustomerHandler(t *testing.T) {
+	fake := &fakeCustomerDeleter{}
+	h := apperr.Wrap(deleteCustomerHandler(fake))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, withCustomer(httptest.NewRequest(http.MethodDelete, "/api/v1/customer", nil), "customer-1"))
+	if rec.Code != http.StatusNoContent || fake.got != "customer-1" {
+		t.Fatalf("status %d, deleted %q", rec.Code, fake.got)
+	}
+
+	fake.err = apperr.Conflict("has_active_orders", "x")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, withCustomer(httptest.NewRequest(http.MethodDelete, "/api/v1/customer", nil), "customer-1"))
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "has_active_orders") {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+}

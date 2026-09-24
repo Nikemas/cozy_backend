@@ -35,6 +35,7 @@ type Service struct {
 	otp       otpStore
 	refresh   refreshStore
 	customers customerStore
+	accounts  accountStore
 	sms       notify.OTPSender
 	jwtSecret []byte
 
@@ -50,6 +51,7 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		otp:         newOTPRepo(db),
 		refresh:     newRefreshRepo(db),
 		customers:   storefront.NewCustomerRepo(db),
+		accounts:    &accountRepo{db: db},
 		sms:         sms,
 		jwtSecret:   jwtSecret,
 		limits:      limits,
@@ -249,6 +251,18 @@ func (s *Service) Logout(ctx context.Context, refreshTokenStr string) error {
 		return err
 	}
 	return s.refresh.revokeFamily(ctx, t.FamilyID)
+}
+
+// DeleteCustomer deletes the customer's account (App Store / Google Play
+// account-deletion requirement): see accountRepo.deleteCustomer for what is
+// removed, what is anonymized and why orders stay. Returns 409
+// has_active_orders while an order is still in progress.
+func (s *Service) DeleteCustomer(ctx context.Context, customerID string) error {
+	if err := s.accounts.deleteCustomer(ctx, customerID); err != nil {
+		return err
+	}
+	slog.InfoContext(ctx, "auth: customer account deleted", "customer_id", customerID)
+	return nil
 }
 
 func (s *Service) issueTokenPair(ctx context.Context, customerID string) (accessToken, refreshTokenStr string, err error) {

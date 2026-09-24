@@ -66,3 +66,33 @@ func TestRegisterDeviceHandlerPropagatesInvalidPlatform(t *testing.T) {
 		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
 	}
 }
+
+type fakeDeviceTokenDeleter struct{ calls [][2]string }
+
+func (f *fakeDeviceTokenDeleter) DeleteForCustomer(_ context.Context, customerID, token string) error {
+	f.calls = append(f.calls, [2]string{customerID, token})
+	return nil
+}
+
+func TestUnregisterDeviceHandler(t *testing.T) {
+	fake := &fakeDeviceTokenDeleter{}
+	handler := apperr.Wrap(unregisterDeviceHandler(fake))
+
+	for _, body := range []string{`{"token":"tok-1"}`, `{"fcm_token":"tok-2"}`, `{}`} {
+		req := withCustomer(httptest.NewRequest(http.MethodDelete, "/api/v1/devices", strings.NewReader(body)), "customer-1")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("body %s: status %d, want 204", body, rec.Code)
+		}
+	}
+	if len(fake.calls) != 2 || fake.calls[0] != [2]string{"customer-1", "tok-1"} || fake.calls[1] != [2]string{"customer-1", "tok-2"} {
+		t.Errorf("calls = %v", fake.calls)
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/v1/devices", strings.NewReader(`{"token":"t"}`)))
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated: status %d", rec.Code)
+	}
+}
