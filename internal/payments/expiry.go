@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/dbtx"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
@@ -17,18 +18,30 @@ const expiryBatch = 100
 // DefaultExpiryInterval is how often RunPendingExpiry scans.
 const DefaultExpiryInterval = time.Minute
 
-// ExpirePending cancels every online payment that has been pending for
-// longer than ttl — the customer abandoned the bank page and no callback
-// will come — together with its order, returning the reserved stock. Each
-// payment is handled in its own transaction under the same FOR UPDATE lock
-// the callback takes, so a callback racing the job is applied exactly once
-// either way; a "paid" arriving after expiry flags the order
-// refund_required (see HandleCallback). Returns how many were expired.
+// unpaidExpiredCond selects open online orders ($1 = TTL seconds) whose
+// latest payment attempt was abandoned: still pending TTL after it was
+// opened, or failed TTL ago and never retried. An order with no payments
+// row at all (can't normally happen) ages from its own created_at.
+const unpaidExpiredCond = `
+	o.status = 'placed' AND o.payment_method = 'online_card' AND o.payment_status IN ('pending', 'failed')
+	AND COALESCE(
+		(SELECT CASE WHEN p.status = 'pending' THEN p.created_at ELSE p.updated_at END
+		 FROM payments p WHERE p.order_id = o.id
+		 ORDER BY p.created_at DESC, p.id DESC LIMIT 1),
+		o.created_at) < now() - make_interval(secs => $1)`
+
+// ExpirePending cancels every online order whose latest payment attempt
+// was abandoned for longer than ttl — the customer left the bank page (no
+// callback will come) or a declined payment was never retried — returning
+// the reserved stock. Only the latest attempt counts, so a retry restarts
+// the clock. Each order is handled in its own transaction under the same
+// order-row lock callbacks and retries take, so a racing callback or retry
+// is applied exactly once either way; a "paid" arriving after expiry flags
+// the order refund_required (see HandleCallback). Returns how many orders
+// were expired.
 func (s *Service) ExpirePending(ctx context.Context, ttl time.Duration) (int, error) {
-	const q = `
-		SELECT id FROM payments
-		WHERE status = 'pending' AND created_at < now() - make_interval(secs => $1)
-		ORDER BY created_at
+	q := `SELECT o.id FROM orders o WHERE` + unpaidExpiredCond + `
+		ORDER BY o.created_at
 		LIMIT $2`
 	rows, err := s.db.QueryContext(ctx, q, ttl.Seconds(), expiryBatch)
 	if err != nil {
@@ -54,10 +67,10 @@ func (s *Service) ExpirePending(ctx context.Context, ttl time.Duration) (int, er
 		if ctx.Err() != nil {
 			return expired, ctx.Err()
 		}
-		ok, err := s.expireOne(ctx, id)
+		ok, err := s.expireOne(ctx, id, ttl)
 		if err != nil {
 			// One bad row must not stall the rest of the batch.
-			slog.Error("payments: expiring pending payment failed", "payment", id, "err", err)
+			slog.Error("payments: expiring unpaid order failed", "order", id, "err", err)
 			continue
 		}
 		if ok {
@@ -67,38 +80,37 @@ func (s *Service) ExpirePending(ctx context.Context, ttl time.Duration) (int, er
 	return expired, nil
 }
 
-func (s *Service) expireOne(ctx context.Context, paymentID string) (bool, error) {
+// expireOne re-checks orderID under its row lock (a callback or retry may
+// have got there first) and cancels it: a still-pending attempt is closed
+// and the stock returned (orders.CancelUnpaidOrderTx).
+func (s *Service) expireOne(ctx context.Context, orderID string, ttl time.Duration) (bool, error) {
 	var expired bool
-	var orderID string
 	err := dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		var status Status
-		err := tx.QueryRowContext(ctx,
-			`SELECT order_id, status FROM payments WHERE id = $1 FOR UPDATE`, paymentID).Scan(&orderID, &status)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
+		if _, err := orders.LockOrderTx(ctx, tx, orderID); err != nil {
+			var appErr *apperr.AppError
+			if errors.As(err, &appErr) && appErr.Code == "order_not_found" {
+				return nil
+			}
+			return err
 		}
+		var still bool
+		if err := tx.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM orders o WHERE`+unpaidExpiredCond+` AND o.id = $2)`,
+			ttl.Seconds(), orderID).Scan(&still); err != nil {
+			return err
+		}
+		if !still {
+			return nil // paid, retried or cancelled in the meantime
+		}
+		ok, err := orders.CancelUnpaidOrderTx(ctx, tx, orderID, "не оплачен вовремя")
 		if err != nil {
 			return err
 		}
-		if status != StatusPending {
-			return nil // settled by a callback in the meantime
-		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE payments SET status = 'cancelled', updated_at = now() WHERE id = $1`, paymentID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE orders SET payment_status = 'cancelled', updated_at = now() WHERE id = $1`, orderID); err != nil {
-			return err
-		}
-		if _, err := orders.CancelUnpaidOrderTx(ctx, tx, orderID, "не оплачен вовремя"); err != nil {
-			return err
-		}
-		expired = true
+		expired = ok
 		return nil
 	})
 	if err == nil && expired {
-		slog.Info("payments: pending payment expired, order cancelled and stock returned", "payment", paymentID, "order", orderID)
+		slog.Info("payments: unpaid online order expired, order cancelled and stock returned", "order", orderID)
 	}
 	return expired, err
 }
