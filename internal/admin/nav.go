@@ -19,6 +19,7 @@ const (
 	pointsIconPath     = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"
 	stockIconPath      = "M21 8l-9-5-9 5v8l9 5 9-5z M3 8l9 5 9-5 M12 13v8"
 	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
+	deliveryIconPath   = "M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
 )
 
 // noAccessPath is where a staff member whose role can see none of the
@@ -46,6 +47,7 @@ var navDefs = []navDef{
 	{"categories", "Категории", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"reports", "Отчёты", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"points", "Склад и точки", pointsIconPath, []staff.Role{staff.RoleOwner}},
+	{"delivery", "Доставка", deliveryIconPath, []staff.Role{staff.RoleOwner}},
 	{"staff", "Сотрудники", staffIconPath, []staff.Role{staff.RoleOwner}},
 }
 
