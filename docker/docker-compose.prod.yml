@@ -119,6 +119,11 @@ services:
     restart: unless-stopped
     logging: *default-logging
     stop_grace_period: 30s
+    # Only BAKAI_WEBHOOK_TOKEN is actually used (Caddyfile's {$BAKAI_WEBHOOK_TOKEN}
+    # placeholder, injected as X-Webhook-Token on the Bakai webhook route —
+    # see Caddyfile); the whole file is passed rather than picking one var
+    # out because compose has no per-service env filtering.
+    env_file: ../.env
     ports:
       - "80:80"
       - "443:443"

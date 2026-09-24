@@ -108,7 +108,28 @@ cozy.erpsystemsales.com {
 	import security_headers
 	import noindex
 	encode zstd gzip
-	import backend_proxy
+
+	# Bakai's payment webhook (see .env.example BAKAI_WEBHOOK_TOKEN):
+	# Bakai posts plain JSON with no auth header of its own and is known to
+	# strip any ?token= query string from the registered callback URL (hit
+	# this exact problem in the sibling Dordoi ERP project), so — same fix
+	# as there — this location-specific rule tags every request that
+	# reaches this exact, unpublished, never-linked path with the header
+	# BakaiProvider.ParseCallback checks; register only the bare URL with
+	# the bank, no query string. Requires the caddy container to see
+	# BAKAI_WEBHOOK_TOKEN too (docker-compose.prod.yml: caddy env_file).
+	@bakai_webhook path /api/v1/payments/bakai/webhook
+	handle @bakai_webhook {
+		reverse_proxy backend:8080 {
+			header_up X-Webhook-Token {$BAKAI_WEBHOOK_TOKEN}
+			lb_try_duration 15s
+			lb_try_interval 250ms
+		}
+	}
+
+	handle {
+		import backend_proxy
+	}
 }
 
 # --- staging: media (MinIO S3 API, public photo GETs from browser/app) -----
