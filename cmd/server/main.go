@@ -69,7 +69,7 @@ func run() error {
 	} else {
 		sms = notify.NewNikitaClient(cfg.NikitaAPIKey)
 	}
-	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret))
+	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth)
 
 	mediaClient, err := media.NewClient(cfg)
 	if err != nil {
