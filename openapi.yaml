@@ -1725,6 +1725,9 @@ components:
         color_snapshot: { type: string }
         quantity: { type: integer }
         price: { type: number, format: double }
+        product_id: { type: string, format: uuid, nullable: true, description: "Current product of the variant — for \"repeat order\" / opening the product." }
+        photo_url: { type: string, nullable: true, description: "Full-size photo of the product (the variant's color if tagged); null when none." }
+        thumb_url: { type: string, nullable: true, description: "400px thumbnail of the same photo; null when none." }
 
     OrderCreateRequest:
       type: object

@@ -101,6 +101,10 @@ func run() error {
 		return err
 	}
 	orders.SetDefaultSettings(orderSettings)
+	// Order items in API responses carry product_id + photo_url/thumb_url.
+	orders.SetItemPhotoURLs(func(key string) (string, string) {
+		return cfg.PublicObjectURL(key), cfg.PublicObjectURL(media.ThumbKey(key))
+	})
 
 	payProvider, err := payments.NewProvider(cfg)
 	if err != nil {
