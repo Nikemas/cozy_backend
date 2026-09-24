@@ -147,6 +147,10 @@ func (f *fakeOnlineCheckout) PlaceOnlineOrder(_ context.Context, in orders.Place
 	return f.order, f.url, f.created, nil
 }
 
+func (f *fakeOnlineCheckout) RetryPayment(context.Context, string, string) (string, error) {
+	return f.url, nil
+}
+
 // newCustomerRequest builds a request carrying an authenticated customer ID
 // in context the same way auth.Service.RequireCustomer would, via
 // auth.NewContextWithCustomerID — so handler tests can exercise a

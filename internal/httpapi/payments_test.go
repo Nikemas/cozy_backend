@@ -21,11 +21,19 @@ type fakeCheckout struct {
 	order  *orders.Order
 	url    string
 	err    error
+
+	retryCustomer, retryOrder string
 }
 
 func (f *fakeCheckout) PlaceOnlineOrder(_ context.Context, _ orders.PlaceOrderInput) (*orders.Order, string, bool, error) {
 	f.called = true
 	return f.order, f.url, true, f.err
+}
+
+func (f *fakeCheckout) RetryPayment(_ context.Context, customerID, orderID string) (string, error) {
+	f.called = true
+	f.retryCustomer, f.retryOrder = customerID, orderID
+	return f.url, f.err
 }
 
 func TestCreateOrderHandlerOnlineCardReturnsPaymentURL(t *testing.T) {
@@ -161,7 +169,7 @@ func TestPaymentCallbackHandlerFixedProviderAndError(t *testing.T) {
 func TestMockCheckoutConfirmSendsSignedCallback(t *testing.T) {
 	mock := payments.NewMockProvider("https://cozy.test", "tok")
 	fake := &fakePaymentBackend{
-		payment: &payments.Payment{OrderNumber: "COZY-1", Amount: 4990.5, Currency: "KGS", Status: payments.StatusPending},
+		payment: &payments.Payment{OrderID: "order-uuid-1", OrderNumber: "COZY-1", Amount: 4990.5, Currency: "KGS", Status: payments.StatusPending},
 		res:     &payments.CallbackResult{Status: payments.StatusPaid, Applied: true},
 	}
 	mux := http.NewServeMux()
@@ -187,8 +195,10 @@ func TestMockCheckoutConfirmSendsSignedCallback(t *testing.T) {
 	if ev.ExternalID != "mock_1" || ev.Status != payments.StatusPaid || ev.Amount != 4990.5 {
 		t.Errorf("event = %+v", ev)
 	}
-	if !strings.Contains(rec.Body.String(), "https://cozy.test/order/COZY-1/done") {
-		t.Errorf("result page lacks return link: %s", rec.Body.String())
+	// Back to the site's payment result page, like a real bank redirect.
+	if !strings.Contains(rec.Body.String(), `href="https://cozy.test/pay/return/order-uuid-1"`) ||
+		!strings.Contains(rec.Body.String(), `content="2;url=https://cozy.test/pay/return/order-uuid-1"`) {
+		t.Errorf("result page lacks the /pay/return link/redirect: %s", rec.Body.String())
 	}
 }
 
@@ -232,5 +242,51 @@ func TestRegisterPaymentRoutesMockPageOnlyForMock(t *testing.T) {
 		if (pattern != "") != isMock {
 			t.Errorf("provider %s: mock checkout route registered = %v, want %v", p.Name(), pattern != "", isMock)
 		}
+	}
+}
+
+// --- POST /api/v1/orders/{id}/pay ---
+
+func TestPayOrderHandlerReturnsPaymentURL(t *testing.T) {
+	co := &fakeCheckout{url: "https://cozy.test/pay/2"}
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay", apperr.Wrap(payOrderHandler(co)))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay", "cust-1", ""))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got["payment_url"] != "https://cozy.test/pay/2" {
+		t.Errorf("body = %v, want only payment_url", got)
+	}
+	if co.retryCustomer != "cust-1" || co.retryOrder != "order-1" {
+		t.Errorf("RetryPayment(%q, %q)", co.retryCustomer, co.retryOrder)
+	}
+}
+
+func TestPayOrderHandlerNotRetryableIs409(t *testing.T) {
+	co := &fakeCheckout{err: orders.ErrPaymentNotRetryable}
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay", apperr.Wrap(payOrderHandler(co)))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay", "cust-1", ""))
+
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "payment_not_retryable") {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPayOrderHandlerWithoutCheckoutIs503(t *testing.T) {
+	rec := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay", apperr.Wrap(payOrderHandler(nil)))
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay", "cust-1", ""))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d", rec.Code)
 	}
 }
