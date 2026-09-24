@@ -5,6 +5,8 @@
      the shared confirm dialog (form[data-confirm], layout.gohtml). */}}
 {{define "content"}}
 <style>
+  /* .admin-field is display:flex, which would beat the [hidden] UA rule. */
+  #bc-form [hidden] { display: none !important; }
   .bc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
   @media (max-width: 1023px) { .bc-grid { grid-template-columns: minmax(0, 1fr); } }
   .bc-textarea { min-height: 84px; resize: vertical; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field);
