@@ -23,9 +23,9 @@ type fakeCheckout struct {
 	err    error
 }
 
-func (f *fakeCheckout) PlaceOnlineOrder(_ context.Context, _ string, _ []orders.OrderItemInput, _, _ *string) (*orders.Order, string, error) {
+func (f *fakeCheckout) PlaceOnlineOrder(_ context.Context, _ orders.PlaceOrderInput) (*orders.Order, string, bool, error) {
 	f.called = true
-	return f.order, f.url, f.err
+	return f.order, f.url, true, f.err
 }
 
 func TestCreateOrderHandlerOnlineCardReturnsPaymentURL(t *testing.T) {

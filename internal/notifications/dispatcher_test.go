@@ -310,3 +310,36 @@ func TestSQLOrderInfoLookup(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestStaffMessageShowsDeliveryFeeAndPaidOnline(t *testing.T) {
+	staff := &fakeStaff{}
+	d := NewDispatcher(Config{Staff: staff})
+	o := deliveryOrder(orders.StatusPlaced)
+	o.DeliveryFee = 200
+	o.TotalAmount = 12700
+	paid := orders.PaymentPaid
+	o.PaymentMethod, o.PaymentStatus = orders.PaymentOnlineCard, &paid
+	d.OrderCreated(o)
+	shutdown(t, d)
+
+	if len(staff.msgs) != 1 {
+		t.Fatalf("got %d staff messages", len(staff.msgs))
+	}
+	for _, want := range []string{"Сумма: <b>12 700 сом</b> (в т.ч. доставка 200 сом)", "Оплата: онлайн картой — оплачено"} {
+		if !strings.Contains(staff.msgs[0], want) {
+			t.Errorf("staff message missing %q:\n%s", want, staff.msgs[0])
+		}
+	}
+}
+
+func TestOrderCancelledByCustomerNotifiesStaff(t *testing.T) {
+	staff := &fakeStaff{}
+	d := NewDispatcher(Config{Staff: staff, AdminBaseURL: "https://cozy.example.com"})
+	d.OrderCancelledByCustomer(deliveryOrder(orders.StatusCancelled))
+	shutdown(t, d)
+
+	if len(staff.msgs) != 1 || !strings.Contains(staff.msgs[0], "Покупатель отменил заказ COZY-20260923-007") ||
+		!strings.Contains(staff.msgs[0], "/admin/orders/11111111-2222-3333-4444-555555555555") {
+		t.Fatalf("staff messages = %q", staff.msgs)
+	}
+}

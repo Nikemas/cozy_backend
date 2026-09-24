@@ -8,6 +8,8 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
+	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
 type recordingNotifier struct {
@@ -33,22 +35,9 @@ func (r *recordingNotifier) OrderStatusChanged(o Order, from OrderStatus) {
 }
 
 func expectPickupOrderCreation(mock sqlmock.Sqlmock, commitErr error) {
-	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
-		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
-	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "size", "color", "price_override", "name_ru", "base_price"}).
-			AddRow("var-1", "42", "Черный", nil, "Air Max", 5000.0))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT quantity FROM stock")).
-		WillReturnRows(sqlmock.NewRows([]string{"quantity"}).AddRow(10))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE stock SET quantity")).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("pg_advisory_xact_lock")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM orders")).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO orders")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow("order-1", time.Now(), time.Now()))
-	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO order_items")).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("item-1"))
+	expectOrderPrologue(mock, 0)
+	expectPickupLine(mock, testVar1, 5000, 10, 2)
+	expectOrderInsert(mock, nil)
 	if commitErr != nil {
 		mock.ExpectCommit().WillReturnError(commitErr)
 	} else {
@@ -56,15 +45,20 @@ func expectPickupOrderCreation(mock sqlmock.Sqlmock, commitErr error) {
 	}
 }
 
-func TestCreateOrderNotifiesAfterCommit(t *testing.T) {
+func newNotifyingService(t *testing.T, n Notifier) (*Service, sqlmock.Sqlmock) {
 	svc, mock := newMockService(t)
+	svc.WithSettings(testSettings()).WithNotifier(n)
+	return svc, mock
+}
+
+func TestCreateOrderNotifiesAfterCommit(t *testing.T) {
 	rec := &recordingNotifier{}
-	svc.WithNotifier(rec)
+	svc, mock := newNotifyingService(t, rec)
 	expectPickupOrderCreation(mock, nil)
 
 	pickupID := "point-1"
 	if _, err := svc.CreateOrder(context.Background(), "cust-1",
-		[]OrderItemInput{{VariantID: "var-1", Quantity: 2}}, nil, &pickupID); err != nil {
+		[]OrderItemInput{{VariantID: testVar1, Quantity: 2}}, nil, &pickupID); err != nil {
 		t.Fatalf("CreateOrder: %v", err)
 	}
 	if len(rec.created) != 1 || rec.created[0].ID != "order-1" || len(rec.created[0].Items) != 1 {
@@ -73,14 +67,13 @@ func TestCreateOrderNotifiesAfterCommit(t *testing.T) {
 }
 
 func TestCreateOrderDoesNotNotifyWhenCommitFails(t *testing.T) {
-	svc, mock := newMockService(t)
 	rec := &recordingNotifier{}
-	svc.WithNotifier(rec)
+	svc, mock := newNotifyingService(t, rec)
 	expectPickupOrderCreation(mock, errors.New("commit failed"))
 
 	pickupID := "point-1"
 	if _, err := svc.CreateOrder(context.Background(), "cust-1",
-		[]OrderItemInput{{VariantID: "var-1", Quantity: 2}}, nil, &pickupID); err == nil {
+		[]OrderItemInput{{VariantID: testVar1, Quantity: 2}}, nil, &pickupID); err == nil {
 		t.Fatal("want commit error")
 	}
 	if len(rec.created) != 0 {
@@ -89,35 +82,32 @@ func TestCreateOrderDoesNotNotifyWhenCommitFails(t *testing.T) {
 }
 
 func TestCreateOrderSurvivesPanickingNotifier(t *testing.T) {
-	svc, mock := newMockService(t)
-	svc.WithNotifier(&recordingNotifier{panics: true})
+	svc, mock := newNotifyingService(t, &recordingNotifier{panics: true})
 	expectPickupOrderCreation(mock, nil)
 
 	pickupID := "point-1"
 	if _, err := svc.CreateOrder(context.Background(), "cust-1",
-		[]OrderItemInput{{VariantID: "var-1", Quantity: 2}}, nil, &pickupID); err != nil {
+		[]OrderItemInput{{VariantID: testVar1, Quantity: 2}}, nil, &pickupID); err != nil {
 		t.Fatalf("CreateOrder must succeed even if the notifier panics: %v", err)
 	}
 }
 
-var orderColumns = []string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method", "payment_status", "total_amount", "comment", "created_at", "updated_at"}
-
 func TestAdminUpdateStatusNotifiesWithPreviousStatus(t *testing.T) {
-	svc, mock := newMockService(t)
 	rec := &recordingNotifier{}
-	svc.WithNotifier(rec)
+	svc, mock := newNotifyingService(t, rec)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("FOR UPDATE")).WithArgs("COZY-20260923-001").
-		WillReturnRows(sqlmock.NewRows(orderColumns).AddRow("order-1", "COZY-20260923-001", "cust-1", "addr-1", "point-1",
-			"placed", "cash_on_delivery", nil, 5000.0, nil, time.Now(), time.Now()))
+		WillReturnRows(codOrder(StatusPlaced).rows())
 	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET status")).
 		WillReturnRows(sqlmock.NewRows([]string{"updated_at"}).AddRow(time.Now()))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO order_status_history")).
+		WithArgs("order-1", "placed", StatusConfirmed, ActorStaff, "staff-1", nil).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
-	mock.ExpectQuery(regexp.QuoteMeta("FROM order_items")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "order_id", "variant_id", "product_name_snapshot", "size_snapshot", "color_snapshot", "quantity", "price"}))
+	expectNoItems(mock)
 
-	o, err := svc.AdminUpdateStatus(context.Background(), "COZY-20260923-001", StatusConfirmed)
+	o, err := svc.AdminUpdateStatus(staffCtx(staff.RoleManager), "COZY-20260923-001", StatusConfirmed)
 	if err != nil {
 		t.Fatalf("AdminUpdateStatus: %v", err)
 	}
@@ -127,20 +117,21 @@ func TestAdminUpdateStatusNotifiesWithPreviousStatus(t *testing.T) {
 	if len(rec.changed) != 1 || rec.changed[0].Status != StatusConfirmed || rec.from[0] != StatusPlaced {
 		t.Fatalf("notifier got changed=%+v from=%v, want one placed→confirmed", rec.changed, rec.from)
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
 }
 
 func TestAdminUpdateStatusInvalidTransitionDoesNotNotify(t *testing.T) {
-	svc, mock := newMockService(t)
 	rec := &recordingNotifier{}
-	svc.WithNotifier(rec)
+	svc, mock := newNotifyingService(t, rec)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("FOR UPDATE")).
-		WillReturnRows(sqlmock.NewRows(orderColumns).AddRow("order-1", "COZY-20260923-001", "cust-1", "addr-1", "point-1",
-			"delivered", "cash_on_delivery", nil, 5000.0, nil, time.Now(), time.Now()))
+		WillReturnRows(codOrder(StatusDelivered).rows())
 	mock.ExpectRollback()
 
-	if _, err := svc.AdminUpdateStatus(context.Background(), "order-1", StatusCancelled); err == nil {
+	if _, err := svc.AdminUpdateStatus(staffCtx(staff.RoleOwner), "order-1", StatusCancelled); err == nil {
 		t.Fatal("want invalid_status_transition")
 	}
 	if len(rec.changed) != 0 {

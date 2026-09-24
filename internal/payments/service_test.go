@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
@@ -132,6 +133,30 @@ func newMockService(t *testing.T, p Provider, creator OnlineOrderCreator) (*Serv
 	return NewService(db, p, creator, "https://cozy.test"), mock
 }
 
+// orderLockRows is the orders row orders.CancelUnpaidOrderTx locks.
+func orderLockRows(status orders.OrderStatus, payment Status) *sqlmock.Rows {
+	now := time.Now()
+	return sqlmock.NewRows([]string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method",
+		"payment_status", "total_amount", "delivery_fee", "refund_required", "comment", "created_at", "updated_at"}).
+		AddRow("order-1", "COZY-1", "cust-1", nil, "point-1", string(status), "online_card", string(payment), 10.0, 0.0, false, nil, now, now)
+}
+
+// expectCancelUnpaid scripts orders.CancelUnpaidOrderTx on a placed order
+// with one line (payment already in its final unpaid status).
+func expectCancelUnpaid(mock sqlmock.Sqlmock, payment Status, note string) {
+	mock.ExpectQuery(regexp.QuoteMeta("FROM orders WHERE id = $1 FOR UPDATE")).
+		WithArgs("order-1").WillReturnRows(orderLockRows(orders.StatusPlaced, payment))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT variant_id, quantity FROM order_items")).
+		WithArgs("order-1").WillReturnRows(sqlmock.NewRows([]string{"variant_id", "quantity"}).AddRow("var-1", 2))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO stock")).
+		WithArgs("var-1", "point-1", 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET status = 'cancelled'")).
+		WithArgs("order-1", sqlmock.AnyArg(), false).WillReturnRows(sqlmock.NewRows([]string{"updated_at"}).AddRow(time.Now()))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO order_status_history")).
+		WithArgs("order-1", "placed", orders.StatusCancelled, orders.ActorSystem, nil, note).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
 func expectLockPayment(mock sqlmock.Sqlmock, ext string, status Status, amount float64) {
 	mock.ExpectQuery(regexp.QuoteMeta("FROM payments")+".*"+regexp.QuoteMeta("FOR UPDATE")).
 		WithArgs(MockProviderName, ext).
@@ -140,7 +165,8 @@ func expectLockPayment(mock sqlmock.Sqlmock, ext string, status Status, amount f
 
 func TestHandleCallbackPaidUpdatesPaymentAndOrder(t *testing.T) {
 	m := NewMockProvider("", "tok")
-	svc, mock := newMockService(t, m, nil)
+	creator := &fakeCreator{}
+	svc, mock := newMockService(t, m, creator)
 	h, body, _ := m.SignedCallback("mock_1", StatusPaid, 4990.5)
 
 	mock.ExpectBegin()
@@ -155,11 +181,80 @@ func TestHandleCallbackPaidUpdatesPaymentAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleCallback: %v", err)
 	}
-	if !res.Applied || res.Status != StatusPaid || res.OrderCancelled {
+	if !res.Applied || res.Status != StatusPaid || res.OrderCancelled || res.RefundRequired {
 		t.Errorf("result = %+v", res)
+	}
+	if len(creator.notified) != 1 || creator.notified[0] != "order-1" {
+		t.Errorf("staff must be notified once the online order is paid, got %v", creator.notified)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
+	}
+}
+
+// TestHandleCallbackPaidForCancelledOrderFlagsRefund: the order was
+// cancelled while the customer paid — refund_required, no "new order".
+func TestHandleCallbackPaidForCancelledOrderFlagsRefund(t *testing.T) {
+	m := NewMockProvider("", "tok")
+	creator := &fakeCreator{}
+	svc, mock := newMockService(t, m, creator)
+	h, body, _ := m.SignedCallback("mock_1", StatusPaid, 10)
+
+	mock.ExpectBegin()
+	expectLockPayment(mock, "mock_1", StatusPending, 10)
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET status")).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET payment_status")).
+		WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("cancelled"))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET refund_required = true")).
+		WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	res, err := svc.HandleCallback(context.Background(), MockProviderName, h, body)
+	if err != nil {
+		t.Fatalf("HandleCallback: %v", err)
+	}
+	if !res.RefundRequired {
+		t.Errorf("result = %+v, want refund_required", res)
+	}
+	if len(creator.notified) != 0 {
+		t.Error("a cancelled order must not be announced as a new paid order")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestHandleCallbackPaidAfterFailedFlagsRefundInDB: "paid" after we
+// already failed/cancelled/expired the payment is recorded in the DB
+// (refund_required), not just logged.
+func TestHandleCallbackPaidAfterFailedFlagsRefundInDB(t *testing.T) {
+	for _, current := range []Status{StatusFailed, StatusCancelled} {
+		m := NewMockProvider("", "tok")
+		creator := &fakeCreator{}
+		svc, mock := newMockService(t, m, creator)
+		h, body, _ := m.SignedCallback("mock_1", StatusPaid, 10)
+
+		mock.ExpectBegin()
+		expectLockPayment(mock, "mock_1", current, 10)
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET raw_webhook")).
+			WithArgs(sqlmock.AnyArg(), "pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET refund_required = true")).
+			WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
+
+		res, err := svc.HandleCallback(context.Background(), MockProviderName, h, body)
+		if err != nil {
+			t.Fatalf("%s: HandleCallback: %v", current, err)
+		}
+		if !res.RefundRequired || res.Applied {
+			t.Errorf("%s: result = %+v", current, res)
+		}
+		if len(creator.notified) != 0 {
+			t.Errorf("%s: must not notify staff", current)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("%s: %v", current, err)
+		}
 	}
 }
 
@@ -195,15 +290,7 @@ func TestHandleCallbackFailedCancelsOrderAndReturnsStock(t *testing.T) {
 		WithArgs(StatusFailed, sqlmock.AnyArg(), "pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET payment_status")).
 		WithArgs(StatusFailed, "order-1").WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("placed"))
-	// orders.CancelUnpaidOrderTx
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT status, point_id FROM orders WHERE id = $1 FOR UPDATE")).
-		WithArgs("order-1").WillReturnRows(sqlmock.NewRows([]string{"status", "point_id"}).AddRow("placed", "point-1"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT variant_id, quantity FROM order_items")).
-		WithArgs("order-1").WillReturnRows(sqlmock.NewRows([]string{"variant_id", "quantity"}).AddRow("var-1", 2))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO stock")).
-		WithArgs("var-1", "point-1", 2).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET status = 'cancelled'")).
-		WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	expectCancelUnpaid(mock, StatusFailed, "оплата отклонена")
 	mock.ExpectCommit()
 
 	res, err := svc.HandleCallback(context.Background(), MockProviderName, h, body)
@@ -266,13 +353,25 @@ func TestHandleCallbackWrongProviderNeverTouchesDB(t *testing.T) {
 type fakeCreator struct {
 	called   bool
 	provider string
+	in       orders.PlaceOrderInput
 	order    *orders.Order
+	replay   bool
+	notified []string
 }
 
-func (f *fakeCreator) CreateOnlineOrder(_ context.Context, _ string, _ []orders.OrderItemInput, _, _ *string, provider string) (*orders.Order, string, error) {
+func (f *fakeCreator) CreateOnlineOrder(_ context.Context, in orders.PlaceOrderInput, provider string) (*orders.Order, string, bool, error) {
 	f.called = true
 	f.provider = provider
-	return f.order, "pay-1", nil
+	f.in = in
+	if f.replay {
+		return f.order, "", false, nil
+	}
+	return f.order, "pay-1", true, nil
+}
+
+func (f *fakeCreator) NotifyOrderPaid(_ context.Context, orderID string) error {
+	f.notified = append(f.notified, orderID)
+	return nil
 }
 
 type failingProvider struct{ *MockProvider }
@@ -285,18 +384,18 @@ func TestPlaceOnlineOrderHappyPath(t *testing.T) {
 	creator := &fakeCreator{order: &orders.Order{ID: "order-1", OrderNumber: "COZY-1", TotalAmount: 10}}
 	svc, mock := newMockService(t, NewMockProvider("https://cozy.test", "tok"), creator)
 
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET provider_tx_id")).
-		WithArgs(sqlmock.AnyArg(), "pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET provider_tx_id = $1, redirect_url = $2")).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), "pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
 
-	order, url, err := svc.PlaceOnlineOrder(context.Background(), "cust-1", nil, nil, nil)
-	if err != nil {
+	order, url, created, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1", IdempotencyKey: "k"})
+	if err != nil || !created {
 		t.Fatalf("PlaceOnlineOrder: %v", err)
 	}
 	if order.ID != "order-1" || !strings.HasPrefix(url, "https://cozy.test"+MockCheckoutPath+"mock_") {
 		t.Errorf("order = %+v, url = %q", order, url)
 	}
-	if creator.provider != MockProviderName {
-		t.Errorf("provider passed to CreateOnlineOrder = %q", creator.provider)
+	if creator.provider != MockProviderName || creator.in.IdempotencyKey != "k" {
+		t.Errorf("provider/key passed to CreateOnlineOrder = %q/%q", creator.provider, creator.in.IdempotencyKey)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
@@ -307,7 +406,7 @@ func TestPlaceOnlineOrderNotReadyDoesNotCreateOrder(t *testing.T) {
 	creator := &fakeCreator{}
 	svc, _ := newMockService(t, NewBakaiProvider("tok"), creator)
 
-	_, _, err := svc.PlaceOnlineOrder(context.Background(), "cust-1", nil, nil, nil)
+	_, _, _, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1"})
 	if !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("err = %v, want ErrNotConfigured", err)
 	}
@@ -323,22 +422,41 @@ func TestPlaceOnlineOrderProviderFailureCancelsOrder(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET status = 'failed'")).
 		WithArgs("pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET payment_status = 'failed'")).
+	// The idempotency key is released so the client's retry places a
+	// fresh order rather than replaying this cancelled one.
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET payment_status = 'failed', idempotency_key = NULL")).
 		WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT status, point_id FROM orders")).
-		WithArgs("order-1").WillReturnRows(sqlmock.NewRows([]string{"status", "point_id"}).AddRow("placed", "point-1"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT variant_id, quantity FROM order_items")).
-		WillReturnRows(sqlmock.NewRows([]string{"variant_id", "quantity"}).AddRow("var-1", 1))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO stock")).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET status = 'cancelled'")).WillReturnResult(sqlmock.NewResult(0, 1))
+	expectCancelUnpaid(mock, StatusFailed, "не удалось открыть платёж")
 	mock.ExpectCommit()
 
-	_, _, err := svc.PlaceOnlineOrder(context.Background(), "cust-1", nil, nil, nil)
+	_, _, _, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1"})
 	if appCode(err) != "payment_create_failed" {
 		t.Fatalf("err = %v, want payment_create_failed", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("compensation not run: %v", err)
+	}
+}
+
+// TestPlaceOnlineOrderReplayReturnsPendingURL: an idempotent replay opens
+// no new session and hands back the first attempt's payment URL.
+func TestPlaceOnlineOrderReplayReturnsPendingURL(t *testing.T) {
+	creator := &fakeCreator{order: &orders.Order{ID: "order-1"}, replay: true}
+	svc, mock := newMockService(t, failingProvider{NewMockProvider("", "tok")}, creator)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT status, COALESCE(redirect_url, '') FROM payments")).
+		WithArgs("order-1").
+		WillReturnRows(sqlmock.NewRows([]string{"status", "redirect_url"}).AddRow("pending", "https://pay/1"))
+
+	order, url, created, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1", IdempotencyKey: "k"})
+	if err != nil || created || order.ID != "order-1" || url != "https://pay/1" {
+		t.Fatalf("replay = %+v %q %v %v", order, url, created, err)
+	}
+
+	// Once the payment is no longer pending there is nothing to open.
+	mock.ExpectQuery(regexp.QuoteMeta("FROM payments")).
+		WillReturnRows(sqlmock.NewRows([]string{"status", "redirect_url"}).AddRow("paid", "https://pay/1"))
+	if _, url, _, _ := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1", IdempotencyKey: "k"}); url != "" {
+		t.Errorf("paid replay url = %q, want empty", url)
 	}
 }
 

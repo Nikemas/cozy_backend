@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/http"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -18,43 +17,25 @@ import (
 // on, so handler-level tests can inject a fake instead of a live database —
 // mirrors stockUpserter in admin_catalog.go.
 type orderService interface {
-	CreateOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string) (*orders.Order, error)
+	PlaceOrder(ctx context.Context, in orders.PlaceOrderInput) (*orders.Order, bool, error)
 	ListOrders(ctx context.Context, customerID string) ([]orders.Order, error)
 	GetOrder(ctx context.Context, customerID, orderID string) (*orders.Order, error)
+	CancelByCustomer(ctx context.Context, customerID, orderID string) (*orders.Order, error)
 }
 
 // onlineCheckout is the subset of *payments.Service createOrderHandler
 // needs for payment_method = online_card.
 type onlineCheckout interface {
-	PlaceOnlineOrder(ctx context.Context, customerID string, items []orders.OrderItemInput, addressID, pickupPointID *string) (*orders.Order, string, error)
+	PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInput) (*orders.Order, string, bool, error)
 }
 
 // cartService is the subset of *orders.CartRepo the cart handlers depend
 // on, for the same reason as orderService above.
 type cartService interface {
-	List(ctx context.Context, customerID string) ([]orders.CartItem, error)
+	ListDetailed(ctx context.Context, customerID string) ([]orders.CartLine, error)
 	Add(ctx context.Context, customerID, variantID string, qty int) error
 	UpdateQty(ctx context.Context, customerID, variantID string, qty int) error
 	Remove(ctx context.Context, customerID, variantID string) error
-}
-
-// cartVariantGetter is the subset of *catalog.VariantRepo listCartHandler
-// needs to enrich a raw cart line with size/color/price-override, mirroring
-// the small-interface pattern used throughout this package (e.g.
-// favoriteProductGetter in favorites.go).
-type cartVariantGetter interface {
-	GetByID(ctx context.Context, id string) (*catalog.Variant, error)
-}
-
-// cartProductGetter is the subset of *catalog.ProductRepo listCartHandler
-// needs. Deliberately GetByIDAny, not GetByID: GetByID filters
-// is_active = true, which would drop a cart line whose product was
-// deactivated after being added — the cart should still show what's
-// already in it even if the product can no longer be newly purchased
-// (rejecting it is checkout's job, via orders.Service.CreateOrder's own
-// catalog lookup, not this read-only endpoint's).
-type cartProductGetter interface {
-	GetByIDAny(ctx context.Context, id string) (*catalog.Product, error)
 }
 
 // cartImageGetter is the subset of *catalog.ImageRepo listCartHandler needs
@@ -62,6 +43,10 @@ type cartProductGetter interface {
 type cartImageGetter interface {
 	PrimaryForProducts(ctx context.Context, productIDs []string) (map[string]catalog.ProductImage, error)
 }
+
+// IdempotencyKeyHeader is the optional header on POST /api/v1/orders that
+// makes a retried checkout return the first attempt's order.
+const IdempotencyKeyHeader = "Idempotency-Key"
 
 // RegisterOrderRoutes mounts the customer-facing order and cart endpoints
 // under /api/v1/*, per §6 of the ТЗ (Flutter mobile app JSON API — orders
@@ -75,8 +60,6 @@ type cartImageGetter interface {
 // paySvc handles payment_method = online_card; nil disables online orders.
 func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config, ordersSvc *orders.Service, paySvc *payments.Service) {
 	cartRepo := orders.NewCartRepo(db)
-	variants := catalog.NewVariantRepo(db)
-	products := catalog.NewProductRepo(db)
 	images := catalog.NewImageRepo(db)
 
 	requireCustomer := authSvc.RequireCustomer
@@ -88,8 +71,9 @@ func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, 
 	mux.Handle("POST /api/v1/orders", requireCustomer(apperr.Wrap(createOrderHandler(ordersSvc, checkout))))
 	mux.Handle("GET /api/v1/orders", requireCustomer(apperr.Wrap(listOrdersHandler(ordersSvc))))
 	mux.Handle("GET /api/v1/orders/{id}", requireCustomer(apperr.Wrap(getOrderHandler(ordersSvc))))
+	mux.Handle("POST /api/v1/orders/{id}/cancel", requireCustomer(apperr.Wrap(cancelOrderHandler(ordersSvc))))
 
-	mux.Handle("GET /api/v1/cart", requireCustomer(apperr.Wrap(listCartHandler(cartRepo, variants, products, images, cfg))))
+	mux.Handle("GET /api/v1/cart", requireCustomer(apperr.Wrap(listCartHandler(cartRepo, images, cfg))))
 	mux.Handle("POST /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(addCartItemHandler(cartRepo))))
 	mux.Handle("PUT /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(updateCartItemHandler(cartRepo))))
 	mux.Handle("DELETE /api/v1/cart/{variantId}", requireCustomer(apperr.Wrap(removeCartItemHandler(cartRepo))))
@@ -107,7 +91,7 @@ type orderItemRequest struct {
 
 // createOrderRequest is the POST /api/v1/orders body. Exactly one of
 // AddressID/PickupPointID must be set (delivery XOR self-pickup); that rule
-// is enforced by orders.Service.CreateOrder itself
+// is enforced by orders.Service itself
 // (apperr.BadRequest("invalid_fulfillment", ...)), so this handler just
 // passes both through unvalidated beyond what decodeJSON already gives us.
 type createOrderRequest struct {
@@ -117,6 +101,8 @@ type createOrderRequest struct {
 	// PaymentMethod is "cash_on_delivery" (default when omitted, the
 	// pre-Task-S behavior) or "online_card".
 	PaymentMethod string `json:"payment_method"`
+	// Comment is an optional note to the store (≤ 500 characters).
+	Comment string `json:"comment"`
 }
 
 // createOrderResponse is the order plus, for online_card, the URL the app
@@ -126,14 +112,25 @@ type createOrderResponse struct {
 	PaymentURL string `json:"payment_url,omitempty"`
 }
 
-func (req createOrderRequest) toItems() []orders.OrderItemInput {
+func (req createOrderRequest) toInput(customerID, idempotencyKey string) orders.PlaceOrderInput {
 	items := make([]orders.OrderItemInput, len(req.Items))
 	for i, it := range req.Items {
 		items[i] = orders.OrderItemInput{VariantID: it.VariantID, Quantity: it.Quantity}
 	}
-	return items
+	return orders.PlaceOrderInput{
+		CustomerID:     customerID,
+		Items:          items,
+		AddressID:      req.AddressID,
+		PickupPointID:  req.PickupPointID,
+		Comment:        req.Comment,
+		IdempotencyKey: idempotencyKey,
+	}
 }
 
+// createOrderHandler serves POST /api/v1/orders. With an Idempotency-Key
+// header, a retry of the same checkout (same customer, same key, within
+// 24h) returns the order the first attempt created with 200 instead of
+// 201, and creates nothing.
 func createOrderHandler(svc orderService, checkout onlineCheckout) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
@@ -146,26 +143,52 @@ func createOrderHandler(svc orderService, checkout onlineCheckout) apperr.Handle
 		if err := decodeJSON(r, &req); err != nil {
 			return err
 		}
+		in := req.toInput(customerID, r.Header.Get(IdempotencyKeyHeader))
 
 		switch orders.PaymentMethod(req.PaymentMethod) {
 		case "", orders.PaymentCashOnDelivery:
-			order, err := svc.CreateOrder(r.Context(), customerID, req.toItems(), req.AddressID, req.PickupPointID)
+			order, created, err := svc.PlaceOrder(r.Context(), in)
 			if err != nil {
 				return err
 			}
-			return writeJSON(w, http.StatusCreated, createOrderResponse{Order: order})
+			return writeJSON(w, createdStatus(created), createOrderResponse{Order: order})
 		case orders.PaymentOnlineCard:
 			if checkout == nil {
 				return payments.ErrNotConfigured
 			}
-			order, paymentURL, err := checkout.PlaceOnlineOrder(r.Context(), customerID, req.toItems(), req.AddressID, req.PickupPointID)
+			order, paymentURL, created, err := checkout.PlaceOnlineOrder(r.Context(), in)
 			if err != nil {
 				return err
 			}
-			return writeJSON(w, http.StatusCreated, createOrderResponse{Order: order, PaymentURL: paymentURL})
+			return writeJSON(w, createdStatus(created), createOrderResponse{Order: order, PaymentURL: paymentURL})
 		default:
 			return apperr.BadRequest("invalid_payment_method", "неизвестный способ оплаты")
 		}
+	}
+}
+
+// createdStatus is 201 for a new order, 200 for an idempotent replay.
+func createdStatus(created bool) int {
+	if created {
+		return http.StatusCreated
+	}
+	return http.StatusOK
+}
+
+// cancelOrderHandler serves POST /api/v1/orders/{id}/cancel: the customer
+// cancels their own order while it is still 'placed' and not paid online.
+// Responds with the updated Order; 409 order_not_cancellable otherwise.
+func cancelOrderHandler(svc orderService) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		customerID, ok := auth.CustomerIDFromContext(r.Context())
+		if !ok {
+			return apperr.Unauthorized("unauthenticated", "требуется вход в систему")
+		}
+		order, err := svc.CancelByCustomer(r.Context(), customerID, r.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, order)
 	}
 }
 
@@ -213,20 +236,18 @@ type cartQtyRequest struct {
 
 // cartLineResponse is the wire shape of one GET /api/v1/cart line. It
 // carries everything a cart screen needs to render without a follow-up
-// round-trip per line (product name/photo/price/size/color) — the bare
-// orders.CartItem this used to return only had customer_id/variant_id/qty/
-// created_at, which forced the client into N extra GET
-// /api/v1/products/{id} calls per cart render.
+// round-trip per line (product name/photo/price/size/color).
 //
 // Field naming: Quantity (not Qty, orders.CartItem's own Go field name) —
 // every other /api/v1/* body that carries an item count uses "quantity"
 // (orderItemRequest, cartQtyRequest), so this follows that convention
 // instead of the domain struct's field name.
 //
-// ProductName is catalog.Product.NameRu — there's no language-negotiation
-// mechanism anywhere in /api/v1/* today (see openapi.yaml's top-level
-// description note on this), so this just matches catalog.Product's own
-// json-tagged fields (name_ru/name_ky), both exposed here for parity.
+// Available is false when the line can't be ordered as is — the product
+// was deactivated (IsActive=false) or no single store holds Quantity pairs
+// (InStock is the most any one store has). The line is still listed so the
+// customer sees why and can remove/adjust it; checkout rejects it with an
+// error naming the product.
 type cartLineResponse struct {
 	VariantID     string  `json:"variant_id"`
 	Quantity      int     `json:"quantity"`
@@ -238,122 +259,68 @@ type cartLineResponse struct {
 	Price         float64 `json:"price"`
 	PhotoURL      *string `json:"photo_url"`
 	ThumbURL      *string `json:"thumb_url"`
+	IsActive      bool    `json:"is_active"`
+	InStock       int     `json:"in_stock"`
+	Available     bool    `json:"available"`
 }
 
-// listCartHandler serves GET /api/v1/cart. It enriches each raw
-// orders.CartItem with the current variant/product/primary-image rows so
-// the mobile app can render a cart screen from one response.
-//
-// A cart line whose variant or product has been hard-deleted since being
-// added (variants can be hard-deleted if never ordered, see
-// catalog.VariantRepo.Delete) is skipped rather than failing the whole
-// request — same "stale reference to something the user picked in the
-// past" shape as listFavoritesHandler in favorites.go, which skips a
-// favorited product that's since gone. The alternative (failing GET /cart
-// entirely) would let one dangling line make a customer's whole cart
-// inaccessible until they somehow know to remove exactly that line via
-// DELETE /api/v1/cart/{variantId} — worse than just not showing it.
-//
-// Unlike listFavoritesHandler's loop (which treats any lookup error as
-// "skip"), this only skips on apperr.NotFound and propagates everything
-// else — a transient DB error has no business being silently swallowed
-// into "this product doesn't exist".
-func listCartHandler(repo cartService, variants cartVariantGetter, products cartProductGetter, images cartImageGetter, cfg *config.Config) apperr.HandlerFunc {
+// listCartHandler serves GET /api/v1/cart: one joined query for every line
+// (orders.CartRepo.ListDetailed) plus one batch image lookup — no per-line
+// variant/product round-trips.
+func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Config) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
 		if !ok {
 			return apperr.Unauthorized("unauthenticated", "требуется вход в систему")
 		}
 
-		cartItems, err := repo.List(r.Context(), customerID)
+		lines, err := repo.ListDetailed(r.Context(), customerID)
 		if err != nil {
 			return err
 		}
 
-		type resolvedLine struct {
-			item    orders.CartItem
-			variant catalog.Variant
-			product catalog.Product
+		productIDs := make([]string, 0, len(lines))
+		seenProduct := make(map[string]bool, len(lines))
+		for _, l := range lines {
+			if !seenProduct[l.ProductID] {
+				seenProduct[l.ProductID] = true
+				productIDs = append(productIDs, l.ProductID)
+			}
 		}
-
-		resolved := make([]resolvedLine, 0, len(cartItems))
-		for _, it := range cartItems {
-			variant, err := variants.GetByID(r.Context(), it.VariantID)
+		primaryImages := map[string]catalog.ProductImage{}
+		if len(productIDs) > 0 {
+			primaryImages, err = images.PrimaryForProducts(r.Context(), productIDs)
 			if err != nil {
-				if isNotFoundErr(err) {
-					continue // dangling variant reference — skip, see doc comment above
-				}
 				return err
 			}
-
-			product, err := products.GetByIDAny(r.Context(), variant.ProductID)
-			if err != nil {
-				if isNotFoundErr(err) {
-					continue // dangling product reference — skip, see doc comment above
-				}
-				return err
-			}
-
-			resolved = append(resolved, resolvedLine{item: it, variant: *variant, product: *product})
 		}
 
-		// Batch the primary-image lookup once for every distinct product in
-		// the cart, instead of once per line.
-		productIDs := make([]string, 0, len(resolved))
-		seenProduct := make(map[string]bool, len(resolved))
-		for _, l := range resolved {
-			if !seenProduct[l.product.ID] {
-				seenProduct[l.product.ID] = true
-				productIDs = append(productIDs, l.product.ID)
-			}
-		}
-		primaryImages, err := images.PrimaryForProducts(r.Context(), productIDs)
-		if err != nil {
-			return err
-		}
-
-		resp := make([]cartLineResponse, 0, len(resolved))
-		for _, l := range resolved {
-			// Effective price: variant.PriceOverride if set, else the
-			// product's base_price — mirrors loadVariantSnapshots in
-			// internal/orders/order.go, the existing pattern for this exact
-			// rule at order-creation time.
-			price := l.product.BasePrice
-			if l.variant.PriceOverride != nil {
-				price = *l.variant.PriceOverride
-			}
-
+		resp := make([]cartLineResponse, 0, len(lines))
+		for _, l := range lines {
 			var photoURLPtr, thumbURLPtr *string
-			if img, ok := primaryImages[l.product.ID]; ok {
+			if img, ok := primaryImages[l.ProductID]; ok {
 				url, thumb := photoURL(cfg, img.ObjectKey), thumbURL(cfg, img.ObjectKey)
 				photoURLPtr, thumbURLPtr = &url, &thumb
 			}
-
 			resp = append(resp, cartLineResponse{
-				VariantID:     l.item.VariantID,
-				Quantity:      l.item.Qty,
-				ProductID:     l.product.ID,
-				ProductName:   l.product.NameRu,
-				ProductNameKy: l.product.NameKy,
-				Size:          l.variant.Size,
-				Color:         l.variant.Color,
-				Price:         price,
+				VariantID:     l.VariantID,
+				Quantity:      l.Qty,
+				ProductID:     l.ProductID,
+				ProductName:   l.ProductName,
+				ProductNameKy: l.ProductNameKy,
+				Size:          l.Size,
+				Color:         l.Color,
+				Price:         l.Price,
 				PhotoURL:      photoURLPtr,
 				ThumbURL:      thumbURLPtr,
+				IsActive:      l.ProductActive,
+				InStock:       l.InStock,
+				Available:     l.Available(),
 			})
 		}
 
 		return writeJSON(w, http.StatusOK, resp)
 	}
-}
-
-// isNotFoundErr reports whether err is an *apperr.AppError with a 404
-// status — the signal that a variant/product referenced by a cart line no
-// longer exists (hard-deleted), as opposed to an unexpected error that
-// should still fail the request.
-func isNotFoundErr(err error) bool {
-	var appErr *apperr.AppError
-	return errors.As(err, &appErr) && appErr.Status == http.StatusNotFound
 }
 
 func addCartItemHandler(repo cartService) apperr.HandlerFunc {
