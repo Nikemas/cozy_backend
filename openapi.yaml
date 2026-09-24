@@ -440,7 +440,12 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
     put:
       tags: [Customer]
-      summary: Update the logged-in customer's name
+      summary: Update the logged-in customer's profile (partial)
+      description: |
+        Partial update: every field is optional and an absent field is left
+        unchanged — e.g. `{"promo_push": false}` from the "Акции и скидки"
+        switch, or `{"lang": "ky"}` when the app language changes. An empty
+        object changes nothing and returns the current profile.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
@@ -448,15 +453,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
-                name: { type: string, example: "Айбек" }
+                name: { type: string, maxLength: 100, example: "Айбек" }
+                lang: { type: string, enum: [ru, ky], description: "Language of order-status and promo pushes." }
+                promo_push: { type: boolean, description: "Receive promo broadcasts (default true). Order-status pushes are not affected." }
       responses:
         "200":
           description: Updated profile.
           content: { application/json: { schema: { $ref: "#/components/schemas/CustomerProfile" } } }
         "400":
-          description: "`invalid_name` — blank name."
+          description: "`invalid_name` — blank/too long name; `invalid_lang` — lang not `ru`/`ky`; `bad_request` — malformed JSON."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
     delete:
@@ -1476,11 +1482,13 @@ components:
 
     CustomerProfile:
       type: object
-      required: [id, phone]
+      required: [id, phone, lang, promo_push]
       properties:
         id: { type: string, format: uuid }
         phone: { type: string, example: "+996700123456" }
         name: { type: string, description: "Omitted until the customer sets it." }
+        lang: { type: string, enum: [ru, ky], description: "Language order-status and promo pushes are sent in (default `ru`); also set by the website's language switch." }
+        promo_push: { type: boolean, description: "Receives promo broadcasts (default true)." }
 
     Category:
       type: object
