@@ -515,8 +515,10 @@ paths:
         default `1.0.0`; `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID`,
         default empty string). Served with `Cache-Control: public, max-age=300`.
         `delivery_fee` is the flat delivery charge in som (`DELIVERY_FEE_SOM`,
-        default 200) that the server adds to `total_amount` of every
-        delivery order; self-pickup is free.
+        default 200) that the server adds to `total_amount` of a delivery
+        order while no delivery zone is active (`GET /api/v1/delivery-zones`
+        returns `[]`); with zones, the chosen zone's fee applies instead.
+        Self-pickup is free.
       responses:
         "200":
           description: Current version policy.
@@ -531,6 +533,23 @@ paths:
                   store_url_ios: { type: string, example: "" }
                   store_url_android: { type: string, example: "" }
                   delivery_fee: { type: number, format: double, example: 200, description: "Som added to a delivery order's total (DELIVERY_FEE_SOM)." }
+
+  /api/v1/delivery-zones:
+    get:
+      tags: [Catalog]
+      summary: Active delivery zones
+      description: |
+        Public, unauthenticated; `Cache-Control: public, max-age=60`. Active
+        zones in display order (the owner manages them in the admin,
+        «Доставка»). A delivery order must send one of these ids as
+        `delivery_zone_id`; its `delivery_fee` is the zone's `fee`, or 0
+        when the items total (delivery excluded) is ≥ `free_from`
+        (`free_from` null = never free). An empty list means zones are off
+        and the flat `delivery_fee` of `GET /api/v1/app/config` applies.
+      responses:
+        "200":
+          description: Active zones.
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DeliveryZone" } } } }
 
   /api/v1/orders:
     post:
@@ -552,18 +571,30 @@ paths:
           is created in the same transaction, then a checkout session is
           opened with the active provider. The response carries
           `payment_url`: open it (WebView/browser) for the customer to pay;
-          afterwards poll `GET /api/v1/orders/{id}` for `payment_status`. If
-          the payment fails or is cancelled, the order is cancelled
-          automatically and its stock returned; place a new order to retry.
-          A payment still `pending` after `PAYMENT_PENDING_TTL` (default 30m)
-          is cancelled by a background job the same way. Staff are notified
+          afterwards poll `GET /api/v1/orders/{id}` for `payment_status`.
+          After paying, the provider sends the customer to
+          `<PUBLIC_BASE_URL>/pay/return/<order_id>` — a site page with the
+          result and a «Вернуться в приложение» button linking to
+          `cozy://orders/<order_id>`.
+          A declined card (`payment_status: failed`) keeps the order
+          (`placed`, stock reserved): pay again with
+          `POST /api/v1/orders/{id}/pay`. If the customer cancels on the bank
+          page (`cancelled`), the order is cancelled and its stock returned.
+          If the latest attempt stays `pending` (or `failed` and never
+          retried) for `PAYMENT_PENDING_TTL` (default 30m), a background job
+          cancels the order and returns the stock. Staff are notified
           (Telegram) about an `online_card` order only once it is paid; a
           `cash_on_delivery` order is announced right away.
 
-        **Delivery fee.** A delivery order (`address_id`) gets
-        `delivery_fee` = `DELIVERY_FEE_SOM` (see `GET /api/v1/app/config`),
-        included in `total_amount` (and in the online payment amount).
-        Self-pickup: `delivery_fee` = 0.
+        **Delivery fee.** A delivery order (`address_id`) is charged by
+        zone: while any zone is active (`GET /api/v1/delivery-zones`),
+        `delivery_zone_id` is required and `delivery_fee` = the zone's
+        `fee`, or 0 when the items total ≥ its `free_from`. With no active
+        zone, `delivery_fee` = `DELIVERY_FEE_SOM` (see
+        `GET /api/v1/app/config`) and `delivery_zone_id` is not needed. The
+        fee is included in `total_amount` (and in the online payment
+        amount). Self-pickup: `delivery_fee` = 0 (`delivery_zone_id` is
+        ignored).
 
         **Idempotency.** Send an `Idempotency-Key` header (≤ 64 printable
         ASCII chars, e.g. a UUID generated once per checkout attempt and
@@ -592,7 +623,7 @@ paths:
         "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "200": { description: "Idempotent replay — the order created earlier with the same `Idempotency-Key`.", content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "400":
-          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_idempotency_key`, `invalid_payment_method`, or malformed body."
+          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_idempotency_key`, `invalid_payment_method`, `delivery_zone_required` (delivery order without a zone while zones are active), `invalid_delivery_zone` (unknown or deactivated zone), or malformed body."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { description: "`address_not_found`, `pickup_point_not_found`, or `variant_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
@@ -650,6 +681,46 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "409":
           description: "`order_not_cancellable` — already confirmed/shipped/finished, or paid online (contact the store)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/orders/{id}/pay:
+    post:
+      tags: [Customer]
+      summary: Pay again for an online order
+      description: |
+        Opens a new payment attempt on the customer's own order and returns
+        its `payment_url` (open it like the one from `POST /api/v1/orders`;
+        the provider returns to `/pay/return/<order_id>` as well). Allowed
+        when the order is `online_card`, not cancelled (`placed`) and
+        `payment_status` is `pending` (customer left the bank page) or
+        `failed` (declined). A still-open previous attempt is closed; if the
+        customer did complete it after all, that payment is still accepted.
+        Each attempt restarts the `PAYMENT_PENDING_TTL` clock; at most 10
+        attempts per order. `{id}` may be the UUID or `order_number`.
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: New checkout session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payment_url]
+                properties:
+                  payment_url: { type: string, format: uri }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`order_not_found` — missing or another customer's."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: "`payment_not_retryable` — cash order, cancelled, already paid, or too many attempts."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: "`payment_create_failed` — the provider couldn't open a session; the order stays open (`payment_status: failed`), try again."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: "`payments_not_configured`."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /api/v1/cart:
@@ -1379,8 +1450,9 @@ paths:
       description: |
         Plays the bank: builds a signed mock callback for `result` and runs it
         through the same code path as `POST /api/v1/payments/mock/callback`,
-        then renders the outcome with a link back to
-        `/order/{orderNumber}/done`. Scriptable:
+        then renders the outcome and returns the customer (link + 2 s
+        auto-redirect) to `/pay/return/{order_id}` — the same page a real
+        provider returns to. Scriptable:
         `curl -X POST "$payment_url?result=paid"`.
       requestBody:
         content:
@@ -1676,9 +1748,18 @@ components:
         payment_status:
           type: string
           enum: [pending, paid, failed, cancelled, refunded]
-          description: "Only present for `online_card` orders (omitted for `cash_on_delivery`). `failed`/`cancelled` orders are auto-cancelled."
+          description: "Only present for `online_card` orders (omitted for `cash_on_delivery`). `failed` = declined: the order stays `placed` and can be paid again (`POST /api/v1/orders/{id}/pay`) until it expires; `cancelled` = cancelled on the bank page or expired (the order is cancelled)."
         total_amount: { type: number, format: double, description: "What the customer pays: items + delivery_fee." }
         delivery_fee: { type: number, format: double, description: "Delivery charge included in total_amount (som); 0 for self-pickup and for orders placed before delivery was charged." }
+        delivery_zone:
+          type: object
+          nullable: true
+          description: "The delivery zone the fee was charged for; null for pickup and for delivery orders placed while no zone was active. Names are the zone's current ones."
+          required: [id, name_ru, name_ky]
+          properties:
+            id: { type: string, format: uuid }
+            name_ru: { type: string }
+            name_ky: { type: string }
         refund_required:
           type: boolean
           description: "true when money was taken for an order that ended up cancelled (paid then cancelled, or a late `paid` callback after the payment failed/expired) — staff must refund it."
@@ -1729,8 +1810,19 @@ components:
               quantity: { type: integer, minimum: 1 }
         address_id: { type: string, format: uuid, nullable: true, description: "Delivery. Exactly one of address_id/pickup_point_id must be set." }
         pickup_point_id: { type: string, format: uuid, nullable: true, description: "Self-pickup. Exactly one of address_id/pickup_point_id must be set." }
+        delivery_zone_id: { type: string, format: uuid, nullable: true, description: "Delivery only (ignored for pickup): a zone from `GET /api/v1/delivery-zones` — required while any zone is active. The fee is computed server-side." }
         payment_method: { type: string, enum: [cash_on_delivery, online_card], default: cash_on_delivery }
         comment: { type: string, maxLength: 500, description: "Optional note to the store (delivery time, intercom code…). Blank = none." }
+
+    DeliveryZone:
+      type: object
+      required: [id, name_ru, name_ky, fee, free_from]
+      properties:
+        id: { type: string, format: uuid }
+        name_ru: { type: string, example: "Бишкек" }
+        name_ky: { type: string, example: "Бишкек ш." }
+        fee: { type: number, format: double, example: 200, description: "Delivery charge to this zone, som." }
+        free_from: { type: number, format: double, nullable: true, example: 5000, description: "Items total (som, delivery excluded) from which delivery is free; null = never." }
 
     OrderCreateResponse:
       allOf:
