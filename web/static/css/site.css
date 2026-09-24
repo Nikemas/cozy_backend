@@ -1019,3 +1019,5 @@ button, input { font-family: inherit; }
   .product-card { padding: 10px; }
   .product-card__thumb { height: 130px; }
 }
+.footer__legal { color: var(--cozy-ink-2); }
+@media (max-width: 860px) { .footer__legal { padding: 0 16px 20px; } }
