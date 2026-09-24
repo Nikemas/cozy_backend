@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,7 +169,12 @@ func TestOrderItemsCarryProductAndPhoto(t *testing.T) {
 	check("get", got)
 }
 
+// countingPush is a push.Sender test double. The broadcast worker sends a
+// batch's messages from concurrent goroutines (internal/broadcasts/worker.go
+// sendBatch), so sent needs its own lock — a real Sender (FCM over HTTP) has
+// no shared mutable state and needs nothing equivalent.
 type countingPush struct {
+	mu   sync.Mutex
 	sent map[string]push.Message
 }
 
@@ -176,8 +182,23 @@ func (p *countingPush) Send(_ context.Context, token string, msg push.Message) e
 	if strings.HasPrefix(token, "dead-") {
 		return push.ErrInvalidToken
 	}
+	p.mu.Lock()
 	p.sent[token] = msg
+	p.mu.Unlock()
 	return nil
+}
+
+func (p *countingPush) get(token string) push.Message {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.sent[token]
+}
+
+func (p *countingPush) has(token string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, ok := p.sent[token]
+	return ok
 }
 
 func TestBroadcastWorkerEndToEnd(t *testing.T) {
@@ -235,13 +256,17 @@ func TestBroadcastWorkerEndToEnd(t *testing.T) {
 		t.Fatalf("broadcast = status %s targets %d sent %d invalid %d failed %d; want done 3/2/1/0",
 			b.Status, b.Targets, b.Sent, b.InvalidRemoved, b.Failed)
 	}
-	if _, ok := p.sent["optout-1"]; ok {
+	if p.has("optout-1") {
 		t.Error("customer with promo_push=false got the promo")
 	}
-	if p.sent["ky-1"].Title != "Арзандатуу" || p.sent["ru-1"].Title != "Скидки" {
-		t.Errorf("titles: ky %q ru %q", p.sent["ky-1"].Title, p.sent["ru-1"].Title)
+	if got := p.get("ky-1"); got.Title != "Арзандатуу" {
+		t.Errorf("ky-1 title = %q", got.Title)
 	}
-	if got := p.sent["ru-1"].Data; got["type"] != "promo" || got["link"] != "/product/"+f.ProductID {
+	ru1 := p.get("ru-1")
+	if ru1.Title != "Скидки" {
+		t.Errorf("ru-1 title = %q", ru1.Title)
+	}
+	if got := ru1.Data; got["type"] != "promo" || got["link"] != "/product/"+f.ProductID {
 		t.Errorf("data = %v", got)
 	}
 	var left int
