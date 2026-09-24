@@ -31,32 +31,6 @@
   </div>
 
   <div class="aside__card">
-    <div class="aside__title">{{t "sidebar.style"}}</div>
-    <!-- Not wired: internal/catalog has no "style" concept on
-         products/categories (see products/categories migrations) — this
-         would need a schema change out of Task 2's scope (it doesn't own
-         internal/catalog's tables). Left decorative/disabled rather than
-         faking a filter that doesn't do anything. -->
-    <div class="aside__chips">
-      <span class="chip">Sneakers</span>
-      <span class="chip">Boots</span>
-      <span class="chip">Casual</span>
-    </div>
-  </div>
-
-  <div class="aside__card">
-    <div class="aside__title">{{t "sidebar.brand"}}</div>
-    <!-- Not wired: catalog.ListFilter has no Brand field (only
-         category/size/color/price/q/sort/page) and adding one means
-         rewriting ProductRepo.List's existing query body, which Task 2
-         was told not to do ("не переписывая их тела") while Task D
-         concurrently adds admin write methods to the same file. Left
-         decorative/disabled — see report deviation. -->
-    <label class="aside__checkbox"><input type="checkbox" disabled> Nike</label>
-    <label class="aside__checkbox"><input type="checkbox" disabled> Adidas</label>
-  </div>
-
-  <div class="aside__card">
     <div class="aside__title">{{t "sidebar.price"}}{{if eq .Screen "shop"}}{{if .Data.PriceMax}} {{.Data.PriceMax}}{{end}}{{end}}</div>
     {{if eq .Screen "shop"}}
     <input type="range" id="shop-price-max" name="price_max" min="{{.Data.PriceSliderMin}}" max="{{.Data.PriceSliderMax}}" step="100"

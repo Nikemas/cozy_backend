@@ -17,10 +17,6 @@ sidebar.orders: Буйрутмалар
 sidebar.favorites: Тандалгандар
 sidebar.categories: Категориялар
 sidebar.category.all: Баары
-sidebar.category.women: Аялдар
-sidebar.category.men: Эркектер
-sidebar.style: Стиль
-sidebar.brand: Бренд
 sidebar.price: Баасы чейин
 sidebar.reset: Чыпкаларды тазалоо
 
@@ -102,13 +98,12 @@ order.empty.cta: Каталогго
 order.number_prefix: Буйрутма
 
 branches.title: Филиалдар
-branches.you_are_here: Сиз бул жердесиз
 branches.route: Маршрут
 branches.empty: Азырынча жеткиликтүү дүкөндөр жок
 
 # Task 2 (Catalog: shop + product) keys.
-shop.banner.eyebrow: Жаңы коллекция
-shop.banner.title: Кроссовкаларга 30% чейин арзандатуу
+shop.banner.eyebrow: Бүт үй-бүлө үчүн бут кийим
+shop.banner.title: Бишкек боюнча жеткирүү жана дүкөндөрүбүздөн алып кетүү
 shop.results_word: товар
 shop.empty: Эч нерсе табылган жок
 shop.prev: Артка

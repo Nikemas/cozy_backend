@@ -23,15 +23,6 @@ func TestPinCoordsWithinMapBoundsAndCycles(t *testing.T) {
 	}
 }
 
-func TestDistanceStubCycles(t *testing.T) {
-	if distanceStub(0) == "" {
-		t.Fatal("distanceStub(0) is empty")
-	}
-	if got, want := distanceStub(len(distanceStubs)), distanceStub(0); got != want {
-		t.Errorf("distanceStub should cycle: distanceStub(%d) = %q, want %q", len(distanceStubs), got, want)
-	}
-}
-
 func TestRouteURLEscapesAddress(t *testing.T) {
 	url := routeURL("ул. Ибраимова, 115")
 	if !strings.HasPrefix(url, "https://www.google.com/maps/search/?api=1&query=") {

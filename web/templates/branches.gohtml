@@ -23,9 +23,6 @@
         <span class="branches-map__pin-shape"><span class="branches-map__pin-num">{{.Number}}</span></span>
       </button>
       {{end}}
-      <div class="branches-map__legend">
-        <span class="branches-map__legend-dot"></span> {{t "branches.you_are_here"}}
-      </div>
     </div>
 
     <div class="branches-list">
@@ -39,7 +36,6 @@
           </div>
         </div>
         <div class="branch-card__footer">
-          <span class="branch-card__distance">{{.Distance}}</span>
           <a class="branch-card__route" href="{{.RouteURL}}" target="_blank" rel="noopener noreferrer">
             <i class="ti ti-navigation"></i> {{t "branches.route"}}
           </a>

@@ -33,19 +33,6 @@ func pinCoords(index int) (x, y float64) {
 	return p[0], p[1]
 }
 
-// distanceStubs are placeholder "distance to branch" labels
-// (COZY_WEB_DESIGN.md §3.7 explicitly calls this a stub: real distance
-// needs the customer's own geolocation, which is an open question in
-// tasks/web-plan.md, not something Task 5 resolves).
-//
-// TODO(geo): replace with a real distance once customer geolocation (or a
-// delivery-address-based estimate) is available.
-var distanceStubs = []string{"0.8 км", "2.1 км", "4.5 км", "6.2 км", "8.0 км"}
-
-func distanceStub(index int) string {
-	return distanceStubs[index%len(distanceStubs)]
-}
-
 // BranchPin backs one pin on branches.gohtml's pseudo-map. Index is the
 // 0-based position (used to match a pin to its list card client-side);
 // Number is the 1-based label shown inside the pin/badge.
@@ -62,7 +49,6 @@ type BranchCard struct {
 	Number     int
 	Name       string
 	Address    string
-	Distance   string
 	RouteURL   string // external map search link — no embedded map/API
 	FirstInSet bool
 }
@@ -89,7 +75,6 @@ func buildBranchesData(branches []storefront.Branch) BranchesData {
 			Number:     i + 1,
 			Name:       b.Name,
 			Address:    b.Address,
-			Distance:   distanceStub(i),
 			RouteURL:   routeURL(b.Address),
 			FirstInSet: i == 0,
 		})
