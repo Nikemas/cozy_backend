@@ -108,17 +108,11 @@ func AccessLog(next http.Handler) http.Handler {
 	})
 }
 
-// clientIP prefers the first X-Forwarded-For hop (Caddy sets it) over
-// RemoteAddr, which is always Caddy's own container address in prod. Used
-// only for logging, never for any security decision.
+// clientIP is the address resolved by the ClientIP middleware, or the raw
+// RemoteAddr when it isn't installed.
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return xff[:i]
-			}
-		}
-		return xff
+	if ip := ClientIPFromContext(r.Context()); ip != "" {
+		return ip
 	}
 	return r.RemoteAddr
 }

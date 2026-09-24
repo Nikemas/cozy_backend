@@ -116,10 +116,16 @@ func run() error {
 		return err
 	}
 
-	// Outermost first: every request gets an ID, then is access-logged
-	// (after Recover has turned any panic into a 500 it can log), then
-	// hits the existing CSRF guard and the router.
-	handler := httpmw.Chain(csrf.Protect(mux), httpmw.RequestID, httpmw.AccessLog, httpmw.Recover)
+	// Outermost first: every request gets an ID and its real client IP
+	// (trusted-proxy aware — rate limits and the access log use it), then
+	// is access-logged (after Recover has turned any panic into a 500 it
+	// can log), then hits the CSRF guard and the router.
+	handler := httpmw.Chain(csrf.Protect(mux),
+		httpmw.RequestID,
+		httpmw.ClientIP(cfg.Security.TrustedProxies),
+		httpmw.AccessLog,
+		httpmw.Recover,
+	)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
