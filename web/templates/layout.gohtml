@@ -46,7 +46,7 @@
 <body>
 <a class="skip-link" href="#main">{{t "a11y.skip_to_content"}}</a>
 {{template "_header" .}}
-<div class="page">
+<div class="page page--{{.Screen}}">
   {{template "_aside_filters" .}}
   <main class="main" id="main" tabindex="-1">
     {{template "content" .}}

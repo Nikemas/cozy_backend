@@ -23,7 +23,6 @@ footer.rights: © Cozy. Бардык укуктар корголгон.
 footer.branches: Филиалдар
 footer.legal: "ЖК Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир."
 
-common.soon: Жакында
 common.back_home: Башкы бетке
 
 screen.shop.title: Каталог
@@ -237,3 +236,4 @@ common.currency: сом
 shop.results.one: товар
 shop.results.few: товар
 shop.results.many: товар
+filter.title: Чыпкалар

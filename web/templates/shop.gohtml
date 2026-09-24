@@ -5,8 +5,14 @@
      from the very same full-page response a plain browser request would
      render — see internal/web/catalog_view.go's doc comment. */}}
 {{define "content"}}
-{{$d := .Data}}
 <div>
+  {{template "_shop_results" .}}
+</div>
+{{end}}
+
+{{define "_shop_results"}}
+{{$d := .Data}}
+<div id="shop-results">
   {{if $d.ShowBanner}}
   <div class="shop-banner">
     <div>
@@ -19,14 +25,6 @@
     </svg>
   </div>
   {{end}}
-
-  {{template "_shop_results" .}}
-</div>
-{{end}}
-
-{{define "_shop_results"}}
-{{$d := .Data}}
-<div id="shop-results">
   <h1 class="shop-title">{{if $d.CategoryName}}{{$d.CategoryName}}{{else if $d.Query}}{{t "shop.search_results"}} «{{$d.Query}}»{{else}}{{t "shop.heading"}}{{end}}</h1>
   <div class="shop-toolbar">
     <nav class="shop-chips" aria-label="{{t "sidebar.categories"}}">
@@ -34,6 +32,7 @@
       <a class="chip chip--tab{{if .Active}} chip--tab--active{{end}}"
          href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}
          hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+         hx-select-oob="#aside-categories,#shop-filters"
          hx-include="#shop-q, #shop-filters, #shop-sort">{{.Label}}</a>
       {{end}}
     </nav>

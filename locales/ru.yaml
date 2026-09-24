@@ -23,7 +23,6 @@ footer.rights: © Cozy. Все права защищены.
 footer.branches: Филиалы
 footer.legal: "ИП Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарынская область, г. Нарын, ул. Ленина 134, кв. 4."
 
-common.soon: Скоро
 common.back_home: На главную
 
 screen.shop.title: Каталог
@@ -237,3 +236,4 @@ common.currency: сом
 shop.results.one: товар
 shop.results.few: товара
 shop.results.many: товаров
+filter.title: Фильтры

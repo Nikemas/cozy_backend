@@ -16,13 +16,14 @@
   <a class="btn btn--primary aside__login" href="/profile">{{t "sidebar.login"}}</a>
   {{end}}
 
-  <nav class="aside__card" aria-label="{{t "sidebar.categories"}}">
+  <nav class="aside__card" id="aside-categories" aria-label="{{t "sidebar.categories"}}">
     <div class="aside__title">{{t "sidebar.categories"}}</div>
     {{if eq .Screen "shop"}}
     {{range .Data.Categories}}
     <a class="aside__pill{{if .Active}} aside__pill--active{{end}}"
        href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}
        hx-get="{{.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+       hx-select-oob="#aside-categories,#shop-filters"
        hx-include="#shop-q, #shop-filters, #shop-sort">{{.Label}}</a>
     {{end}}
     {{else}}
@@ -32,7 +33,12 @@
 
   {{if eq .Screen "shop"}}
   {{$d := .Data}}
-  <form id="shop-filters" class="aside__card aside__filters" method="get" action="{{$d.BasePath}}"
+  {{/* <details> so phones can collapse the filters (closed on load by the
+       script below at ≤860px); on desktop the summary is hidden and it
+       stays open. */}}
+  <details class="aside__card aside__filters-wrap" id="shop-filters-wrap" open>
+  <summary class="aside__filters-summary"><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i> {{t "filter.title"}}{{if $d.HasFilters}} <span class="aside__filters-dot" aria-hidden="true"></span>{{end}}</summary>
+  <form id="shop-filters" class="aside__filters" method="get" action="{{$d.BasePath}}"
         hx-get="{{$d.BasePath}}" hx-trigger="change, submit"
         hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
         hx-include="#shop-q, #shop-sort">
@@ -82,6 +88,13 @@
       {{if $d.HasFilters}}<a class="aside__reset" href="{{$d.BasePath}}">{{t "sidebar.reset"}}</a>{{end}}
     </div>
   </form>
+  </details>
+  <script>
+    (function () {
+      var d = document.getElementById("shop-filters-wrap");
+      if (d && window.matchMedia("(max-width: 860px)").matches) d.open = false;
+    })();
+  </script>
   {{end}}
 </aside>
 {{end}}
