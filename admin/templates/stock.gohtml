@@ -1,0 +1,88 @@
+{{/* stock.gohtml — Остатки: one point of sale's stock per variant,
+     editable in place. .Data is admin.StockPageData (internal/admin/
+     stock_page.go). point_staff is pinned to their own point (no point
+     selector, no product links); owner/manager choose any point. */}}
+{{define "content"}}
+{{with .Data}}
+<div class="admin-products">
+  <form method="get" action="/admin/stock" class="admin-filterbar" role="search">
+    {{if .CanChoosePoint}}
+    <div class="admin-field admin-filterbar__field">
+      <label for="stock-point">Точка продаж</label>
+      <select id="stock-point" name="point" onchange="this.form.submit()">
+        {{range .Points}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    {{else if .PointName}}
+    <div class="admin-filterbar__static">Точка: <strong>{{.PointName}}</strong></div>
+    {{end}}
+    <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
+      <label for="stock-q">Поиск</label>
+      <input type="search" id="stock-q" name="q" value="{{.Query}}" placeholder="Название, бренд или артикул">
+    </div>
+    <button type="submit" class="admin-btn admin-btn--secondary">Найти</button>
+  </form>
+
+  {{if .Err}}<div class="admin-form-error" role="alert">{{.Err}}</div>{{end}}
+
+  {{if .NoPoint}}
+  <div class="admin-card"><div class="admin-empty"><div class="admin-empty__title">{{.NoPoint}}</div></div></div>
+  {{else}}
+  <form method="post" action="/admin/stock" class="admin-card" id="stock-form">
+    <input type="hidden" name="point" value="{{.PointID}}">
+    <input type="hidden" name="q" value="{{.Query}}">
+    <input type="hidden" name="page" value="{{.Page}}">
+    {{if .Empty}}
+    <div class="admin-empty">
+      <div class="admin-empty__title">Ничего не нашлось</div>
+      <div class="admin-empty__text">Попробуйте другое название</div>
+    </div>
+    {{else}}
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-variants-table">
+        <caption class="admin-visually-hidden">Остатки на точке «{{.PointName}}»</caption>
+        <thead>
+          <tr>
+            <th scope="col">Товар</th>
+            <th scope="col">Размер</th>
+            <th scope="col">Цвет</th>
+            <th scope="col">Остаток</th>
+            <th scope="col">Уровень</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td>
+              {{if .EditURL}}<a href="{{.EditURL}}" class="admin-table__name">{{.ProductName}}</a>{{else}}<span class="admin-table__name">{{.ProductName}}</span>{{end}}
+              {{if .Brand}}<div class="admin-table__brand">{{.Brand}}</div>{{end}}
+            </td>
+            <td>{{.Size}}</td>
+            <td>{{.Color}}</td>
+            <td>
+              <input type="hidden" name="variant_id" value="{{.VariantID}}">
+              {{with .Cell}}
+              <input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="Остаток: {{$.Data.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}>
+              {{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}
+              {{end}}
+            </td>
+            <td><span class="admin-chip" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    <div class="admin-orders-footer">
+      <div class="admin-orders-count">{{.CountLabel}}</div>
+      <div class="admin-orders-pager">
+        {{if .HasPrev}}<a href="{{.PrevURL}}" class="admin-btn admin-btn--secondary">Назад</a>{{end}}
+        {{if .HasNext}}<a href="{{.NextURL}}" class="admin-btn admin-btn--secondary">Дальше</a>{{end}}
+        <button type="submit" class="admin-btn admin-btn--primary">Сохранить изменения</button>
+      </div>
+    </div>
+    {{end}}
+  </form>
+  {{end}}
+</div>
+{{end}}
+{{end}}

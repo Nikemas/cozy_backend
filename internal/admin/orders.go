@@ -347,10 +347,22 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	list, total, err := h.ordersSvc.AdminListOrders(r.Context(), filter)
-	if err != nil {
-		h.handleOrdersServiceError(w, err)
-		return
+	// point_staff only ever sees its own point's orders (the JSON API's
+	// rule, httpapi/admin_orders.go); no point at all fails closed.
+	var list []orders.Order
+	var total int
+	if st.Role == staff.RolePointStaff && st.PointID == nil {
+		list = []orders.Order{}
+	} else {
+		if st.Role == staff.RolePointStaff {
+			filter.PointID = st.PointID
+		}
+		var err error
+		list, total, err = h.ordersSvc.AdminListOrders(r.Context(), filter)
+		if err != nil {
+			h.handleOrdersServiceError(w, err)
+			return
+		}
 	}
 
 	data := h.buildOrdersListView(r.Context(), list, total, statusParam, rangeParam, page)
@@ -465,6 +477,10 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	order, err := h.ordersSvc.AdminGetOrder(r.Context(), id)
 	if err != nil {
 		h.handleOrdersServiceError(w, err)
+		return
+	}
+	if !staffCanSeeOrder(st, order) {
+		http.Error(w, "заказ не найден", http.StatusNotFound)
 		return
 	}
 
@@ -593,6 +609,14 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if st.Role == staff.RolePointStaff {
+		order, err := h.ordersSvc.AdminGetOrder(r.Context(), id)
+		if err != nil || !staffCanSeeOrder(st, order) {
+			http.Error(w, "заказ не найден", http.StatusNotFound)
+			return
+		}
+	}
+
 	if _, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus); err != nil {
 		msg := "не удалось изменить статус"
 		var appErr *apperr.AppError
@@ -604,6 +628,20 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, detailURL, http.StatusSeeOther)
+}
+
+// staffCanSeeOrder is the point-based RBAC rule for one order: owner and
+// manager see every order, point_staff only orders of its own point (an
+// order with no point, or a point_staff with none, is hidden) — the same
+// rule httpapi/admin_orders.go enforces for the JSON API.
+func staffCanSeeOrder(st *staff.Staff, o *orders.Order) bool {
+	if st == nil || o == nil {
+		return false
+	}
+	if st.Role != staff.RolePointStaff {
+		return true
+	}
+	return st.PointID != nil && o.PointID != nil && *st.PointID == *o.PointID
 }
 
 // handleOrdersServiceError translates an error from *orders.Service into

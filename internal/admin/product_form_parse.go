@@ -20,6 +20,7 @@
 package admin
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -93,6 +94,52 @@ func parsePrice(s string) (float64, error) {
 		return 0, fmt.Errorf("цена не может быть отрицательной")
 	}
 	return v, nil
+}
+
+// errStaleForm marks a hidden orig_ value that isn't a valid quantity —
+// only possible with a tampered or corrupted form.
+var errStaleForm = errors.New("форма повреждена — обновите страницу")
+
+const staleFormMessage = "Форма повреждена — обновите страницу"
+
+// parsedCell is one stock cell as submitted.
+type parsedCell struct {
+	Qty     int  // the submitted quantity (or the original one when skipped)
+	Orig    *int // nil = no stock row existed when the form was rendered
+	Changed bool // Qty differs from Orig: this cell must be written
+}
+
+// parseStockCell interprets one stock input (raw, present) and its hidden
+// original (origRaw, hasOrig). A cell that wasn't submitted, or was left
+// blank where no stock row existed, is unchanged; a cleared cell that did
+// have stock is an error (never a silent 0).
+func parseStockCell(raw string, present bool, origRaw string, hasOrig bool) (parsedCell, error) {
+	raw = strings.TrimSpace(raw)
+	origRaw = strings.TrimSpace(origRaw)
+
+	var orig *int
+	if hasOrig && origRaw != "" {
+		n, err := strconv.Atoi(origRaw)
+		if err != nil || n < 0 {
+			return parsedCell{}, errStaleForm
+		}
+		orig = &n
+	}
+
+	if !present || (raw == "" && orig == nil) {
+		pc := parsedCell{Orig: orig}
+		if orig != nil {
+			pc.Qty = *orig
+		}
+		return pc, nil
+	}
+
+	qty, err := parseStockQty(raw)
+	if err != nil {
+		return parsedCell{}, err
+	}
+	unchanged := (orig == nil && qty == 0) || (orig != nil && *orig == qty)
+	return parsedCell{Qty: qty, Orig: orig, Changed: !unchanged}, nil
 }
 
 // parsedProductForm is parseProductForm's result: Input is ready for
@@ -176,41 +223,21 @@ func parseProductForm(form url.Values, productID string, isActive bool, points [
 			cell.Orig = strings.TrimSpace(origRaw)
 			cell.HasOrig = hasOrig
 
-			var orig *int
-			if hasOrig && cell.Orig != "" {
-				n, err := strconv.Atoi(cell.Orig)
-				if err != nil || n < 0 {
-					addErr("Форма повреждена — обновите страницу")
-					cell.Invalid = true
-					row.Cells = append(row.Cells, cell)
-					continue
-				}
-				orig = &n
-			}
-
-			if !present || (cell.Value == "" && orig == nil) {
-				// Not rendered/submitted, or left blank on a cell that
-				// had no stock row: nothing to write.
-				if orig != nil {
-					total += *orig
-				}
-				row.Cells = append(row.Cells, cell)
-				continue
-			}
-
-			qty, err := parseStockQty(cell.Value)
+			pc, err := parseStockCell(raw, present, origRaw, hasOrig)
 			if err != nil {
-				addErr(fmt.Sprintf("Остаток %s / %s, «%s»: %s", orEmpty(size), orEmpty(color), p.Name, err.Error()))
+				if errors.Is(err, errStaleForm) {
+					addErr(staleFormMessage)
+				} else {
+					addErr(fmt.Sprintf("Остаток %s / %s, «%s»: %s", orEmpty(size), orEmpty(color), p.Name, err.Error()))
+				}
 				cell.Invalid = true
 				row.Cells = append(row.Cells, cell)
 				continue
 			}
-			total += qty
+			total += pc.Qty
 			row.Cells = append(row.Cells, cell)
-
-			unchanged := (orig == nil && qty == 0) || (orig != nil && *orig == qty)
-			if !unchanged {
-				out.Input.Stock = append(out.Input.Stock, stockCellChange{RowKey: key, PointID: p.ID, Qty: qty, Orig: orig})
+			if pc.Changed {
+				out.Input.Stock = append(out.Input.Stock, stockCellChange{RowKey: key, PointID: p.ID, Qty: pc.Qty, Orig: pc.Orig})
 			}
 		}
 		row.Qty = total

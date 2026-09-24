@@ -17,19 +17,19 @@ const (
 	categoriesIconPath = "M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z"
 	reportsIconPath    = "M18 20V10 M12 20V4 M6 20v-4"
 	pointsIconPath     = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"
+	stockIconPath      = "M21 8l-9-5-9 5v8l9 5 9-5z M3 8l9 5 9-5 M12 13v8"
 	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
 )
 
 // noAccessPath is where a staff member whose role can see none of the
-// admin screens below ends up — only staff.RolePointStaff in this wave
-// (see tasks/plan.md Wave 4's RBAC mapping: the design canvas only models
-// owner/manager, and point_staff gets no admin panel access at all yet).
+// admin screens below ends up (an unknown role). point_staff used to land
+// here; since fix/admin it sees Заказы and Остатки of its own point.
 const noAccessPath = "/admin/no-access"
 
 // navDef is one entry from the design canvas's navDefs array — key, label,
 // icon, and the roles allowed to see it (§5 ТЗ: owner sees everything
-// here, manager sees orders/products/reports, point_staff sees nothing in
-// this wave). Order matters: it's both the sidebar's display order and,
+// here, manager sees orders/products/reports, point_staff sees orders and
+// stock of its own point). Order matters: it's both the sidebar's display order and,
 // via firstAllowedPath, the fallback page a role lands on when it hits a
 // route/nav item it can't see.
 type navDef struct {
@@ -40,8 +40,9 @@ type navDef struct {
 }
 
 var navDefs = []navDef{
-	{"orders", "Заказы", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"orders", "Заказы", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
 	{"products", "Товары", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"stock", "Остатки", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
 	{"categories", "Категории", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"reports", "Отчёты", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"points", "Склад и точки", pointsIconPath, []staff.Role{staff.RoleOwner}},
