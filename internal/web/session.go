@@ -19,6 +19,15 @@ const (
 	sessionCookieTTL = 15 * time.Minute
 )
 
+// cookieSecure is the Secure attribute of the session cookie: true by
+// default (HTTPS everywhere but local dev); cmd/server sets it from
+// COOKIE_SECURE / APP_ENV via SetCookieSecure before serving.
+var cookieSecure = true
+
+// SetCookieSecure configures the Secure attribute of the storefront
+// session cookie. Call once at startup, before serving requests.
+func SetCookieSecure(secure bool) { cookieSecure = secure }
+
 type ctxKey int
 
 const customerIDKey ctxKey = iota
@@ -62,7 +71,7 @@ func setSessionCookie(w http.ResponseWriter, accessToken string, ttl time.Durati
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // TODO(prod): true once the site is served HTTPS-only
+		Secure:   cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(ttl.Seconds()),
 	})
@@ -74,6 +83,7 @@ func clearSessionCookie(w http.ResponseWriter) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})

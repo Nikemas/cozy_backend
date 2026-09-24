@@ -211,5 +211,6 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 
 // registerWebRoutes mounts / — the public html/template storefront.
 func registerWebRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc *auth.Service) error {
+	web.SetCookieSecure(cfg.Security.CookieSecure)
 	return web.RegisterRoutes(mux, db, cfg, authSvc)
 }
