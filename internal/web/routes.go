@@ -100,6 +100,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /pay/return/{orderID}", withSession(apperr.Wrap(h.payReturn)))
 	mux.Handle("GET /pay/return/{orderID}/status", withSession(apperr.Wrap(h.payReturnStatus)))
 	mux.Handle("POST /pay/{orderID}/retry", withSession(apperr.Wrap(h.payRetry)))
+	mux.Handle("POST /pay/{orderID}/qr", withSession(apperr.Wrap(h.payQR)))
 
 	// Web login: cookie wrapper over the existing OTP service, extended
 	// with the 3rd step (name-for-a-new-customer) this task adds.

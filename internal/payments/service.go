@@ -70,6 +70,15 @@ func NewService(db *sql.DB, provider Provider, ordersSvc OnlineOrderCreator, pub
 // Provider returns the active provider.
 func (s *Service) Provider() Provider { return s.provider }
 
+// QRAvailable reports whether the active provider offers a QR checkout —
+// i.e. GetPaymentQR won't immediately fail with ErrQRNotConfigured. Cheap
+// (no request, no payment attempt opened): for a page deciding whether to
+// show a "Показать QR" button at all.
+func (s *Service) QRAvailable() bool {
+	qp, ok := s.provider.(QRProvider)
+	return ok && qp.QREnabled()
+}
+
 // PlaceOnlineOrder creates an online_card order (reserving stock and a
 // pending payment in one transaction), then opens a checkout session with
 // the provider and returns the order plus the URL to send the customer to.
@@ -176,6 +185,47 @@ func (s *Service) RetryPayment(ctx context.Context, customerID, orderID string) 
 		return "", sessionError(err)
 	}
 	return url, nil
+}
+
+// GetPaymentQR opens a fresh payment attempt on customerID's own
+// online_card order idOrNumber — same eligibility, locking and
+// max-attempts guard as RetryPayment (it's literally the same
+// PrepareRetryPayment call) — but asks the provider for a scannable QR
+// instead of a redirect link. Works for a first payment or a retry alike:
+// there's no separate "first QR" path, opening a fresh attempt is always
+// safe and bounded.
+//
+// ErrQRNotConfigured if the active provider doesn't support QR (checked
+// before touching the order, so an unsupported provider never opens or
+// burns a payment attempt).
+func (s *Service) GetPaymentQR(ctx context.Context, customerID, idOrNumber string) (qrLink, qrImage string, err error) {
+	qp, ok := s.provider.(QRProvider)
+	if !ok || !qp.QREnabled() {
+		return "", "", ErrQRNotConfigured
+	}
+	if err := s.provider.Ready(); err != nil {
+		return "", "", err
+	}
+	order, paymentID, err := s.orders.PrepareRetryPayment(ctx, customerID, idOrNumber, s.provider.Name())
+	if err != nil {
+		return "", "", err
+	}
+	link, image, err := qp.GenerateQR(ctx, order.TotalAmount, paymentID)
+	if err != nil {
+		slog.Error("payments: generating QR failed", "provider", s.provider.Name(), "order", order.OrderNumber, "err", err)
+		if ferr := s.failAttempt(context.WithoutCancel(ctx), paymentID, order.ID); ferr != nil {
+			slog.Error("payments: marking the failed QR attempt failed", "order", order.OrderNumber, "err", ferr)
+		}
+		return "", "", sessionError(err)
+	}
+	// provider_tx_id must equal paymentID for HandleCallback to match the
+	// webhook's echoed operationID — same value openSession stores for a
+	// CreatePayment session (see BakaiProvider.GenerateQR's doc comment).
+	const q = `UPDATE payments SET provider_tx_id = $1, updated_at = now() WHERE id = $1`
+	if _, err := s.db.ExecContext(ctx, q, paymentID); err != nil {
+		return "", "", err
+	}
+	return link, image, nil
 }
 
 // failAttempt marks a retry attempt whose session never opened as failed

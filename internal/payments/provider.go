@@ -89,6 +89,31 @@ type Provider interface {
 var ErrNotConfigured = apperr.New(http.StatusServiceUnavailable, "payments_not_configured",
 	"онлайн-оплата пока недоступна, выберите оплату при получении")
 
+// QRProvider is an optional capability: a Provider that can also open a
+// scannable EMVCo QR checkout as an alternative to CreatePayment's
+// redirect link. Only BakaiProvider implements it today; callers
+// type-assert (s.provider.(QRProvider)) rather than it being part of the
+// main Provider interface, so MockProvider and any future provider
+// without QR support don't need a stub method.
+type QRProvider interface {
+	// QREnabled reports whether GenerateQR is actually usable (e.g. a QR
+	// bearer token is configured) — a provider can implement the
+	// interface yet still not offer QR in a given deployment.
+	QREnabled() bool
+	// GenerateQR opens a QR checkout for amount, keyed by operationID
+	// (same role as CreatePayment's CreateRequest.PaymentID — the
+	// provider must echo it back in the webhook callback so it can be
+	// matched the same way a redirect-link payment is). Returns qrLink
+	// (the raw EMVCo payload) and qrImage (a ready-to-embed
+	// "data:image/..." URL, or "" if the provider doesn't supply one).
+	GenerateQR(ctx context.Context, amount float64, operationID string) (qrLink, qrImage string, err error)
+}
+
+// ErrQRNotConfigured is returned when the active provider doesn't offer a
+// QR checkout (not a QRProvider, or QREnabled() is false).
+var ErrQRNotConfigured = apperr.New(http.StatusNotImplemented, "qr_not_configured",
+	"оплата по QR-коду пока недоступна")
+
 // NewProvider builds the provider selected by cfg.PaymentsProvider.
 func NewProvider(cfg *config.Config) (Provider, error) {
 	switch cfg.PaymentsProvider {

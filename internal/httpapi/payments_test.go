@@ -20,6 +20,7 @@ type fakeCheckout struct {
 	called bool
 	order  *orders.Order
 	url    string
+	image  string
 	err    error
 
 	retryCustomer, retryOrder string
@@ -34,6 +35,12 @@ func (f *fakeCheckout) RetryPayment(_ context.Context, customerID, orderID strin
 	f.called = true
 	f.retryCustomer, f.retryOrder = customerID, orderID
 	return f.url, f.err
+}
+
+func (f *fakeCheckout) GetPaymentQR(_ context.Context, customerID, orderID string) (string, string, error) {
+	f.called = true
+	f.retryCustomer, f.retryOrder = customerID, orderID
+	return f.url, f.image, f.err
 }
 
 func TestCreateOrderHandlerOnlineCardReturnsPaymentURL(t *testing.T) {
@@ -286,6 +293,50 @@ func TestPayOrderHandlerWithoutCheckoutIs503(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle("POST /api/v1/orders/{id}/pay", apperr.Wrap(payOrderHandler(nil)))
 	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay", "cust-1", ""))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestPayOrderQRHandlerReturnsQR(t *testing.T) {
+	co := &fakeCheckout{url: "00020101...emvco", image: "data:image/png;base64,abc"}
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay/qr", apperr.Wrap(payOrderQRHandler(co)))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay/qr", "cust-1", ""))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["qr_link"] != "00020101...emvco" || got["qr_image"] != "data:image/png;base64,abc" {
+		t.Errorf("body = %v", got)
+	}
+	if co.retryCustomer != "cust-1" || co.retryOrder != "order-1" {
+		t.Errorf("GetPaymentQR(%q, %q)", co.retryCustomer, co.retryOrder)
+	}
+}
+
+func TestPayOrderQRHandlerNotConfiguredIs501(t *testing.T) {
+	co := &fakeCheckout{err: payments.ErrQRNotConfigured}
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay/qr", apperr.Wrap(payOrderQRHandler(co)))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay/qr", "cust-1", ""))
+
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "qr_not_configured") {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPayOrderQRHandlerWithoutCheckoutIs503(t *testing.T) {
+	rec := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/v1/orders/{id}/pay/qr", apperr.Wrap(payOrderQRHandler(nil)))
+	mux.ServeHTTP(rec, newCustomerRequest(http.MethodPost, "/api/v1/orders/order-1/pay/qr", "cust-1", ""))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d", rec.Code)
 	}

@@ -151,6 +151,10 @@ func (f *fakeOnlineCheckout) RetryPayment(context.Context, string, string) (stri
 	return f.url, nil
 }
 
+func (f *fakeOnlineCheckout) GetPaymentQR(context.Context, string, string) (string, string, error) {
+	return f.url, "", nil
+}
+
 // newCustomerRequest builds a request carrying an authenticated customer ID
 // in context the same way auth.Service.RequireCustomer would, via
 // auth.NewContextWithCustomerID — so handler tests can exercise a

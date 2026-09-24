@@ -28,41 +28,54 @@ func onlineOrderFor(status orders.OrderStatus, ps orders.PaymentStatus) *orders.
 
 func TestBuildPayReturnData(t *testing.T) {
 	t.Run("anonymous visitor gets only the app link", func(t *testing.T) {
-		d := buildPayReturnData(testOrderID, nil, 0, false)
+		d := buildPayReturnData(testOrderID, nil, 0, false, false)
 		if !d.Anonymous || !d.ShowAppLink || d.AppLink != "cozy://orders/"+testOrderID || d.Poll || d.Retryable {
 			t.Errorf("anonymous = %+v", d)
 		}
 	})
 	t.Run("malformed id has no app link", func(t *testing.T) {
-		d := buildPayReturnData(`x"><script>`, nil, 0, true)
+		d := buildPayReturnData(`x"><script>`, nil, 0, true, false)
 		if d.AppLink != "" || d.ShowAppLink {
 			t.Errorf("AppLink = %q, ShowAppLink = %v", d.AppLink, d.ShowAppLink)
 		}
 	})
 	t.Run("pending polls, then times out with retry", func(t *testing.T) {
-		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), 3, false)
+		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), 3, false, false)
 		if d.State != payStatePending || !d.Poll || d.Retryable || d.PollURL != "/pay/return/"+testOrderID+"/status?n=4" {
 			t.Errorf("pending = %+v", d)
 		}
-		d = buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), payPollMax, false)
+		d = buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), payPollMax, false, false)
 		if d.Poll || !d.TimedOut || !d.Retryable {
 			t.Errorf("timed out = %+v", d)
 		}
 	})
 	t.Run("failed offers retry, no polling", func(t *testing.T) {
-		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed), 0, true)
+		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed), 0, true, false)
 		if d.State != payStateFailed || d.Poll || !d.Retryable || !d.ShowAppLink {
 			t.Errorf("failed = %+v", d)
 		}
 	})
 	t.Run("paid and cancelled stop", func(t *testing.T) {
-		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPaid), 0, false)
+		d := buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPaid), 0, false, false)
 		if d.State != payStatePaid || d.Poll || d.Retryable {
 			t.Errorf("paid = %+v", d)
 		}
-		d = buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusCancelled, orders.PaymentCancelled), 0, false)
+		d = buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusCancelled, orders.PaymentCancelled), 0, false, false)
 		if d.State != payStateCancelled || d.Poll || d.Retryable {
 			t.Errorf("cancelled = %+v", d)
+		}
+	})
+	t.Run("QR offered only when retryable and the provider supports it", func(t *testing.T) {
+		failed := onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed)
+		if d := buildPayReturnData(testOrderID, failed, 0, false, true); !d.QROffered {
+			t.Errorf("retryable + qrAvailable must offer QR: %+v", d)
+		}
+		if d := buildPayReturnData(testOrderID, failed, 0, false, false); d.QROffered {
+			t.Errorf("qrAvailable=false must not offer QR: %+v", d)
+		}
+		paid := onlineOrderFor(orders.StatusPlaced, orders.PaymentPaid)
+		if d := buildPayReturnData(testOrderID, paid, 0, false, true); d.QROffered {
+			t.Errorf("not retryable (already paid) must not offer QR even if qrAvailable: %+v", d)
 		}
 	})
 }
@@ -75,14 +88,16 @@ func TestRenderPayReturnExecutes(t *testing.T) {
 		wants []string
 		not   []string
 	}{
-		{"anonymous", buildPayReturnData(testOrderID, nil, 0, false),
+		{"anonymous", buildPayReturnData(testOrderID, nil, 0, false, false),
 			[]string{`href="cozy://orders/` + testOrderID + `"`, "Вернуться в приложение"}, []string{"hx-get", "COZY-"}},
-		{"pending", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), 0, false),
+		{"pending", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPending), 0, false, false),
 			[]string{`hx-get="/pay/return/` + testOrderID + `/status?n=1"`, `hx-trigger="every 2s"`, "COZY-20260924-001"}, []string{"/retry"}},
-		{"failed", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed), 0, true),
-			[]string{`action="/pay/` + testOrderID + `/retry"`, "Оплатить снова", "cozy://orders/"}, []string{"hx-get"}},
-		{"paid", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPaid), 0, false),
-			[]string{"Оплата прошла"}, []string{"hx-get", "/retry", "cozy://"}},
+		{"failed", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed), 0, true, false),
+			[]string{`action="/pay/` + testOrderID + `/retry"`, "Оплатить снова", "cozy://orders/"}, []string{"hx-get", "Показать QR"}},
+		{"failed_with_qr", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentFailed), 0, true, true),
+			[]string{`hx-post="/pay/` + testOrderID + `/qr"`, "Показать QR", `id="pay-qr"`}, nil},
+		{"paid", buildPayReturnData(testOrderID, onlineOrderFor(orders.StatusPlaced, orders.PaymentPaid), 0, false, false),
+			[]string{"Оплата прошла"}, []string{"hx-get", "/retry", "cozy://", "Показать QR"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -108,6 +123,37 @@ func TestRenderPayReturnExecutes(t *testing.T) {
 					if strings.Contains(body, s) {
 						t.Errorf("partial=%v: body must not contain %q", partial, s)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestRenderPayQRFragment(t *testing.T) {
+	rr := newTestRenderer(t)
+	cases := []struct {
+		name  string
+		data  PayQRData
+		wants []string
+	}{
+		{"image", PayQRData{OrderID: testOrderID, QRLink: "00020101...emvco", QRImage: "data:image/png;base64,abc"},
+			[]string{`src="data:image/png;base64,abc"`}},
+		{"link only", PayQRData{OrderID: testOrderID, QRLink: "00020101...emvco"},
+			[]string{"00020101...emvco"}},
+		{"error", PayQRData{OrderID: testOrderID, Error: "оплата по QR пока недоступна"},
+			[]string{"оплата по QR пока недоступна"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			data := PageData{Lang: i18n.LangRU, Screen: "pay_return", Authed: true, Data: c.data}
+			if err := rr.RenderPartial(w, "pay_return", "pay_qr", data); err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			body := w.Body.String()
+			for _, s := range c.wants {
+				if !strings.Contains(body, s) {
+					t.Errorf("body lacks %q: %s", s, body)
 				}
 			}
 		})

@@ -28,6 +28,7 @@ type orderService interface {
 type onlineCheckout interface {
 	PlaceOnlineOrder(ctx context.Context, in orders.PlaceOrderInput) (*orders.Order, string, bool, error)
 	RetryPayment(ctx context.Context, customerID, orderID string) (string, error)
+	GetPaymentQR(ctx context.Context, customerID, orderID string) (qrLink, qrImage string, err error)
 }
 
 // cartService is the subset of *orders.CartRepo the cart handlers depend
@@ -74,6 +75,7 @@ func RegisterOrderRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, 
 	mux.Handle("GET /api/v1/orders/{id}", requireCustomer(apperr.Wrap(getOrderHandler(ordersSvc))))
 	mux.Handle("POST /api/v1/orders/{id}/cancel", requireCustomer(apperr.Wrap(cancelOrderHandler(ordersSvc))))
 	mux.Handle("POST /api/v1/orders/{id}/pay", requireCustomer(apperr.Wrap(payOrderHandler(checkout))))
+	mux.Handle("POST /api/v1/orders/{id}/pay/qr", requireCustomer(apperr.Wrap(payOrderQRHandler(checkout))))
 
 	// Public: the checkout's delivery-zone picker (no auth needed).
 	mux.Handle("GET /api/v1/delivery-zones", apperr.Wrap(listDeliveryZonesHandler(orders.NewDeliveryZoneRepo(db))))
@@ -208,6 +210,34 @@ func payOrderHandler(checkout onlineCheckout) apperr.HandlerFunc {
 			return err
 		}
 		return writeJSON(w, http.StatusOK, payOrderResponse{PaymentURL: url})
+	}
+}
+
+// payOrderQRResponse is the POST /api/v1/orders/{id}/pay/qr body.
+type payOrderQRResponse struct {
+	QRLink  string `json:"qr_link"`
+	QRImage string `json:"qr_image,omitempty"`
+}
+
+// payOrderQRHandler serves POST /api/v1/orders/{id}/pay/qr: like
+// payOrderHandler, a new payment attempt on the customer's own online_card
+// order, but returns a scannable QR instead of a redirect link — 501
+// qr_not_configured if the active provider doesn't support QR, 409
+// payment_not_retryable for the same reasons /pay would refuse.
+func payOrderQRHandler(checkout onlineCheckout) apperr.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		customerID, ok := auth.CustomerIDFromContext(r.Context())
+		if !ok {
+			return apperr.Unauthorized("unauthenticated", "требуется вход в систему")
+		}
+		if checkout == nil {
+			return payments.ErrNotConfigured
+		}
+		link, image, err := checkout.GetPaymentQR(r.Context(), customerID, r.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, payOrderQRResponse{QRLink: link, QRImage: image})
 	}
 }
 

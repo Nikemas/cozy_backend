@@ -48,6 +48,11 @@
       <button type="submit" class="btn btn--primary">{{t "pay.return.retry"}}</button>
     </form>
     {{end}}
+    {{if $d.QROffered}}
+    <button type="button" class="btn btn--ghost" id="pay-qr-toggle"
+      hx-post="/pay/{{$d.OrderID}}/qr" hx-target="#pay-qr" hx-swap="innerHTML"
+      hx-indicator="#pay-qr-toggle" onclick="this.disabled=true">{{t "pay.return.show_qr"}}</button>
+    {{end}}
     {{if $d.TimedOut}}<a class="btn btn--ghost" href="/pay/return/{{$d.OrderID}}">{{t "pay.return.refresh"}}</a>{{end}}
     {{if $d.ShowAppLink}}<a class="btn {{if $d.Anonymous}}btn--primary{{else}}btn--ghost{{end}}" href="{{$d.AppLink}}">{{t "pay.return.back_to_app"}}</a>{{end}}
     {{if $d.Anonymous}}
@@ -56,5 +61,21 @@
     <a class="btn btn--ghost" href="/orders">{{t "pay.return.my_orders"}}</a>
     {{end}}
   </div>
+  {{if $d.QROffered}}<div id="pay-qr" class="pay-qr"></div>{{end}}
 </div>
+{{end}}
+
+{{define "pay_qr"}}{{$q := .Data}}
+{{if $q.Error}}
+  <p class="pay-qr__error">{{$q.Error}}</p>
+{{else if $q.QRImage}}
+  <img class="pay-qr__image" src="{{$q.QRImage}}" alt="{{t "pay.return.qr_alt"}}" width="240" height="240">
+  <p class="pay-qr__hint">{{t "pay.return.qr_hint"}}</p>
+{{else}}
+  {{/* Bakai didn't send an image, just the raw EMVCo payload — show it as
+       copyable text rather than a broken <img>; a real wallet app that
+       accepts a pasted EMVCo string can still use it. */}}
+  <p class="pay-qr__hint">{{t "pay.return.qr_hint"}}</p>
+  <code class="pay-qr__link">{{$q.QRLink}}</code>
+{{end}}
 {{end}}

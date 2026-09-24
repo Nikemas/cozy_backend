@@ -135,7 +135,7 @@ func TestBakaiProviderGenerateQRDisabledWithoutToken(t *testing.T) {
 	if b.QREnabled() {
 		t.Fatal("QREnabled() = true without BAKAI_QR_TOKEN")
 	}
-	if _, err := b.GenerateQR(context.Background(), 100, "pay-1"); err == nil {
+	if _, _, err := b.GenerateQR(context.Background(), 100, "pay-1"); err == nil {
 		t.Fatal("GenerateQR succeeded without a QR token")
 	}
 }
@@ -149,7 +149,7 @@ func TestBakaiProviderGenerateQRSendsRequestAndParsesLink(t *testing.T) {
 		}
 		gotAuth = r.Header.Get("Authorization")
 		_ = json.NewDecoder(r.Body).Decode(&gotReq)
-		_ = json.NewEncoder(w).Encode(generateQRResponse{QrLink: "00020101...emvco-payload"})
+		_ = json.NewEncoder(w).Encode(generateQRResponse{QrLink: "00020101...emvco-payload", QrImage: "base64pngdata"})
 	}))
 	defer srv.Close()
 
@@ -157,12 +157,15 @@ func TestBakaiProviderGenerateQRSendsRequestAndParsesLink(t *testing.T) {
 	if !b.QREnabled() {
 		t.Fatal("QREnabled() = false with a QR token set")
 	}
-	link, err := b.GenerateQR(context.Background(), 5150, "pay-1")
+	link, image, err := b.GenerateQR(context.Background(), 5150, "pay-1")
 	if err != nil {
 		t.Fatalf("GenerateQR: %v", err)
 	}
 	if link != "00020101...emvco-payload" {
 		t.Errorf("link = %q", link)
+	}
+	if image != "data:image/png;base64,base64pngdata" {
+		t.Errorf("image = %q, want the bare base64 wrapped in a data: URL", image)
 	}
 	if gotAuth != "Bearer qr-tok" {
 		t.Errorf("Authorization = %q, want the QR token, not the pay-link token", gotAuth)

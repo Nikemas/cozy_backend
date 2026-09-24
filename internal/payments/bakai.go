@@ -142,14 +142,19 @@ type generateQRResponse struct {
 }
 
 // GenerateQR creates a scannable EMVCo payment QR via Bakai OpenBanking
-// POST /api/Qr/GenerateQR, as an alternative to the CreatePayLink redirect —
-// operationID should be the same req.PaymentID passed to CreatePayment, so
-// the webhook (which echoes it back) matches the same payment either way.
-// Returns qrLink, the EMVCo payload to render as a QR image; nothing in
-// Provider calls this yet, it's exposed for a future in-app QR checkout.
-func (b *BakaiProvider) GenerateQR(ctx context.Context, amount float64, operationID string) (string, error) {
+// POST /api/Qr/GenerateQR, as an alternative to CreatePayment's redirect
+// link. operationID should be a payments.id (same role as CreatePayment's
+// transactionID) — the webhook echoes it back as operationID, which is
+// how HandleCallback matches the payment either way (see payments.Service
+// GetPaymentQR, which stores operationID into payments.provider_tx_id the
+// same way openSession does for CreatePayment).
+//
+// Returns qrLink (the EMVCo payload some wallets scan directly) and
+// qrImage, a ready-to-embed "data:image/png;base64,..." URL built from
+// Bakai's own qrImage field so callers don't need a QR-rendering library.
+func (b *BakaiProvider) GenerateQR(ctx context.Context, amount float64, operationID string) (qrLink, qrImage string, err error) {
 	if !b.QREnabled() {
-		return "", ErrNotConfigured
+		return "", "", ErrNotConfigured
 	}
 	body, err := json.Marshal(generateQRRequest{
 		AccountNo:   b.accountNo,
@@ -160,35 +165,39 @@ func (b *BakaiProvider) GenerateQR(ctx context.Context, amount float64, operatio
 		QrTtl:       5,
 	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		b.baseURL+"/api/Qr/GenerateQR", bytes.NewReader(body))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+b.qrToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := b.hc.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("bakai GenerateQR: %w", err)
+		return "", "", fmt.Errorf("bakai GenerateQR: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("bakai GenerateQR: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		return "", "", fmt.Errorf("bakai GenerateQR: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
 	}
 	var out generateQRResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", fmt.Errorf("bakai GenerateQR decode: %w", err)
+		return "", "", fmt.Errorf("bakai GenerateQR decode: %w", err)
 	}
 	if out.QrLink == "" {
-		return "", fmt.Errorf("bakai GenerateQR: empty qrLink")
+		return "", "", fmt.Errorf("bakai GenerateQR: empty qrLink")
 	}
-	return out.QrLink, nil
+	img := strings.TrimSpace(out.QrImage)
+	if img != "" && !strings.HasPrefix(img, "data:") {
+		img = "data:image/png;base64," + img
+	}
+	return out.QrLink, img, nil
 }
 
 // bakaiWebhook is Bakai's payment callback body (plain JSON, no auth

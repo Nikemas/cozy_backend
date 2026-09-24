@@ -740,6 +740,50 @@ paths:
           description: "`payments_not_configured`."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
+  /api/v1/orders/{id}/pay/qr:
+    post:
+      tags: [Customer]
+      summary: Pay by scanning a QR instead of the redirect link
+      description: |
+        Same eligibility, attempt limit and TTL-restart as
+        `POST /api/v1/orders/{id}/pay` — it's the same "open a fresh
+        attempt" call, just asking the provider for a scannable QR instead
+        of a redirect link. `qr_link` is the raw EMVCo payload (for a
+        wallet app that scans a link); `qr_image` is a ready-to-embed
+        `data:image/...` URL, omitted if the provider doesn't supply one.
+        501 `qr_not_configured` if the active payment provider doesn't
+        support QR (currently: Bakai only, and only when `BAKAI_QR_TOKEN`
+        is set).
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: New QR checkout session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [qr_link]
+                properties:
+                  qr_link: { type: string }
+                  qr_image: { type: string, description: "data: URL, e.g. data:image/png;base64,..." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`order_not_found` — missing or another customer's."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: "`payment_not_retryable` — cash order, cancelled, already paid, or too many attempts."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "501":
+          description: "`qr_not_configured` — the active provider doesn't offer a QR checkout."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "502":
+          description: "`payment_create_failed` — the provider couldn't open a session; the order stays open (`payment_status: failed`), try again."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "503":
+          description: "`payments_not_configured`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
   /api/v1/cart:
     get:
       tags: [Customer]

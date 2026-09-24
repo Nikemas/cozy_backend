@@ -272,3 +272,6 @@ pay.return.app_title: Оплата завершена
 pay.return.app_text: Если вы оплачивали заказ в приложении Cozy, вернитесь в него — статус оплаты виден в заказе.
 pay.return.login: Войти на сайт
 pay.return.my_orders: Мои заказы
+pay.return.show_qr: Показать QR
+pay.return.qr_alt: QR-код для оплаты
+pay.return.qr_hint: Отсканируйте QR в приложении вашего банка

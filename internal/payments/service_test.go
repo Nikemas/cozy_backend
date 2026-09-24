@@ -666,3 +666,108 @@ func (r *recordingProvider) CreatePayment(ctx context.Context, req CreateRequest
 	r.last = req
 	return r.MockProvider.CreatePayment(ctx, req)
 }
+
+// fakeQRProvider adds QRProvider to a MockProvider's behavior, so
+// Service.GetPaymentQR can be tested without a real BakaiProvider/HTTP.
+type fakeQRProvider struct {
+	*MockProvider
+	enabled bool
+	qrLink  string
+	qrImage string
+	qrErr   error
+
+	gotAmount      float64
+	gotOperationID string
+}
+
+func (f *fakeQRProvider) QREnabled() bool { return f.enabled }
+
+func (f *fakeQRProvider) GenerateQR(_ context.Context, amount float64, operationID string) (string, string, error) {
+	f.gotAmount, f.gotOperationID = amount, operationID
+	if f.qrErr != nil {
+		return "", "", f.qrErr
+	}
+	return f.qrLink, f.qrImage, nil
+}
+
+func TestGetPaymentQRNotConfiguredWhenProviderLacksQR(t *testing.T) {
+	creator := &fakeCreator{}
+	svc, _ := newMockService(t, NewMockProvider("", "tok"), creator) // *MockProvider isn't a QRProvider
+	if _, _, err := svc.GetPaymentQR(context.Background(), "cust-1", "order-1"); !errors.Is(err, ErrQRNotConfigured) {
+		t.Fatalf("err = %v, want ErrQRNotConfigured", err)
+	}
+	if creator.called {
+		t.Fatal("no payment attempt may be opened when the provider doesn't support QR")
+	}
+}
+
+func TestGetPaymentQRNotConfiguredWhenDisabled(t *testing.T) {
+	creator := &fakeCreator{}
+	qp := &fakeQRProvider{MockProvider: NewMockProvider("", "tok"), enabled: false}
+	svc, _ := newMockService(t, qp, creator)
+	if _, _, err := svc.GetPaymentQR(context.Background(), "cust-1", "order-1"); !errors.Is(err, ErrQRNotConfigured) {
+		t.Fatalf("err = %v, want ErrQRNotConfigured", err)
+	}
+	if creator.called {
+		t.Fatal("no payment attempt may be opened while QR is disabled")
+	}
+}
+
+func TestGetPaymentQRHappyPath(t *testing.T) {
+	creator := &fakeCreator{order: &orders.Order{ID: "order-1", OrderNumber: "COZY-1", TotalAmount: 5150}}
+	qp := &fakeQRProvider{MockProvider: NewMockProvider("", "tok"), enabled: true,
+		qrLink: "00020101...emvco", qrImage: "data:image/png;base64,abc"}
+	svc, mock := newMockService(t, qp, creator)
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET provider_tx_id = $1, updated_at = now() WHERE id = $1")).
+		WithArgs("pay-2").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	link, image, err := svc.GetPaymentQR(context.Background(), "cust-1", "order-1")
+	if err != nil {
+		t.Fatalf("GetPaymentQR: %v", err)
+	}
+	if link != "00020101...emvco" || image != "data:image/png;base64,abc" {
+		t.Errorf("link/image = %q/%q", link, image)
+	}
+	if creator.retryCustomer != "cust-1" || creator.retryOrder != "order-1" || creator.provider != MockProviderName {
+		t.Errorf("PrepareRetryPayment got %q/%q/%q", creator.retryCustomer, creator.retryOrder, creator.provider)
+	}
+	if qp.gotAmount != 5150 || qp.gotOperationID != "pay-2" {
+		t.Errorf("GenerateQR got amount=%v operationID=%q", qp.gotAmount, qp.gotOperationID)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetPaymentQRNotRetryablePassesThrough(t *testing.T) {
+	creator := &fakeCreator{retryErr: orders.ErrPaymentNotRetryable}
+	qp := &fakeQRProvider{MockProvider: NewMockProvider("", "tok"), enabled: true}
+	svc, _ := newMockService(t, qp, creator)
+	if _, _, err := svc.GetPaymentQR(context.Background(), "cust-1", "order-1"); appCode(err) != "payment_not_retryable" {
+		t.Fatalf("err = %v, want payment_not_retryable", err)
+	}
+}
+
+// TestGetPaymentQRProviderFailureMarksAttemptFailed mirrors
+// TestRetryPaymentProviderFailureMarksAttemptFailed: the order stays
+// retryable, only the new attempt is failed.
+func TestGetPaymentQRProviderFailureMarksAttemptFailed(t *testing.T) {
+	creator := &fakeCreator{order: &orders.Order{ID: "order-1", OrderNumber: "COZY-1", TotalAmount: 10}}
+	qp := &fakeQRProvider{MockProvider: NewMockProvider("", "tok"), enabled: true, qrErr: errors.New("bank down")}
+	svc, mock := newMockService(t, qp, creator)
+
+	mock.ExpectBegin()
+	expectLockOrder(mock, orders.StatusPlaced, StatusPending)
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments SET status = 'failed'")).
+		WithArgs("pay-2").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET payment_status = 'failed', updated_at = now() WHERE id = $1 AND status = 'placed'")).
+		WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if _, _, err := svc.GetPaymentQR(context.Background(), "cust-1", "order-1"); appCode(err) != "payment_create_failed" {
+		t.Fatalf("err = %v, want payment_create_failed", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}

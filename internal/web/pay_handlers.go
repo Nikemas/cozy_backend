@@ -45,6 +45,9 @@ type PayReturnData struct {
 	Anonymous bool
 	// Retryable: "Оплатить снова" is offered (orders.PaymentRetryable).
 	Retryable bool
+	// QROffered: "Показать QR" is offered — Retryable, and the active
+	// provider supports a QR checkout (payments.Service.QRAvailable).
+	QROffered bool
 	// Poll: the status fragment keeps polling every PollEverySec seconds;
 	// PollURL is its next URL.
 	Poll         bool
@@ -91,8 +94,9 @@ func payState(o *orders.Order) string {
 
 // buildPayReturnData is the pure part of the result page: o is the
 // customer's own order or nil (anonymous / not theirs); poll is how many
-// status polls have run.
-func buildPayReturnData(orderID string, o *orders.Order, poll int, mobile bool) PayReturnData {
+// status polls have run; qrAvailable is payments.Service.QRAvailable()
+// (false when there's no active payments.Service at all).
+func buildPayReturnData(orderID string, o *orders.Order, poll int, mobile, qrAvailable bool) PayReturnData {
 	d := PayReturnData{OrderID: orderID, AppLink: AppOrderLink(orderID), ShowAppLink: mobile}
 	if o == nil {
 		d.Anonymous = true
@@ -119,6 +123,7 @@ func buildPayReturnData(orderID string, o *orders.Order, poll int, mobile bool) 
 	case payStateFailed:
 		d.Retryable = retryable
 	}
+	d.QROffered = d.Retryable && qrAvailable
 	return d
 }
 
@@ -166,7 +171,7 @@ func (h *handlers) payReturn(w http.ResponseWriter, r *http.Request) error {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	data := h.base(r, "pay_return")
-	data.Data = buildPayReturnData(orderID, o, 0, isMobileUA(r))
+	data.Data = buildPayReturnData(orderID, o, 0, isMobileUA(r), h.paySvc != nil && h.paySvc.QRAvailable())
 	return h.render.Render(w, "pay_return", data)
 }
 
@@ -184,7 +189,7 @@ func (h *handlers) payReturnStatus(w http.ResponseWriter, r *http.Request) error
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	data := h.base(r, "pay_return")
-	data.Data = buildPayReturnData(orderID, o, n, isMobileUA(r))
+	data.Data = buildPayReturnData(orderID, o, n, isMobileUA(r), h.paySvc != nil && h.paySvc.QRAvailable())
 	return h.render.RenderPartial(w, "pay_return", "pay_status", data)
 }
 
@@ -215,4 +220,49 @@ func (h *handlers) payRetry(w http.ResponseWriter, r *http.Request) error {
 	}
 	http.Redirect(w, r, url, http.StatusSeeOther)
 	return nil
+}
+
+// PayQRData backs the pay_qr fragment: either QRImage/QRLink are set, or
+// Error is (a QR attempt failing is shown in place, not as a page error —
+// "Оплатить снова" is still right there).
+type PayQRData struct {
+	OrderID string
+	QRLink  string
+	// QRImage is template.URL, not string: html/template treats a <img
+	// src> as URL context and blanks any scheme it doesn't recognize as
+	// safe (http/https/mailto) — same reason AppLink above is
+	// template.URL. Safe here because it's built server-side from the
+	// bank's own response (BakaiProvider.GenerateQR), never user input.
+	QRImage template.URL
+	Error   string
+}
+
+// payQR serves POST /pay/{orderID}/qr ("Показать QR"): opens a fresh
+// payment attempt (same eligibility as payRetry) and renders the
+// resulting QR in place via an HTMX swap, instead of redirecting.
+func (h *handlers) payQR(w http.ResponseWriter, r *http.Request) error {
+	customerID := CustomerID(r)
+	if customerID == "" {
+		http.Redirect(w, r, "/profile", http.StatusSeeOther)
+		return nil
+	}
+	if h.paySvc == nil {
+		return payments.ErrNotConfigured
+	}
+	orderID := r.PathValue("orderID")
+	if uuid.Validate(orderID) != nil {
+		return apperr.NotFound("order_not_found", "заказ не найден")
+	}
+	data := h.base(r, "pay_return")
+	link, image, err := h.paySvc.GetPaymentQR(r.Context(), customerID, orderID)
+	if err != nil {
+		var appErr *apperr.AppError
+		if !errors.As(err, &appErr) {
+			return err
+		}
+		data.Data = PayQRData{OrderID: orderID, Error: appErr.Message}
+		return h.render.RenderPartial(w, "pay_return", "pay_qr", data)
+	}
+	data.Data = PayQRData{OrderID: orderID, QRLink: link, QRImage: template.URL(image)} //nolint:gosec // built server-side from BakaiProvider.GenerateQR's own response, not user input
+	return h.render.RenderPartial(w, "pay_return", "pay_qr", data)
 }

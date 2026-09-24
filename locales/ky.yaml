@@ -272,3 +272,6 @@ pay.return.app_title: Төлөм аяктады
 pay.return.app_text: Эгер буйрутманы Cozy колдонмосунда төлөсөңүз, ага кайтыңыз — төлөмдүн абалы буйрутмада көрүнөт.
 pay.return.login: Сайтка кирүү
 pay.return.my_orders: Менин буйрутмаларым
+pay.return.show_qr: QR көрсөтүү
+pay.return.qr_alt: Төлөө үчүн QR-код
+pay.return.qr_hint: Банктын колдонмосу менен QR-кодду скандаңыз
