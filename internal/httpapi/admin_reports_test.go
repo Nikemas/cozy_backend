@@ -23,6 +23,7 @@ type fakeSalesRepo struct {
 	pointNames   map[string]string
 	loadErr      error
 	pointNameErr error
+	categoryRows []reports.Row
 
 	lastFrom, lastTo time.Time
 }
@@ -40,6 +41,14 @@ func (f *fakeSalesRepo) PointNames(_ context.Context) (map[string]string, error)
 		return nil, f.pointNameErr
 	}
 	return f.pointNames, nil
+}
+
+func (f *fakeSalesRepo) CategorySales(_ context.Context, from, to time.Time) ([]reports.Row, error) {
+	f.lastFrom, f.lastTo = from, to
+	if f.loadErr != nil {
+		return nil, f.loadErr
+	}
+	return f.categoryRows, nil
 }
 
 func salesReportRequest(query string) *http.Request {

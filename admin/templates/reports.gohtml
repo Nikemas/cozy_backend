@@ -91,7 +91,7 @@
   </div>
 
   <div class="admin-reports__card admin-ranked-list">
-    <div class="admin-ranked-list__title">По категориям</div>
+    <div class="admin-ranked-list__title">По категориям{{if .Data.CategoryExportURL}} · <a href="{{.Data.CategoryExportURL}}">Excel</a>{{end}}</div>
     {{if .Data.Categories}}
     <table class="admin-table admin-category-report">
       <thead>
