@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpmw"
@@ -86,6 +87,10 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/stock", anyRole(h.stockPage))
 	mux.HandleFunc("POST /admin/stock", anyRole(h.stockSave))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
+
+	// W2 fix/promo-push: Рассылки (promo push) — broadcasts_page.go; the
+	// sending itself is broadcasts.Worker, started in cmd/server.
+	registerBroadcastRoutes(mux, h, broadcasts.NewRepo(db), ownerOrManager)
 
 	// Категории: list + add/edit modals + delete, same RBAC as products —
 	// see categories_page.go. The JSON API at /admin/api/categories

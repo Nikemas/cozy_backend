@@ -80,6 +80,12 @@ type OrderItem struct {
 	ColorSnapshot       string  `json:"color_snapshot"`
 	Quantity            int     `json:"quantity"`
 	Price               float64 `json:"price"`
+	// ProductID/PhotoURL/ThumbURL come from the current catalog (not the
+	// snapshot), filled in one batched query by attachItemPhotos; null when
+	// unknown or the product has no photo.
+	ProductID *string `json:"product_id"`
+	PhotoURL  *string `json:"photo_url"`
+	ThumbURL  *string `json:"thumb_url"`
 }
 
 // OrderItemInput is what CreateOrder needs per line. Only VariantID/Qty
@@ -375,6 +381,8 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 	// Staff hear about a cash order now; about an online order only once
 	// it's paid (NotifyOrderPaid, called from the payment callback) — an
 	// unpaid online order is not something to start packing.
+	// Before notifying: the notifier reads order.Items on another goroutine.
+	s.attachItemPhotos(ctx, []Order{order}) // shares order.Items' backing array
 	if method == PaymentCashOnDelivery {
 		s.notifyCreated(order)
 	}
@@ -622,7 +630,11 @@ func (s *Service) attachItems(ctx context.Context, list []Order) error {
 		}
 		list[i].Items = append(list[i].Items, it)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	s.attachItemPhotos(ctx, list)
+	return nil
 }
 
 // validateFulfillment enforces "exactly one of addressID/pickupPointID" —

@@ -8,6 +8,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
@@ -34,29 +35,31 @@ type favoriteProductGetter interface {
 // anonymous access to a customer's favorites. Called from
 // RegisterCustomerRoutes (customer.go), the one exported entry point for
 // this whole file group.
-func registerFavoritesRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service) {
+func registerFavoritesRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Service, cfg *config.Config) {
 	favorites := storefront.NewFavoriteRepo(db)
 	products := catalog.NewProductRepo(db)
+	details := catalogDetailSources{
+		variants: catalog.NewVariantRepo(db),
+		stock:    catalog.NewStockRepo(db),
+		images:   catalog.NewImageRepo(db),
+	}
 
-	mux.Handle("GET /api/v1/favorites", authSvc.RequireCustomer(apperr.Wrap(listFavoritesHandler(favorites, products))))
+	mux.Handle("GET /api/v1/favorites", authSvc.RequireCustomer(apperr.Wrap(listFavoritesHandler(favorites, products, details, cfg))))
 	mux.Handle("POST /api/v1/favorites/{productId}", authSvc.RequireCustomer(apperr.Wrap(addFavoriteHandler(favorites))))
 	mux.Handle("DELETE /api/v1/favorites/{productId}", authSvc.RequireCustomer(apperr.Wrap(removeFavoriteHandler(favorites))))
 }
 
-// listFavoritesHandler returns full catalog.Product rows for a customer's
-// favorited products, not bare IDs.
+// listFavoritesHandler returns the customer's favorited products as full
+// product objects — the exact GET /api/v1/products/{id} shape (images,
+// variants with per-point stock) — newest favorite first, so the app can
+// render the list and open a product without another request per item.
 //
-// Design decision (see this task's report for the full tradeoff): a
-// favorites list screen in the Flutter app needs to render product cards
-// (name/price/photo), so returning bare IDs would just force the app into
-// a second round-trip — either N GET /api/v1/products/{id} calls or a
-// batch endpoint that doesn't exist yet. Products are resolved with a
-// single ProductRepo.GetActiveByIDs query (formerly one GetByID per id),
-// keeping the favorites' newest-first order. A product that's since gone
-// inactive/deleted is skipped rather than failing the whole request —
-// same behavior as internal/web's loadFavoriteCards. A genuine DB error
-// now fails the request instead of being silently swallowed per row.
-func listFavoritesHandler(favorites favoriteLister, products favoriteProductGetter) apperr.HandlerFunc {
+// Query count is constant, whatever the list length: favorite ids,
+// products (ProductRepo.GetActiveByIDs), then variants, stock and images
+// in one batch query each (buildProductDetails). A product that has since
+// gone inactive/deleted is skipped rather than failing the whole request —
+// same behavior as internal/web's loadFavoriteCards.
+func listFavoritesHandler(favorites favoriteLister, products favoriteProductGetter, details productDetailSources, cfg *config.Config) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
 		if !ok {
@@ -72,19 +75,23 @@ func listFavoritesHandler(favorites favoriteLister, products favoriteProductGett
 		if err != nil {
 			return err
 		}
-		items := make([]catalog.Product, 0, len(ids))
+		active := make([]catalog.Product, 0, len(ids))
 		for _, id := range ids {
 			if p, ok := byID[id]; ok {
-				items = append(items, p)
+				active = append(active, p)
 			}
 		}
 
+		items, err := buildProductDetails(r.Context(), details, cfg, active)
+		if err != nil {
+			return err
+		}
 		return writeJSON(w, http.StatusOK, favoritesResponse{Items: items})
 	}
 }
 
 type favoritesResponse struct {
-	Items []catalog.Product `json:"items"`
+	Items []productDetailResponse `json:"items"`
 }
 
 // addFavoriteHandler adds a product to the authenticated customer's

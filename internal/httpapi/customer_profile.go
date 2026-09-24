@@ -15,7 +15,7 @@ import (
 // live database — mirrors favoriteLister/addressStore in this package.
 type customerProfileStore interface {
 	GetByID(ctx context.Context, id string) (*storefront.Customer, error)
-	SetName(ctx context.Context, id, name string) error
+	UpdateProfile(ctx context.Context, id string, u storefront.ProfileUpdate) (*storefront.Customer, error)
 }
 
 // registerCustomerProfileRoutes mounts the authenticated customer's own
@@ -62,13 +62,19 @@ type customerProfileResponse struct {
 	ID    string  `json:"id"`
 	Phone string  `json:"phone"`
 	Name  *string `json:"name,omitempty"`
+	// Lang is "ru" or "ky" — the language pushes are sent in.
+	Lang string `json:"lang"`
+	// PromoPush: the customer receives promo broadcasts (default true).
+	PromoPush bool `json:"promo_push"`
 }
 
 func newCustomerProfileResponse(c storefront.Customer) customerProfileResponse {
 	return customerProfileResponse{
-		ID:    c.ID,
-		Phone: c.Phone,
-		Name:  c.Name,
+		ID:        c.ID,
+		Phone:     c.Phone,
+		Name:      c.Name,
+		Lang:      c.Lang,
+		PromoPush: c.PromoPush,
 	}
 }
 
@@ -95,16 +101,20 @@ func getCustomerProfileHandler(customers customerProfileStore) apperr.HandlerFun
 	}
 }
 
-// customerProfileRequest is what PUT /api/v1/customer's body decodes into.
+// customerProfileRequest is what PUT /api/v1/customer's body decodes
+// into. Every field is optional (partial update): an absent field is left
+// unchanged, so the app can send just {"promo_push": false} or
+// {"lang": "ky"} without re-sending the name.
 type customerProfileRequest struct {
-	Name string `json:"name"`
+	Name      *string `json:"name"`
+	Lang      *string `json:"lang"`
+	PromoPush *bool   `json:"promo_push"`
 }
 
-// updateCustomerProfileHandler sets the authenticated customer's name and
+// updateCustomerProfileHandler applies a partial profile update and
 // returns the updated profile in the same shape as
-// getCustomerProfileHandler. Blank-name validation lives in
-// storefront.CustomerRepo.SetName (apperr.BadRequest("invalid_name", ...))
-// and isn't duplicated here.
+// getCustomerProfileHandler. Validation (blank name → invalid_name,
+// unknown lang → invalid_lang) lives in storefront.ProfileUpdate.
 func updateCustomerProfileHandler(customers customerProfileStore) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		customerID, ok := auth.CustomerIDFromContext(r.Context())
@@ -117,11 +127,9 @@ func updateCustomerProfileHandler(customers customerProfileStore) apperr.Handler
 			return err
 		}
 
-		if err := customers.SetName(r.Context(), customerID, req.Name); err != nil {
-			return err
-		}
-
-		c, err := customers.GetByID(r.Context(), customerID)
+		c, err := customers.UpdateProfile(r.Context(), customerID, storefront.ProfileUpdate{
+			Name: req.Name, Lang: req.Lang, PromoPush: req.PromoPush,
+		})
 		if err != nil {
 			return err
 		}

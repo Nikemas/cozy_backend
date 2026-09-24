@@ -41,6 +41,8 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 	// per-customer), so clients may reuse them briefly. Products carry
 	// stock numbers, hence the shorter window; the category tree only
 	// changes when staff edit it.
+	detailSources := catalogDetailSources{variants: variants, stock: stock, images: images}
+
 	categoryCache := httpmw.PublicCache(publicCategoryMaxAge)
 	productCache := httpmw.PublicCache(publicProductMaxAge)
 
@@ -106,49 +108,11 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 			return err
 		}
 
-		productVariants, err := variants.ListByProduct(r.Context(), product.ID)
+		details, err := buildProductDetails(r.Context(), detailSources, cfg, []catalog.Product{*product})
 		if err != nil {
 			return err
 		}
-
-		variantIDs := make([]string, len(productVariants))
-		for i, v := range productVariants {
-			variantIDs[i] = v.ID
-		}
-
-		stockRows, err := stock.ByVariantIDs(r.Context(), variantIDs)
-		if err != nil {
-			return err
-		}
-
-		stockByVariant := make(map[string][]stockPoint, len(productVariants))
-		for _, s := range stockRows {
-			stockByVariant[s.VariantID] = append(stockByVariant[s.VariantID], stockPoint{
-				PointID:  s.PointID,
-				Quantity: s.Quantity,
-			})
-		}
-
-		productImages, err := images.ListByProduct(r.Context(), product.ID)
-		if err != nil {
-			return err
-		}
-		imageOuts := make([]imageOut, len(productImages))
-		for i, img := range productImages {
-			imageOuts[i] = imageOut{URL: photoURL(cfg, img.ObjectKey), ThumbURL: thumbURL(cfg, img.ObjectKey), SortOrder: img.SortOrder, Color: img.Color}
-		}
-
-		resp := productDetailResponse{Product: *product, Images: imageOuts, Variants: make([]variantDetail, 0, len(productVariants))}
-		for _, v := range productVariants {
-			stockForVariant := stockByVariant[v.ID]
-			if stockForVariant == nil {
-				stockForVariant = []stockPoint{}
-			}
-			resp.Variants = append(resp.Variants, variantDetail{
-				Variant: v,
-				Stock:   stockForVariant,
-			})
-		}
+		resp := details[0]
 
 		return writeJSON(w, http.StatusOK, resp)
 	})))

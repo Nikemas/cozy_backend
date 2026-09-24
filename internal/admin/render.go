@@ -37,7 +37,8 @@ var screenPages = map[string]string{
 	"points":         "points.gohtml",
 	"staff":          "staff.gohtml",
 	"categories":     "categories.gohtml",
-	"stock":          "stock.gohtml", // fix/admin: per-point stock screen (point_staff's catalog view)
+	"stock":          "stock.gohtml",      // fix/admin: per-point stock screen (point_staff's catalog view)
+	"broadcasts":     "broadcasts.gohtml", // W2 fix/promo-push: Рассылки (promo push)
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell

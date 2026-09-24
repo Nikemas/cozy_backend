@@ -63,6 +63,17 @@ func statusPushText(lang string, order orders.Order) (title, body string, ok boo
 	return fmt.Sprintf(t.Title, order.OrderNumber), t.Body, true
 }
 
+// statusSMSText is the SMS fallback for a status update: "Cozy: " + the
+// push title — one short line keeps it within a single Cyrillic SMS
+// segment (70 chars) for the usual order number length.
+func statusSMSText(lang string, order orders.Order) (string, bool) {
+	title, _, ok := statusPushText(lang, order)
+	if !ok {
+		return "", false
+	}
+	return "Cozy: " + title, true
+}
+
 func isPickup(o orders.Order) bool { return o.AddressID == nil || *o.AddressID == "" }
 
 // maxTelegramItems caps the item lines in a staff message — Telegram
