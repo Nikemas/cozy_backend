@@ -576,6 +576,136 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 	}, nil
 }
 
+// QuickBuyData backs the "Купить" quick-buy modal opened from a
+// shop-grid card (COZY_WEB_DESIGN.md §3.1 "Быстрая покупка" — ported
+// from the mobile design's quick-buy sheet): a compact size/color picker
+// that lets a visitor buy without leaving the shop screen. It reuses the
+// exact same CartActionURL/BuyActionURL as the full product page — only
+// the picker options' own Href (back to this product's /quickbuy/:id,
+// not the product page) differs.
+type QuickBuyData struct {
+	Name      string
+	Brand     string
+	PriceText string
+
+	HasPhoto bool
+	PhotoURL string
+
+	Sizes  []SizeOption
+	Colors []ColorOption
+
+	SelectedSize  string
+	SelectedColor string
+	InStock       bool
+
+	CartActionURL string
+	BuyActionURL  string
+}
+
+// buildQuickBuyData is buildProductData's slimmed-down sibling: same
+// variant/stock lookup and size-color selection logic, but no gallery
+// thumbnails, delivery/availability block or SEO — the modal only needs
+// enough to let the visitor pick a variant and add it to the cart/buy it.
+func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, productID string) (*QuickBuyData, error) {
+	product, err := h.products.GetByID(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+
+	variantList, err := h.variants.ListByProduct(ctx, product.ID)
+	if err != nil {
+		return nil, err
+	}
+	variantIDs := make([]string, len(variantList))
+	for i, v := range variantList {
+		variantIDs[i] = v.ID
+	}
+	stockRows, err := h.stock.ByVariantIDs(ctx, variantIDs)
+	if err != nil {
+		return nil, err
+	}
+	qtyByVariant := make(map[string]int, len(variantList))
+	for _, s := range stockRows {
+		qtyByVariant[s.VariantID] += s.Quantity
+	}
+
+	sizeVals := make([]string, len(variantList))
+	colorVals := make([]string, len(variantList))
+	for i, v := range variantList {
+		sizeVals[i] = v.Size
+		colorVals[i] = v.Color
+	}
+	sizes := distinctInOrder(sizeVals)
+	colors := distinctInOrder(colorVals)
+
+	selectedSize := q.Get("size")
+	selectedColor := q.Get("color")
+	if selectedSize == "" && len(sizes) > 0 {
+		selectedSize = sizes[0]
+	}
+	if selectedColor == "" && len(colors) > 0 {
+		selectedColor = colors[0]
+	}
+
+	quickBuyPath := "/quickbuy/" + product.ID
+	sizeOpts := make([]SizeOption, 0, len(sizes))
+	for _, s := range sizes {
+		v := findVariant(variantList, s, selectedColor)
+		sizeOpts = append(sizeOpts, SizeOption{
+			Label:     s,
+			Selected:  s == selectedSize,
+			Available: v != nil && qtyByVariant[v.ID] > 0,
+			Href:      quickBuyPath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(selectedColor),
+		})
+	}
+	colorOpts := make([]ColorOption, 0, len(colors))
+	for _, c := range colors {
+		v := findVariant(variantList, selectedSize, c)
+		colorOpts = append(colorOpts, ColorOption{
+			Label:     c,
+			Selected:  c == selectedColor,
+			Available: v != nil && qtyByVariant[v.ID] > 0,
+			Href:      quickBuyPath + "?size=" + url.QueryEscape(selectedSize) + "&color=" + url.QueryEscape(c),
+		})
+	}
+
+	price := product.BasePrice
+	selectedVariantID := ""
+	if v := findVariant(variantList, selectedSize, selectedColor); v != nil {
+		selectedVariantID = v.ID
+		if v.PriceOverride != nil {
+			price = *v.PriceOverride
+		}
+	}
+
+	productImages, err := h.images.ListByProduct(ctx, product.ID)
+	if err != nil {
+		return nil, err
+	}
+	photos := buildGallery(catalog.ForColor(productImages, selectedColor), h.photoURL)
+	photoURL := ""
+	if len(photos) > 0 {
+		photoURL = photos[0].URL
+	}
+
+	productPath := ProductPath(product.ID, product.NameRu)
+
+	return &QuickBuyData{
+		Name:          pickName(product.NameRu, product.NameKy, lang),
+		Brand:         stringOr(product.Brand, ""),
+		PriceText:     formatAmount(price, h.t(lang, "common.currency")),
+		HasPhoto:      len(photos) > 0,
+		PhotoURL:      photoURL,
+		Sizes:         sizeOpts,
+		Colors:        colorOpts,
+		SelectedSize:  selectedSize,
+		SelectedColor: selectedColor,
+		InStock:       selectedVariantID != "" && qtyByVariant[selectedVariantID] > 0,
+		CartActionURL: productPath + "/cart",
+		BuyActionURL:  productPath + "/buy",
+	}, nil
+}
+
 func findVariant(variants []catalog.Variant, size, color string) *catalog.Variant {
 	for i := range variants {
 		if variants[i].Size == size && variants[i].Color == color {

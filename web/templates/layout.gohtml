@@ -56,6 +56,10 @@
 {{/* _toast renders the single #toast-slot mount point: HTMX responses
      swap one-off toasts into it (hx-target / OOB / HX-Retarget). */}}
 {{template "_toast" .}}
+{{/* quickbuy-slot is the shop screen's "Купить" modal mount point (see
+     shop.gohtml's _quickbuy_modal and internal/web/quickbuy_handlers.go)
+     — present on every page like #toast-slot, empty everywhere else. */}}
+<div id="quickbuy-slot"></div>
 </body>
 </html>
 {{end}}

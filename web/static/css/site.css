@@ -766,28 +766,70 @@ button, input { font-family: inherit; }
 .shop-empty i { display: block; font-size: 34px; margin-bottom: 10px; }
 
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-.product-card { position: relative; border: 1.5px solid var(--cozy-accent-border); border-radius: var(--cozy-r-16); padding: 14px; background: var(--cozy-surface); }
+/* Ported from the mobile design's catalog card (COZY_WEB_DESIGN.md §3.1):
+   solid bright accent background, white photo square, white text, plus
+   the "Купить" quick-buy button (.product-card__buy) — see
+   shop.gohtml's _quickbuy_modal. Client explicitly asked for the plain
+   bright --cozy-accent (#FF7A1A) with white text, matching the design
+   1:1, over the higher-contrast --cozy-accent-aa/dark-ink pairing this
+   started with — white-on-accent here is ~2.6:1, below WCAG AA's 4.5:1
+   for this text size; flagged, but this is the approved visual. */
+.product-card { position: relative; border-radius: var(--cozy-r-16); padding: 12px 14px 14px; background: var(--cozy-accent); }
 .product-card__fav {
-  position: absolute; top: 7px; right: 7px; z-index: 2;
-  width: 32px; height: 32px; border: none; background: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; color: var(--cozy-ink-4); font-size: 18px;
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  width: 32px; height: 32px; border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.25); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--cozy-surface); font-size: 17px;
 }
 .product-card__link { display: block; color: inherit; }
 .product-card__thumb {
-  background: var(--cozy-surface-2); border-radius: var(--cozy-r-12);
-  height: 150px; margin-bottom: 12px;
+  background: var(--cozy-surface); border-radius: var(--cozy-r-12);
+  aspect-ratio: 1; margin-top: 34px; margin-bottom: 12px; padding: 10px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .product-card__thumb img { width: 100%; height: 100%; object-fit: contain; }
-.product-card__brand { font-size: 11.5px; color: var(--cozy-ink-3); margin-bottom: 3px; }
-.product-card__name { font-size: var(--cozy-fs-14); color: var(--cozy-ink); margin-bottom: 6px; }
-.product-card__price { font-size: 15px; font-weight: 700; color: var(--cozy-ink); }
+.product-card__brand { font-size: 11.5px; color: rgba(255, 255, 255, 0.8); margin-bottom: 3px; }
+.product-card__name { font-size: var(--cozy-fs-14); font-weight: 700; color: var(--cozy-surface); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.product-card__price { font-size: 15px; font-weight: 800; color: var(--cozy-surface); }
+.product-card__buy {
+  width: 100%; margin-top: 12px; height: 40px; border: none; border-radius: var(--cozy-r-pill);
+  background: var(--cozy-surface); color: var(--cozy-accent-ink); font-family: inherit; font-size: 13.5px; font-weight: 800;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
 
 .shop-pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 28px; }
 .shop-pager__link { display: flex; align-items: center; gap: 4px; font-size: var(--cozy-fs-13); font-weight: 600; color: var(--cozy-accent); }
 .shop-pager__page { font-size: var(--cozy-fs-13); color: var(--cozy-ink-3); }
 
 .aside__pill--active { background: var(--cozy-accent-bg); color: var(--cozy-accent-ink); }
+
+/* ---- Quick-buy modal (COZY_WEB_DESIGN.md §3.1 "Быстрая покупка",
+   ported from the mobile design's quick-buy sheet — see shop.gohtml's
+   _quickbuy_modal and internal/web/quickbuy_handlers.go). Centered, not
+   a bottom sheet, since the web design is desktop-first. */
+.modal-overlay { position: fixed; inset: 0; background: rgba(26, 26, 26, 0.45); z-index: 40; }
+.quickbuy-modal {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  z-index: 41; background: var(--cozy-surface); border-radius: 24px; padding: 24px; box-sizing: border-box;
+  box-shadow: 0 20px 60px rgba(26, 26, 26, 0.2);
+}
+.quickbuy-modal__close {
+  position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border: none; border-radius: 50%;
+  background: var(--cozy-surface-2); color: var(--cozy-ink-2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.quickbuy-modal__head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; padding-right: 34px; }
+.quickbuy-modal__photo {
+  width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--cozy-r-16); background: var(--cozy-accent-bg);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 8px; box-sizing: border-box;
+}
+.quickbuy-modal__photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.quickbuy-modal__info { flex: 1; min-width: 0; }
+.quickbuy-modal__brand { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin-bottom: 3px; }
+.quickbuy-modal__name { font-size: var(--cozy-fs-19); font-weight: 800; color: var(--cozy-ink); margin-bottom: 6px; }
+.quickbuy-modal__price { font-size: var(--cozy-fs-19); font-weight: 800; color: var(--cozy-accent-strong); }
+.quickbuy-modal__actions { display: flex; gap: 12px; margin-top: 4px; }
+.quickbuy-modal__actions .btn { flex: 1; justify-content: center; }
 
 /* ---- Product screen (COZY_WEB_DESIGN.md §3.2, Task 2) ---- */
 .product-page { max-width: 1040px; margin: 0 auto; }
@@ -983,7 +1025,6 @@ button, input { font-family: inherit; }
 .fav-card__brand,
 .shop-count,
 .shop-empty,
-.product-card__brand,
 .shop-pager__page,
 .product-meta__brand { color: var(--cozy-ink-2); }
 
@@ -1017,7 +1058,9 @@ button, input { font-family: inherit; }
   .shop-toolbar__right { flex-wrap: wrap; justify-content: flex-end; }
   .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .product-card { padding: 10px; }
-  .product-card__thumb { height: 130px; }
+  .product-card__thumb { margin-top: 26px; }
+  .quickbuy-modal { padding: 18px; }
+  .quickbuy-modal__photo { width: 72px; height: 72px; }
 }
 .footer__legal { color: var(--cozy-ink-2); }
 @media (max-width: 860px) { .footer__legal { padding: 0 16px 20px; } }

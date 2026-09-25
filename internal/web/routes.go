@@ -79,6 +79,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("GET /product/{slug}", withSession(apperr.Wrap(h.product)))
 	mux.Handle("POST /product/{slug}/cart", withSession(apperr.Wrap(h.productAddToCart)))
 	mux.Handle("POST /product/{slug}/buy", withSession(apperr.Wrap(h.productBuyNow)))
+	// Quick-buy modal (shop-grid "Купить" button) — not one of the 9
+	// screens, just an HTMX fragment; see quickbuy_handlers.go.
+	mux.Handle("GET /quickbuy/{id}", withSession(apperr.Wrap(h.quickBuy)))
 	mux.Handle("GET /cart", withSession(apperr.Wrap(h.cart)))
 	mux.Handle("POST /cart/items", withSession(apperr.Wrap(h.cartAddItem)))
 	mux.Handle("POST /cart/items/{variantID}/increment", withSession(apperr.Wrap(h.cartIncrement)))

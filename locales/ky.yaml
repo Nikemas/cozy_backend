@@ -24,6 +24,7 @@ footer.branches: Филиалдар
 footer.legal: "ЖК Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир."
 
 common.back_home: Башкы бетке
+common.close: Жабуу
 
 screen.shop.title: Каталог
 screen.product.title: Товар
@@ -109,6 +110,7 @@ shop.banner.title: Бишкек боюнча жеткирүү жана дүкө�
 shop.empty: Эч нерсе табылган жок
 shop.prev: Артка
 shop.next: Кийинки
+shop.quick_buy: Сатып алуу
 
 product.size: Өлчөм
 product.color: Түс

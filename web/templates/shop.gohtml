@@ -8,6 +8,17 @@
 <div>
   {{template "_shop_results" .}}
 </div>
+<script>
+  // Escape closes the quick-buy modal. Lives here (rendered once with the
+  // full page) rather than inside _quickbuy_modal, which is re-rendered
+  // on every size/color pick — an inline listener there would stack a
+  // new one on each swap instead of just running once.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var slot = document.getElementById("quickbuy-slot");
+    if (slot) slot.innerHTML = "";
+  });
+</script>
 {{end}}
 
 {{define "_shop_results"}}
@@ -69,9 +80,9 @@
           {{if .HasPhoto}}
           <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400" loading="lazy" decoding="async">
           {{else}}
-          <svg width="120" height="72" viewBox="0 0 100 60" aria-hidden="true">
-            <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
-            <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="2.5" stroke-linecap="round"/>
+          <svg width="110" height="66" viewBox="0 0 100 60" aria-hidden="true">
+            <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
+            <path d="M20 33 L45 33" stroke="var(--cozy-accent-aa)" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
           {{end}}
         </div>
@@ -79,6 +90,13 @@
         <div class="product-card__name">{{.Name}}</div>
         <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
       </a>
+      {{/* Quick-buy (COZY_WEB_DESIGN.md §3.1, ported from the mobile
+           design's "Быстрая покупка"): opens _quickbuy_modal below in
+           #quickbuy-slot instead of leaving the shop screen. */}}
+      <button class="product-card__buy" type="button" aria-label="{{t "shop.quick_buy"}}: {{.Name}}"
+              hx-get="/quickbuy/{{.ID}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">
+        <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i> {{t "shop.quick_buy"}}
+      </button>
     </div>
     {{end}}
   </div>
@@ -101,5 +119,75 @@
   </div>
   {{end}}
   {{end}}
+</div>
+{{end}}
+
+{{/* Quick-buy modal (COZY_WEB_DESIGN.md §3.1) — rendered by
+     GET /quickbuy/{id} into #quickbuy-slot (see layout.gohtml) and
+     re-rendered in place on every size/color pick; see
+     internal/web/quickbuy_handlers.go and catalog_view.go's
+     buildQuickBuyData. Closing (X, overlay click, Escape) is plain JS —
+     no server round trip needed to just empty the mount point. */}}
+{{define "_quickbuy_modal"}}
+{{$d := .Data}}
+<div class="modal-overlay" onclick="document.getElementById('quickbuy-slot').innerHTML=''"></div>
+<div class="quickbuy-modal" role="dialog" aria-modal="true" aria-label="{{$d.Name}}">
+  <button type="button" class="quickbuy-modal__close" aria-label="{{t "common.close"}}"
+          onclick="document.getElementById('quickbuy-slot').innerHTML=''">
+    <i class="ti ti-x" aria-hidden="true"></i>
+  </button>
+  <div class="quickbuy-modal__head">
+    <div class="quickbuy-modal__photo">
+      {{if $d.HasPhoto}}
+      <img src="{{$d.PhotoURL}}" alt="{{$d.Name}}" width="200" height="200">
+      {{else}}
+      <svg width="70" height="42" viewBox="0 0 100 60" aria-hidden="true">
+        <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
+      </svg>
+      {{end}}
+    </div>
+    <div class="quickbuy-modal__info">
+      {{if $d.Brand}}<div class="quickbuy-modal__brand">{{$d.Brand}}</div>{{end}}
+      <div class="quickbuy-modal__name">{{$d.Name}}</div>
+      <div class="quickbuy-modal__price">{{$d.PriceText}}</div>
+    </div>
+  </div>
+
+  {{if $d.Sizes}}
+  <div class="product-section-title">{{t "product.size"}}</div>
+  <div class="product-options">
+    {{range $d.Sizes}}
+    <a class="product-option{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
+       href="{{.Href}}"{{if .Selected}} aria-current="true"{{end}}
+       hx-get="{{.Href}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if $d.Colors}}
+  <div class="product-section-title">{{t "product.color"}}</div>
+  <div class="product-options">
+    {{range $d.Colors}}
+    <a class="product-option product-option--color{{if .Selected}} product-option--active{{end}}{{if not .Available}} product-option--unavailable{{end}}"
+       href="{{.Href}}"{{if .Selected}} aria-current="true"{{end}}
+       hx-get="{{.Href}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">{{.Label}}</a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <form class="quickbuy-modal__actions">
+    <input type="hidden" name="size" value="{{$d.SelectedSize}}">
+    <input type="hidden" name="color" value="{{$d.SelectedColor}}">
+    <button type="button" class="btn btn--primary quickbuy-modal__order" {{if not $d.InStock}}disabled{{end}}
+            hx-post="{{$d.BuyActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
+            hx-on::after-request="document.getElementById('quickbuy-slot').innerHTML=''">
+      {{t "product.buy_now"}} <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i>
+    </button>
+    <button type="button" class="btn btn--ghost quickbuy-modal__cart" {{if not $d.InStock}}disabled{{end}}
+            hx-post="{{$d.CartActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
+            hx-on::after-request="document.getElementById('quickbuy-slot').innerHTML=''">
+      {{t "product.add_to_cart"}} <i class="ti ti-shopping-bag" aria-hidden="true"></i>
+    </button>
+  </form>
 </div>
 {{end}}

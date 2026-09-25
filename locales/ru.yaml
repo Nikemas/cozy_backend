@@ -24,6 +24,7 @@ footer.branches: Филиалы
 footer.legal: "ИП Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарынская область, г. Нарын, ул. Ленина 134, кв. 4."
 
 common.back_home: На главную
+common.close: Закрыть
 
 screen.shop.title: Каталог
 screen.product.title: Товар
@@ -109,6 +110,7 @@ shop.banner.title: Доставка по Бишкеку и самовывоз и
 shop.empty: Ничего не найдено
 shop.prev: Назад
 shop.next: Дальше
+shop.quick_buy: Купить
 
 product.size: Размер
 product.color: Цвет
