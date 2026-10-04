@@ -46,6 +46,7 @@ type pointResponse struct {
 	Latitude     *float64 `json:"latitude"`
 	Longitude    *float64 `json:"longitude"`
 	MapURL       string   `json:"map_url"`
+	EmbedURL     string   `json:"embed_url"`
 }
 
 func newPointResponse(b storefront.Branch) pointResponse {
@@ -58,6 +59,7 @@ func newPointResponse(b storefront.Branch) pointResponse {
 		Latitude:     b.Latitude,
 		Longitude:    b.Longitude,
 		MapURL:       b.MapURL(),
+		EmbedURL:     b.EmbedURL(),
 	}
 }
 
