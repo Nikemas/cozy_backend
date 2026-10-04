@@ -133,8 +133,8 @@ func newOwnerOrdersHandlers(t *testing.T, meta *fakeOrderListMeta) *handlers {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "name", "address", "is_active", "created_at"}).
-			AddRow("pA", "Главный склад", "ул. 1", true, time.Now()))
+		sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}).
+			AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()))
 	return &handlers{render: newTestRenderer(t), orderMeta: meta, pointsRepo: points.NewPointsRepo(db)}
 }
 

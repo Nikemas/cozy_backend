@@ -22,28 +22,40 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
 	mux.Handle("DELETE /admin/api/points/{id}", ownerOnly(apperr.Wrap(deletePointHandler(repo))))
 }
 
-// createPointRequest is the POST body: {name, address}. is_active isn't
+// createPointRequest is the POST body: {name, city, address, working_hours, latitude, longitude}. is_active isn't
 // accepted here — a newly created point always defaults to active.
 type createPointRequest struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
+	Name         string   `json:"name"`
+	City         string   `json:"city"`
+	Address      string   `json:"address"`
+	WorkingHours string   `json:"working_hours"`
+	Latitude     *float64 `json:"latitude"`
+	Longitude    *float64 `json:"longitude"`
 }
 
 func (req createPointRequest) toInput() PointInput {
 	return PointInput{
-		Name:     req.Name,
-		Address:  req.Address,
-		IsActive: true,
+		Name:         req.Name,
+		City:         req.City,
+		Address:      req.Address,
+		WorkingHours: req.WorkingHours,
+		Latitude:     req.Latitude,
+		Longitude:    req.Longitude,
+		IsActive:     true,
 	}
 }
 
-// updatePointRequest is the PUT body: {name, address, is_active} — unlike
+// updatePointRequest is the PUT body: {name, city, address, working_hours, latitude, longitude, is_active} — unlike
 // create, is_active is an explicit, required field so a point can be
 // deactivated/reactivated through this endpoint.
 type updatePointRequest struct {
-	Name     string `json:"name"`
-	Address  string `json:"address"`
-	IsActive bool   `json:"is_active"`
+	Name         string   `json:"name"`
+	City         string   `json:"city"`
+	Address      string   `json:"address"`
+	WorkingHours string   `json:"working_hours"`
+	Latitude     *float64 `json:"latitude"`
+	Longitude    *float64 `json:"longitude"`
+	IsActive     bool     `json:"is_active"`
 }
 
 func (req updatePointRequest) toInput() PointInput {

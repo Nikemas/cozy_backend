@@ -14,7 +14,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
-var pointCols = []string{"id", "name", "address", "is_active", "created_at"}
+var pointCols = []string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}
 
 func newPointsHandlers(t *testing.T) (*handlers, sqlmock.Sqlmock) {
 	t.Helper()
@@ -34,11 +34,11 @@ func ownerStaff() *staff.Staff {
 func TestPointsUpdateKeepsActiveFlag(t *testing.T) {
 	h, mock := newPointsHandlers(t)
 	mock.ExpectQuery(`FROM points_of_sale\s+WHERE id::text = \$1`).WithArgs("p1").
-		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "ул. 1", false, time.Now()))
-	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Дордой-Центр", "ул. Дордой, 1", false).
-		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Дордой-Центр", "ул. Дордой, 1", false, time.Now()))
+		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "Бишкек", "ул. 1", "", nil, nil, false, time.Now()))
+	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Дордой-Центр", "Бишкек", "ул. Дордой, 1", "", nil, nil, false).
+		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Дордой-Центр", "Бишкек", "ул. Дордой, 1", "", nil, nil, false, time.Now()))
 
-	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{"name": {" Дордой-Центр "}, "address": {"ул. Дордой, 1"}})
+	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{"name": {" Дордой-Центр "}, "city": {"Бишкек"}, "address": {"ул. Дордой, 1"}})
 	r.SetPathValue("id", "p1")
 	w := httptest.NewRecorder()
 	h.pointsUpdate(w, r)
@@ -53,10 +53,10 @@ func TestPointsUpdateKeepsActiveFlag(t *testing.T) {
 
 func TestPointsUpdateValidationErrorRerenders(t *testing.T) {
 	h, mock := newPointsHandlers(t)
-	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "ул. 1", true, time.Now()))
-	mock.ExpectQuery(`FROM points_of_sale\s+ORDER BY name`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "ул. 1", true, time.Now()))
+	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()))
+	mock.ExpectQuery(`FROM points_of_sale\s+ORDER BY name`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Старое", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()))
 
-	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{"name": {""}, "address": {"ул. 1"}})
+	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{"name": {""}, "city": {"Бишкек"}, "address": {"ул. 1"}})
 	r.SetPathValue("id", "p1")
 	w := httptest.NewRecorder()
 	h.pointsUpdate(w, r)
@@ -72,8 +72,8 @@ func TestPointsUpdateValidationErrorRerenders(t *testing.T) {
 func TestPointsPageHasEditAndDeactivateConfirm(t *testing.T) {
 	h, mock := newPointsHandlers(t)
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows(pointCols).
-		AddRow("p1", "Дордой", "ул. 1", true, time.Now()).
-		AddRow("p2", "Склад", "ул. 2", false, time.Now()))
+		AddRow("p1", "Дордой", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()).
+		AddRow("p2", "Склад", "Бишкек", "ул. 2", "", nil, nil, false, time.Now()))
 
 	w := httptest.NewRecorder()
 	h.pointsPage(w, requestAs(http.MethodGet, "/admin/points", ownerStaff(), nil))
@@ -88,5 +88,39 @@ func TestPointsPageHasEditAndDeactivateConfirm(t *testing.T) {
 	}
 	if !strings.Contains(body, `role="dialog"`) {
 		t.Error("point modal is not a dialog")
+	}
+}
+
+func TestParseCoordAcceptsCommaAndBlank(t *testing.T) {
+	if v, err := parseCoord(" 42,8746 "); err != nil || v == nil || *v != 42.8746 {
+		t.Errorf("comma decimal: %v %v", v, err)
+	}
+	if v, err := parseCoord("  "); err != nil || v != nil {
+		t.Errorf("blank: %v %v", v, err)
+	}
+	if _, err := parseCoord("abc"); err == nil {
+		t.Error("want error for non-number")
+	}
+}
+
+func TestPointsUpdateSavesHoursAndCoords(t *testing.T) {
+	h, mock := newPointsHandlers(t)
+	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()))
+	lat, lng := 42.8746, 74.5698
+	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Т", "Бишкек", "ул. 1", "10:00–20:00", &lat, &lng, true).
+		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Т", "Бишкек", "ул. 1", "10:00–20:00", lat, lng, true, time.Now()))
+
+	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{
+		"name": {"Т"}, "city": {"Бишкек"}, "address": {"ул. 1"}, "working_hours": {"10:00–20:00"},
+		"latitude": {"42,8746"}, "longitude": {"74.5698"}})
+	r.SetPathValue("id", "p1")
+	w := httptest.NewRecorder()
+	h.pointsUpdate(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want redirect", w.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
 	}
 }

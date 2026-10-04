@@ -38,16 +38,26 @@ func RegisterPublicPointsRoutes(mux *http.ServeMux, db *sql.DB) {
 // JSON-specific dependency to the shared storefront domain type. Mirrors
 // addressResponse in addresses.go.
 type pointResponse struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Address string `json:"address"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	City         string   `json:"city"`
+	Address      string   `json:"address"`
+	WorkingHours string   `json:"working_hours"`
+	Latitude     *float64 `json:"latitude"`
+	Longitude    *float64 `json:"longitude"`
+	MapURL       string   `json:"map_url"`
 }
 
 func newPointResponse(b storefront.Branch) pointResponse {
 	return pointResponse{
-		ID:      b.ID,
-		Name:    b.Name,
-		Address: b.Address,
+		ID:           b.ID,
+		Name:         b.Name,
+		City:         b.City,
+		Address:      b.Address,
+		WorkingHours: b.WorkingHours,
+		Latitude:     b.Latitude,
+		Longitude:    b.Longitude,
+		MapURL:       b.MapURL(),
 	}
 }
 

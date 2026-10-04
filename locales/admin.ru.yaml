@@ -209,6 +209,14 @@ admin.reports.build_failed: не удалось построить отчёт
 
 # Products: list, form, import
 admin.points.address_placeholder: ул. Дордой, 1
+admin.points.city: "Город"
+admin.points.hours: "Время работы"
+admin.points.hours_placeholder: "пн–вс 10:00–20:00"
+admin.points.coords: "Координаты (для 2ГИС)"
+admin.points.lat_placeholder: "42.8746"
+admin.points.lng_placeholder: "74.5698"
+admin.points.coords_hint: "Широта и долгота точки из 2ГИС: правый клик по карте → «Скопировать координаты». Нужны для ссылки «Маршрут» на сайте и в приложении."
+admin.points.invalid_coords: "Некорректные координаты: используйте числа вроде 42.8746"
 admin.products.import: Импорт
 admin.products.add: Добавить товар
 admin.products.subcategory: Подкатегория

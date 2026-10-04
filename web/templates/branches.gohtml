@@ -9,30 +9,20 @@
   </div>
   {{else}}
   <div class="branches-layout">
-    <!-- Decorative CSS pseudo-map (COZY_WEB_DESIGN.md §3.7): a grid
-         background + hand-placed % pins, no real geocoding/maps API. -->
     <div class="branches-map" id="branches-map">
-      <div class="branches-map__road branches-map__road--v"></div>
-      <div class="branches-map__road branches-map__road--h"></div>
-      {{range .Data.Pins}}
-      <button type="button"
-              class="branches-map__pin{{if .FirstInSet}} branches-map__pin--active{{end}}"
-              style="left:{{.X}}%;top:{{.Y}}%;"
-              data-branch="{{.Index}}"
-              aria-label="{{.Number}}">
-        <span class="branches-map__pin-shape"><span class="branches-map__pin-num">{{.Number}}</span></span>
-      </button>
-      {{end}}
+      <iframe id="branches-map-frame" title="{{t "branches.title"}}" src="{{(index .Data.Cards 0).EmbedURL}}"
+              loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
     </div>
 
     <div class="branches-list">
       {{range .Data.Cards}}
-      <div class="branch-card{{if .FirstInSet}} branch-card--active{{end}}" data-branch="{{.Index}}" tabindex="0">
+      <div class="branch-card{{if .FirstInSet}} branch-card--active{{end}}" data-branch="{{.Index}}" data-embed="{{.EmbedURL}}" tabindex="0">
         <div class="branch-card__row">
           <div class="branch-card__badge">{{.Number}}</div>
           <div class="branch-card__info">
             <div class="branch-card__name">{{.Name}}</div>
-            <div class="branch-card__address">{{.Address}}</div>
+            <div class="branch-card__address">{{.City}}, {{.Address}}</div>
+            {{if .Hours}}<div class="branch-card__address"><i class="ti ti-clock" aria-hidden="true"></i> {{.Hours}}</div>{{end}}
           </div>
         </div>
         <div class="branch-card__footer">
@@ -48,28 +38,23 @@
 </div>
 
 <script>
-  // Pure client-side pin <-> card selection sync — no HTMX round trip
-  // needed for this interaction (COZY_WEB_DESIGN.md §3.7 / web-plan Task 5).
+  // Pure client-side card selection: highlights the card and points the
+  // Google Maps iframe at that branch.
   (function () {
-    var map = document.getElementById("branches-map");
-    if (!map) return;
+    var frame = document.getElementById("branches-map-frame");
+    if (!frame) return;
 
-    function select(branchIndex) {
-      document.querySelectorAll(".branches-map__pin").forEach(function (el) {
-        el.classList.toggle("branches-map__pin--active", el.dataset.branch === branchIndex);
-      });
+    function select(card) {
       document.querySelectorAll(".branch-card").forEach(function (el) {
-        el.classList.toggle("branch-card--active", el.dataset.branch === branchIndex);
+        el.classList.toggle("branch-card--active", el === card);
       });
+      if (card.dataset.embed && frame.src !== card.dataset.embed) frame.src = card.dataset.embed;
     }
 
-    document.querySelectorAll(".branches-map__pin").forEach(function (el) {
-      el.addEventListener("click", function () { select(el.dataset.branch); });
-    });
     document.querySelectorAll(".branch-card").forEach(function (el) {
-      el.addEventListener("click", function () { select(el.dataset.branch); });
+      el.addEventListener("click", function () { select(el); });
       el.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el.dataset.branch); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el); }
       });
     });
   })();

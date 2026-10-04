@@ -27,11 +27,12 @@
       </div>
       <div class="admin-row__info">
         <div class="admin-row__title">{{.Name}}</div>
-        <div class="admin-row__subtitle">{{.Address}}</div>
+        <div class="admin-row__subtitle">{{.FullAddress}}{{if .Hours}} · {{.Hours}}{{end}}</div>
       </div>
       <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
-              data-id="{{.ID}}" data-name="{{.Name}}" data-address="{{.Address}}"
+              data-id="{{.ID}}" data-name="{{.Name}}" data-city="{{.City}}" data-address="{{.Address}}"
+              data-hours="{{.Hours}}" data-lat="{{.Lat}}" data-lng="{{.Lng}}"
               onclick="openPointModal(this)" aria-label="{{tf "admin.points.edit_aria" .Name}}">{{t "admin.common.change"}}</button>
       <form method="post" action="/admin/points/{{.ID}}/toggle"{{if .IsActive}}
             data-confirm="{{tf "admin.points.deactivate_text" .Name}}"
@@ -60,8 +61,24 @@
         <input id="point-name" name="name" placeholder="Дордой-Центр" required maxlength="200">
       </div>
       <div class="admin-field">
+        <label for="point-city">{{t "admin.points.city"}}</label>
+        <input id="point-city" name="city" value="Бишкек" required maxlength="100">
+      </div>
+      <div class="admin-field">
         <label for="point-address">{{t "admin.common.address"}}</label>
         <input id="point-address" name="address" placeholder="{{t "admin.points.address_placeholder"}}" required maxlength="300">
+      </div>
+      <div class="admin-field">
+        <label for="point-hours">{{t "admin.points.hours"}}</label>
+        <input id="point-hours" name="working_hours" placeholder="{{t "admin.points.hours_placeholder"}}" maxlength="200">
+      </div>
+      <div class="admin-field">
+        <label for="point-lat">{{t "admin.points.coords"}}</label>
+        <div style="display:flex;gap:8px">
+          <input id="point-lat" name="latitude" inputmode="decimal" placeholder="{{t "admin.points.lat_placeholder"}}" maxlength="20">
+          <input id="point-lng" name="longitude" inputmode="decimal" placeholder="{{t "admin.points.lng_placeholder"}}" maxlength="20">
+        </div>
+        <div class="admin-list-note">{{t "admin.points.coords_hint"}}</div>
       </div>
       <div class="admin-modal__actions">
         <button type="button" class="admin-btn admin-btn--secondary" onclick="closePointModal()">{{t "admin.common.cancel"}}</button>
@@ -76,16 +93,28 @@ function openPointModal(btn) {
   var title = document.getElementById('admin-point-modal-title');
   var name = document.getElementById('point-name');
   var address = document.getElementById('point-address');
+  var city = document.getElementById('point-city');
+  var hours = document.getElementById('point-hours');
+  var lat = document.getElementById('point-lat');
+  var lng = document.getElementById('point-lng');
   if (btn && btn.dataset && btn.dataset.id) {
     form.action = '/admin/points/' + encodeURIComponent(btn.dataset.id);
     title.textContent = {{t "admin.points.edit_title"}};
     name.value = btn.dataset.name || '';
     address.value = btn.dataset.address || '';
+    city.value = btn.dataset.city || '';
+    hours.value = btn.dataset.hours || '';
+    lat.value = btn.dataset.lat || '';
+    lng.value = btn.dataset.lng || '';
   } else {
     form.action = '/admin/points';
     title.textContent = {{t "admin.points.new_title"}};
     name.value = '';
     address.value = '';
+    city.value = 'Бишкек';
+    hours.value = '';
+    lat.value = '';
+    lng.value = '';
   }
   document.getElementById('admin-point-modal').style.display = 'flex';
 }

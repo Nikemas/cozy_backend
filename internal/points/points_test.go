@@ -37,10 +37,13 @@ func TestPointCreateValidatesRequiredFields(t *testing.T) {
 		name string
 		in   PointInput
 	}{
-		{"missing name", PointInput{Address: "ул. Чуй, 1"}},
-		{"missing address", PointInput{Name: "Точка на Чуй"}},
-		{"blank name", PointInput{Name: "   ", Address: "ул. Чуй, 1"}},
-		{"blank address", PointInput{Name: "Точка на Чуй", Address: "   "}},
+		{"missing name", PointInput{City: "Бишкек", Address: "ул. Чуй, 1"}},
+		{"missing address", PointInput{Name: "Точка на Чуй", City: "Бишкек"}},
+		{"blank name", PointInput{Name: "   ", City: "Бишкек", Address: "ул. Чуй, 1"}},
+		{"blank address", PointInput{Name: "Точка на Чуй", City: "Бишкек", Address: "   "}},
+		{"missing city", PointInput{Name: "Точка на Чуй", Address: "ул. Чуй, 1"}},
+		{"only latitude", PointInput{Name: "Т", City: "Бишкек", Address: "ул. Чуй, 1", Latitude: fp(42.87)}},
+		{"latitude out of range", PointInput{Name: "Т", City: "Бишкек", Address: "ул. Чуй, 1", Latitude: fp(142.87), Longitude: fp(74.6)}},
 	}
 
 	for _, c := range cases {
@@ -107,4 +110,17 @@ func TestPointGetByIDNotFound(t *testing.T) {
 
 	_, err = NewPointsRepo(db).GetByID(context.Background(), "nope")
 	assertAppErrStatus(t, err, http.StatusNotFound)
+}
+
+func fp(v float64) *float64 { return &v }
+
+func TestPointInputValidateAcceptsCoordinatePairAndNone(t *testing.T) {
+	base := PointInput{Name: "Т", City: "Бишкек", Address: "ул. Чуй, 1"}
+	if err := base.validate(); err != nil {
+		t.Fatalf("no coords: %v", err)
+	}
+	base.Latitude, base.Longitude = fp(42.87), fp(74.6)
+	if err := base.validate(); err != nil {
+		t.Fatalf("valid pair: %v", err)
+	}
 }

@@ -206,6 +206,14 @@ admin.reports.build_failed: отчетту түзүү мүмкүн болбод�
 
 # Products: list, form, import
 admin.points.address_placeholder: Дордой көч., 1
+admin.points.city: "Шаар"
+admin.points.hours: "Иш убактысы"
+admin.points.hours_placeholder: "дш–жк 10:00–20:00"
+admin.points.coords: "Координаттар (2ГИС үчүн)"
+admin.points.lat_placeholder: "42.8746"
+admin.points.lng_placeholder: "74.5698"
+admin.points.coords_hint: "Чекиттин туурасы жана узундугу 2ГИСтен: картада оң баскыч → «Координаттарды көчүрүү». Сайттагы жана тиркемедеги «Маршрут» шилтемеси үчүн керек."
+admin.points.invalid_coords: "Координаттар туура эмес: 42.8746 сыяктуу сандарды колдонуңуз"
 admin.products.import: Импорт
 admin.products.add: Товар кошуу
 admin.products.subcategory: Ички категория

@@ -192,8 +192,8 @@ func (f *fakeSaver) Save(_ context.Context, in productSaveInput) (string, error)
 
 func expectFormLookups(mock sqlmock.Sqlmock) {
 	pointsRows := func() *sqlmock.Rows {
-		return sqlmock.NewRows([]string{"id", "name", "address", "is_active", "created_at"}).
-			AddRow("pA", "Главный склад", "ул. 1", true, time.Now())
+		return sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}).
+			AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, true, time.Now())
 	}
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
 	mock.ExpectQuery(`FROM categories`).WillReturnRows(sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).

@@ -8,6 +8,7 @@ package admin
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/audit"
@@ -21,7 +22,11 @@ import (
 type pointRow struct {
 	ID          string
 	Name        string
+	City        string
 	Address     string
+	FullAddress string // "city, address" shown in the list
+	Hours       string
+	Lat, Lng    string // formatted for the edit form; empty when unset
 	IsActive    bool
 	ChipLabel   string
 	ChipClass   string // admin-chip modifier class, see admin.css
@@ -35,7 +40,11 @@ type pointRow struct {
 // inactive reuses the neutral grey of the "placed" order-status chip
 // (#8A8A86/#EDEDEB) — see admin.css's .admin-chip--active/--inactive.
 func newPointRow(t tr, p *points.Point) pointRow {
-	row := pointRow{ID: p.ID, Name: p.Name, Address: p.Address, IsActive: p.IsActive}
+	row := pointRow{
+		ID: p.ID, Name: p.Name, City: p.City, Address: p.Address, Hours: p.WorkingHours, IsActive: p.IsActive,
+		FullAddress: strings.Trim(p.City+", "+p.Address, ", "),
+		Lat:         formatCoord(p.Latitude), Lng: formatCoord(p.Longitude),
+	}
 	if p.IsActive {
 		row.ChipLabel = t.T("admin.points.active")
 		row.ChipClass = "admin-chip--active"
@@ -84,8 +93,8 @@ func (h *handlers) renderPointsPage(w http.ResponseWriter, r *http.Request, errM
 	}
 }
 
-// pointsCreate handles POST /admin/points — the pointModal form (name +
-// address). New points are created active by default (the design's
+// pointsCreate handles POST /admin/points — the pointModal form (name, city,
+// address, hours, coordinates). New points are created active by default (the design's
 // pointModal has no active/inactive toggle of its own). On success it
 // redirects back to /admin/points (POST-redirect-GET, avoids a resubmit on
 // refresh); on failure (validation) it re-renders the list with the error
@@ -96,11 +105,12 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	in := points.PointInput{
-		Name:     strings.TrimSpace(r.FormValue("name")),
-		Address:  strings.TrimSpace(r.FormValue("address")),
-		IsActive: true,
+	in, err := pointInputFromForm(r)
+	if err != nil {
+		h.renderPointsPage(w, r, h.tr(r).T("admin.points.invalid_coords"))
+		return
 	}
+	in.IsActive = true
 	created, err := h.pointsRepo.Create(r.Context(), in)
 	if err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
@@ -111,8 +121,8 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
 }
 
-// pointsUpdate handles POST /admin/points/{id} — the edit modal (name +
-// address). The active flag is left as it is; that's the toggle's job.
+// pointsUpdate handles POST /admin/points/{id} — the edit modal (name, city,
+// address, hours, coordinates). The active flag is left as it is; that's the toggle's job.
 func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := r.ParseForm(); err != nil {
@@ -126,11 +136,12 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	in := points.PointInput{
-		Name:     strings.TrimSpace(r.FormValue("name")),
-		Address:  strings.TrimSpace(r.FormValue("address")),
-		IsActive: current.IsActive,
+	in, err := pointInputFromForm(r)
+	if err != nil {
+		h.renderPointsPage(w, r, h.tr(r).T("admin.points.invalid_coords"))
+		return
 	}
+	in.IsActive = current.IsActive
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
@@ -153,7 +164,10 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	in := points.PointInput{Name: target.Name, Address: target.Address, IsActive: !target.IsActive}
+	in := points.PointInput{
+		Name: target.Name, City: target.City, Address: target.Address, WorkingHours: target.WorkingHours,
+		Latitude: target.Latitude, Longitude: target.Longitude, IsActive: !target.IsActive,
+	}
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
@@ -165,4 +179,46 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 	h.auditPoint(r.Context(), toggleAction, id, target, in)
 
 	http.Redirect(w, r, "/admin/points", http.StatusSeeOther)
+}
+
+func formatCoord(v *float64) string {
+	if v == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*v, 'f', -1, 64)
+}
+
+// parseCoord reads an optional coordinate from a form field; "42,87" and
+// "42.87" are both accepted. Blank means "not set".
+func parseCoord(raw string) (*float64, error) {
+	raw = strings.TrimSpace(strings.ReplaceAll(raw, ",", "."))
+	if raw == "" {
+		return nil, nil
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// pointInputFromForm reads the point modal's fields. IsActive is set by the
+// caller (create: true, edit: unchanged).
+func pointInputFromForm(r *http.Request) (points.PointInput, error) {
+	lat, err := parseCoord(r.FormValue("latitude"))
+	if err != nil {
+		return points.PointInput{}, err
+	}
+	lng, err := parseCoord(r.FormValue("longitude"))
+	if err != nil {
+		return points.PointInput{}, err
+	}
+	return points.PointInput{
+		Name:         strings.TrimSpace(r.FormValue("name")),
+		City:         strings.TrimSpace(r.FormValue("city")),
+		Address:      strings.TrimSpace(r.FormValue("address")),
+		WorkingHours: strings.TrimSpace(r.FormValue("working_hours")),
+		Latitude:     lat,
+		Longitude:    lng,
+	}, nil
 }

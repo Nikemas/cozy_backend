@@ -385,7 +385,7 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 	switch action {
 	case audit.ActionPointCreate:
 		e.Summary = fmt.Sprintf("Создана точка «%s»", in.Name)
-		e.Details = map[string]any{"name": in.Name, "address": in.Address}
+		e.Details = map[string]any{"name": in.Name, "city": in.City, "address": in.Address, "working_hours": in.WorkingHours}
 	case audit.ActionPointActivate, audit.ActionPointDeactivate:
 		verb := "отключена"
 		if in.IsActive {
@@ -399,8 +399,17 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 		if before != nil && before.Name != in.Name {
 			d["name"] = audit.Change{From: before.Name, To: in.Name}
 		}
+		if before != nil && before.City != in.City {
+			d["city"] = audit.Change{From: before.City, To: in.City}
+		}
 		if before != nil && before.Address != in.Address {
 			d["address"] = audit.Change{From: before.Address, To: in.Address}
+		}
+		if before != nil && before.WorkingHours != in.WorkingHours {
+			d["working_hours"] = audit.Change{From: before.WorkingHours, To: in.WorkingHours}
+		}
+		if before != nil && (formatCoord(before.Latitude) != formatCoord(in.Latitude) || formatCoord(before.Longitude) != formatCoord(in.Longitude)) {
+			d["coordinates"] = audit.Change{From: formatCoord(before.Latitude) + ", " + formatCoord(before.Longitude), To: formatCoord(in.Latitude) + ", " + formatCoord(in.Longitude)}
 		}
 		e.Details = d
 	}

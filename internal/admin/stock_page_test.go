@@ -41,9 +41,9 @@ func newStockHandlers(t *testing.T, store *fakeStockStore, pointListings int) *h
 	t.Cleanup(func() { _ = db.Close() })
 	for i := 0; i < pointListings; i++ {
 		mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(
-			sqlmock.NewRows([]string{"id", "name", "address", "is_active", "created_at"}).
-				AddRow("pA", "Главный склад", "ул. 1", true, time.Now()).
-				AddRow("pB", "Дордой", "ул. 2", true, time.Now()))
+			sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}).
+				AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, true, time.Now()).
+				AddRow("pB", "Дордой", "Бишкек", "ул. 2", "", nil, nil, true, time.Now()))
 	}
 	return &handlers{render: newTestRenderer(t), pointsRepo: points.NewPointsRepo(db), stockStore: store}
 }
