@@ -41,9 +41,9 @@ type cartService interface {
 }
 
 // cartImageGetter is the subset of *catalog.ImageRepo listCartHandler needs
-// — one batch call for every product in the cart, not one call per line.
+// — one batch call for every variant in the cart, not one call per line.
 type cartImageGetter interface {
-	PrimaryForProducts(ctx context.Context, productIDs []string) (map[string]catalog.ProductImage, error)
+	PrimaryForVariants(ctx context.Context, variantIDs []string) (map[string]catalog.ProductImage, error)
 }
 
 // IdempotencyKeyHeader is the optional header on POST /api/v1/orders that
@@ -331,7 +331,7 @@ type cartLineResponse struct {
 }
 
 // listCartHandler serves GET /api/v1/cart: one joined query for every line
-// (orders.CartRepo.ListDetailed) plus one batch image lookup — no per-line
+// (orders.CartRepo.ListDetailed) plus one batch per-variant image lookup — no per-line
 // variant/product round-trips.
 func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Config) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
@@ -345,17 +345,13 @@ func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Confi
 			return err
 		}
 
-		productIDs := make([]string, 0, len(lines))
-		seenProduct := make(map[string]bool, len(lines))
-		for _, l := range lines {
-			if !seenProduct[l.ProductID] {
-				seenProduct[l.ProductID] = true
-				productIDs = append(productIDs, l.ProductID)
+		variantImages := map[string]catalog.ProductImage{}
+		if len(lines) > 0 {
+			variantIDs := make([]string, len(lines))
+			for i, l := range lines {
+				variantIDs[i] = l.VariantID
 			}
-		}
-		primaryImages := map[string]catalog.ProductImage{}
-		if len(productIDs) > 0 {
-			primaryImages, err = images.PrimaryForProducts(r.Context(), productIDs)
+			variantImages, err = images.PrimaryForVariants(r.Context(), variantIDs)
 			if err != nil {
 				return err
 			}
@@ -364,7 +360,7 @@ func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Confi
 		resp := make([]cartLineResponse, 0, len(lines))
 		for _, l := range lines {
 			var photoURLPtr, thumbURLPtr *string
-			if img, ok := primaryImages[l.ProductID]; ok {
+			if img, ok := variantImages[l.VariantID]; ok {
 				url, thumb := photoURL(cfg, img.ObjectKey), thumbURL(cfg, img.ObjectKey)
 				photoURLPtr, thumbURLPtr = &url, &thumb
 			}

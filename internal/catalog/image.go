@@ -64,6 +64,41 @@ func (r *ImageRepo) PrimaryForProducts(ctx context.Context, productIDs []string)
 	return out, rows.Err()
 }
 
+// PrimaryForVariants returns one photo per variant id: the photo tagged with
+// the variant's colour if there is one, else a general product photo, else
+// any photo of the product. Variants whose product has no photos are absent.
+// Used by the cart API so a line shows the colour the shopper picked, not the
+// product's first photo (same ordering as web's variantPhotos).
+func (r *ImageRepo) PrimaryForVariants(ctx context.Context, variantIDs []string) (map[string]ProductImage, error) {
+	if len(variantIDs) == 0 {
+		return map[string]ProductImage{}, nil
+	}
+
+	const q = `
+		SELECT DISTINCT ON (pv.id) pv.id, pi.id, pi.product_id, pi.object_key, pi.sort_order, pi.color
+		FROM product_variants pv
+		JOIN product_images pi ON pi.product_id = pv.product_id
+		WHERE pv.id = ANY($1)
+		ORDER BY pv.id, (pi.color IS DISTINCT FROM pv.color), (pi.color IS NOT NULL), pi.sort_order`
+
+	rows, err := r.db.QueryContext(ctx, q, variantIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[string]ProductImage, len(variantIDs))
+	for rows.Next() {
+		var variantID string
+		var pi ProductImage
+		if err := rows.Scan(&variantID, &pi.ID, &pi.ProductID, &pi.ObjectKey, &pi.SortOrder, &pi.Color); err != nil {
+			return nil, err
+		}
+		out[variantID] = pi
+	}
+	return out, rows.Err()
+}
+
 // ListByProduct returns every image of productID — general (color IS NULL)
 // photos first, then color-tagged ones grouped by color, each group
 // internally ordered by sort_order. Unlike PrimaryForProducts (batch, one

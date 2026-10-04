@@ -114,15 +114,15 @@ func (f *fakeCartService) Remove(_ context.Context, customerID, variantID string
 
 // fakeCartImageGetter is an in-memory cartImageGetter for listCartHandler
 // tests. Records every call's productIDs argument so tests can assert
-// PrimaryForProducts is called once with the full, de-duplicated list
-// rather than once per cart line.
+// PrimaryForVariants is called once with every cart variant id rather
+// than once per cart line. images is keyed by variant id.
 type fakeCartImageGetter struct {
 	images      map[string]catalog.ProductImage
 	calls       int
 	lastCallIDs []string
 }
 
-func (f *fakeCartImageGetter) PrimaryForProducts(_ context.Context, productIDs []string) (map[string]catalog.ProductImage, error) {
+func (f *fakeCartImageGetter) PrimaryForVariants(_ context.Context, productIDs []string) (map[string]catalog.ProductImage, error) {
 	f.calls++
 	f.lastCallIDs = productIDs
 	out := make(map[string]catalog.ProductImage, len(productIDs))
@@ -481,7 +481,7 @@ func TestListCartHandlerUnauthenticatedWithoutContext(t *testing.T) {
 func TestListCartHandlerEnrichesLine(t *testing.T) {
 	f := newCartHandlerFakes()
 	f.cart.listResult = []orders.CartLine{cartLine("var-1", "prod-1", 2)}
-	f.images.images["prod-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/prod-1.jpg"}
+	f.images.images["var-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/prod-1.jpg"}
 
 	rec := httptest.NewRecorder()
 	f.handler().ServeHTTP(rec, newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", ""))
@@ -511,7 +511,7 @@ func TestListCartHandlerEnrichesLine(t *testing.T) {
 func TestListCartHandlerThumbURLForNormalizedPhoto(t *testing.T) {
 	f := newCartHandlerFakes()
 	f.cart.listResult = []orders.CartLine{cartLine("var-1", "prod-1", 1)}
-	f.images.images["prod-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/abc/full.jpg"}
+	f.images.images["var-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/abc/full.jpg"}
 
 	rec := httptest.NewRecorder()
 	f.handler().ServeHTTP(rec, newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", ""))
@@ -571,21 +571,29 @@ func TestListCartHandlerEmptyCartReturnsEmptyArray(t *testing.T) {
 	}
 }
 
-// TestListCartHandlerBatchesImageLookup checks PrimaryForProducts is called
-// exactly once with the de-duplicated set of product IDs — not once per
-// line, even when two lines share a product (two sizes of the same shoe).
+// TestListCartHandlerBatchesImageLookup checks PrimaryForVariants is called
+// exactly once with every variant id — not once per line, and each line gets
+// the photo of its own variant (colour), even when two lines share a product.
 func TestListCartHandlerBatchesImageLookup(t *testing.T) {
 	f := newCartHandlerFakes()
 	f.cart.listResult = []orders.CartLine{cartLine("var-1", "prod-1", 1), cartLine("var-2", "prod-1", 1)}
+	f.images.images["var-1"] = catalog.ProductImage{ID: "img-1", ProductID: "prod-1", ObjectKey: "products/green.jpg"}
+	f.images.images["var-2"] = catalog.ProductImage{ID: "img-2", ProductID: "prod-1", ObjectKey: "products/blue.jpg"}
 
 	rec := httptest.NewRecorder()
 	f.handler().ServeHTTP(rec, newCustomerRequest(http.MethodGet, "/api/v1/cart", "cust-1", ""))
-	decodeCart(t, rec)
+	lines := decodeCart(t, rec)
 	if f.images.calls != 1 {
-		t.Fatalf("PrimaryForProducts called %d times, want 1", f.images.calls)
+		t.Fatalf("PrimaryForVariants called %d times, want 1", f.images.calls)
 	}
-	if len(f.images.lastCallIDs) != 1 || f.images.lastCallIDs[0] != "prod-1" {
-		t.Errorf("PrimaryForProducts called with %v, want [prod-1] (de-duplicated)", f.images.lastCallIDs)
+	if len(f.images.lastCallIDs) != 2 || f.images.lastCallIDs[0] != "var-1" || f.images.lastCallIDs[1] != "var-2" {
+		t.Errorf("PrimaryForVariants called with %v, want [var-1 var-2]", f.images.lastCallIDs)
+	}
+	if got := lines[0].PhotoURL; got == nil || *got != "http://minio.local/cozy-media/products/green.jpg" {
+		t.Errorf("line 0 photo_url = %v", got)
+	}
+	if got := lines[1].PhotoURL; got == nil || *got != "http://minio.local/cozy-media/products/blue.jpg" {
+		t.Errorf("line 1 photo_url = %v", got)
 	}
 }
 
