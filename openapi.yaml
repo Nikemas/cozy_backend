@@ -17,7 +17,32 @@ info:
     returned `payment_url` is a local test page that simulates the bank. With
     `PAYMENTS_PROVIDER=bakai` (the prod default) online orders are refused with
     `503 payments_not_configured` until the real integration lands.
-  version: "0.6.0"
+
+    ## Error language (`Accept-Language` / `Content-Language`)
+
+    Every JSON error (`ErrorResponse`) from `/api/v1/*` and `/admin/api/*`
+    (and from the admin import endpoints when called with
+    `Accept: application/json`) has its `message` in the request's language.
+    The language is picked in this order, unsupported values falling through:
+
+    1. `?lang=ru|ky` query parameter;
+    2. `Accept-Language` header — `ru` or `ky` (region subtags like `ky-KG`
+       are fine), the highest `q` wins, ties go to the earlier entry, `q=0`
+       excludes a language; a header naming neither (`en-US`) is skipped;
+    3. the language cookie — `cozy_lang` (site) or, under `/admin`,
+       `admin_lang` (admin panel);
+    4. Russian.
+
+    `code` and the HTTP status never depend on the language — branch on
+    them. Each error response carries `Content-Language: ru|ky`: the
+    language `message` is **actually** written in. A code without a Kyrgyz
+    translation yet keeps its Russian `message` and says
+    `Content-Language: ru`, so a client can show its own fallback instead.
+    Error responses also send `Vary: Accept-Language`.
+
+    Translations live in `locales/errors.ru.yaml` / `errors.ky.yaml`; a test
+    fails if any code raised in the code lacks either one.
+  version: "0.7.0"
 
 servers:
   - url: http://localhost:8080
@@ -1443,6 +1468,12 @@ paths:
         Owner/manager only. Format is detected from the filename extension
         and/or `Content-Type` and rejected with 400 before any parsing.
 
+        **Language.** Row `message`s and file-level errors follow the same
+        language rules as `ErrorResponse` (see the top of this document);
+        the admin page sends its language as `Accept-Language` and
+        `Accept: application/json` (without the latter, errors on this
+        non-`/api/` path are an HTML page).
+
         **Rows → products.** Rows are grouped into models: by the article
         column (`model_code` / «Артикул») when present, otherwise by
         brand + name + category. One model = one product; each row with
@@ -1674,6 +1705,31 @@ components:
         `/api/v1/auth/refresh`. Required on every `Customer`-tagged endpoint
         (favorites, addresses, devices, orders, cart).
 
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: |
+        Language of error `message`s (and of the import report's row
+        messages): `ru` or `ky`, q-values honored, unknown languages ignored
+        (→ cookie → `ru`). See "Error language" in the API description.
+      schema: { type: string, example: "ky-KG,ky;q=0.9,ru;q=0.8" }
+    LangQuery:
+      name: lang
+      in: query
+      required: false
+      description: Overrides `Accept-Language` for error messages. Other values are ignored.
+      schema: { type: string, enum: [ru, ky] }
+
+  headers:
+    ContentLanguage:
+      description: |
+        Language `message` is actually written in. `ky` only when a Kyrgyz
+        translation exists for the error; otherwise `ru` (untranslated code
+        or a Russian request).
+      schema: { type: string, enum: [ru, ky] }
+
   responses:
     Unauthorized:
       description: Missing, invalid, or expired session/token.
@@ -1697,10 +1753,20 @@ components:
   schemas:
     ErrorResponse:
       type: object
-      description: The uniform shape every `apperr.AppError` serializes to.
+      description: |
+        The uniform shape every `apperr.AppError` serializes to. Sent with
+        a `Content-Language` header (see `components.headers.ContentLanguage`).
       properties:
-        code: { type: string, example: invalid_phone }
-        message: { type: string, example: "укажите номер в формате +996XXXXXXXXX" }
+        code: { type: string, example: invalid_phone, description: "Machine-readable, never translated." }
+        message:
+          type: string
+          example: "укажите номер в формате +996XXXXXXXXX"
+          description: |
+            Human-readable, in the request's language (`Accept-Language` /
+            `?lang=` / cookie, default `ru`) — e.g. for `Accept-Language: ky`
+            "номерди +996XXXXXXXXX форматында жазыңыз". The header
+            `Content-Language` tells which language it really is.
+        request_id: { type: string, description: "X-Request-ID of the failed request, when known." }
 
     TokenPair:
       type: object
