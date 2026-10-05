@@ -95,12 +95,12 @@ func (h *handlers) ensureInCart(ctx context.Context, customerID, variantID strin
 // a client-supplied variant ID directly.
 func (h *handlers) resolveSelectedVariant(ctx context.Context, productID string, r *http.Request) (string, error) {
 	if err := r.ParseForm(); err != nil {
-		return "", apperr.BadRequest("bad_request", "некорректная форма")
+		return "", apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	size := r.FormValue("size")
 	color := r.FormValue("color")
 	if size == "" || color == "" {
-		return "", apperr.BadRequest("variant_required", "выберите размер и цвет")
+		return "", apperr.BadRequest("variant_required", "выберите размер и цвет").WithVariant("choose")
 	}
 
 	variantList, err := h.variants.ListByProduct(ctx, productID)
@@ -110,7 +110,7 @@ func (h *handlers) resolveSelectedVariant(ctx context.Context, productID string,
 	if v := findVariant(variantList, size, color); v != nil {
 		return v.ID, nil
 	}
-	return "", apperr.NotFound("variant_not_found", "такого размера/цвета нет в наличии")
+	return "", apperr.NotFound("variant_not_found", "такого размера/цвета нет в наличии").WithVariant("unavailable")
 }
 
 // redirectToLogin sends an unauthenticated visitor to /profile instead of

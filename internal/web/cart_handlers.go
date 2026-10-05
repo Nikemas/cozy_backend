@@ -72,7 +72,7 @@ func (h *handlers) cartAddItem(w http.ResponseWriter, r *http.Request) error {
 		return apperr.Unauthorized("unauthorized", "войдите в аккаунт")
 	}
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 
 	variantID := r.FormValue("variant_id")
@@ -80,7 +80,7 @@ func (h *handlers) cartAddItem(w http.ResponseWriter, r *http.Request) error {
 	if v := r.FormValue("qty"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
-			return apperr.BadRequest("invalid_qty", "некорректное количество")
+			return apperr.BadRequest("invalid_qty", "некорректное количество").WithVariant("format")
 		}
 		qty = n
 	}

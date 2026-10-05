@@ -98,13 +98,14 @@ func sendErrorFor(status string) error {
 	case "0":
 		return nil
 	case "7":
-		return apperr.BadRequest("invalid_phone", "некорректный номер телефона")
+		return apperr.BadRequest("invalid_phone", "некорректный номер телефона").WithVariant("provider")
 	case "4":
 		return apperr.New(http.StatusServiceUnavailable, "sms_provider_out_of_funds", "закончился баланс SMS-провайдера")
 	case "10":
 		return apperr.New(http.StatusTooManyRequests, "otp_duplicate_request", "код уже запрошен, подождите")
 	default:
-		return apperr.New(http.StatusBadGateway, "sms_provider_error", "ошибка SMS-провайдера (status "+status+")")
+		return apperr.New(http.StatusBadGateway, "sms_provider_error", "ошибка SMS-провайдера (status "+status+")").
+			WithParams(map[string]string{"status": status})
 	}
 }
 
@@ -118,6 +119,7 @@ func verifyErrorFor(status string) error {
 	case "14", "12":
 		return apperr.BadRequest("otp_invalid", "неверный код")
 	default:
-		return apperr.New(http.StatusBadGateway, "sms_provider_error", "ошибка SMS-провайдера (status "+status+")")
+		return apperr.New(http.StatusBadGateway, "sms_provider_error", "ошибка SMS-провайдера (status "+status+")").
+			WithParams(map[string]string{"status": status})
 	}
 }

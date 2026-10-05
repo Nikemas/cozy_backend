@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -66,12 +67,14 @@ func (s *SQLImportStore) ResolveCategory(ctx context.Context, raw string) (strin
 	}
 	switch {
 	case len(ids) == 0:
-		return "", apperr.BadRequest("category_not_found", fmt.Sprintf("категория %q не найдена", raw))
+		return "", apperr.BadRequest("category_not_found", fmt.Sprintf("категория %q не найдена", raw)).
+			WithVariant("named").WithParams(map[string]string{"name": strconv.Quote(raw)})
 	case len(ids) == 1 || exactSlug:
 		return ids[0], nil
 	}
 	return "", apperr.BadRequest("category_ambiguous",
-		fmt.Sprintf("категория %q неоднозначна (несколько категорий с таким названием) — укажите slug", raw))
+		fmt.Sprintf("категория %q неоднозначна (несколько категорий с таким названием) — укажите slug", raw)).
+		WithParams(map[string]string{"name": strconv.Quote(raw)})
 }
 
 // ActivePoint reports whether id is an active point of sale.

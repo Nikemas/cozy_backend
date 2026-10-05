@@ -617,8 +617,8 @@
 
   // uploadPhoto sends the file as multipart/form-data (field "file"). The
   // server decides whether it is a usable image (real format, size,
-  // resolution); its 400 message is Russian and meant for the user, so
-  // it's surfaced as is. Anything else (network, 5xx, expired session)
+  // resolution); its 400 message is meant for the user and comes in the
+  // page's language (Accept-Language), so it's surfaced as is. Anything else (network, 5xx, expired session)
   // gets the generic message. The error's .message is what alert() shows.
   function uploadPhoto(file) {
     if (file.size > MAX_UPLOAD_BYTES) {
@@ -626,7 +626,9 @@
     }
     var body = new FormData();
     body.append('file', file);
-    return fetch('/admin/api/media/upload', { method: 'POST', body: body }).catch(function () {
+    return fetch('/admin/api/media/upload', {
+      method: 'POST', body: body, headers: { 'Accept-Language': {{lang}} }
+    }).catch(function () {
       throw new Error(L.uploadOffline);
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {

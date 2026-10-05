@@ -147,7 +147,7 @@ func parseAdminDate(v string) (time.Time, error) {
 	if t, err := time.Parse("2006-01-02", v); err == nil {
 		return t, nil
 	}
-	return time.Time{}, apperr.BadRequest("invalid_date", "дата должна быть в формате RFC3339 или YYYY-MM-DD")
+	return time.Time{}, apperr.BadRequest("invalid_date", "дата должна быть в формате RFC3339 или YYYY-MM-DD").WithVariant("rfc3339")
 }
 
 // staffCanAccessOrderPoint reports whether st may see/act on an order at
@@ -182,7 +182,7 @@ func getAdminOrderHandler(svc adminOrderService) apperr.HandlerFunc {
 		}
 
 		if !staffCanAccessOrderPoint(st, order.PointID) {
-			return apperr.Forbidden("forbidden", "сотрудник точки может просматривать только заказы своей точки")
+			return apperr.Forbidden("forbidden", "сотрудник точки может просматривать только заказы своей точки").WithVariant("point_orders_view")
 		}
 
 		return writeJSON(w, http.StatusOK, order)
@@ -213,7 +213,7 @@ func updateAdminOrderStatusHandler(svc adminOrderService) apperr.HandlerFunc {
 			return err
 		}
 		if !staffCanAccessOrderPoint(st, existing.PointID) {
-			return apperr.Forbidden("forbidden", "сотрудник точки может изменять только заказы своей точки")
+			return apperr.Forbidden("forbidden", "сотрудник точки может изменять только заказы своей точки").WithVariant("point_orders_edit")
 		}
 
 		var req updateOrderStatusRequest

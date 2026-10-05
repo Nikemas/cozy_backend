@@ -139,7 +139,7 @@ func (h *handlers) addressCreate(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 
 	label := r.FormValue("label")
@@ -168,7 +168,7 @@ func (h *handlers) addressUpdate(w http.ResponseWriter, r *http.Request) error {
 	}
 	id := r.PathValue("id")
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 
 	label := r.FormValue("label")

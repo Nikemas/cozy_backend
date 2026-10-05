@@ -58,7 +58,7 @@ func (s *Service) RequireRole(roles ...Role) func(http.Handler) http.Handler {
 				return err
 			}
 			if st == nil {
-				return apperr.Unauthorized("unauthenticated", "сессия недействительна или истекла")
+				return apperr.Unauthorized("unauthenticated", "сессия недействительна или истекла").WithVariant("session")
 			}
 
 			if !allowed[st.Role] {

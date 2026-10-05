@@ -1,0 +1,226 @@
+# Client-facing error texts — Kyrgyz (fix/api-error-i18n).
+# Same keys and {placeholders} as errors.ru.yaml (TestErrorLocalesHaveSameKeys).
+# Wording follows cozy_mobile/lib/core/l10n/ky.arb and admin.ky.yaml.
+
+err.address_in_use: бул дарек буйрутмада колдонулган, аны өчүрүүгө болбойт
+err.address_not_found: дарек табылган жок
+err.address_required: жеткирүү дарегин тандаңыз
+err.amount_mismatch: төлөмдүн суммасы буйрутманын суммасына дал келбейт
+err.bad_request: суроо-талаптын денеси туура эмес
+err.bad_request.form: форма туура эмес толтурулган
+err.bad_request.multipart: file талаасы бар multipart/form-data күтүлөт
+err.body_too_large: суроо-талап өтө чоң
+err.broadcast_not_found: жөнөтмө табылган жок
+err.cancel_forbidden: буйрутманы ээси гана жокко чыгара алат
+err.cart_item_not_found: товар себеттен табылган жок
+err.category_ambiguous: категория {name} бир маанилүү эмес (мындай аталыштагы категориялар бир нече) — slug көрсөтүңүз
+err.category_in_use: "категорияны өчүрүүгө болбойт: ага товарлар же ички категориялар шилтеме кылат"
+err.category_not_found: категория табылган жок
+err.category_not_found.named: категория {name} табылган жок
+err.category_slug_taken: мындай slug менен категория бар
+err.comment_too_long: комментарий {max} белгиден узун
+err.customer_not_found: сатып алуучу табылган жок
+err.delivery_zone_in_use: бул зона боюнча буйрутмалар бар — аны активсиздештирсеңиз гана болот
+err.delivery_zone_not_found: жеткирүү аймагы табылган жок
+err.delivery_zone_required: жеткирүү аймагын тандаңыз
+err.duplicate_column: тилке {column} кайталанат ({first} жана {second})
+err.empty_cart: себет бош
+err.empty_file: импорт файлы бош
+err.empty_file.no_sheets: Excel файлында барактар жок
+err.empty_order: буйрутма үчүн товарлар жок
+err.file_required: файл берилген жок (file талаасы)
+err.file_too_large: файл 10 МБдан чоң
+err.forbidden: бул аракет үчүн укук жетишсиз
+err.forbidden.point_orders_edit: кампачы өз сатуу жайынын буйрутмаларын гана өзгөртө алат
+err.forbidden.point_orders_view: кампачы өз сатуу жайынын буйрутмаларын гана көрө алат
+err.forbidden.point_stock: кампачы өз сатуу жайынын калдыктарын гана өзгөртө алат
+err.forbidden.staff_only: бул аракет кызматкерлерге гана жеткиликтүү
+err.fulfillment_required: алуу ыкмасын тандаңыз
+err.has_active_orders: аякталбаган буйрутмалар бар — аккаунтту алар жеткирилгенден же жокко чыгарылгандан кийин өчүрсөңүз болот
+err.image_too_large: "өтө чоң чечилиш: {width}×{height} px (эң көп {max_mp} Мп)"
+err.image_too_small: "сүрөт өтө кичинекей: {width}×{height} px — кыска жагы кеминде {min} px болушу керек"
+err.insufficient_stock: товар кампада жетишсиз
+err.insufficient_stock.left: «{name}» товарынан {count} даана гана калды
+err.insufficient_stock.sold_out: «{name}» товары түгөндү
+err.insufficient_stock.split: буйрутманын баары бир да дүкөндө жок — товарларды өзүнчө буйрутмалар менен тариздеңиз же өзү алып кетүүнү тандаңыз
+err.internal_error: серверде ички ката кетти
+err.invalid_address: жеткирүү дарегин көрсөтүңүз
+err.invalid_address.field: address милдеттүү
+err.invalid_base_price: баасы терс болбошу керек
+err.invalid_base_price.field: base_price терс болбошу керек
+err.invalid_broadcast: орусча аталышын жана текстин толтуруңуз
+err.invalid_broadcast.body_ky_too_long: текст (KY) 240 белгиден узун
+err.invalid_broadcast.body_ru_too_long: текст (RU) 240 белгиден узун
+err.invalid_broadcast.title_ky_too_long: аталыш (KY) 65 белгиден узун
+err.invalid_broadcast.title_ru_too_long: аталыш (RU) 65 белгиден узун
+err.invalid_broadcast_link: шилтеме үчүн товарды же категорияны тандаңыз
+err.invalid_broadcast_link.category: категория табылган жок
+err.invalid_broadcast_link.product: товар табылган жок же жашырылган
+err.invalid_broadcast_link.unknown_type: шилтеменин белгисиз түрү
+err.invalid_callback: төлөм тууралуу билдирүү туура эмес
+err.invalid_category_id: категория табылган жок
+err.invalid_category_id.field: category_id милдеттүү
+err.invalid_category_id.required: категорияны тандаңыз
+err.invalid_city: city милдеттүү
+err.invalid_color: color милдеттүү
+err.invalid_coordinates: координаттар жол берилген чектен тышкары
+err.invalid_coordinates.pair: туурасын да, узундугун да көрсөтүңүз
+err.invalid_credentials: телефон же сырсөз туура эмес
+err.invalid_csv: CSV окулган жок
+err.invalid_csv.detail: "CSV окулган жок: {detail}"
+err.invalid_date: күнү YYYY-MM-DD форматында болушу керек
+err.invalid_date.rfc3339: күнү RFC3339 же YYYY-MM-DD форматында болушу керек
+err.invalid_delivery_zone: жеткирүү аймагы табылган жок же мындан ары тейленбейт — башкасын тандаңыз
+err.invalid_delivery_zone_input: жеткирүү баасы — 0дон {max} сомго чейинки сан
+err.invalid_delivery_zone_input.free_from: «акысыз ... баштап» — оң сумма же бош
+err.invalid_delivery_zone_input.name_ky: аталыш (KY) милдеттүү, {max} белгиден узун эмес
+err.invalid_delivery_zone_input.name_ru: аталыш (RU) милдеттүү, {max} белгиден узун эмес
+err.invalid_expected_quantity: expected_quantity терс болбошу керек
+err.invalid_from: from күнү туура эмес
+err.invalid_fulfillment: "алуунун бир гана ыкмасын көрсөтүңүз: жеткирүү дареги же өзү алып кетүү пункту"
+err.invalid_group_by: "group_by төмөнкүлөрдүн бири болушу керек: day, product, point"
+err.invalid_group_by.with_category: group_by day, product, point же category болушу керек
+err.invalid_idempotency_key: Idempotency-Key басылып чыгуучу ASCII белгилеринен турушу керек
+err.invalid_idempotency_key.too_long: Idempotency-Key {max} белгиден узун
+err.invalid_item: товардын варианты көрсөтүлгөн жок
+err.invalid_lang: lang ru же ky болушу керек
+err.invalid_multipart: multipart-форма туура эмес же файл өтө чоң
+err.invalid_name: атыңызды киргизиңиз
+err.invalid_name.field: name милдеттүү
+err.invalid_name.required: аты милдеттүү
+err.invalid_name.too_long: аты өтө узун
+err.invalid_name_ky: кыргызча аталышын жазыңыз
+err.invalid_name_ky.field: name_ky милдеттүү
+err.invalid_name_ru: орусча аталышын жазыңыз
+err.invalid_name_ru.field: name_ru милдеттүү
+err.invalid_object_key: object_key милдеттүү
+err.invalid_page: page туура эмес
+err.invalid_parent_id: негизги категория табылган жок
+err.invalid_parent_id.self: категория өзүнө өзү негизги боло албайт
+err.invalid_password: сырсөз кеминде 8 белгиден турушу керек
+err.invalid_password.too_long: сырсөз өтө узун (эң көп 72 байт)
+err.invalid_payment_method: белгисиз төлөм ыкмасы
+err.invalid_phone: номерди +996XXXXXXXXX форматында жазыңыз
+err.invalid_phone.provider: телефон номери туура эмес
+err.invalid_phone.required: телефон милдеттүү
+err.invalid_platform: platform ios же android болушу керек
+err.invalid_point: сатуу жайы табылган жок
+err.invalid_point.inactive: сатуу жайы табылган жок же өчүрүлгөн
+err.invalid_point_id: сатуу жайы табылган жок
+err.invalid_price_max: price_max туура эмес
+err.invalid_price_min: price_min туура эмес
+err.invalid_price_override: price_override терс болбошу керек
+err.invalid_product_id: товар табылган жок
+err.invalid_qty: саны нөлдөн чоң болушу керек
+err.invalid_qty.format: саны туура эмес
+err.invalid_quantity: quantity терс болбошу керек
+err.invalid_quantity.form: саны терс болбошу керек
+err.invalid_range: башталыш күнү аяктоо күнүнөн кеч болбошу керек
+err.invalid_result: result paid, failed же cancelled болушу керек
+err.invalid_role: белгисиз роль
+err.invalid_size: size милдеттүү
+err.invalid_slug: slug милдеттүү
+err.invalid_sort: sort туура эмес
+err.invalid_status: буйрутманын абалы туура эмес
+err.invalid_status_transition: буйрутманы {from} абалынан {to} абалына өткөрүүгө болбойт
+err.invalid_submit_token: форма эскирди — баракты жаңылаңыз
+err.invalid_to: to күнү туура эмес
+err.invalid_variant: ар бир вариациянын өлчөмү жана түсү болушу керек
+err.invalid_variant_id: товар вариантынын идентификатору туура эмес
+err.invalid_variant_or_point: вариация же сатуу жайы табылган жок
+err.invalid_variant_or_point.refresh: вариация же сатуу жайы табылган жок — баракты жаңылаңыз
+err.invalid_webhook_token: вебхуктун токени туура эмес
+err.invalid_xlsx: "Excel файлы окулган жок: {detail}"
+err.invalid_xlsx.sheet: "барак окулган жок: {detail}"
+err.last_owner: акыркы ээсинин ролун төмөндөтүүгө же аны активсиздештирүүгө болбойт
+err.missing_columns: "файлда милдеттүү тилкелер жок: {columns} — импорттун үлгүсүн жүктөп алыңыз"
+err.missing_file: file талаасы милдеттүү
+err.not_found: барак табылган жок
+err.order_not_cancellable: буйрутманы эми жокко чыгарууга болбойт — дүкөн менен байланышыңыз
+err.order_not_found: буйрутма табылган жок
+err.otp_attempts_exceeded: туура эмес аракеттер өтө көп болду — жаңы код сураңыз
+err.otp_cooldown: код жиберилди — бир аздан кийин кайра аракет кылыңыз
+err.otp_daily_limit: SMS аркылуу кирүү убактылуу жеткиликсиз — кийинчерээк аракет кылыңыз
+err.otp_duplicate_request: код буга чейин суралган, күтө туруңуз
+err.otp_expired: коддун мөөнөтү бүттү — жаңысын сураңыз
+err.otp_invalid: код туура эмес
+err.otp_invalid_code: код туура эмес (dev-режимде 0000 колдонуңуз)
+err.otp_rate_limited: код суроолор өтө көп — кийинчерээк аракет кылыңыз
+err.payment_create_failed: төлөмдү түзүү мүмкүн болгон жок, кайра аракет кылыңыз
+err.payment_not_completed: онлайн-төлөмдүү буйрутманы төлөнгөндөн кийин гана ырастоого болот
+err.payment_not_found: төлөм табылган жок
+err.payment_not_retryable: бул буйрутманы кайра төлөөгө болбойт
+err.payment_not_retryable.too_many: төлөө аракеттери өтө көп — буйрутманы кайра тариздеңиз же алганда төлөөнү тандаңыз
+err.payment_provider_not_found: төлөм провайдери табылган жок
+err.payments_not_configured: онлайн-төлөм азырынча жеткиликсиз, алганда төлөөнү тандаңыз
+err.phone_taken: бул телефон номери колдонулуп жатат
+err.pickup_point_not_found: өзү алып кетүү пункту табылган жок
+err.point_id_forbidden: owner/manager ролу үчүн point_id бош болушу керек
+err.point_id_required: point_staff ролу үчүн point_id милдеттүү
+err.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"
+err.point_not_found: сатуу жайы табылган жок
+err.point_required: өзү алып кетүү пунктун тандаңыз
+err.product_not_found: товар табылган жок
+err.product_unavailable: бул товар мындан ары сатылбайт
+err.product_unavailable.named: «{name}» товары мындан ары сатылбайт — аны себеттен алып салыңыз
+err.qr_not_configured: QR-код менен төлөө азырынча жеткиликсиз
+err.qty_too_large: бир товардан {max} даанадан ашпашы керек
+err.qty_too_large.order: буйрутмада бир товардан {max} даанадан ашпашы керек
+err.range_too_long: мезгил бир жылдан узун болбошу керек
+err.refresh_invalid: сеанстын мөөнөтү бүттү — кайра кириңиз
+err.refresh_rate_limited: суроо-талаптар өтө көп — кийинчерээк аракет кылыңыз
+err.sms_provider_error: SMS-провайдердин катасы (status {status})
+err.sms_provider_out_of_funds: SMS-провайдердин балансы түгөндү
+err.sms_provider_unreachable: SMS-провайдер менен байланышуу мүмкүн болгон жок
+err.staff_not_found: кызматкер табылган жок
+err.too_many_attempts: кирүү аракеттери өтө көп, кийинчерээк аракет кылыңыз
+err.too_many_open_orders: сизде {count} аякталбаган буйрутма бар — алардын аткарылышын күтүңүз же керексиздерин жокко чыгарыңыз
+err.unauthenticated: системага кирүү талап кылынат
+err.unauthenticated.session: сеанс жараксыз же мөөнөтү бүткөн
+err.unauthorized: аккаунтка кириңиз
+err.unauthorized.expired: сеанстын мөөнөтү бүттү, кайра кириңиз
+err.unsupported_format: .csv жана .xlsx файлдары гана колдоого алынат
+err.unsupported_format.internal: импорт файлынын форматы колдоого алынбайт
+err.unsupported_image: файл JPEG, PNG же WEBP сүрөтү эмес
+err.variant_exists: мындай вариация (өлчөм/түс) же SKU бар
+err.variant_exists.form: "вариациялар кайталанат: мындай өлчөм жана түс таблицада бар"
+err.variant_in_use: "вариацияны өчүрүүгө болбойт: ал боюнча буйрутмалар бар"
+err.variant_in_use.form: "вариацияны өчүрүүгө болбойт: ал боюнча буйрутмалар бар — калдыгын 0 кылыңыз"
+err.variant_not_found: вариация табылган жок
+err.variant_not_found.order: буйрутмадагы товар табылган жок — себетти жаңыртыңыз
+err.variant_not_found.product: товар табылган жок
+err.variant_not_found.unavailable: мындай өлчөм/түс жок
+err.variant_required: товардын варианты көрсөтүлгөн жок
+err.variant_required.choose: өлчөмүн жана түсүн тандаңыз
+
+# Product import report (internal/catalog import): per-row messages.
+import.ambiguous_product: бул категорияда «{name}» деген бир нече товар табылды — моделдин артикулун же SKU көрсөтүңүз
+import.db_conflict: "учурдагы маалыматтар менен кагылышуу: мындай өлчөм/түс, SKU же артикул башка товарда/вариацияда бар"
+import.db_internal: сактоодо ички ката кетти — кайра аракет кылыңыз
+import.db_not_found: категория же сатуу жайы табылган жок
+import.db_out_of_range: маани жол берилген чектен тышкары
+import.duplicate_variant: өлчөм {size} / түс {color} {line}-сапта бар
+import.model_skipped: модель {line}-саптагы катадан улам импорттолгон жок
+import.multi_row_needs_variant: моделде бир нече сап бар — ар биринде өлчөм жана түс болушу керек
+import.no_active_point: калдыкты жазуу үчүн активдүү сатуу жайы жок
+import.no_category: категория көрсөтүлгөн жок
+import.no_category_or_article: категория (же моделдин артикулу) көрсөтүлгөн жок
+import.no_name: аталышы көрсөтүлгөн жок
+import.no_name_or_article: аталышы (же моделдин артикулу) көрсөтүлгөн жок
+import.no_price: баасы көрсөтүлгөн жок
+import.point_inactive: сатуу жайы {point} табылган жок же өчүрүлгөн
+import.point_stock: "{point} сатуу жайындагы калдык: {reason}"
+import.price_negative: "баасы терс болбошу керек: {value}"
+import.price_not_number: "баасы сан эмес: {value}"
+import.price_too_large: "баасы өтө чоң: {value}"
+import.qty_negative: "калдык терс болбошу керек: {value}"
+import.qty_not_integer: "калдык бүтүн сан болушу керек: {value}"
+import.qty_too_large: "калдык өтө чоң: {value}"
+import.sku_duplicate_in_file: SKU {sku} {line}-сапта мурунтан эле бар
+import.sku_other_product: SKU {sku} моделдин башка саптарынан башка товарга тиешелүү
+import.sku_taken: SKU {sku} башка товарда колдонулуп жатат
+import.sku_taken_article: SKU {sku} башка товарда колдонулуп жатат (артикулу {article})
+import.sku_without_variant: SKU өлчөмү жана түсү жок көрсөтүлгөн
+import.stock_without_variant: калдык өлчөмү жана түсү жок көрсөтүлгөн
+import.variant_needs_size_and_color: "вариация үчүн эки талаа тең керек: өлчөм жана түс"
+import.variant_price: "вариациянын баасы: {reason}"

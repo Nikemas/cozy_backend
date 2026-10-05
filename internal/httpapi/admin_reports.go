@@ -113,7 +113,7 @@ func parseSalesReportQuery(r *http.Request) (from, to time.Time, groupBy reports
 	}
 	groupBy, err = reports.ParseGroupBy(q.Get("group_by"))
 	if err != nil {
-		return time.Time{}, time.Time{}, "", apperr.BadRequest("invalid_group_by", "group_by должен быть day, product, point или category")
+		return time.Time{}, time.Time{}, "", apperr.BadRequest("invalid_group_by", "group_by должен быть day, product, point или category").WithVariant("with_category")
 	}
 
 	return from, to, groupBy, nil

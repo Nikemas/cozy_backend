@@ -117,7 +117,7 @@ func (s *Service) PrepareRetryPayment(ctx context.Context, customerID, idOrNumbe
 		}
 		if attempts >= MaxPaymentAttempts {
 			return apperr.Conflict("payment_not_retryable",
-				"слишком много попыток оплаты — оформите заказ заново или выберите оплату при получении")
+				"слишком много попыток оплаты — оформите заказ заново или выберите оплату при получении").WithVariant("too_many")
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE payments SET status = 'cancelled', updated_at = now() WHERE order_id = $1 AND status = 'pending'`,

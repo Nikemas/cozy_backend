@@ -235,10 +235,10 @@ func (s *Service) ListStaff(ctx context.Context) ([]Staff, error) {
 // surface here as ordinary *apperr.AppError values.
 func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff, error) {
 	if strings.TrimSpace(in.Phone) == "" {
-		return nil, apperr.BadRequest("invalid_phone", "телефон обязателен")
+		return nil, apperr.BadRequest("invalid_phone", "телефон обязателен").WithVariant("required")
 	}
 	if strings.TrimSpace(in.Name) == "" {
-		return nil, apperr.BadRequest("invalid_name", "имя обязательно")
+		return nil, apperr.BadRequest("invalid_name", "имя обязательно").WithVariant("required")
 	}
 	if err := validatePassword(in.Password); err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff,
 // unchanged, and leaves the staff account untouched.
 func (s *Service) UpdateStaff(ctx context.Context, id string, in UpdateStaffInput) (*Staff, error) {
 	if strings.TrimSpace(in.Name) == "" {
-		return nil, apperr.BadRequest("invalid_name", "имя обязательно")
+		return nil, apperr.BadRequest("invalid_name", "имя обязательно").WithVariant("required")
 	}
 	if err := validateStaffRolePointID(in.Role, in.PointID); err != nil {
 		return nil, err
@@ -335,7 +335,7 @@ func validatePassword(p string) error {
 		return apperr.BadRequest("invalid_password", "пароль должен быть не короче 8 символов")
 	}
 	if len(p) > maxPasswordBytes {
-		return apperr.BadRequest("invalid_password", "пароль слишком длинный (максимум 72 байта)")
+		return apperr.BadRequest("invalid_password", "пароль слишком длинный (максимум 72 байта)").WithVariant("too_long")
 	}
 	return nil
 }

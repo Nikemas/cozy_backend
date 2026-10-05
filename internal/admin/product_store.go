@@ -116,7 +116,7 @@ func newProductStore(db *sql.DB) *productStore { return &productStore{db: db} }
 // without going through catalog.ProductRepo.
 func validateProductInput(in catalog.ProductInput) error {
 	if strings.TrimSpace(in.CategoryID) == "" {
-		return apperr.BadRequest("invalid_category_id", "выберите категорию")
+		return apperr.BadRequest("invalid_category_id", "выберите категорию").WithVariant("required")
 	}
 	if strings.TrimSpace(in.NameRu) == "" {
 		return apperr.BadRequest("invalid_name_ru", "укажите название на русском")
@@ -269,7 +269,7 @@ func syncVariantsTx(ctx context.Context, tx *sql.Tx, productID string, rows []va
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM product_variants WHERE id = $1`, id); err != nil {
 			if pgErrCode(err) == pgForeignKeyViolation {
-				return nil, apperr.Conflict("variant_in_use", "нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0")
+				return nil, apperr.Conflict("variant_in_use", "нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0").WithVariant("form")
 			}
 			return nil, err
 		}
@@ -318,7 +318,7 @@ func variantIDsTx(ctx context.Context, tx *sql.Tx, productID string) ([]string, 
 
 func translateVariantErr(err error) error {
 	if pgErrCode(err) == pgUniqueViolation {
-		return apperr.Conflict("variant_exists", "вариации повторяются: такой размер и цвет уже есть в таблице")
+		return apperr.Conflict("variant_exists", "вариации повторяются: такой размер и цвет уже есть в таблице").WithVariant("form")
 	}
 	return err
 }
@@ -358,7 +358,7 @@ func applyStockChangesTx(ctx context.Context, tx *sql.Tx, idByKey map[string]str
 // false when that precondition failed — i.e. a concurrent change.
 func writeStockCellTx(ctx context.Context, tx *sql.Tx, variantID, pointID string, qty int, orig *int) (applied bool, err error) {
 	if qty < 0 {
-		return false, apperr.BadRequest("invalid_quantity", "количество не может быть отрицательным")
+		return false, apperr.BadRequest("invalid_quantity", "количество не может быть отрицательным").WithVariant("form")
 	}
 
 	var res sql.Result
@@ -376,7 +376,7 @@ func writeStockCellTx(ctx context.Context, tx *sql.Tx, variantID, pointID string
 	}
 	if err != nil {
 		if pgErrCode(err) == pgForeignKeyViolation {
-			return false, apperr.BadRequest("invalid_variant_or_point", "вариация или точка продаж не найдена — обновите страницу")
+			return false, apperr.BadRequest("invalid_variant_or_point", "вариация или точка продаж не найдена — обновите страницу").WithVariant("refresh")
 		}
 		return false, err
 	}

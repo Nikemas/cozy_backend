@@ -186,7 +186,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		return nil
 	}
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 
 	var addressID, pickupPointID, zoneID *string

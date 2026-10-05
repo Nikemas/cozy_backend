@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -84,21 +85,27 @@ var ErrInvalidDeliveryZone = apperr.BadRequest("invalid_delivery_zone",
 func (in *DeliveryZoneInput) Normalize() error {
 	in.NameRu = strings.TrimSpace(in.NameRu)
 	in.NameKy = strings.TrimSpace(in.NameKy)
-	bad := func(msg string) error { return apperr.BadRequest("invalid_delivery_zone_input", msg) }
 	if in.NameRu == "" || utf8.RuneCountInString(in.NameRu) > maxZoneNameLen {
-		return bad(fmt.Sprintf("название (RU) обязательно, не длиннее %d символов", maxZoneNameLen))
+		return apperr.BadRequest("invalid_delivery_zone_input",
+			fmt.Sprintf("название (RU) обязательно, не длиннее %d символов", maxZoneNameLen)).
+			WithVariant("name_ru").WithParams(map[string]string{"max": strconv.Itoa(maxZoneNameLen)})
 	}
 	if in.NameKy == "" || utf8.RuneCountInString(in.NameKy) > maxZoneNameLen {
-		return bad(fmt.Sprintf("название (KY) обязательно, не длиннее %d символов", maxZoneNameLen))
+		return apperr.BadRequest("invalid_delivery_zone_input",
+			fmt.Sprintf("название (KY) обязательно, не длиннее %d символов", maxZoneNameLen)).
+			WithVariant("name_ky").WithParams(map[string]string{"max": strconv.Itoa(maxZoneNameLen)})
 	}
 	if math.IsNaN(in.Fee) || math.IsInf(in.Fee, 0) || in.Fee < 0 || in.Fee > maxZoneFee {
-		return bad(fmt.Sprintf("стоимость доставки — число от 0 до %d сом", maxZoneFee))
+		return apperr.BadRequest("invalid_delivery_zone_input",
+			fmt.Sprintf("стоимость доставки — число от 0 до %d сом", maxZoneFee)).
+			WithParams(map[string]string{"max": strconv.Itoa(maxZoneFee)})
 	}
 	in.Fee = roundSom(in.Fee)
 	if in.FreeFrom != nil {
 		f := *in.FreeFrom
 		if math.IsNaN(f) || math.IsInf(f, 0) || f <= 0 || f > maxZoneFreeFrom {
-			return bad("«бесплатно от» — положительная сумма или пусто")
+			return apperr.BadRequest("invalid_delivery_zone_input",
+				"«бесплатно от» — положительная сумма или пусто").WithVariant("free_from")
 		}
 		f = roundSom(f)
 		in.FreeFrom = &f

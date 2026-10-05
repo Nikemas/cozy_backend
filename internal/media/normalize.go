@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	_ "image/png" // register the PNG decoder for image.Decode
 	"math"
+	"strconv"
 
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // register the WebP decoder for image.Decode
@@ -76,13 +77,15 @@ func normalizeImage(data []byte) (*normalizedImage, error) {
 	}
 	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxSourcePixels {
 		return nil, apperr.BadRequest("image_too_large",
-			fmt.Sprintf("слишком большое разрешение: %d×%d px (максимум %d Мп)", cfg.Width, cfg.Height, maxSourcePixels/1_000_000))
+			fmt.Sprintf("слишком большое разрешение: %d×%d px (максимум %d Мп)", cfg.Width, cfg.Height, maxSourcePixels/1_000_000)).
+			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "max_mp": strconv.Itoa(maxSourcePixels / 1_000_000)})
 	}
 	// Rotation by EXIF only swaps width and height, so the shorter side
 	// is the same before and after — safe to check on the raw header.
 	if min(cfg.Width, cfg.Height) < minSourceSide {
 		return nil, apperr.BadRequest("image_too_small",
-			fmt.Sprintf("фото слишком маленькое: %d×%d px — меньшая сторона должна быть не меньше %d px", cfg.Width, cfg.Height, minSourceSide))
+			fmt.Sprintf("фото слишком маленькое: %d×%d px — меньшая сторона должна быть не меньше %d px", cfg.Width, cfg.Height, minSourceSide)).
+			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "min": strconv.Itoa(minSourceSide)})
 	}
 
 	src, _, err := image.Decode(bytes.NewReader(data))

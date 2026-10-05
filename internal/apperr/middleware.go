@@ -62,8 +62,21 @@ func IsAPIPath(path string) bool {
 	return strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/admin/api/")
 }
 
-// WriteError writes err as the standard JSON error body for API paths —
-// *AppError as-is, anything else as a generic 500 — or as an HTML error
+// acceptsJSON reports whether r explicitly asks for JSON (its Accept
+// header's first media range is application/json) — how a page's own
+// fetch() to a JSON endpoint outside /api/ and /admin/api/ (e.g. the
+// admin product import, POST /admin/products/import) gets JSON errors it
+// can show instead of an HTML error page.
+func acceptsJSON(r *http.Request) bool {
+	first, _, _ := strings.Cut(r.Header.Get("Accept"), ",")
+	first, _, _ = strings.Cut(first, ";")
+	return strings.EqualFold(strings.TrimSpace(first), "application/json")
+}
+
+// WriteError writes err as the standard JSON error body for API paths
+// (and requests whose Accept prefers JSON) — *AppError with its message in
+// the request's language (LangFromRequest, Localize), anything else as a
+// generic 500 — or as an HTML error
 // page for browser-facing paths (the storefront, admin pages), logging
 // 5xx errors with the request's context (and so its request_id).
 // Exported for middleware that must produce the same shape outside Wrap,
@@ -78,16 +91,19 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		slog.ErrorContext(r.Context(), "request failed", "path", r.URL.Path, "code", appErr.Code, "err", err)
 	}
 
-	if !IsAPIPath(r.URL.Path) {
+	if !IsAPIPath(r.URL.Path) && !acceptsJSON(r) {
 		writeHTMLError(w, r, appErr)
 		return
 	}
 
+	msg, msgLang := localize(LangFromRequest(r), appErr)
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Language", msgLang)
+	w.Header().Add("Vary", "Accept-Language")
 	w.WriteHeader(appErr.Status)
 	_ = json.NewEncoder(w).Encode(errorBody{
 		Code:      appErr.Code,
-		Message:   appErr.Message,
+		Message:   msg,
 		RequestID: reqid.FromContext(r.Context()),
 	})
 }

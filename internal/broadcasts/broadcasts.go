@@ -101,15 +101,15 @@ func (in *Input) normalize() error {
 	for _, f := range []struct {
 		val string
 		max int
-		msg string
+		err *apperr.AppError
 	}{
-		{in.TitleRU, MaxTitleLen, "заголовок (RU) длиннее 65 символов"},
-		{in.TitleKY, MaxTitleLen, "заголовок (KY) длиннее 65 символов"},
-		{in.BodyRU, MaxBodyLen, "текст (RU) длиннее 240 символов"},
-		{in.BodyKY, MaxBodyLen, "текст (KY) длиннее 240 символов"},
+		{in.TitleRU, MaxTitleLen, apperr.BadRequest("invalid_broadcast", "заголовок (RU) длиннее 65 символов").WithVariant("title_ru_too_long")},
+		{in.TitleKY, MaxTitleLen, apperr.BadRequest("invalid_broadcast", "заголовок (KY) длиннее 65 символов").WithVariant("title_ky_too_long")},
+		{in.BodyRU, MaxBodyLen, apperr.BadRequest("invalid_broadcast", "текст (RU) длиннее 240 символов").WithVariant("body_ru_too_long")},
+		{in.BodyKY, MaxBodyLen, apperr.BadRequest("invalid_broadcast", "текст (KY) длиннее 240 символов").WithVariant("body_ky_too_long")},
 	} {
 		if utf8.RuneCountInString(f.val) > f.max {
-			return apperr.BadRequest("invalid_broadcast", f.msg)
+			return f.err
 		}
 	}
 	switch in.LinkType {
@@ -120,7 +120,7 @@ func (in *Input) normalize() error {
 			return apperr.BadRequest("invalid_broadcast_link", "выберите товар или категорию для ссылки")
 		}
 	default:
-		return apperr.BadRequest("invalid_broadcast_link", "неизвестный тип ссылки")
+		return apperr.BadRequest("invalid_broadcast_link", "неизвестный тип ссылки").WithVariant("unknown_type")
 	}
 	return nil
 }
@@ -231,9 +231,9 @@ func (r *Repo) linkLabel(ctx context.Context, linkType, id string) (string, erro
 	err := r.db.QueryRowContext(ctx, q, id).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
 		if linkType == LinkProduct {
-			return "", apperr.BadRequest("invalid_broadcast_link", "товар не найден или скрыт")
+			return "", apperr.BadRequest("invalid_broadcast_link", "товар не найден или скрыт").WithVariant("product")
 		}
-		return "", apperr.BadRequest("invalid_broadcast_link", "категория не найдена")
+		return "", apperr.BadRequest("invalid_broadcast_link", "категория не найдена").WithVariant("category")
 	}
 	return name, err
 }

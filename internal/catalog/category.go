@@ -126,10 +126,10 @@ type CategoryInput struct {
 
 func (in CategoryInput) validate() error {
 	if strings.TrimSpace(in.NameRu) == "" {
-		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен")
+		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен").WithVariant("field")
 	}
 	if strings.TrimSpace(in.NameKy) == "" {
-		return apperr.BadRequest("invalid_name_ky", "name_ky обязателен")
+		return apperr.BadRequest("invalid_name_ky", "name_ky обязателен").WithVariant("field")
 	}
 	if strings.TrimSpace(in.Slug) == "" {
 		return apperr.BadRequest("invalid_slug", "slug обязателен")
@@ -165,7 +165,7 @@ func (r *CategoryRepo) Update(ctx context.Context, id string, in CategoryInput) 
 		return nil, err
 	}
 	if in.ParentID != nil && *in.ParentID == id {
-		return nil, apperr.BadRequest("invalid_parent_id", "категория не может быть собственным родителем")
+		return nil, apperr.BadRequest("invalid_parent_id", "категория не может быть собственным родителем").WithVariant("self")
 	}
 
 	const q = `

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -274,11 +275,12 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 		for _, id := range variantIDs {
 			snap, ok := snapshots[id]
 			if !ok {
-				return apperr.NotFound("variant_not_found", "товар из заказа не найден — обновите корзину")
+				return apperr.NotFound("variant_not_found", "товар из заказа не найден — обновите корзину").WithVariant("order")
 			}
 			if !snap.Active {
 				return apperr.Conflict("product_unavailable",
-					fmt.Sprintf("товар «%s» больше не продаётся — уберите его из корзины", snap.label()))
+					fmt.Sprintf("товар «%s» больше не продаётся — уберите его из корзины", snap.label())).
+					WithVariant("named").WithParams(map[string]string{"name": snap.label()})
 			}
 		}
 
@@ -466,7 +468,8 @@ func checkOpenOrdersLimit(ctx context.Context, tx *sql.Tx, customerID string, ma
 	}
 	if n >= max {
 		return apperr.Conflict("too_many_open_orders",
-			fmt.Sprintf("у вас уже %d незавершённых заказов — дождитесь их выполнения или отмените ненужные", n))
+			fmt.Sprintf("у вас уже %d незавершённых заказов — дождитесь их выполнения или отмените ненужные", n)).
+			WithParams(map[string]string{"count": strconv.Itoa(n)})
 	}
 	return nil
 }
@@ -496,7 +499,8 @@ func normalizeComment(c string) (*string, error) {
 	}
 	if utf8.RuneCountInString(c) > MaxCommentLen {
 		return nil, apperr.BadRequest("comment_too_long",
-			fmt.Sprintf("комментарий длиннее %d символов", MaxCommentLen))
+			fmt.Sprintf("комментарий длиннее %d символов", MaxCommentLen)).
+			WithParams(map[string]string{"max": strconv.Itoa(MaxCommentLen)})
 	}
 	return &c, nil
 }
@@ -509,7 +513,8 @@ func normalizeIdempotencyKey(k string) (*string, error) {
 	}
 	if len(k) > MaxIdempotencyKeyLen {
 		return nil, apperr.BadRequest("invalid_idempotency_key",
-			fmt.Sprintf("Idempotency-Key длиннее %d символов", MaxIdempotencyKeyLen))
+			fmt.Sprintf("Idempotency-Key длиннее %d символов", MaxIdempotencyKeyLen)).
+			WithVariant("too_long").WithParams(map[string]string{"max": strconv.Itoa(MaxIdempotencyKeyLen)})
 	}
 	for _, r := range k {
 		if r < 0x21 || r > 0x7e {
@@ -701,11 +706,13 @@ func mergeItemQuantities(items []OrderItemInput) (map[string]int, []string, erro
 			return nil, nil, apperr.BadRequest("invalid_qty", "количество должно быть больше нуля")
 		}
 		if it.Quantity > MaxCartQty {
-			return nil, nil, apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара в заказе", MaxCartQty))
+			return nil, nil, apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара в заказе", MaxCartQty)).
+				WithVariant("order").WithParams(map[string]string{"max": strconv.Itoa(MaxCartQty)})
 		}
 		merged[it.VariantID] += it.Quantity
 		if merged[it.VariantID] > MaxCartQty {
-			return nil, nil, apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара в заказе", MaxCartQty))
+			return nil, nil, apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара в заказе", MaxCartQty)).
+				WithVariant("order").WithParams(map[string]string{"max": strconv.Itoa(MaxCartQty)})
 		}
 	}
 
@@ -850,16 +857,19 @@ func insufficientStockForDelivery(ctx context.Context, tx *sql.Tx, variantIDs []
 		}
 	}
 	return apperr.Conflict("insufficient_stock",
-		"весь заказ целиком нет ни в одном магазине — оформите товары отдельными заказами или выберите самовывоз")
+		"весь заказ целиком нет ни в одном магазине — оформите товары отдельными заказами или выберите самовывоз").
+		WithVariant("split")
 }
 
 // stockError names the line that is short: "Air Max, 42 — осталось 1 шт.".
 func stockError(snap variantSnapshot, available int) error {
 	if available <= 0 {
-		return apperr.Conflict("insufficient_stock", fmt.Sprintf("товар «%s» закончился", snap.label()))
+		return apperr.Conflict("insufficient_stock", fmt.Sprintf("товар «%s» закончился", snap.label())).
+			WithVariant("sold_out").WithParams(map[string]string{"name": snap.label()})
 	}
 	return apperr.Conflict("insufficient_stock",
-		fmt.Sprintf("товара «%s» осталось только %d шт.", snap.label(), available))
+		fmt.Sprintf("товара «%s» осталось только %d шт.", snap.label(), available)).
+		WithVariant("left").WithParams(map[string]string{"name": snap.label(), "count": strconv.Itoa(available)})
 }
 
 func pointCoversStock(ctx context.Context, tx *sql.Tx, pointID string, variantIDs []string, qtyByVariant map[string]int) (bool, error) {

@@ -1,0 +1,233 @@
+# Client-facing error texts — Russian (fix/api-error-i18n).
+#
+#   err.<code>[.<variant>]  messages of internal/apperr error codes; the
+#                           JSON "message" for Accept-Language: ru is the
+#                           code's own Message, which TestRussianError-
+#                           MessagesMatchCode keeps identical to this file.
+#   import.*                per-row messages of the product import report.
+#
+# {name} is a placeholder filled by the code (WithParams / catalog import).
+# Same keys as errors.ky.yaml (TestErrorLocalesHaveSameKeys).
+
+err.address_in_use: этот адрес использован в заказе, его нельзя удалить
+err.address_not_found: адрес не найден
+err.address_required: выберите адрес доставки
+err.amount_mismatch: сумма платежа не совпадает с суммой заказа
+err.bad_request.form: некорректная форма
+err.bad_request.multipart: ожидается multipart/form-data с полем file
+err.bad_request: некорректное тело запроса
+err.body_too_large: слишком большой запрос
+err.broadcast_not_found: рассылка не найдена
+err.cancel_forbidden: только владелец может отменить заказ
+err.cart_item_not_found: товар не найден в корзине
+err.category_ambiguous: категория {name} неоднозначна (несколько категорий с таким названием) — укажите slug
+err.category_in_use: "нельзя удалить категорию: на неё ссылаются товары или подкатегории"
+err.category_not_found.named: категория {name} не найдена
+err.category_not_found: категория не найдена
+err.category_slug_taken: категория с таким slug уже существует
+err.comment_too_long: комментарий длиннее {max} символов
+err.customer_not_found: покупатель не найден
+err.delivery_zone_in_use: по этой зоне уже есть заказы — её можно только деактивировать
+err.delivery_zone_not_found: зона доставки не найдена
+err.delivery_zone_required: выберите зону доставки
+err.duplicate_column: колонка {column} повторяется ({first} и {second})
+err.empty_cart: корзина пуста
+err.empty_file.no_sheets: в Excel-файле нет листов
+err.empty_file: файл импорта пустой
+err.empty_order: нет товаров для заказа
+err.file_required: файл не передан (поле file)
+err.file_too_large: файл больше 10 МБ
+err.forbidden.point_orders_edit: сотрудник точки может изменять только заказы своей точки
+err.forbidden.point_orders_view: сотрудник точки может просматривать только заказы своей точки
+err.forbidden.point_stock: сотрудник точки может изменять остатки только своей точки
+err.forbidden.staff_only: действие доступно только сотрудникам
+err.forbidden: недостаточно прав для этого действия
+err.fulfillment_required: выберите способ получения
+err.has_active_orders: есть незавершённые заказы — удалить аккаунт можно после их доставки или отмены
+err.image_too_large: "слишком большое разрешение: {width}×{height} px (максимум {max_mp} Мп)"
+err.image_too_small: "фото слишком маленькое: {width}×{height} px — меньшая сторона должна быть не меньше {min} px"
+err.insufficient_stock.left: товара «{name}» осталось только {count} шт.
+err.insufficient_stock.sold_out: товар «{name}» закончился
+err.insufficient_stock.split: весь заказ целиком нет ни в одном магазине — оформите товары отдельными заказами или выберите самовывоз
+err.insufficient_stock: недостаточно товара в наличии
+err.internal_error: internal server error
+err.invalid_address.field: address обязателен
+err.invalid_address: укажите адрес доставки
+err.invalid_base_price.field: base_price не может быть отрицательным
+err.invalid_base_price: цена не может быть отрицательной
+err.invalid_broadcast.body_ky_too_long: текст (KY) длиннее 240 символов
+err.invalid_broadcast.body_ru_too_long: текст (RU) длиннее 240 символов
+err.invalid_broadcast.title_ky_too_long: заголовок (KY) длиннее 65 символов
+err.invalid_broadcast.title_ru_too_long: заголовок (RU) длиннее 65 символов
+err.invalid_broadcast: заполните заголовок и текст на русском
+err.invalid_broadcast_link.category: категория не найдена
+err.invalid_broadcast_link.product: товар не найден или скрыт
+err.invalid_broadcast_link.unknown_type: неизвестный тип ссылки
+err.invalid_broadcast_link: выберите товар или категорию для ссылки
+err.invalid_callback: некорректное уведомление об оплате
+err.invalid_category_id.field: category_id обязателен
+err.invalid_category_id.required: выберите категорию
+err.invalid_category_id: категория не найдена
+err.invalid_city: city обязателен
+err.invalid_color: color обязателен
+err.invalid_coordinates.pair: укажите и широту, и долготу
+err.invalid_coordinates: координаты вне допустимого диапазона
+err.invalid_credentials: неверный телефон или пароль
+err.invalid_csv.detail: "не удалось прочитать CSV: {detail}"
+err.invalid_csv: не удалось прочитать CSV
+err.invalid_date.rfc3339: дата должна быть в формате RFC3339 или YYYY-MM-DD
+err.invalid_date: дата должна быть в формате YYYY-MM-DD
+err.invalid_delivery_zone: зона доставки не найдена или больше не обслуживается — выберите другую
+err.invalid_delivery_zone_input.free_from: «бесплатно от» — положительная сумма или пусто
+err.invalid_delivery_zone_input.name_ky: название (KY) обязательно, не длиннее {max} символов
+err.invalid_delivery_zone_input.name_ru: название (RU) обязательно, не длиннее {max} символов
+err.invalid_delivery_zone_input: стоимость доставки — число от 0 до {max} сом
+err.invalid_expected_quantity: expected_quantity не может быть отрицательным
+err.invalid_from: некорректная дата from
+err.invalid_fulfillment: "укажите ровно один способ получения: адрес доставки или точку самовывоза"
+err.invalid_group_by.with_category: group_by должен быть day, product, point или category
+err.invalid_group_by: "group_by должен быть одним из: day, product, point"
+err.invalid_idempotency_key.too_long: Idempotency-Key длиннее {max} символов
+err.invalid_idempotency_key: Idempotency-Key должен состоять из печатных ASCII-символов
+err.invalid_item: не указан вариант товара
+err.invalid_lang: lang должен быть ru или ky
+err.invalid_multipart: некорректная multipart-форма или файл слишком большой
+err.invalid_name.field: name обязателен
+err.invalid_name.required: имя обязательно
+err.invalid_name.too_long: имя слишком длинное
+err.invalid_name: укажите имя
+err.invalid_name_ky.field: name_ky обязателен
+err.invalid_name_ky: укажите название на кыргызском
+err.invalid_name_ru.field: name_ru обязателен
+err.invalid_name_ru: укажите название на русском
+err.invalid_object_key: object_key обязателен
+err.invalid_page: некорректный page
+err.invalid_parent_id.self: категория не может быть собственным родителем
+err.invalid_parent_id: родительская категория не найдена
+err.invalid_password.too_long: пароль слишком длинный (максимум 72 байта)
+err.invalid_password: пароль должен быть не короче 8 символов
+err.invalid_payment_method: неизвестный способ оплаты
+err.invalid_phone.provider: некорректный номер телефона
+err.invalid_phone.required: телефон обязателен
+err.invalid_phone: укажите номер в формате +996XXXXXXXXX
+err.invalid_platform: platform должен быть ios или android
+err.invalid_point.inactive: точка продаж не найдена или отключена
+err.invalid_point: точка продаж не найдена
+err.invalid_point_id: точка продаж не найдена
+err.invalid_price_max: некорректный price_max
+err.invalid_price_min: некорректный price_min
+err.invalid_price_override: price_override не может быть отрицательным
+err.invalid_product_id: товар не найден
+err.invalid_qty.format: некорректное количество
+err.invalid_qty: количество должно быть больше нуля
+err.invalid_quantity.form: количество не может быть отрицательным
+err.invalid_quantity: quantity не может быть отрицательным
+err.invalid_range: дата начала не может быть позже даты окончания
+err.invalid_result: result должен быть paid, failed или cancelled
+err.invalid_role: неизвестная роль
+err.invalid_size: size обязателен
+err.invalid_slug: slug обязателен
+err.invalid_sort: некорректный sort
+err.invalid_status: некорректный статус заказа
+err.invalid_status_transition: нельзя перевести заказ из статуса {from} в {to}
+err.invalid_submit_token: форма устарела — обновите страницу
+err.invalid_to: некорректная дата to
+err.invalid_variant: у каждой вариации должны быть размер и цвет
+err.invalid_variant_id: некорректный идентификатор варианта товара
+err.invalid_variant_or_point.refresh: вариация или точка продаж не найдена — обновите страницу
+err.invalid_variant_or_point: вариация или точка продаж не найдена
+err.invalid_webhook_token: неверный токен вебхука
+err.invalid_xlsx.sheet: "не удалось прочитать лист: {detail}"
+err.invalid_xlsx: "не удалось прочитать Excel-файл: {detail}"
+err.last_owner: нельзя понизить или деактивировать последнего владельца
+err.missing_columns: "в файле нет обязательных колонок: {columns} — скачайте шаблон импорта"
+err.missing_file: поле file обязательно
+err.not_found: страница не найдена
+err.order_not_cancellable: заказ уже нельзя отменить — свяжитесь с магазином
+err.order_not_found: заказ не найден
+err.otp_attempts_exceeded: слишком много неверных попыток, запросите новый код
+err.otp_cooldown: код уже отправлен, попробуйте чуть позже
+err.otp_daily_limit: вход по SMS временно недоступен, попробуйте позже
+err.otp_duplicate_request: код уже запрошен, подождите
+err.otp_expired: код устарел, запросите новый
+err.otp_invalid: неверный код
+err.otp_invalid_code: неверный код (в dev-режиме используйте 0000)
+err.otp_rate_limited: слишком много запросов кода, попробуйте позже
+err.payment_create_failed: не удалось создать платёж, попробуйте ещё раз
+err.payment_not_completed: заказ с онлайн-оплатой можно подтвердить только после оплаты
+err.payment_not_found: платёж не найден
+err.payment_not_retryable.too_many: слишком много попыток оплаты — оформите заказ заново или выберите оплату при получении
+err.payment_not_retryable: этот заказ нельзя оплатить повторно
+err.payment_provider_not_found: платёжный провайдер не найден
+err.payments_not_configured: онлайн-оплата пока недоступна, выберите оплату при получении
+err.phone_taken: этот номер телефона уже используется
+err.pickup_point_not_found: точка самовывоза не найдена
+err.point_id_forbidden: point_id должен быть пустым для роли owner/manager
+err.point_id_required: point_id обязателен для роли point_staff
+err.point_in_use: "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"
+err.point_not_found: точка продаж не найдена
+err.point_required: выберите точку самовывоза
+err.product_not_found: товар не найден
+err.product_unavailable.named: товар «{name}» больше не продаётся — уберите его из корзины
+err.product_unavailable: товар больше не продаётся
+err.qr_not_configured: оплата по QR-коду пока недоступна
+err.qty_too_large.order: не больше {max} шт. одного товара в заказе
+err.qty_too_large: не больше {max} шт. одного товара
+err.range_too_long: период не может быть длиннее года
+err.refresh_invalid: сессия истекла, войдите снова
+err.refresh_rate_limited: слишком много запросов, попробуйте позже
+err.sms_provider_error: ошибка SMS-провайдера (status {status})
+err.sms_provider_out_of_funds: закончился баланс SMS-провайдера
+err.sms_provider_unreachable: не удалось связаться с провайдером SMS
+err.staff_not_found: сотрудник не найден
+err.too_many_attempts: слишком много попыток входа, попробуйте позже
+err.too_many_open_orders: у вас уже {count} незавершённых заказов — дождитесь их выполнения или отмените ненужные
+err.unauthenticated.session: сессия недействительна или истекла
+err.unauthenticated: требуется вход в систему
+err.unauthorized.expired: сессия истекла, войдите заново
+err.unauthorized: войдите в аккаунт
+err.unsupported_format.internal: неподдерживаемый формат файла импорта
+err.unsupported_format: поддерживаются только файлы .csv и .xlsx
+err.unsupported_image: файл не является изображением JPEG, PNG или WEBP
+err.variant_exists.form: "вариации повторяются: такой размер и цвет уже есть в таблице"
+err.variant_exists: такая вариация (размер/цвет) или SKU уже существует
+err.variant_in_use.form: "нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0"
+err.variant_in_use: "нельзя удалить вариацию: по ней есть заказы"
+err.variant_not_found.order: товар из заказа не найден — обновите корзину
+err.variant_not_found.product: товар не найден
+err.variant_not_found.unavailable: такого размера/цвета нет в наличии
+err.variant_not_found: вариация не найдена
+err.variant_required.choose: выберите размер и цвет
+err.variant_required: не указан вариант товара
+
+# Product import report (internal/catalog import): per-row messages.
+import.ambiguous_product: найдено несколько товаров «{name}» в этой категории — укажите артикул модели или SKU
+import.db_conflict: "конфликт с существующими данными: такой размер/цвет, SKU или артикул уже есть у другого товара/вариации"
+import.db_internal: внутренняя ошибка при сохранении — попробуйте ещё раз
+import.db_not_found: категория или точка продаж не найдена
+import.db_out_of_range: значение вне допустимого диапазона
+import.duplicate_variant: размер {size} / цвет {color} уже есть в строке {line}
+import.model_skipped: модель не импортирована из-за ошибки в строке {line}
+import.multi_row_needs_variant: в модели несколько строк — у каждой нужны размер и цвет
+import.no_active_point: нет активной точки продаж, чтобы записать остаток
+import.no_category: не указана категория
+import.no_category_or_article: не указана категория (или артикул модели)
+import.no_name: не указано название
+import.no_name_or_article: не указано название (или артикул модели)
+import.no_price: не указана цена
+import.point_inactive: точка продаж {point} не найдена или отключена
+import.point_stock: "остаток по точке {point}: {reason}"
+import.price_negative: "цена не может быть отрицательной: {value}"
+import.price_not_number: "цена не число: {value}"
+import.price_too_large: "слишком большая цена: {value}"
+import.qty_negative: "остаток не может быть отрицательным: {value}"
+import.qty_not_integer: "остаток должен быть целым числом: {value}"
+import.qty_too_large: "слишком большой остаток: {value}"
+import.sku_duplicate_in_file: SKU {sku} уже встречается в строке {line}
+import.sku_other_product: SKU {sku} относится к другому товару, чем остальные строки модели
+import.sku_taken: SKU {sku} уже используется у другого товара
+import.sku_taken_article: SKU {sku} уже используется у другого товара (артикул {article})
+import.sku_without_variant: SKU указан без размера и цвета
+import.stock_without_variant: остаток указан без размера и цвета
+import.variant_needs_size_and_color: "для вариации нужны оба поля: размер и цвет"
+import.variant_price: "цена варианта: {reason}"

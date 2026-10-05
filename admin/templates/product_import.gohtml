@@ -72,6 +72,9 @@
 <script>
 (function () {
   var importURL = {{.ImportURL}};
+  // Row messages and file errors come back in the page's language; JSON
+  // (not an HTML error page) is asked for so a file error can be shown.
+  var apiHeaders = { 'Accept': 'application/json', 'Accept-Language': {{lang}} };
   var dropzone = document.getElementById('import-dropzone');
   var fileInput = document.getElementById('import-file-input');
   var fileNameEl = document.getElementById('import-file-name');
@@ -143,7 +146,7 @@
     setBusy(false);
   }
 
-  fetch(importURL + '/points', { credentials: 'same-origin' })
+  fetch(importURL + '/points', { credentials: 'same-origin', headers: apiHeaders })
     .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
     .then(function (res) {
       pointSelect.innerHTML = '';
@@ -244,7 +247,7 @@
     form.append('dry_run', dryRun ? '1' : '0');
     if (pointSelect.value) form.append('point_id', pointSelect.value);
     setBusy(true);
-    fetch(importURL, { method: 'POST', body: form, credentials: 'same-origin' })
+    fetch(importURL, { method: 'POST', body: form, credentials: 'same-origin', headers: apiHeaders })
       .then(function (r) {
         if (!r.ok) {
           return r.json().catch(function () { return {}; }).then(function (e) {
