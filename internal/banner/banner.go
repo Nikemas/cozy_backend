@@ -28,11 +28,13 @@ const (
 	MaxButtonLen  = 30
 )
 
-// Default colors — the site's --cozy-accent-bg / --cozy-ink tokens
-// (web/static/css/site.css), also the column defaults in 000039.
+// Default colors — the site's --cozy-accent-bg / --cozy-ink /
+// --cozy-accent-ink tokens (web/static/css/site.css), also the column
+// defaults in 000039.
 const (
-	DefaultBgColor   = "#FFF3E9"
-	DefaultTextColor = "#1A1A1A"
+	DefaultBgColor      = "#FFF3E9"
+	DefaultTextColor    = "#1A1A1A"
+	DefaultEyebrowColor = "#B35400"
 )
 
 // hexColor is the only color format accepted: "#RRGGBB". Anything else
@@ -55,6 +57,7 @@ type Banner struct {
 	LinkCategorySlug *string
 	BgColor          string
 	TextColor        string
+	EyebrowColor     string
 	ImageKey         *string
 	BgImageKey       *string
 	UpdatedAt        time.Time
@@ -95,7 +98,7 @@ func orFallback(s, fallback string) string {
 // and the app hides the banner, and the admin form still opens and
 // recreates the row on save.
 func notConfigured() *Banner {
-	return &Banner{BgColor: DefaultBgColor, TextColor: DefaultTextColor}
+	return &Banner{BgColor: DefaultBgColor, TextColor: DefaultTextColor, EyebrowColor: DefaultEyebrowColor}
 }
 
 // Input carries the writable fields of the banner.
@@ -110,6 +113,7 @@ type Input struct {
 	LinkCategoryID *string // nil = the whole catalog
 	BgColor        string
 	TextColor      string
+	EyebrowColor   string
 	ImageKey       *string
 	BgImageKey     *string
 }
@@ -126,6 +130,7 @@ func (in Input) Normalized() Input {
 	out.ButtonKY = strings.TrimSpace(in.ButtonKY)
 	out.BgColor = strings.ToUpper(strings.TrimSpace(in.BgColor))
 	out.TextColor = strings.ToUpper(strings.TrimSpace(in.TextColor))
+	out.EyebrowColor = strings.ToUpper(strings.TrimSpace(in.EyebrowColor))
 	out.LinkCategoryID = nilIfBlank(in.LinkCategoryID)
 	out.ImageKey = nilIfBlank(in.ImageKey)
 	out.BgImageKey = nilIfBlank(in.BgImageKey)
@@ -148,7 +153,10 @@ func nilIfBlank(p *string) *string {
 // as is. Called by Store.Update too; exported so the admin handler can
 // reject a bad form before uploading any picture.
 func (in Input) Validate() error {
-	if in.Enabled && in.TitleRU == "" {
+	// The title is required even for a disabled banner: the app treats
+	// an enabled banner without a title as a broken response, and
+	// switching a banner back on must not be able to produce one.
+	if in.TitleRU == "" {
 		return apperr.BadRequest("banner_title_required", "укажите заголовок баннера на русском")
 	}
 	if err := checkLen(in.EyebrowRU, in.EyebrowKY, MaxEyebrowLen, "eyebrow"); err != nil {
@@ -165,6 +173,9 @@ func (in Input) Validate() error {
 	}
 	if !hexColor.MatchString(in.TextColor) {
 		return apperr.BadRequest("invalid_color", "цвет текста баннера должен быть в формате #RRGGBB").WithVariant("banner_text")
+	}
+	if !hexColor.MatchString(in.EyebrowColor) {
+		return apperr.BadRequest("invalid_color", "цвет надзаголовка баннера должен быть в формате #RRGGBB").WithVariant("banner_eyebrow")
 	}
 	if in.LinkCategoryID != nil {
 		if _, err := uuid.Parse(*in.LinkCategoryID); err != nil {

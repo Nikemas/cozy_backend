@@ -73,7 +73,7 @@ func (f *fakeBannerImages) RemoveObject(_ context.Context, key string) error {
 func storedBanner() *banner.Banner {
 	return &banner.Banner{
 		Enabled: true, EyebrowRU: "Обувь для всей семьи", TitleRU: "Доставка по Бишкеку", ButtonRU: "Смотреть", ButtonKY: "Көрүү",
-		BgColor: "#FFF3E9", TextColor: "#1A1A1A", ImageKey: strPtr("banners/old.png"),
+		BgColor: "#FFF3E9", TextColor: "#1A1A1A", EyebrowColor: "#B35400", ImageKey: strPtr("banners/old.png"),
 		UpdatedAt: time.Date(2026, 10, 5, 6, 0, 0, 0, time.UTC),
 	}
 }
@@ -138,7 +138,7 @@ func validBannerFields() url.Values {
 	return url.Values{
 		"enabled": {"1"}, "eyebrow_ru": {"Новинки"}, "title_ru": {" Осенняя коллекция "}, "title_ky": {""},
 		"button_ru": {"Смотреть"}, "link_category_id": {"6f1c1f9e-7a43-4c55-9d0b-0a4f3c1d2e3f"},
-		"bg_color": {"#102030"}, "text_color": {"#ffffff"},
+		"bg_color": {"#102030"}, "text_color": {"#ffffff"}, "eyebrow_color": {"#ffcc00"},
 	}
 }
 
@@ -157,6 +157,7 @@ func TestBannerPageRendersStoredBanner(t *testing.T) {
 		`<option value="c1" >Кроссовки</option>`,
 		`name="bg_color" value="#FFF3E9"`,
 		`type="color" value="#1A1A1A"`,
+		`name="eyebrow_color" value="#B35400"`,
 		`src="https://media.example/banners/old.png"`,
 		`name="remove_image" value="1"`,
 		"Баннер сохранён",
@@ -192,7 +193,7 @@ func TestBannerSaveUploadsPicturesAndRedirects(t *testing.T) {
 		t.Fatalf("status %d → %q: %s", w.Code, w.Header().Get("Location"), w.Body.String())
 	}
 	in := store.updated
-	if in == nil || in.TitleRU != "Осенняя коллекция" || in.TextColor != "#FFFFFF" || !in.Enabled ||
+	if in == nil || in.TitleRU != "Осенняя коллекция" || in.TextColor != "#FFFFFF" || in.EyebrowColor != "#FFCC00" || !in.Enabled ||
 		in.LinkCategoryID == nil || *in.LinkCategoryID != "6f1c1f9e-7a43-4c55-9d0b-0a4f3c1d2e3f" {
 		t.Fatalf("saved input = %+v", in)
 	}

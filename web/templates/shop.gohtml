@@ -28,8 +28,8 @@
   {{/* Editable at /admin/banner (internal/web/banner_view.go). Colors are
        validated #RRGGBB; they only set custom properties site.css reads,
        so an empty value keeps the stylesheet default. */}}
-  <div class="shop-banner{{if .CustomInk}} shop-banner--ink{{end}}"
-       {{- if or .BgColor .TextColor .BgImageURL}} style="{{if .BgColor}}--banner-bg: {{.BgColor}};{{end}}{{if .TextColor}} --banner-ink: {{.TextColor}};{{end}}{{if .BgImageURL}} background-image: url({{.BgImageURL}});{{end}}"{{end}}>
+  <div class="shop-banner"
+       {{- if or .BgColor .TextColor .EyebrowColor .BgImageURL}} style="{{if .BgColor}}--banner-bg: {{.BgColor}};{{end}}{{if .TextColor}} --banner-ink: {{.TextColor}};{{end}}{{if .EyebrowColor}} --banner-eyebrow: {{.EyebrowColor}};{{end}}{{if .BgImageURL}} background-image: url({{.BgImageURL}});{{end}}"{{end}}>
     <div class="shop-banner__text">
       {{if .Eyebrow}}<div class="shop-banner__eyebrow">{{.Eyebrow}}</div>{{end}}
       <div class="shop-banner__title">{{.Title}}</div>

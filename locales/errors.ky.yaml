@@ -69,6 +69,7 @@ err.invalid_category_id.required: категорияны тандаңыз
 err.invalid_city: city милдеттүү
 err.invalid_color: color милдеттүү
 err.invalid_color.banner_bg: "баннердин фонунун түсү #RRGGBB форматында болушу керек"
+err.invalid_color.banner_eyebrow: "баннердин үстүңкү жазуусунун түсү #RRGGBB форматында болушу керек"
 err.invalid_color.banner_text: "баннердин текстинин түсү #RRGGBB форматында болушу керек"
 err.invalid_coordinates: координаттар жол берилген чектен тышкары
 err.invalid_coordinates.pair: туурасын да, узундугун да көрсөтүңүз

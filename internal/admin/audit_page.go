@@ -320,7 +320,8 @@ var auditDetailLabels = map[string]string{
 	"banner_title_ky": "admin.audit.field.banner_title_ky", "banner_button_ru": "admin.audit.field.banner_button_ru",
 	"banner_button_ky": "admin.audit.field.banner_button_ky", "banner_link": "admin.audit.field.banner_link",
 	"banner_bg_color": "admin.audit.field.banner_bg_color", "banner_text_color": "admin.audit.field.banner_text_color",
-	"banner_image": "admin.audit.field.banner_image", "banner_bg_image": "admin.audit.field.banner_bg_image",
+	"banner_eyebrow_color": "admin.audit.field.banner_eyebrow_color",
+	"banner_image":         "admin.audit.field.banner_image", "banner_bg_image": "admin.audit.field.banner_bg_image",
 }
 
 // auditDetailsText renders Details as "field: from → to; field: value",

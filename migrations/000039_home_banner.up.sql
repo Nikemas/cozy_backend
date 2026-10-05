@@ -18,6 +18,7 @@ CREATE TABLE home_banner (
   link_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   bg_color         TEXT NOT NULL DEFAULT '#FFF3E9' CHECK (bg_color ~ '^#[0-9A-Fa-f]{6}$'),
   text_color       TEXT NOT NULL DEFAULT '#1A1A1A' CHECK (text_color ~ '^#[0-9A-Fa-f]{6}$'),
+  eyebrow_color    TEXT NOT NULL DEFAULT '#B35400' CHECK (eyebrow_color ~ '^#[0-9A-Fa-f]{6}$'),
   image_key        TEXT,
   bg_image_key     TEXT,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -25,8 +26,9 @@ CREATE TABLE home_banner (
 
 -- Seeded with the texts the home page showed before the banner became
 -- editable (locales/*.yaml shop.banner.*), so nothing changes visually
--- until the owner edits it. Colors are the site's --cozy-accent-bg and
--- --cozy-ink tokens (web/static/css/site.css).
+-- until the owner edits it. Colors are the site's --cozy-accent-bg,
+-- --cozy-ink and --cozy-accent-ink (the eyebrow) tokens
+-- (web/static/css/site.css).
 INSERT INTO home_banner (id, enabled, eyebrow_ru, eyebrow_ky, title_ru, title_ky, button_ru, button_ky)
 VALUES (
   1, true,

@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/banner"
 )
@@ -23,16 +22,13 @@ type BannerView struct {
 	Title      string
 	ButtonText string // "" = no button
 	ButtonHref string
-	// BgColor/TextColor are validated "#RRGGBB" (banner.Input.Validate +
+	// The colors are validated "#RRGGBB" (banner.Input.Validate +
 	// a CHECK in migration 000039), so they are safe in a style attribute.
-	BgColor   string
-	TextColor string
-	// CustomInk: the owner picked a text color other than the default, so
-	// the eyebrow follows it instead of the accent orange (which may not
-	// read on the chosen background).
-	CustomInk  bool
-	ImageURL   string // picture on the right; "" keeps the decorative SVG
-	BgImageURL string // full background, covered
+	BgColor      string
+	TextColor    string
+	EyebrowColor string
+	ImageURL     string // picture on the right; "" keeps the decorative SVG
+	BgImageURL   string // full background, covered
 }
 
 // catalogAnchor is where a banner without a linked category points: the
@@ -71,13 +67,13 @@ func newBannerView(b *banner.Banner, lang string, objectURL func(string) string)
 	}
 	texts := b.TextsFor(lang)
 	v := &BannerView{
-		Eyebrow:    texts.Eyebrow,
-		Title:      texts.Title,
-		ButtonText: texts.Button,
-		ButtonHref: catalogAnchor,
-		BgColor:    b.BgColor,
-		TextColor:  b.TextColor,
-		CustomInk:  !strings.EqualFold(b.TextColor, banner.DefaultTextColor),
+		Eyebrow:      texts.Eyebrow,
+		Title:        texts.Title,
+		ButtonText:   texts.Button,
+		ButtonHref:   catalogAnchor,
+		BgColor:      b.BgColor,
+		TextColor:    b.TextColor,
+		EyebrowColor: b.EyebrowColor,
 	}
 	if b.LinkCategorySlug != nil && *b.LinkCategorySlug != "" {
 		v.ButtonHref = "/catalog/" + *b.LinkCategorySlug // same URL as the category chips

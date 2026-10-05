@@ -42,13 +42,13 @@ func TestNewBannerViewDisabledIsHidden(t *testing.T) {
 func TestNewBannerView(t *testing.T) {
 	b := &banner.Banner{
 		Enabled: true, EyebrowRU: "Обувь", TitleRU: "Доставка", TitleKY: "Жеткирүү", ButtonRU: "Смотреть",
-		BgColor: "#FFF3E9", TextColor: "#1A1A1A",
+		BgColor: "#FFF3E9", TextColor: "#1A1A1A", EyebrowColor: "#B35400",
 	}
 	plain := newBannerView(b, i18n.LangKY, objURL)
 	if plain.Title != "Жеткирүү" || plain.Eyebrow != "Обувь" || plain.ButtonText != "Смотреть" {
 		t.Errorf("ky texts with ru fallback = %+v", plain)
 	}
-	if plain.ButtonHref != "#catalog" || plain.CustomInk || plain.ImageURL != "" || plain.BgImageURL != "" {
+	if plain.ButtonHref != "#catalog" || plain.EyebrowColor != "#B35400" || plain.ImageURL != "" || plain.BgImageURL != "" {
 		t.Errorf("defaults = %+v", plain)
 	}
 
@@ -57,7 +57,7 @@ func TestNewBannerView(t *testing.T) {
 	linked.ImageKey, linked.BgImageKey = strp("banners/a.png"), strp("banners/b.jpg")
 	linked.TextColor = "#FFFFFF"
 	v := newBannerView(&linked, i18n.LangRU, objURL)
-	if v.ButtonHref != "/catalog/sneakers" || !v.CustomInk ||
+	if v.ButtonHref != "/catalog/sneakers" || v.TextColor != "#FFFFFF" ||
 		v.ImageURL != "https://media.example/cozy-media/banners/a.png" || v.BgImageURL != "https://media.example/cozy-media/banners/b.jpg" {
 		t.Errorf("view = %+v", v)
 	}
@@ -71,7 +71,7 @@ func TestHomeBannerFallsBackToStaticTextsOnError(t *testing.T) {
 	if v == nil || v.Eyebrow != h.t(i18n.LangKY, "shop.banner.eyebrow") || v.Title != h.t(i18n.LangKY, "shop.banner.title") {
 		t.Fatalf("fallback = %+v", v)
 	}
-	if v.BgColor != "" || v.TextColor != "" || v.ButtonText != "" {
+	if v.BgColor != "" || v.TextColor != "" || v.EyebrowColor != "" || v.ButtonText != "" {
 		t.Errorf("fallback must use stylesheet defaults and no button: %+v", v)
 	}
 }
@@ -99,12 +99,13 @@ func renderShopBanner(t *testing.T, v *BannerView) string {
 func TestRenderShopBannerFromAdmin(t *testing.T) {
 	body := renderShopBanner(t, &BannerView{
 		Eyebrow: "Новинки", Title: "Осень <2026>", ButtonText: "Смотреть", ButtonHref: "/catalog/sneakers",
-		BgColor: "#102030", TextColor: "#FFFFFF", CustomInk: true,
+		BgColor: "#102030", TextColor: "#FFFFFF", EyebrowColor: "#FFCC00",
 		ImageURL: "https://media.example/cozy-media/banners/a.png", BgImageURL: "https://media.example/cozy-media/banners/b.jpg",
 	})
 
 	for _, want := range []string{
-		`class="shop-banner shop-banner--ink"`,
+		`class="shop-banner"`,
+		`--banner-eyebrow: #FFCC00;`,
 		`--banner-bg: #102030;`,
 		`--banner-ink: #FFFFFF;`,
 		`background-image: url(https://media.example/cozy-media/banners/b.jpg);`,

@@ -68,6 +68,7 @@ type bannerForm struct {
 	ButtonRU, ButtonKY   string
 	CategoryID           string
 	BgColor, TextColor   string
+	EyebrowColor         string
 	ImageURL, BgImageURL string
 	UpdatedAt            string
 }
@@ -88,7 +89,7 @@ func newBannerForm(b *banner.Banner, objectURL func(string) string) bannerForm {
 		TitleRU: b.TitleRU, TitleKY: b.TitleKY,
 		ButtonRU: b.ButtonRU, ButtonKY: b.ButtonKY,
 		CategoryID: deref(b.LinkCategoryID),
-		BgColor:    b.BgColor, TextColor: b.TextColor,
+		BgColor:    b.BgColor, TextColor: b.TextColor, EyebrowColor: b.EyebrowColor,
 		ImageURL:   objectURL(deref(b.ImageKey)),
 		BgImageURL: objectURL(deref(b.BgImageKey)),
 	}
@@ -239,6 +240,7 @@ func bannerInputFromForm(r *http.Request, current *banner.Banner) banner.Input {
 		LinkCategoryID: &categoryID,
 		BgColor:        r.FormValue("bg_color"),
 		TextColor:      r.FormValue("text_color"),
+		EyebrowColor:   r.FormValue("eyebrow_color"),
 		ImageKey:       current.ImageKey,
 		BgImageKey:     current.BgImageKey,
 	}
@@ -260,7 +262,7 @@ func stickyBannerForm(in banner.Input, current *banner.Banner, objectURL func(st
 	f.TitleRU, f.TitleKY = in.TitleRU, in.TitleKY
 	f.ButtonRU, f.ButtonKY = in.ButtonRU, in.ButtonKY
 	f.CategoryID = deref(in.LinkCategoryID)
-	f.BgColor, f.TextColor = in.BgColor, in.TextColor
+	f.BgColor, f.TextColor, f.EyebrowColor = in.BgColor, in.TextColor, in.EyebrowColor
 	return f
 }
 
@@ -370,6 +372,7 @@ func bannerAuditEntry(before, after *banner.Banner) audit.Entry {
 	add("banner_link", deref(before.LinkCategorySlug), deref(after.LinkCategorySlug))
 	add("banner_bg_color", before.BgColor, after.BgColor)
 	add("banner_text_color", before.TextColor, after.TextColor)
+	add("banner_eyebrow_color", before.EyebrowColor, after.EyebrowColor)
 	add("banner_image", deref(before.ImageKey), deref(after.ImageKey))
 	add("banner_bg_image", deref(before.BgImageKey), deref(after.BgImageKey))
 	return audit.Entry{

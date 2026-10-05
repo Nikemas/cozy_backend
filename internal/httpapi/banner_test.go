@@ -31,7 +31,7 @@ func seededBanner() *banner.Banner {
 		EyebrowRU: "Обувь для всей семьи", EyebrowKY: "Бүт үй-бүлө үчүн бут кийим",
 		TitleRU: "Доставка по Бишкеку", TitleKY: "",
 		ButtonRU: "Смотреть", ButtonKY: "Көрүү",
-		BgColor: "#FFF3E9", TextColor: "#1A1A1A",
+		BgColor: "#FFF3E9", TextColor: "#1A1A1A", EyebrowColor: "#B35400",
 		UpdatedAt: time.Date(2026, 10, 5, 18, 0, 0, 0, time.FixedZone("KGT", 6*3600)),
 	}
 }
@@ -61,7 +61,7 @@ func TestGetBannerEnabledMatchesContract(t *testing.T) {
 	}
 	want := `{"enabled":true,"banner":{"eyebrow":"Обувь для всей семьи","title":"Доставка по Бишкеку",` +
 		`"button_text":"Смотреть","category_slug":null,"category_id":null,"bg_color":"#FFF3E9","text_color":"#1A1A1A",` +
-		`"image_url":null,"background_image_url":null,"updated_at":"2026-10-05T12:00:00Z"}}`
+		`"eyebrow_color":"#B35400","image_url":null,"background_image_url":null,"updated_at":"2026-10-05T12:00:00Z"}}`
 	if got := strings.TrimSpace(rec.Body.String()); got != want {
 		t.Errorf("body =\n%s\nwant\n%s", got, want)
 	}
@@ -105,6 +105,17 @@ func TestGetBannerBuildsAbsoluteImageURLsAndCategory(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Errorf("body lacks %s: %s", want, rec.Body.String())
 		}
+	}
+}
+
+func TestGetBannerSendsCategoryIDAndSlugTogether(t *testing.T) {
+	b := seededBanner()
+	b.LinkCategoryID = strp("c1") // slug missing: inconsistent row
+
+	rec := serveBanner(t, fakeBannerGetter{b: b}, "")
+
+	if !strings.Contains(rec.Body.String(), `"category_slug":null,"category_id":null`) {
+		t.Errorf("half a category link leaked: %s", rec.Body.String())
 	}
 }
 

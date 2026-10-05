@@ -49,6 +49,7 @@ type bannerFields struct {
 	CategoryID         *string   `json:"category_id"`
 	BgColor            string    `json:"bg_color"`
 	TextColor          string    `json:"text_color"`
+	EyebrowColor       string    `json:"eyebrow_color"`
 	ImageURL           *string   `json:"image_url"`
 	BackgroundImageURL *string   `json:"background_image_url"`
 	UpdatedAt          time.Time `json:"updated_at"`
@@ -59,18 +60,30 @@ func newBannerResponse(b *banner.Banner, lang string, objectURL func(string) str
 		return bannerResponse{Enabled: false}
 	}
 	texts := b.TextsFor(lang)
+	categoryID, categorySlug := linkedCategory(b)
 	return bannerResponse{Enabled: true, Banner: &bannerFields{
 		Eyebrow:            texts.Eyebrow,
 		Title:              texts.Title,
 		ButtonText:         texts.Button,
-		CategorySlug:       b.LinkCategorySlug,
-		CategoryID:         b.LinkCategoryID,
+		CategorySlug:       categorySlug,
+		CategoryID:         categoryID,
 		BgColor:            b.BgColor,
 		TextColor:          b.TextColor,
+		EyebrowColor:       b.EyebrowColor,
 		ImageURL:           objectURLPtr(b.ImageKey, objectURL),
 		BackgroundImageURL: objectURLPtr(b.BgImageKey, objectURL),
 		UpdatedAt:          b.UpdatedAt.UTC(),
 	}}
+}
+
+// linkedCategory returns the linked category's id and slug — both or
+// neither: the app navigates by id, the site by slug, so a half-filled
+// pair (which the FK + join shouldn't produce anyway) is sent as no link.
+func linkedCategory(b *banner.Banner) (id, slug *string) {
+	if b.LinkCategoryID == nil || *b.LinkCategoryID == "" || b.LinkCategorySlug == nil || *b.LinkCategorySlug == "" {
+		return nil, nil
+	}
+	return b.LinkCategoryID, b.LinkCategorySlug
 }
 
 func objectURLPtr(key *string, objectURL func(string) string) *string {

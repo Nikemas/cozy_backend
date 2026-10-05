@@ -24,14 +24,14 @@ func NewStore(db *sql.DB) *Store {
 // selectColumns reads a banner row b joined with its linked category c.
 const selectColumns = `
 	b.enabled, b.eyebrow_ru, b.eyebrow_ky, b.title_ru, b.title_ky, b.button_ru, b.button_ky,
-	b.link_category_id::text, c.slug, b.bg_color, b.text_color, b.image_key, b.bg_image_key, b.updated_at`
+	b.link_category_id::text, c.slug, b.bg_color, b.text_color, b.eyebrow_color, b.image_key, b.bg_image_key, b.updated_at`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanBanner(row rowScanner) (*Banner, error) {
 	var b Banner
 	err := row.Scan(&b.Enabled, &b.EyebrowRU, &b.EyebrowKY, &b.TitleRU, &b.TitleKY, &b.ButtonRU, &b.ButtonKY,
-		&b.LinkCategoryID, &b.LinkCategorySlug, &b.BgColor, &b.TextColor, &b.ImageKey, &b.BgImageKey, &b.UpdatedAt)
+		&b.LinkCategoryID, &b.LinkCategorySlug, &b.BgColor, &b.TextColor, &b.EyebrowColor, &b.ImageKey, &b.BgImageKey, &b.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +64,8 @@ func (s *Store) Update(ctx context.Context, in Input) (*Banner, error) {
 	const q = `
 		WITH b AS (
 			INSERT INTO home_banner (id, enabled, eyebrow_ru, eyebrow_ky, title_ru, title_ky, button_ru, button_ky,
-			                         link_category_id, bg_color, text_color, image_key, bg_image_key, updated_at)
-			VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+			                         link_category_id, bg_color, text_color, eyebrow_color, image_key, bg_image_key, updated_at)
+			VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
 			ON CONFLICT (id) DO UPDATE SET
 				enabled = EXCLUDED.enabled,
 				eyebrow_ru = EXCLUDED.eyebrow_ru, eyebrow_ky = EXCLUDED.eyebrow_ky,
@@ -73,6 +73,7 @@ func (s *Store) Update(ctx context.Context, in Input) (*Banner, error) {
 				button_ru = EXCLUDED.button_ru, button_ky = EXCLUDED.button_ky,
 				link_category_id = EXCLUDED.link_category_id,
 				bg_color = EXCLUDED.bg_color, text_color = EXCLUDED.text_color,
+				eyebrow_color = EXCLUDED.eyebrow_color,
 				image_key = EXCLUDED.image_key, bg_image_key = EXCLUDED.bg_image_key,
 				updated_at = now()
 			RETURNING *
@@ -82,7 +83,7 @@ func (s *Store) Update(ctx context.Context, in Input) (*Banner, error) {
 
 	b, err := scanBanner(s.db.QueryRowContext(ctx, q,
 		in.Enabled, in.EyebrowRU, in.EyebrowKY, in.TitleRU, in.TitleKY, in.ButtonRU, in.ButtonKY,
-		in.LinkCategoryID, in.BgColor, in.TextColor, in.ImageKey, in.BgImageKey))
+		in.LinkCategoryID, in.BgColor, in.TextColor, in.EyebrowColor, in.ImageKey, in.BgImageKey))
 	if pgErrCode(err) == pgForeignKeyViolation {
 		return nil, errUnknownCategory()
 	}

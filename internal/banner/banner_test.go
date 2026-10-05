@@ -18,7 +18,7 @@ func sp(s string) *string { return &s }
 
 func validInput() Input {
 	return Input{
-		Enabled: true, TitleRU: "Доставка по Бишкеку", BgColor: "#fff3e9", TextColor: "#1A1A1A",
+		Enabled: true, TitleRU: "Доставка по Бишкеку", BgColor: "#fff3e9", TextColor: "#1A1A1A", EyebrowColor: "#b35400",
 	}
 }
 
@@ -40,8 +40,9 @@ func TestInputValidate(t *testing.T) {
 		wantKey string // "" = valid
 	}{
 		{"valid", func(in Input) Input { return in }, ""},
-		{"disabled banner may have no title", func(in Input) Input { in.Enabled = false; in.TitleRU = ""; return in }, ""},
+		{"disabled banner still needs a title", func(in Input) Input { in.Enabled = false; in.TitleRU = "  "; return in }, "err.banner_title_required"},
 		{"enabled banner needs a russian title", func(in Input) Input { in.TitleRU = ""; return in }, "err.banner_title_required"},
+		{"bad eyebrow color", func(in Input) Input { in.EyebrowColor = "orange"; return in }, "err.invalid_color.banner_eyebrow"},
 		{"eyebrow at limit", func(in Input) Input { in.EyebrowKY = strings.Repeat("ы", MaxEyebrowLen); return in }, ""},
 		{"eyebrow over limit", func(in Input) Input { in.EyebrowRU = strings.Repeat("ы", MaxEyebrowLen+1); return in }, "err.banner_text_too_long.eyebrow"},
 		{"ky title over limit", func(in Input) Input { in.TitleKY = strings.Repeat("a", MaxTitleLen+1); return in }, "err.banner_text_too_long.title"},
@@ -94,7 +95,7 @@ func TestTextsForFallsBackToRussianPerField(t *testing.T) {
 }
 
 var bannerCols = []string{"enabled", "eyebrow_ru", "eyebrow_ky", "title_ru", "title_ky", "button_ru", "button_ky",
-	"link_category_id", "slug", "bg_color", "text_color", "image_key", "bg_image_key", "updated_at"}
+	"link_category_id", "slug", "bg_color", "text_color", "eyebrow_color", "image_key", "bg_image_key", "updated_at"}
 
 func newMock(t *testing.T) (*Store, sqlmock.Sqlmock) {
 	t.Helper()
@@ -111,7 +112,7 @@ func TestStoreGetJoinsCategorySlug(t *testing.T) {
 	at := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	mock.ExpectQuery(`FROM home_banner b LEFT JOIN categories c ON c.id = b.link_category_id\s+WHERE b.id = 1`).
 		WillReturnRows(sqlmock.NewRows(bannerCols).AddRow(true, "Обувь", "", "Доставка", "", "Смотреть", "Көрүү",
-			"c1", "sneakers", "#FFF3E9", "#1A1A1A", "banners/a.png", nil, at))
+			"c1", "sneakers", "#FFF3E9", "#1A1A1A", "#B35400", "banners/a.png", nil, at))
 
 	b, err := store.Get(context.Background())
 
@@ -136,7 +137,7 @@ func TestStoreGetMissingRowIsDisabledDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.Enabled || b.BgColor != DefaultBgColor || b.TextColor != DefaultTextColor {
+	if b.Enabled || b.BgColor != DefaultBgColor || b.TextColor != DefaultTextColor || b.EyebrowColor != DefaultEyebrowColor {
 		t.Errorf("banner = %+v", b)
 	}
 }
@@ -153,12 +154,12 @@ func TestStoreGetPassesThroughDBErrors(t *testing.T) {
 
 func TestStoreUpdateUpsertsNormalizedInput(t *testing.T) {
 	store, mock := newMock(t)
-	in := Input{Enabled: true, TitleRU: " Новинки ", ButtonRU: "Смотреть", BgColor: "#abcdef", TextColor: "#000000",
+	in := Input{Enabled: true, TitleRU: " Новинки ", ButtonRU: "Смотреть", BgColor: "#abcdef", TextColor: "#000000", EyebrowColor: "#ff0000",
 		LinkCategoryID: sp(""), ImageKey: sp("banners/x.jpg")}
 	mock.ExpectQuery(`INSERT INTO home_banner .* ON CONFLICT \(id\) DO UPDATE SET`).
-		WithArgs(true, "", "", "Новинки", "", "Смотреть", "", nil, "#ABCDEF", "#000000", "banners/x.jpg", nil).
+		WithArgs(true, "", "", "Новинки", "", "Смотреть", "", nil, "#ABCDEF", "#000000", "#FF0000", "banners/x.jpg", nil).
 		WillReturnRows(sqlmock.NewRows(bannerCols).AddRow(true, "", "", "Новинки", "", "Смотреть", "",
-			nil, nil, "#ABCDEF", "#000000", "banners/x.jpg", nil, time.Now()))
+			nil, nil, "#ABCDEF", "#000000", "#FF0000", "banners/x.jpg", nil, time.Now()))
 
 	b, err := store.Update(context.Background(), in)
 
@@ -179,7 +180,7 @@ func TestStoreUpdateUpsertsNormalizedInput(t *testing.T) {
 func TestStoreUpdateValidatesBeforeTouchingDB(t *testing.T) {
 	store := NewStore(nil) // a nil *sql.DB would panic if reached
 
-	_, err := store.Update(context.Background(), Input{Enabled: true, TitleRU: "T", BgColor: "blue", TextColor: "#000000"})
+	_, err := store.Update(context.Background(), Input{Enabled: true, TitleRU: "T", BgColor: "blue", TextColor: "#000000", EyebrowColor: "#000000"})
 
 	assertAppErr(t, err, http.StatusBadRequest, "err.invalid_color.banner_bg")
 }

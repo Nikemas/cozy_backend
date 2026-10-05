@@ -591,6 +591,7 @@ admin.banner.look: Ссылка и оформление
 admin.banner.link: Куда ведёт кнопка
 admin.banner.link_all: Весь каталог
 admin.banner.bg_color: Цвет фона
+admin.banner.eyebrow_color: Цвет надписи
 admin.banner.text_color: Цвет текста
 admin.banner.image: Картинка справа
 admin.banner.image_hint: PNG с прозрачным фоном, JPEG или WEBP, до 10 МБ, меньшая сторона от 200 px
@@ -612,6 +613,7 @@ admin.audit.field.banner_button_ru: кнопка (рус)
 admin.audit.field.banner_button_ky: кнопка (кырг)
 admin.audit.field.banner_link: ссылка
 admin.audit.field.banner_bg_color: цвет фона
+admin.audit.field.banner_eyebrow_color: цвет надзаголовка
 admin.audit.field.banner_text_color: цвет текста
 admin.audit.field.banner_image: картинка
 admin.audit.field.banner_bg_image: фоновое изображение

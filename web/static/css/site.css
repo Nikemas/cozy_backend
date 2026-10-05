@@ -721,14 +721,11 @@ button, input { font-family: inherit; }
   gap: 16px;
   margin-bottom: 24px;
 }
-.shop-banner__eyebrow { font-size: var(--cozy-fs-13); color: var(--cozy-accent); font-weight: 700; margin-bottom: 8px; letter-spacing: 0.02em; }
+.shop-banner__eyebrow { font-size: var(--cozy-fs-13); color: var(--banner-eyebrow, var(--cozy-accent-ink)); font-weight: 700; margin-bottom: 8px; letter-spacing: 0.02em; }
 .shop-banner__title { font-size: 28px; font-weight: 700; color: var(--banner-ink, var(--cozy-ink)); line-height: 1.25; overflow-wrap: anywhere; }
 .shop-banner__text { flex: 1; min-width: 0; }
 .shop-banner__btn { margin-top: 16px; }
 .shop-banner__img { width: 240px; height: 160px; object-fit: contain; flex-shrink: 0; }
-/* A custom text color also recolors the eyebrow (the accent orange may
-   not read on the chosen background). */
-.shop-banner--ink .shop-banner__eyebrow { color: var(--banner-ink); }
 
 .shop-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .shop-chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -989,7 +986,6 @@ button, input { font-family: inherit; }
 .link-btn,
 .aside__reset,
 .shop-pager__link,
-.shop-banner__eyebrow,
 .branch-card__route,
 .icon-btn--active { color: var(--cozy-accent-ink); }
 /* Large price text needs 3:1 — accent-strong gives 3.25:1. */

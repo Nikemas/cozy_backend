@@ -22,7 +22,7 @@
   .bn-banner { border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 12px;
     background-size: cover; background-position: center; min-height: 120px; }
   .bn-banner__text { flex: 1; min-width: 0; }
-  .bn-banner__eyebrow { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .bn-banner__eyebrow { font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #B35400; }
   .bn-banner__title { font-size: 18px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
   .bn-banner__btn { display: inline-block; margin-top: 10px; padding: 8px 14px; border-radius: 10px; background: #E85D04; color: #FFFFFF; font-size: 12px; font-weight: 700; }
   .bn-banner img { width: 96px; height: 72px; object-fit: contain; }
@@ -88,6 +88,15 @@
           <div class="bn-color">
             <input type="color" value="{{.Form.TextColor}}" data-color-for="bn-text-color" aria-label="{{t "admin.banner.text_color"}}">
             <input type="text" id="bn-text-color" name="text_color" value="{{.Form.TextColor}}" required pattern="#[0-9A-Fa-f]{6}" maxlength="7" placeholder="#1A1A1A">
+          </div>
+        </div>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="bn-eyebrow-color">{{t "admin.banner.eyebrow_color"}}</label>
+          <div class="bn-color">
+            <input type="color" value="{{.Form.EyebrowColor}}" data-color-for="bn-eyebrow-color" aria-label="{{t "admin.banner.eyebrow_color"}}">
+            <input type="text" id="bn-eyebrow-color" name="eyebrow_color" value="{{.Form.EyebrowColor}}" required pattern="#[0-9A-Fa-f]{6}" maxlength="7" placeholder="#B35400">
           </div>
         </div>
       </div>
@@ -165,6 +174,8 @@
     var bg = $("bn-bg-color").value, ink = $("bn-text-color").value;
     prev.style.backgroundColor = hex.test(bg) ? bg : "";
     prev.style.color = hex.test(ink) ? ink : "";
+    var eyebrowColor = $("bn-eyebrow-color").value;
+    $("bn-prev-eyebrow").style.color = hex.test(eyebrowColor) ? eyebrowColor : "";
     var bgImage = fileURL($("bn-bg-image"), "bn-bg-image-current", "remove_bg_image");
     prev.style.backgroundImage = bgImage ? "url(\"" + bgImage + "\")" : "";
     prev.classList.toggle("bn-off", !$("bn-enabled").checked);
