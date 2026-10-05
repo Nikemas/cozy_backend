@@ -256,7 +256,8 @@ func TestLoad_SecurityDefaults(t *testing.T) {
 	}
 	a := cfg.Security.Auth
 	if a.OTPPerIPPerHour != 30 || a.OTPPerDay != 1000 || a.OTPVerifyMaxAttempts != 5 ||
-		a.OTPVerifyFailsPerIPPerHour != 30 || a.RefreshPerIPPerMinute != 120 || a.StaffLoginPerIP != 20 {
+		a.OTPVerifyFailsPerIPPerHour != 30 || a.RefreshPerIPPerMinute != 120 || a.StaffLoginPerIP != 20 ||
+		a.OTPRetentionDays != DefaultOTPRetentionDays {
 		t.Errorf("auth limits = %+v", a)
 	}
 	if len(cfg.Security.TrustedProxies) == 0 {
@@ -298,6 +299,7 @@ func TestLoad_SecurityOverrides(t *testing.T) {
 		"COOKIE_SECURE":           "yes please",
 		"TRUSTED_PROXY_CIDRS":     "10.0.0.0/99",
 		"OTP_VERIFY_MAX_ATTEMPTS": "0",
+		"OTP_RETENTION_DAYS":      "1",
 		"MAX_BODY_BYTES":          "0",
 	} {
 		setDevEnv(t)

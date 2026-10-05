@@ -129,6 +129,15 @@ func run() error {
 		orderSettings.PaymentPendingTTL, payments.DefaultExpiryInterval)
 	defer func() { stopExpiry(); <-expiryDone }()
 
+	// Purge otp_codes rows (phone + client IP of each SMS code request)
+	// older than OTP_RETENTION_DAYS — the period /privacy and
+	// /account-deletion state. Stopped (and waited for) before the DB
+	// pool closes.
+	otpCleanupCtx, stopOTPCleanup := context.WithCancel(context.Background())
+	otpCleanupDone := auth.RunOTPCleanup(otpCleanupCtx, db,
+		time.Duration(cfg.Security.Auth.OTPRetentionDays)*24*time.Hour, auth.DefaultOTPCleanupInterval)
+	defer func() { stopOTPCleanup(); <-otpCleanupDone }()
+
 	// Promo broadcasts (admin "Рассылки") are sent by this background
 	// worker, batch by batch. On shutdown it finishes and records the batch
 	// in flight, then stops; an unfinished broadcast resumes on restart.

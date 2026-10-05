@@ -38,6 +38,7 @@ func TestDeleteCustomerAnonymizesAndCleansUp(t *testing.T) {
 		`DELETE FROM customer_addresses a WHERE a.customer_id = $1`,
 		`UPDATE customer_addresses SET label = NULL, is_default = false WHERE customer_id = $1`,
 		`UPDATE refresh_tokens SET revoked_at = now() WHERE customer_id = $1 AND revoked_at IS NULL`,
+		`DELETE FROM otp_codes WHERE phone = (SELECT phone FROM customers WHERE id = $1)`,
 		`UPDATE customers SET phone = 'deleted:' || id::text, name = NULL, deleted_at = now()`,
 	} {
 		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs("cust-1").WillReturnResult(sqlmock.NewResult(0, 1))
