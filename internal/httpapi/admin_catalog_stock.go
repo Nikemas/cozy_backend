@@ -135,6 +135,7 @@ func stockJournalEntry(ctx context.Context, tx *sql.Tx, variantID, pointID strin
 	return []audit.Entry{{
 		Action: audit.ActionStockUpdate, EntityType: audit.EntityStock, EntityID: variantID,
 		Summary: fmt.Sprintf("Остаток «%s» %s / %s, %s: %d → %d (API)", product, size, color, point, from, to),
+		MsgKey:  audit.MsgStockChanged, MsgArgs: audit.StockArgs(product, size, color, point, from, to), MsgVia: audit.ViaAPI,
 		Details: map[string]any{"product_id": productID, "point_id": pointID, "point": point,
 			"quantity": audit.Change{From: from, To: to}},
 	}}, nil
@@ -143,7 +144,12 @@ func stockJournalEntry(ctx context.Context, tx *sql.Tx, variantID, pointID strin
 // --- journal entries for the other catalog endpoints ---
 
 func categoryEntry(action, id, summary string, req *categoryRequest) audit.Entry {
-	e := audit.Entry{Action: action, EntityType: audit.EntityCategory, EntityID: id, Summary: summary}
+	e := audit.Entry{Action: action, EntityType: audit.EntityCategory, EntityID: id, Summary: summary, MsgVia: audit.ViaAPI}
+	name := ""
+	if req != nil {
+		name = req.NameRu
+	}
+	e.MsgKey, e.MsgArgs = audit.CategoryMessage(action, name)
 	if req != nil {
 		parent := ""
 		if req.ParentID != nil {
@@ -160,12 +166,32 @@ func productEntry(action string, p *catalog.Product, summary string) audit.Entry
 	if p.Brand != nil {
 		brand = *p.Brand
 	}
+	msg := map[string]string{audit.ActionProductCreate: audit.MsgProductCreated, audit.ActionProductUpdate: audit.MsgProductUpdated}[action]
 	return audit.Entry{Action: action, EntityType: audit.EntityProduct, EntityID: p.ID, Summary: summary,
+		MsgKey: msg, MsgArgs: audit.Args{"name": p.NameRu}, MsgVia: audit.ViaAPI,
 		Details: map[string]any{"name_ru": p.NameRu, "category_id": p.CategoryID, "base_price": p.BasePrice,
 			"brand": brand, "is_active": p.IsActive}}
 }
 
-func variantEntry(action, productID, variantID, summary string, req *variantRequest) audit.Entry {
+func productDeletedEntry(id string) audit.Entry {
+	return audit.Entry{Action: audit.ActionProductDelete, EntityType: audit.EntityProduct, EntityID: id,
+		Summary: "Товар удалён (скрыт из каталога) (API)", MsgKey: audit.MsgProductDeleted, MsgVia: audit.ViaAPI}
+}
+
+func productImagesEntry(productID string, count int) audit.Entry {
+	return audit.Entry{Action: audit.ActionProductImages, EntityType: audit.EntityProduct, EntityID: productID,
+		Summary: fmt.Sprintf("Фото товара заменены: %d шт. (API)", count), Details: map[string]any{"count": count},
+		MsgKey: audit.MsgProductImages, MsgArgs: audit.Args{"count": count}, MsgVia: audit.ViaAPI}
+}
+
+// variantMessages maps a variant action to its API summary message.
+var variantMessages = map[string]string{
+	audit.ActionVariantCreate: audit.MsgVariantCreated,
+	audit.ActionVariantUpdate: audit.MsgVariantUpdated,
+	audit.ActionVariantDelete: audit.MsgVariantDeleted,
+}
+
+func variantEntry(action, productID, variantID, size, color, summary string, req *variantRequest) audit.Entry {
 	d := map[string]any{"product_id": productID}
 	if req != nil {
 		d["size"], d["color"] = req.Size, req.Color
@@ -176,5 +202,6 @@ func variantEntry(action, productID, variantID, summary string, req *variantRequ
 			d["price_override"] = *req.PriceOverride
 		}
 	}
-	return audit.Entry{Action: action, EntityType: audit.EntityVariant, EntityID: variantID, Summary: summary, Details: d}
+	return audit.Entry{Action: action, EntityType: audit.EntityVariant, EntityID: variantID, Summary: summary, Details: d,
+		MsgKey: variantMessages[action], MsgArgs: audit.Args{"size": size, "color": color}, MsgVia: audit.ViaAPI}
 }

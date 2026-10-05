@@ -91,7 +91,7 @@ func TestProductOpsBulkSetActiveJournalsChangedOnly(t *testing.T) {
 	mock.ExpectExec(`SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WithArgs("s1", audit.ActionProductDeactivate, audit.EntityProduct, uuid1, "Товар «Кеды» деактивирован (массово)",
-			`{"bulk":true,"is_active":{"from":true,"to":false}}`, nil).
+			`{"bulk":true,"is_active":{"from":true,"to":false},"msg_args":{"name":"Кеды"},"msg_key":"admin.audit.summary.product_deactivated","msg_via":"bulk"}`, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`RELEASE SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
@@ -112,6 +112,7 @@ func TestProductOpsBulkSetCategory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
+	var details []string
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT name_ru FROM categories WHERE id = \$1`).WithArgs(catID).
@@ -126,7 +127,7 @@ func TestProductOpsBulkSetCategory(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name_ru"}).AddRow("old-cat", "Кроссовки"))
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WithArgs("s1", audit.ActionProductCategory, audit.EntityProduct, uuid1,
-			"Товар «Vans Old Skool»: категория «Кроссовки» → «Кеды» (массово)", sqlmock.AnyArg(), nil).
+			"Товар «Vans Old Skool»: категория «Кроссовки» → «Кеды» (массово)", argCapture{&details}, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`RELEASE SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
@@ -139,6 +140,10 @@ func TestProductOpsBulkSetCategory(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
 	}
+	if len(details) != 1 {
+		t.Fatalf("captured details = %v", details)
+	}
+	checkTranslatedRow(t, detailsRow(t, "Товар «Vans Old Skool»: категория «Кроссовки» → «Кеды» (массово)", details[0]))
 }
 
 func TestProductOpsBulkSetCategoryUnknownCategory(t *testing.T) {

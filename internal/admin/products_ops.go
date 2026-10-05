@@ -79,15 +79,16 @@ func (s *productOpsStore) BulkSetActive(ctx context.Context, ids []string, activ
 			return err
 		}
 
-		action, verb := audit.ActionProductDeactivate, "деактивирован"
+		action, verb, msg := audit.ActionProductDeactivate, "деактивирован", audit.MsgProductDeactivated
 		if active {
-			action, verb = audit.ActionProductActivate, "активирован"
+			action, verb, msg = audit.ActionProductActivate, "активирован", audit.MsgProductActivated
 		}
 		entries := make([]audit.Entry, len(changed))
 		for i, p := range changed {
 			entries[i] = audit.Entry{
 				Action: action, EntityType: audit.EntityProduct, EntityID: p.ID,
 				Summary: fmt.Sprintf("Товар «%s» %s (массово)", p.Name, verb),
+				MsgKey:  msg, MsgArgs: audit.Args{"name": p.Name}, MsgVia: audit.ViaBulk,
 				Details: map[string]any{"is_active": audit.Change{From: !active, To: active}, "bulk": true},
 			}
 		}
@@ -149,6 +150,8 @@ func (s *productOpsStore) BulkSetCategory(ctx context.Context, ids []string, cat
 					entries[i] = audit.Entry{
 						Action: audit.ActionProductCategory, EntityType: audit.EntityProduct, EntityID: p.ID,
 						Summary: fmt.Sprintf("Товар «%s»: категория «%s» → «%s» (массово)", p.Name, names[p.CategoryID], categoryName),
+						MsgKey:  audit.MsgProductCategory, MsgVia: audit.ViaBulk,
+						MsgArgs: audit.Args{"name": p.Name, "from": names[p.CategoryID], "to": categoryName},
 						Details: map[string]any{"category_id": audit.Change{From: p.CategoryID, To: categoryID}, "bulk": true},
 					}
 				}

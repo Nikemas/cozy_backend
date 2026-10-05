@@ -21,13 +21,14 @@ func TestAuditPointUpdateAndStaffPassword(t *testing.T) {
 
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WithArgs("s1", audit.ActionPointUpdate, audit.EntityPoint, "p1", "Изменена точка «Дордой»",
-			`{"name":{"from":"Старое","to":"Дордой"}}`, nil).
+			`{"msg_args":{"name":"Дордой"},"msg_key":"admin.audit.summary.point_updated","name":{"from":"Старое","to":"Дордой"}}`, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	h.auditPoint(ownerCtx(), audit.ActionPointUpdate, "p1",
 		&points.Point{ID: "p1", Name: "Старое", Address: "ул. 1"}, points.PointInput{Name: "Дордой", Address: "ул. 1", IsActive: true})
 
 	mock.ExpectExec(`INSERT INTO audit_log`).
-		WithArgs("s1", audit.ActionStaffPassword, audit.EntityStaff, "st2", "Сброшен пароль сотрудника «Нурлан»", "{}", nil).
+		WithArgs("s1", audit.ActionStaffPassword, audit.EntityStaff, "st2", "Сброшен пароль сотрудника «Нурлан»",
+			`{"msg_args":{"name":"Нурлан"},"msg_key":"admin.audit.summary.staff_password_reset"}`, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	h.auditStaff(ownerCtx(), audit.ActionStaffPassword, "st2", "Нурлан", nil)
 

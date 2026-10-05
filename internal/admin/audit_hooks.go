@@ -104,15 +104,10 @@ func productChanges(old *productSnapshot, in catalog.ProductInput) map[string]an
 }
 
 // changedFieldsLabel lists changed fields for a summary, in a stable order.
-// Summaries are stored with the entry, so they are always written in
-// Russian (ruTr); only the journal page's own labels follow the viewer's
-// language.
+// The stored Summary is always Russian (ruTr); the journal page renders
+// the entry's message (with changedFieldCodes) in the viewer's language.
 func changedFieldsLabel(changes map[string]any) string {
-	keys := make([]string, 0, len(changes))
-	for k := range changes {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := changedFieldCodes(changes)
 	labels := make([]string, len(keys))
 	for i, k := range keys {
 		if l, ok := productFieldLabels[k]; ok {
@@ -122,6 +117,17 @@ func changedFieldsLabel(changes map[string]any) string {
 		}
 	}
 	return strings.Join(labels, ", ")
+}
+
+// changedFieldCodes is the sorted list of changed field codes — the
+// "fields" argument of a translatable summary.
+func changedFieldCodes(changes map[string]any) []string {
+	keys := make([]string, 0, len(changes))
+	for k := range changes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // productSaveEntries builds the product + variant entries of one form
@@ -134,6 +140,7 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 		out = append(out, audit.Entry{
 			Action: audit.ActionProductCreate, EntityType: audit.EntityProduct, EntityID: productID,
 			Summary: fmt.Sprintf("Создан товар «%s»", name),
+			MsgKey:  audit.MsgProductCreated, MsgArgs: audit.Args{"name": name},
 			Details: map[string]any{"name_ru": name, "category_id": in.Product.CategoryID, "base_price": in.Product.BasePrice,
 				"brand": deref(in.Product.Brand)},
 		})
@@ -142,6 +149,7 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 			out = append(out, audit.Entry{
 				Action: audit.ActionProductUpdate, EntityType: audit.EntityProduct, EntityID: productID,
 				Summary: fmt.Sprintf("Изменён товар «%s»: %s", name, changedFieldsLabel(changes)),
+				MsgKey:  audit.MsgProductUpdatedFields, MsgArgs: audit.Args{"name": name, "fields": changedFieldCodes(changes)},
 				Details: changes,
 			})
 		}
@@ -149,6 +157,7 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 		out = append(out, audit.Entry{
 			Action: audit.ActionProductUpdate, EntityType: audit.EntityProduct, EntityID: productID,
 			Summary: fmt.Sprintf("Изменён товар «%s»", name),
+			MsgKey:  audit.MsgProductUpdated, MsgArgs: audit.Args{"name": name},
 		})
 	}
 
@@ -162,6 +171,8 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 				out = append(out, audit.Entry{
 					Action: audit.ActionVariantUpdate, EntityType: audit.EntityVariant, EntityID: id,
 					Summary: fmt.Sprintf("«%s»: вариация %s / %s → %s / %s", name, prev.Size, prev.Color, row.Size, row.Color),
+					MsgKey:  audit.MsgVariantChanged, MsgArgs: audit.Args{"product": name,
+						"from_size": prev.Size, "from_color": prev.Color, "size": row.Size, "color": row.Color},
 					Details: map[string]any{"product_id": productID,
 						"size": audit.Change{From: prev.Size, To: row.Size}, "color": audit.Change{From: prev.Color, To: row.Color}},
 				})
@@ -174,6 +185,7 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 		out = append(out, audit.Entry{
 			Action: audit.ActionVariantCreate, EntityType: audit.EntityVariant, EntityID: id,
 			Summary: fmt.Sprintf("«%s»: добавлена вариация %s / %s", name, row.Size, row.Color),
+			MsgKey:  audit.MsgVariantAdded, MsgArgs: audit.Args{"product": name, "size": row.Size, "color": row.Color},
 			Details: map[string]any{"product_id": productID, "size": row.Size, "color": row.Color},
 		})
 	}
@@ -189,6 +201,7 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 		out = append(out, audit.Entry{
 			Action: audit.ActionVariantDelete, EntityType: audit.EntityVariant, EntityID: id,
 			Summary: fmt.Sprintf("«%s»: удалена вариация %s / %s", name, prev.Size, prev.Color),
+			MsgKey:  audit.MsgVariantRemoved, MsgArgs: audit.Args{"product": name, "size": prev.Size, "color": prev.Color},
 			Details: map[string]any{"product_id": productID, "size": prev.Size, "color": prev.Color},
 		})
 	}
@@ -253,6 +266,7 @@ func stockEntriesTx(ctx context.Context, tx *sql.Tx, idByKey map[string]string, 
 		out = append(out, audit.Entry{
 			Action: audit.ActionStockUpdate, EntityType: audit.EntityStock, EntityID: c.variantID,
 			Summary: fmt.Sprintf("Остаток «%s» %s / %s, %s: %d → %d", l.Product, l.Size, l.Color, pointName, c.from, c.to),
+			MsgKey:  audit.MsgStockChanged, MsgArgs: audit.StockArgs(l.Product, l.Size, l.Color, pointName, c.from, c.to),
 			Details: map[string]any{"product_id": l.ProductID, "point_id": c.pointID, "point": pointName,
 				"quantity": audit.Change{From: c.from, To: c.to}},
 		})
@@ -312,13 +326,14 @@ func pointNamesTx(ctx context.Context, tx *sql.Tx, pointIDs []string) (map[strin
 
 // auditProductActive journals the row menu's Активировать/Деактивировать.
 func (h *handlers) auditProductActive(ctx context.Context, id, name string, active bool) {
-	action, verb := audit.ActionProductDeactivate, "деактивирован"
+	action, verb, msg := audit.ActionProductDeactivate, "деактивирован", audit.MsgProductDeactivated
 	if active {
-		action, verb = audit.ActionProductActivate, "активирован"
+		action, verb, msg = audit.ActionProductActivate, "активирован", audit.MsgProductActivated
 	}
 	h.audit.Record(ctx, audit.Entry{
 		Action: action, EntityType: audit.EntityProduct, EntityID: id,
 		Summary: fmt.Sprintf("Товар «%s» %s", name, verb),
+		MsgKey:  msg, MsgArgs: audit.Args{"name": name},
 		Details: map[string]any{"is_active": audit.Change{From: !active, To: active}},
 	})
 }
@@ -328,6 +343,7 @@ func (h *handlers) auditProductDeleted(ctx context.Context, id string) {
 	h.audit.Record(ctx, audit.Entry{
 		Action: audit.ActionProductDelete, EntityType: audit.EntityProduct, EntityID: id,
 		Summary: "Товар удалён (скрыт из каталога)",
+		MsgKey:  audit.MsgProductDeleted,
 	})
 }
 
@@ -369,8 +385,12 @@ func categoryAuditEntry(action, id, name string, in *catalog.CategoryInput) audi
 		audit.ActionCategoryUpdate: "Изменена",
 		audit.ActionCategoryDelete: "Удалена",
 	}[action]
-	e := audit.Entry{Action: action, EntityType: audit.EntityCategory, EntityID: id,
-		Summary: strings.TrimSpace(fmt.Sprintf("%s категория «%s»", verb, name))}
+	summary := fmt.Sprintf("%s категория «%s»", verb, name)
+	if name == "" {
+		summary = verb + " категория"
+	}
+	e := audit.Entry{Action: action, EntityType: audit.EntityCategory, EntityID: id, Summary: summary}
+	e.MsgKey, e.MsgArgs = audit.CategoryMessage(action, name)
 	if in != nil {
 		e.Details = map[string]any{"name_ru": in.NameRu, "name_ky": in.NameKy, "slug": in.Slug,
 			"parent_id": deref(in.ParentID), "sort_order": in.SortOrder}
@@ -385,16 +405,19 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 	switch action {
 	case audit.ActionPointCreate:
 		e.Summary = fmt.Sprintf("Создана точка «%s»", in.Name)
+		e.MsgKey = audit.MsgPointCreated
 		e.Details = map[string]any{"name": in.Name, "city": in.City, "address": in.Address, "working_hours": in.WorkingHours}
 	case audit.ActionPointActivate, audit.ActionPointDeactivate:
-		verb := "отключена"
+		verb, msg := "отключена", audit.MsgPointDisabled
 		if in.IsActive {
-			verb = "включена"
+			verb, msg = "включена", audit.MsgPointEnabled
 		}
+		e.MsgKey = msg
 		e.Summary = fmt.Sprintf("Точка «%s» %s", in.Name, verb)
 		e.Details = map[string]any{"is_active": audit.Change{From: !in.IsActive, To: in.IsActive}}
 	default:
 		e.Summary = fmt.Sprintf("Изменена точка «%s»", in.Name)
+		e.MsgKey = audit.MsgPointUpdated
 		d := map[string]any{}
 		if before != nil && before.Name != in.Name {
 			d["name"] = audit.Change{From: before.Name, To: in.Name}
@@ -413,6 +436,7 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 		}
 		e.Details = d
 	}
+	e.MsgArgs = audit.Args{"name": in.Name}
 	h.audit.Record(ctx, e)
 }
 
@@ -434,6 +458,12 @@ func (h *handlers) auditStaff(ctx context.Context, action, id, name string, deta
 		audit.ActionStaffDeactivate: "Сотрудник «%s» отключён",
 		audit.ActionStaffPassword:   "Сброшен пароль сотрудника «%s»",
 	}[action]
+	msg := map[string]string{
+		audit.ActionStaffCreate:     audit.MsgStaffCreated,
+		audit.ActionStaffActivate:   audit.MsgStaffEnabled,
+		audit.ActionStaffDeactivate: audit.MsgStaffDisabled,
+		audit.ActionStaffPassword:   audit.MsgStaffPasswordReset,
+	}[action]
 	h.audit.Record(ctx, audit.Entry{Action: action, EntityType: audit.EntityStaff, EntityID: id,
-		Summary: fmt.Sprintf(summary, name), Details: details})
+		Summary: fmt.Sprintf(summary, name), Details: details, MsgKey: msg, MsgArgs: audit.Args{"name": name}})
 }
