@@ -45,7 +45,7 @@ func (h *handlers) accountDelete(w http.ResponseWriter, r *http.Request) error {
 		return h.redirectOrHXRedirect(w, r, "/profile")
 	}
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	if r.FormValue("confirm") != deleteConfirmValue {
 		return h.redirectOrHXRedirect(w, r, "/profile?delete="+deleteStatusUnconfirmed+"#account-delete")
