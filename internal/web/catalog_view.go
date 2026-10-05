@@ -638,14 +638,7 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 	sizes := distinctInOrder(sizeVals)
 	colors := distinctInOrder(colorVals)
 
-	selectedSize := q.Get("size")
-	selectedColor := q.Get("color")
-	if selectedSize == "" && len(sizes) > 0 {
-		selectedSize = sizes[0]
-	}
-	if selectedColor == "" && len(colors) > 0 {
-		selectedColor = colors[0]
-	}
+	selectedSize, selectedColor := defaultQuickBuySelection(variantList, qtyByVariant, q.Get("size"), q.Get("color"))
 
 	quickBuyPath := "/quickbuy/" + product.ID
 	sizeOpts := make([]SizeOption, 0, len(sizes))
@@ -704,6 +697,29 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 		CartActionURL: productPath + "/cart",
 		BuyActionURL:  productPath + "/buy",
 	}, nil
+}
+
+// defaultQuickBuySelection picks the size/color the quick-buy modal opens
+// with. With no choice yet it prefers the first in-stock variant, so the
+// buy buttons are not disabled on open; with none in stock (or a partial
+// choice) empty parts fall back to the first listed size/color.
+func defaultQuickBuySelection(variants []catalog.Variant, qtyByVariant map[string]int, size, color string) (string, string) {
+	if size == "" && color == "" {
+		for _, v := range variants {
+			if qtyByVariant[v.ID] > 0 {
+				return v.Size, v.Color
+			}
+		}
+	}
+	if len(variants) > 0 {
+		if size == "" {
+			size = variants[0].Size
+		}
+		if color == "" {
+			color = variants[0].Color
+		}
+	}
+	return size, color
 }
 
 func findVariant(variants []catalog.Variant, size, color string) *catalog.Variant {

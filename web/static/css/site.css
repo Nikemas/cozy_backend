@@ -1043,3 +1043,4 @@ button, input { font-family: inherit; }
 .pay-qr__hint { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin: 0; }
 .pay-qr__link { display: block; max-width: 320px; word-break: break-all; font-size: var(--cozy-fs-13); color: var(--cozy-ink); background: var(--cozy-surface); border-radius: 8px; padding: 8px 10px; }
 .pay-qr__error { color: var(--cozy-danger); font-size: var(--cozy-fs-13); }
+.quickbuy-modal__unavailable { margin: 8px 0 0; color: #b3261e; font-size: 14px; }
