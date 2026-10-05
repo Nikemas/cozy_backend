@@ -175,6 +175,8 @@
   </div>
   {{end}}
 
+  {{if not $d.InStock}}<p class="quickbuy-modal__unavailable" role="status">{{t "product.out_of_stock"}}</p>{{end}}
+
   <form class="quickbuy-modal__actions">
     <input type="hidden" name="size" value="{{$d.SelectedSize}}">
     <input type="hidden" name="color" value="{{$d.SelectedColor}}">
