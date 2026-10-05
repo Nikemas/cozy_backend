@@ -58,7 +58,20 @@ type AuthLimits struct {
 	// StaffLoginPerIP — admin login attempts per client IP per 15 minutes,
 	// on top of the per-phone limit (STAFF_LOGIN_MAX_PER_IP, default 20).
 	StaffLoginPerIP int
+	// OTPRetentionDays — how long otp_codes rows (phone, client IP) are
+	// kept before the background cleanup deletes them (OTP_RETENTION_DAYS,
+	// default DefaultOTPRetentionDays, min MinOTPRetentionDays: the send
+	// limits look back up to 24 hours).
+	OTPRetentionDays int
 }
+
+const (
+	// DefaultOTPRetentionDays is OTP_RETENTION_DAYS when unset.
+	DefaultOTPRetentionDays = 30
+	// MinOTPRetentionDays keeps every rolling OTP limit window (max 24h)
+	// fully covered by retained rows.
+	MinOTPRetentionDays = 2
+)
 
 func loadSecurity(env string) (Security, error) {
 	s := Security{CookieSecure: env != EnvDev}
@@ -105,6 +118,7 @@ func loadSecurity(env string) (Security, error) {
 		{"OTP_VERIFY_MAX_FAILS_PER_IP_PER_HOUR", 30, &a.OTPVerifyFailsPerIPPerHour, false},
 		{"AUTH_REFRESH_MAX_PER_IP_PER_MINUTE", 120, &a.RefreshPerIPPerMinute, false},
 		{"STAFF_LOGIN_MAX_PER_IP", 20, &a.StaffLoginPerIP, false},
+		{"OTP_RETENTION_DAYS", DefaultOTPRetentionDays, &a.OTPRetentionDays, true},
 	} {
 		n, err := getEnvInt(f.key, f.def)
 		if err != nil {
@@ -114,6 +128,9 @@ func loadSecurity(env string) (Security, error) {
 			return s, fmt.Errorf("%s must be at least 1", f.key)
 		}
 		*f.dst = n
+	}
+	if a.OTPRetentionDays < MinOTPRetentionDays {
+		return s, fmt.Errorf("OTP_RETENTION_DAYS must be at least %d", MinOTPRetentionDays)
 	}
 	return s, nil
 }

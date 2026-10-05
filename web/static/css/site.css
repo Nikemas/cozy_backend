@@ -630,6 +630,14 @@ button, input { font-family: inherit; }
 .profile-menu__item--disabled { color: var(--cozy-ink-3); cursor: default; }
 .profile-menu__item--disabled i:first-child { color: var(--cozy-ink-4); }
 
+.account-delete { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.account-delete__title { font-size: var(--cozy-fs-15); font-weight: 700; margin: 0; }
+.account-delete__text { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin: 0; }
+.account-delete__text a { color: var(--cozy-accent-ink); text-decoration: underline; }
+.account-delete .form-error { margin: 0; }
+.account-delete .btn--danger { align-self: flex-start; }
+.static-notice { background: var(--cozy-accent-bg-2); border-radius: var(--cozy-r-14); padding: 12px 16px; margin: 0 0 16px; font-weight: 600; }
+
 /* ---- Favorites (COZY_WEB_DESIGN.md §3.4) ---- */
 .fav-grid {
   display: grid;
@@ -890,6 +898,7 @@ button, input { font-family: inherit; }
 .static-page ul { padding-left: 22px; }
 .static-page li { margin-bottom: 6px; }
 .static-page a:not(.btn) { color: var(--cozy-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.static-page ul.static-requisites { list-style: none; padding-left: 0; }
 .static-page__meta { color: var(--cozy-ink-2); font-size: var(--cozy-fs-13); }
 .static-page mark.fill { background: var(--cozy-accent-bg-2); color: var(--cozy-ink); padding: 0 3px; border-radius: 3px; }
 .static-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 16px 0 8px; }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
@@ -37,11 +38,11 @@ var screenPages = map[string]string{
 }
 
 // staticPages are the legal/info pages (/about, /contacts, /delivery,
-// /privacy, /terms). Their long-form copy doesn't fit the flat
+// /privacy, /terms, /account-deletion). Their long-form copy doesn't fit the flat
 // one-line-per-key locales/*.yaml, so each has one content file per
 // language: web/templates/pages/<name>.<lang>.gohtml, registered as
 // screen "page_<name>".
-var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms"}
+var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms", accountDeletionPage}
 
 // layoutPartials are parsed alongside every page: the shared chrome from
 // COZY_WEB_DESIGN.md §2 (header/aside/footer/toast), plus Task 4's
@@ -104,7 +105,18 @@ type PageData struct {
 type Renderer struct {
 	bundle *i18n.Bundle
 	tmpl   map[string]map[string]*template.Template // lang -> screen -> template set
+	// contacts back the "seller" template func (footer legal line); set
+	// once at startup via SetContacts, before serving.
+	contacts config.Contacts
 }
+
+// SetContacts configures the shop's legal/contact details the shared
+// chrome renders (footer legal line). Call once at startup.
+func (rr *Renderer) SetContacts(c config.Contacts) { rr.contacts = c }
+
+// seller is the "seller" template func: the configured legal entity, read
+// at execution time so SetContacts after NewRenderer takes effect.
+func (rr *Renderer) seller() config.Contacts { return rr.contacts }
 
 // NewRenderer parses every screen's templates for every supported
 // language.
@@ -129,7 +141,7 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 			}
 			files = append(files, filepath.Join(templatesDir, page))
 
-			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).ParseFiles(files...)
+			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).Funcs(template.FuncMap{"seller": rr.seller}).ParseFiles(files...)
 			if err != nil {
 				return nil, fmt.Errorf("web: parsing templates for screen %q (%s): %w", screen, lang, err)
 			}

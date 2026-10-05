@@ -9,9 +9,10 @@
       <a href="/contacts">{{t "screen.page_contacts.title"}}</a>
       <a href="/terms">{{t "screen.page_terms.title"}}</a>
       <a href="/privacy">{{t "screen.page_privacy.title"}}</a>
+      <a href="/account-deletion">{{t "screen.page_account-deletion.title"}}</a>
       <a href="/lang">{{t "screen.lang.title"}}</a>
     </nav>
   </div>
-  <div class="footer__legal">{{t "footer.legal"}}</div>
+  {{with seller}}{{if .LegalName}}<div class="footer__legal">{{.LegalName}}{{with .TaxID}}. {{t "legal.inn"}} {{.}}{{end}}{{with .LegalAddress}}. {{.}}{{end}}</div>{{end}}{{end}}
 </footer>
 {{end}}

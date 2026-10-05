@@ -44,6 +44,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	if err != nil {
 		return err
 	}
+	if cfg != nil {
+		renderer.SetContacts(cfg.Contacts)
+	}
 
 	h := &handlers{
 		db:           db,
@@ -65,6 +68,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		cartRepo:  orders.NewCartRepo(db),
 		ordersSvc: orders.NewService(db),
 		zones:     orders.NewDeliveryZoneRepo(db),
+	}
+	if authSvc != nil {
+		h.accounts = authSvc
 	}
 	if payProvider != nil {
 		h.paySvc = payments.NewService(db, payProvider, h.ordersSvc, cfg.PaymentsBaseURL())
@@ -111,6 +117,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("POST /login/otp/verify", withSession(apperr.Wrap(h.loginVerifyOTP)))
 	mux.Handle("POST /login/name", withSession(apperr.Wrap(h.loginSetName)))
 	mux.Handle("POST /logout", withSession(apperr.Wrap(h.logout)))
+	// Account deletion from the profile screen (Google Play requirement;
+	// the public explainer is the /account-deletion static page).
+	mux.Handle("POST /account/delete", withSession(apperr.Wrap(h.accountDelete)))
 
 	// Favorites: HTMX-only mutation endpoints (remove / add-to-cart) that
 	// swap the grid/toast in place — see internal/web/favorites_handlers.go.
@@ -133,7 +142,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("POST /addresses/{id}", withSession(apperr.Wrap(h.addressUpdate)))
 	mux.Handle("DELETE /addresses/{id}", withSession(apperr.Wrap(h.addressDelete)))
 
-	// Legal/info pages (footer links; the mobile app opens /privacy).
+	// Legal/info pages (footer links; the mobile app opens /privacy;
+	// Google Play Console links to /account-deletion).
 	for _, name := range staticPages {
 		mux.Handle("GET /"+name, withSession(apperr.Wrap(h.staticPage(name))))
 	}

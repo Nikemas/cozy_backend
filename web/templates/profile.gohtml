@@ -41,6 +41,18 @@
     <form method="post" action="/logout" hx-post="/logout">
       <button type="submit" class="btn btn--danger">{{t "auth.logout"}}</button>
     </form>
+
+    <section class="card account-delete" id="account-delete" aria-labelledby="account-delete-title">
+      <h2 class="account-delete__title" id="account-delete-title">{{t "account_delete.title"}}</h2>
+      <p class="account-delete__text">{{t "account_delete.text"}} <a href="/account-deletion">{{t "account_delete.more"}}</a></p>
+      {{with .Data}}{{if .DeleteError}}<p class="form-error" role="alert">{{.DeleteError}}</p>{{end}}{{end}}
+      <form method="post" action="/account/delete" onsubmit="return confirm('{{t "account_delete.confirm_dialog"}}')">
+        <label class="aside__checkbox">
+          <input type="checkbox" name="confirm" value="yes" required> {{t "account_delete.confirm_label"}}
+        </label>
+        <button type="submit" class="btn btn--danger">{{t "account_delete.button"}}</button>
+      </form>
+    </section>
   {{else}}
     {{template "_profile_auth" .}}
   {{end}}

@@ -32,6 +32,8 @@ const terminalOrderStatuses = `('delivered', 'cancelled')`
 //   - addresses referenced by orders are kept (they are part of the order
 //     record for accounting) but lose their label/default flag;
 //   - revokes all refresh tokens;
+//   - deletes the phone's otp_codes rows (phone + client IP of every SMS
+//     code request) — must run before the phone is anonymized below;
 //   - anonymizes the customer row (phone -> 'deleted:<id>', name -> NULL,
 //     deleted_at set). The row itself stays because orders reference it,
 //     and the freed phone number can register again as a new customer.
@@ -68,6 +70,7 @@ func (r *accountRepo) deleteCustomer(ctx context.Context, customerID string) err
 				AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.address_id = a.id)`,
 			`UPDATE customer_addresses SET label = NULL, is_default = false WHERE customer_id = $1`,
 			`UPDATE refresh_tokens SET revoked_at = now() WHERE customer_id = $1 AND revoked_at IS NULL`,
+			`DELETE FROM otp_codes WHERE phone = (SELECT phone FROM customers WHERE id = $1)`,
 			`UPDATE customers SET phone = 'deleted:' || id::text, name = NULL, deleted_at = now(), updated_at = now()
 				WHERE id = $1`,
 		} {

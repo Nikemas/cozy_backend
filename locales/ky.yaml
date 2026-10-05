@@ -21,7 +21,7 @@ sidebar.reset: Чыпкаларды тазалоо
 
 footer.rights: © Cozy. Бардык укуктар корголгон.
 footer.branches: Филиалдар
-footer.legal: "ЖК Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир."
+legal.inn: ИНН
 
 common.back_home: Башкы бетке
 common.close: Жабуу
@@ -187,6 +187,7 @@ screen.page_about.title: Дүкөн жөнүндө
 screen.page_contacts.title: Байланыш
 screen.page_delivery.title: Жеткирүү жана төлөө
 screen.page_privacy.title: Купуялык саясаты
+screen.page_account-deletion.title: Аккаунтту өчүрүү
 screen.page_terms.title: Коомдук оферта
 footer.nav_label: Дүкөн жөнүндө маалымат
 
@@ -232,6 +233,7 @@ seo.page_about.description: Cozy — Бишкектеги ыңгайлуу бу�
 seo.page_contacts.description: Бишкектеги Cozy бут кийим дүкөнүнүн телефону, мессенджерлери, e-mail дареги жана иш убактысы.
 seo.page_delivery.description: Бишкек боюнча жеткирүүнүн шарттары, Cozy дүкөндөрүнөн акысыз алып кетүү, төлөө ыкмалары, алмаштыруу жана кайтаруу.
 seo.page_privacy.description: Cozy интернет-дүкөнү сатып алуучулардын жеке маалыматтарын кантип иштетет жана коргойт.
+seo.page_account-deletion.description: Cozy аккаунтун жана жеке маалыматтарды кантип өчүрүү керек — тиркемеде же сайтта, тиркемени орнотпостон. Эмне өчүрүлөт жана эмне сакталат.
 seo.page_terms.description: Cozy бут кийим интернет-дүкөнүнүн коомдук офертасы: буйрутма берүү, төлөө, жеткирүү, алмаштыруу жана кайтаруу.
 
 # Accessibility labels.
@@ -277,3 +279,16 @@ pay.return.my_orders: Менин буйрутмаларым
 pay.return.show_qr: QR көрсөтүү
 pay.return.qr_alt: Төлөө үчүн QR-код
 pay.return.qr_hint: Банктын колдонмосу менен QR-кодду скандаңыз
+
+# Account deletion on the profile screen (internal/web/account_deletion.go).
+account_delete.title: Аккаунтту өчүрүү
+account_delete.text: Атыңыз, телефонуңуз, даректериңиз, тандалмалар жана себет биротоло өчүрүлөт. Буйрутмалардын тарыхы дүкөндө эсеп үчүн сакталат.
+account_delete.more: Аккаунтту өчүрүү жөнүндө кененирээк
+account_delete.confirm_label: Өчүрүлгөн аккаунтту калыбына келтирүүгө болбосун түшүнөм
+account_delete.confirm_dialog: Аккаунтту өчүрөсүзбү? Бул аракетти артка кайтарууга болбойт.
+account_delete.button: Аккаунтту өчүрүү
+account_delete.has_active_orders: Аякталбаган буйрутмалар бар кезде аккаунтту өчүрүүгө болбойт. Алардын аткарылышын күтүңүз же жокко чыгарыңыз.
+account_delete.unconfirmed: Өчүрүлгөн аккаунтту калыбына келтирүүгө болбосун түшүнгөнүңүздү белгилеңиз.
+common.days.one: күн
+common.days.few: күн
+common.days.many: күн
