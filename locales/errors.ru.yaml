@@ -16,6 +16,11 @@ err.amount_mismatch: сумма платежа не совпадает с сум
 err.bad_request.form: некорректная форма
 err.bad_request.multipart: ожидается multipart/form-data с полем file
 err.bad_request: некорректное тело запроса
+err.banner_text_too_long.button: текст кнопки баннера длиннее 30 символов
+err.banner_text_too_long.eyebrow: надзаголовок баннера длиннее 60 символов
+err.banner_text_too_long.title: заголовок баннера длиннее 120 символов
+err.banner_text_too_long: текст баннера слишком длинный
+err.banner_title_required: укажите заголовок баннера на русском
 err.body_too_large: слишком большой запрос
 err.broadcast_not_found: рассылка не найдена
 err.cancel_forbidden: только владелец может отменить заказ
@@ -70,6 +75,8 @@ err.invalid_category_id.required: выберите категорию
 err.invalid_category_id: категория не найдена
 err.invalid_city: city обязателен
 err.invalid_color: color обязателен
+err.invalid_color.banner_bg: "цвет фона баннера должен быть в формате #RRGGBB"
+err.invalid_color.banner_text: "цвет текста баннера должен быть в формате #RRGGBB"
 err.invalid_coordinates.pair: укажите и широту, и долготу
 err.invalid_coordinates: координаты вне допустимого диапазона
 err.invalid_credentials: неверный телефон или пароль
