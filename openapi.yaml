@@ -546,6 +546,49 @@ paths:
                         name: { type: string }
                         address: { type: string }
 
+  /api/v1/banner:
+    get:
+      tags: [Catalog]
+      summary: Home-screen promo banner
+      description: |
+        Public, unauthenticated; served with `Cache-Control: public, max-age=60`
+        and `Vary: Accept-Language`. The single banner the owner edits in the
+        admin panel (/admin/banner). Texts come in the `Accept-Language`
+        language (`ky` or `ru`, default `ru`); an empty Kyrgyz text falls
+        back to the Russian one field by field. `button_text` may be empty
+        (no button). `category_slug`/`category_id` are the button/tap
+        target — null means the whole catalog. Colors are always `#RRGGBB`.
+        `image_url` (picture on the right side; PNG with transparency or
+        JPEG) and `background_image_url` (optional full background, JPEG,
+        cover) are absolute public URLs, built like a product `photo_url`;
+        null when not set. When the banner is switched off the body is
+        `{"enabled": false, "banner": null}`.
+      responses:
+        "200":
+          description: "The banner, or `banner: null` when it is disabled."
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled, banner]
+                properties:
+                  enabled: { type: boolean }
+                  banner:
+                    type: object
+                    nullable: true
+                    required: [eyebrow, title, button_text, category_slug, category_id, bg_color, text_color, image_url, background_image_url, updated_at]
+                    properties:
+                      eyebrow: { type: string, maxLength: 60, example: "Обувь для всей семьи" }
+                      title: { type: string, maxLength: 120, example: "Доставка по Бишкеку и самовывоз из наших магазинов" }
+                      button_text: { type: string, maxLength: 30, example: "Смотреть" }
+                      category_slug: { type: string, nullable: true }
+                      category_id: { type: string, format: uuid, nullable: true }
+                      bg_color: { type: string, pattern: "^#[0-9A-Fa-f]{6}$", example: "#FFF3E9" }
+                      text_color: { type: string, pattern: "^#[0-9A-Fa-f]{6}$", example: "#1A1A1A" }
+                      image_url: { type: string, format: uri, nullable: true }
+                      background_image_url: { type: string, format: uri, nullable: true }
+                      updated_at: { type: string, format: date-time }
+
   /api/v1/app/config:
     get:
       tags: [System]
