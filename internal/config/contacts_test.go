@@ -27,13 +27,17 @@ func TestLoad_ContactsFromEnv(t *testing.T) {
 	t.Setenv("SHOP_EMAIL", "help@cozy.kg")
 	t.Setenv("SHOP_HOURS", "10:00–20:00")
 	t.Setenv("SHOP_BANK_DETAILS", "ОАО «Банк», р/с 1240000000000000, БИК 124001")
+	t.Setenv("SHOP_LEGAL_NAME", " ОсОО «Пример» ")
+	t.Setenv("SHOP_INN", "01234567890123")
+	t.Setenv("SHOP_LEGAL_ADDRESS", "Бишкек, ул. Примерная 1")
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	c := cfg.Contacts
-	if c.Phone != "+996 (555) 123-456" || c.Telegram != "cozy_kg" || c.Email != "help@cozy.kg" {
+	if c.Phone != "+996 (555) 123-456" || c.Telegram != "cozy_kg" || c.Email != "help@cozy.kg" || c.LegalName != "ОсОО «Пример»" ||
+		c.TaxID != "01234567890123" || c.LegalAddress != "Бишкек, ул. Примерная 1" {
 		t.Errorf("Contacts = %+v", c)
 	}
 	if got, want := c.PhoneDial(), "+996555123456"; got != want {
@@ -55,12 +59,15 @@ func TestLoad_ContactsFromEnv(t *testing.T) {
 
 func TestLoad_ContactsRejectMalformedValues(t *testing.T) {
 	cases := map[string]string{
-		"SHOP_PHONE":        "call us",
-		"SHOP_WHATSAPP":     "wa.me/123",
-		"SHOP_TELEGRAM":     "t.me/cozy",
-		"SHOP_EMAIL":        "not-an-email",
-		"SHOP_HOURS":        strings.Repeat("x", maxContactTextLen+1),
-		"SHOP_BANK_DETAILS": strings.Repeat("x", maxContactTextLen+1),
+		"SHOP_PHONE":         "call us",
+		"SHOP_WHATSAPP":      "wa.me/123",
+		"SHOP_TELEGRAM":      "t.me/cozy",
+		"SHOP_EMAIL":         "not-an-email",
+		"SHOP_HOURS":         strings.Repeat("x", maxContactTextLen+1),
+		"SHOP_BANK_DETAILS":  strings.Repeat("x", maxContactTextLen+1),
+		"SHOP_LEGAL_NAME":    strings.Repeat("x", maxContactTextLen+1),
+		"SHOP_INN":           "ИНН 123",
+		"SHOP_LEGAL_ADDRESS": strings.Repeat("x", maxContactTextLen+1),
 	}
 	for key, value := range cases {
 		t.Run(key, func(t *testing.T) {

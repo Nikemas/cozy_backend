@@ -898,6 +898,7 @@ button, input { font-family: inherit; }
 .static-page ul { padding-left: 22px; }
 .static-page li { margin-bottom: 6px; }
 .static-page a:not(.btn) { color: var(--cozy-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.static-page ul.static-requisites { list-style: none; padding-left: 0; }
 .static-page__meta { color: var(--cozy-ink-2); font-size: var(--cozy-fs-13); }
 .static-page mark.fill { background: var(--cozy-accent-bg-2); color: var(--cozy-ink); padding: 0 3px; border-radius: 3px; }
 .static-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 16px 0 8px; }

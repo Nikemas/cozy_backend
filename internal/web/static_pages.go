@@ -17,6 +17,9 @@ type StaticPageData struct {
 	// AccountDeleted shows the "your account was deleted" notice on
 	// /account-deletion right after POST /account/delete succeeded.
 	AccountDeleted bool
+	// OTPRetentionDays is how long SMS-code request records are kept
+	// (OTP_RETENTION_DAYS) — stated on /privacy and /account-deletion.
+	OTPRetentionDays int
 }
 
 // staticPage serves one of the legal/info pages (see render.go's
@@ -36,11 +39,16 @@ func (h *handlers) staticPage(name string) func(http.ResponseWriter, *http.Reque
 
 func (h *handlers) staticPageData() StaticPageData {
 	if h.cfg == nil {
-		return StaticPageData{}
+		return StaticPageData{OTPRetentionDays: config.DefaultOTPRetentionDays}
+	}
+	days := h.cfg.Security.Auth.OTPRetentionDays
+	if days <= 0 {
+		days = config.DefaultOTPRetentionDays
 	}
 	return StaticPageData{
-		Contacts:        h.cfg.Contacts,
-		StoreURLIOS:     h.cfg.AppStoreURLIOS,
-		StoreURLAndroid: h.cfg.AppStoreURLAndroid,
+		Contacts:         h.cfg.Contacts,
+		StoreURLIOS:      h.cfg.AppStoreURLIOS,
+		StoreURLAndroid:  h.cfg.AppStoreURLAndroid,
+		OTPRetentionDays: days,
 	}
 }

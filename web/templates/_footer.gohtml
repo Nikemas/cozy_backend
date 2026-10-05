@@ -13,6 +13,6 @@
       <a href="/lang">{{t "screen.lang.title"}}</a>
     </nav>
   </div>
-  <div class="footer__legal">{{t "footer.legal"}}</div>
+  {{with seller}}{{if .LegalName}}<div class="footer__legal">{{.LegalName}}{{with .TaxID}}. {{t "legal.inn"}} {{.}}{{end}}{{with .LegalAddress}}. {{.}}{{end}}</div>{{end}}{{end}}
 </footer>
 {{end}}

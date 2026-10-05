@@ -21,7 +21,7 @@ sidebar.reset: Сбросить фильтры
 
 footer.rights: © Cozy. Все права защищены.
 footer.branches: Филиалы
-footer.legal: "ИП Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарынская область, г. Нарын, ул. Ленина 134, кв. 4."
+legal.inn: ИНН
 
 common.back_home: На главную
 common.close: Закрыть
@@ -289,3 +289,6 @@ account_delete.confirm_dialog: Удалить аккаунт? Это дейст�
 account_delete.button: Удалить аккаунт
 account_delete.has_active_orders: Нельзя удалить аккаунт, пока есть незавершённые заказы. Дождитесь их выполнения или отмените их.
 account_delete.unconfirmed: Отметьте, что понимаете — удалённый аккаунт нельзя восстановить.
+common.days.one: день
+common.days.few: дня
+common.days.many: дней

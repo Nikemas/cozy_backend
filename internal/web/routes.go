@@ -44,6 +44,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	if err != nil {
 		return err
 	}
+	if cfg != nil {
+		renderer.SetContacts(cfg.Contacts)
+	}
 
 	h := &handlers{
 		db:           db,

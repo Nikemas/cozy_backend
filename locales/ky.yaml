@@ -21,7 +21,7 @@ sidebar.reset: Чыпкаларды тазалоо
 
 footer.rights: © Cozy. Бардык укуктар корголгон.
 footer.branches: Филиалдар
-footer.legal: "ЖК Айбек уулу Ардак. ИНН 21403200501198. Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир."
+legal.inn: ИНН
 
 common.back_home: Башкы бетке
 common.close: Жабуу
@@ -289,3 +289,6 @@ account_delete.confirm_dialog: Аккаунтту өчүрөсүзбү? Бул �
 account_delete.button: Аккаунтту өчүрүү
 account_delete.has_active_orders: Аякталбаган буйрутмалар бар кезде аккаунтту өчүрүүгө болбойт. Алардын аткарылышын күтүңүз же жокко чыгарыңыз.
 account_delete.unconfirmed: Өчүрүлгөн аккаунтту калыбына келтирүүгө болбосун түшүнгөнүңүздү белгилеңиз.
+common.days.one: күн
+common.days.few: күн
+common.days.many: күн

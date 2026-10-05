@@ -31,12 +31,24 @@ type Contacts struct {
 	// BankDetails is the seller's bank details for the public offer, free
 	// text, e.g. "ОАО «Бакай Банк», р/с 1240..., БИК 124001". SHOP_BANK_DETAILS.
 	BankDetails string
+	// LegalName is the seller / app developer / personal-data operator as
+	// it should appear on the footer, /contacts, /privacy, /terms and
+	// /account-deletion, e.g. "ИП Фамилия Имя" (language-neutral: shown on
+	// both RU and KY pages). Empty hides every legal-entity line, so no
+	// legal name is ever hardcoded in templates. SHOP_LEGAL_NAME.
+	LegalName string
+	// TaxID is the seller's INN (10–14 digits). SHOP_INN.
+	TaxID string
+	// LegalAddress is the seller's registered address, free text.
+	// SHOP_LEGAL_ADDRESS.
+	LegalAddress string
 }
 
 var (
 	contactPhonePattern    = regexp.MustCompile(`^\+?[0-9][0-9 ()-]{4,24}$`)
 	contactTelegramPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{4,31}$`)
 	contactEmailPattern    = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+	contactTaxIDPattern    = regexp.MustCompile(`^[0-9]{10,14}$`)
 	nonDigitPattern        = regexp.MustCompile(`[^0-9]`)
 )
 
@@ -48,12 +60,15 @@ const maxContactTextLen = 300
 // (the server refuses to start) so a typo never reaches the public pages.
 func loadContacts() (Contacts, error) {
 	c := Contacts{
-		Phone:       strings.TrimSpace(os.Getenv("SHOP_PHONE")),
-		WhatsApp:    strings.TrimSpace(os.Getenv("SHOP_WHATSAPP")),
-		Telegram:    strings.TrimPrefix(strings.TrimSpace(os.Getenv("SHOP_TELEGRAM")), "@"),
-		Email:       strings.TrimSpace(os.Getenv("SHOP_EMAIL")),
-		Hours:       strings.TrimSpace(os.Getenv("SHOP_HOURS")),
-		BankDetails: strings.TrimSpace(os.Getenv("SHOP_BANK_DETAILS")),
+		Phone:        strings.TrimSpace(os.Getenv("SHOP_PHONE")),
+		WhatsApp:     strings.TrimSpace(os.Getenv("SHOP_WHATSAPP")),
+		Telegram:     strings.TrimPrefix(strings.TrimSpace(os.Getenv("SHOP_TELEGRAM")), "@"),
+		Email:        strings.TrimSpace(os.Getenv("SHOP_EMAIL")),
+		Hours:        strings.TrimSpace(os.Getenv("SHOP_HOURS")),
+		BankDetails:  strings.TrimSpace(os.Getenv("SHOP_BANK_DETAILS")),
+		LegalName:    strings.TrimSpace(os.Getenv("SHOP_LEGAL_NAME")),
+		TaxID:        strings.TrimSpace(os.Getenv("SHOP_INN")),
+		LegalAddress: strings.TrimSpace(os.Getenv("SHOP_LEGAL_ADDRESS")),
 	}
 	if err := c.validate(); err != nil {
 		return Contacts{}, err
@@ -73,6 +88,9 @@ func (c Contacts) validate() error {
 		{"SHOP_EMAIL", c.Email, contactEmailPattern.MatchString, `an e-mail address`},
 		{"SHOP_HOURS", c.Hours, shortText, fmt.Sprintf("at most %d characters", maxContactTextLen)},
 		{"SHOP_BANK_DETAILS", c.BankDetails, shortText, fmt.Sprintf("at most %d characters", maxContactTextLen)},
+		{"SHOP_LEGAL_NAME", c.LegalName, shortText, fmt.Sprintf("at most %d characters", maxContactTextLen)},
+		{"SHOP_INN", c.TaxID, contactTaxIDPattern.MatchString, "10 to 14 digits"},
+		{"SHOP_LEGAL_ADDRESS", c.LegalAddress, shortText, fmt.Sprintf("at most %d characters", maxContactTextLen)},
 	}
 	for _, ch := range checks {
 		if ch.value != "" && !ch.ok(ch.value) {

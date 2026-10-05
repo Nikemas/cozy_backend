@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
@@ -104,7 +105,18 @@ type PageData struct {
 type Renderer struct {
 	bundle *i18n.Bundle
 	tmpl   map[string]map[string]*template.Template // lang -> screen -> template set
+	// contacts back the "seller" template func (footer legal line); set
+	// once at startup via SetContacts, before serving.
+	contacts config.Contacts
 }
+
+// SetContacts configures the shop's legal/contact details the shared
+// chrome renders (footer legal line). Call once at startup.
+func (rr *Renderer) SetContacts(c config.Contacts) { rr.contacts = c }
+
+// seller is the "seller" template func: the configured legal entity, read
+// at execution time so SetContacts after NewRenderer takes effect.
+func (rr *Renderer) seller() config.Contacts { return rr.contacts }
 
 // NewRenderer parses every screen's templates for every supported
 // language.
@@ -129,7 +141,7 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 			}
 			files = append(files, filepath.Join(templatesDir, page))
 
-			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).ParseFiles(files...)
+			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).Funcs(template.FuncMap{"seller": rr.seller}).ParseFiles(files...)
 			if err != nil {
 				return nil, fmt.Errorf("web: parsing templates for screen %q (%s): %w", screen, lang, err)
 			}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
@@ -239,5 +240,61 @@ func TestProfileRendersDeleteSectionAndReason(t *testing.T) {
 	}
 	if got := h.deleteStatusText(i18n.LangRU, "bogus"); got != "" {
 		t.Errorf("unknown status text = %q, want empty", got)
+	}
+}
+
+func legalConfig() *config.Config {
+	cfg := filledContactsConfig()
+	cfg.Contacts.LegalName = "ОсОО «Тест Девелопер»"
+	cfg.Contacts.TaxID = "01234567890123"
+	cfg.Contacts.LegalAddress = "Бишкек, ул. Тестовая 1"
+	cfg.Security.Auth.OTPRetentionDays = 21
+	return cfg
+}
+
+func TestLegalEntityRenderedOnlyFromConfig(t *testing.T) {
+	mux := newTestMuxWithConfig(t, legalConfig())
+	for _, lang := range staticPageLangs {
+		for _, name := range []string{accountDeletionPage, "privacy", "terms", "contacts"} {
+			body := getStaticPage(t, mux, name, lang)
+			if !strings.Contains(body, "ОсОО «Тест Девелопер»") {
+				t.Errorf("GET /%s (%s): configured legal name missing", name, lang)
+			}
+			if !strings.Contains(body, `class="footer__legal"`) || !strings.Contains(body, "01234567890123") {
+				t.Errorf("GET /%s (%s): footer legal line missing", name, lang)
+			}
+		}
+	}
+}
+
+func TestLegalEntityOmittedWhenUnset(t *testing.T) {
+	mux := newTestMux(t)
+	for _, lang := range staticPageLangs {
+		for _, name := range staticPages {
+			body := getStaticPage(t, mux, name, lang)
+			if strings.Contains(body, `class="footer__legal"`) || strings.Contains(body, "static-requisites") {
+				t.Errorf("GET /%s (%s): legal block rendered without SHOP_LEGAL_NAME", name, lang)
+			}
+		}
+		if body := getStaticPage(t, mux, accountDeletionPage, lang); strings.Contains(body, "— .") || strings.Contains(body, "оператор персональных данных —") {
+			t.Errorf("GET /%s (%s): developer line rendered without SHOP_LEGAL_NAME", accountDeletionPage, lang)
+		}
+	}
+}
+
+func TestOTPRetentionStatedOnPrivacyAndDeletionPages(t *testing.T) {
+	mux := newTestMuxWithConfig(t, legalConfig())
+	want := map[string]string{i18n.LangRU: "21 день", i18n.LangKY: "21 күн"}
+	for lang, phrase := range want {
+		for _, name := range []string{accountDeletionPage, "privacy"} {
+			if body := getStaticPage(t, mux, name, lang); !strings.Contains(body, phrase) {
+				t.Errorf("GET /%s (%s): retention %q missing", name, lang, phrase)
+			}
+		}
+	}
+	// Unconfigured (zero) retention falls back to the documented default.
+	body := getStaticPage(t, newTestMux(t), "privacy", i18n.LangRU)
+	if !strings.Contains(body, "30 дней") {
+		t.Error("default retention (30 дней) missing on /privacy")
 	}
 }

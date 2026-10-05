@@ -15,9 +15,13 @@
   <h2>Дүкөндөр</h2>
   <p>Бардык дүкөндөрдүн даректери, иш убактысы жана маршруттары — <a href="/branches">Филиалдар</a> барагында.</p>
 
+  {{with .Data.Contacts}}{{if or .LegalName .TaxID .LegalAddress}}
   <h2>Реквизиттер</h2>
-  <p>Жеке ишкер Айбек уулу Ардак<br>
-  ИНН: 21403200501198<br>
-  Юридикалык дареги: Кыргызстан, Нарын облусу, Нарын шаары, Ленин көчөсү 134, 4-батир</p>
+  <ul class="static-requisites">
+    {{with .LegalName}}<li>{{.}}</li>{{end}}
+    {{with .TaxID}}<li>ИНН: {{.}}</li>{{end}}
+    {{with .LegalAddress}}<li>Юридикалык дареги: {{.}}</li>{{end}}
+  </ul>
+  {{end}}{{end}}
 </article>
 {{end}}
