@@ -35,6 +35,7 @@ const (
 	EntityPoint    = "point"
 	EntityStaff    = "staff"
 	EntityOrder    = "order"
+	EntityBanner   = "banner"
 )
 
 // Actions. The prefix before the dot is the entity type.
@@ -62,6 +63,7 @@ const (
 	ActionStaffDeactivate   = "staff.deactivate"
 	ActionStaffPassword     = "staff.password_reset"
 	ActionOrderStatus       = "order.status"
+	ActionBannerUpdate      = "banner.update"
 )
 
 // Entry is one journal line. Summary is the human-readable Russian line

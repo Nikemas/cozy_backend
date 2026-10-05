@@ -36,6 +36,7 @@ var auditEntityTypes = []struct{ Value, Label string }{
 	{audit.EntityCategory, "admin.audit.entity.category"},
 	{audit.EntityPoint, "admin.audit.entity.point"},
 	{audit.EntityStaff, "admin.audit.entity.staff"},
+	{audit.EntityBanner, "admin.audit.entity.banner"},
 }
 
 func auditEntityLabel(t string) string {
@@ -286,6 +287,8 @@ func auditRowVM(t tr, row audit.Row) AuditRowVM {
 		vm.EntityURL = "/admin/points"
 	case audit.EntityStaff:
 		vm.EntityURL = "/admin/staff"
+	case audit.EntityBanner:
+		vm.EntityURL = "/admin/banner"
 	}
 	if row.Action == audit.ActionOrderStatus {
 		from, _ := row.Details["from"].(string)
@@ -312,6 +315,12 @@ var auditDetailLabels = map[string]string{
 	"sku": "admin.audit.field.sku", "price_override": "admin.audit.field.price_override", "count": "admin.audit.field.quantity",
 	"slug": "admin.audit.field.slug", "sort_order": "admin.audit.field.sort_order", "parent_id": "admin.audit.field.parent",
 	"city": "admin.audit.field.city", "working_hours": "admin.audit.field.working_hours", "coordinates": "admin.audit.field.coordinates",
+	"enabled": "admin.audit.field.enabled", "banner_eyebrow_ru": "admin.audit.field.banner_eyebrow_ru",
+	"banner_eyebrow_ky": "admin.audit.field.banner_eyebrow_ky", "banner_title_ru": "admin.audit.field.banner_title_ru",
+	"banner_title_ky": "admin.audit.field.banner_title_ky", "banner_button_ru": "admin.audit.field.banner_button_ru",
+	"banner_button_ky": "admin.audit.field.banner_button_ky", "banner_link": "admin.audit.field.banner_link",
+	"banner_bg_color": "admin.audit.field.banner_bg_color", "banner_text_color": "admin.audit.field.banner_text_color",
+	"banner_image": "admin.audit.field.banner_image", "banner_bg_image": "admin.audit.field.banner_bg_image",
 }
 
 // auditDetailsText renders Details as "field: from → to; field: value",

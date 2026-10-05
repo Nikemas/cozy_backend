@@ -1,0 +1,186 @@
+{{/* banner.gohtml — "Баннер на главной" (feat/home-banner): the promo banner
+     at the top of the site's home page and the app's home screen. Owner +
+     manager. .Data is admin.bannerPageData (internal/admin/banner_page.go).
+     One multipart form; the pictures go through internal/media's banner
+     pipeline. The preview on the right is client-side only. */}}
+{{define "content"}}
+<style>
+  .bn-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+  @media (max-width: 1023px) { .bn-grid { grid-template-columns: minmax(0, 1fr); } }
+  .bn-section { font-size: 13px; font-weight: 700; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 10px; }
+  .bn-hint { font-size: 12px; color: var(--admin-muted); }
+  .bn-check { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .bn-check input { width: 18px; height: 18px; }
+  .bn-color { display: flex; gap: 8px; align-items: center; }
+  .admin-field .bn-color input[type=color] { width: 52px; padding: 4px; flex-shrink: 0; }
+  .admin-field .bn-color input[type=text] { flex: 1; min-width: 0; font-family: ui-monospace, monospace; }
+  .admin-field input[type=file] { height: auto; padding: 10px 14px; }
+  .bn-current { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--admin-muted); margin-top: 4px; }
+  .bn-current img { width: 96px; height: 64px; object-fit: contain; border: 1px solid var(--admin-border); border-radius: 8px; background: #F3F2EF; }
+  .bn-current label { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13px; }
+  .bn-preview { position: sticky; top: 16px; }
+  .bn-banner { border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 12px;
+    background-size: cover; background-position: center; min-height: 120px; }
+  .bn-banner__text { flex: 1; min-width: 0; }
+  .bn-banner__eyebrow { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .bn-banner__title { font-size: 18px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .bn-banner__btn { display: inline-block; margin-top: 10px; padding: 8px 14px; border-radius: 10px; background: #E85D04; color: #FFFFFF; font-size: 12px; font-weight: 700; }
+  .bn-banner img { width: 96px; height: 72px; object-fit: contain; }
+  .bn-off { opacity: .45; }
+</style>
+<div class="admin-screen-narrow" style="max-width:1200px">
+{{with .Data}}
+  <div class="admin-list-note" style="max-width:none">{{t "admin.banner.note"}}{{if .Form.UpdatedAt}} {{t "admin.banner.updated_at"}}: {{.Form.UpdatedAt}}.{{end}}</div>
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+
+  <div class="bn-grid">
+    <form method="post" action="/admin/banner" enctype="multipart/form-data" id="bn-form" class="admin-card admin-card--pad">
+      <label class="bn-check"><input type="checkbox" name="enabled" value="1" id="bn-enabled" {{if .Form.Enabled}}checked{{end}}> {{t "admin.banner.enabled"}}</label>
+
+      <div class="bn-section">{{t "admin.lang.ru_title"}}</div>
+      <div class="admin-field">
+        <label for="bn-eyebrow-ru">{{t "admin.banner.eyebrow"}}</label>
+        <input id="bn-eyebrow-ru" name="eyebrow_ru" value="{{.Form.EyebrowRU}}" maxlength="{{.MaxEyebrow}}" data-preview="eyebrow" data-lang="ru">
+      </div>
+      <div class="admin-field">
+        <label for="bn-title-ru">{{t "admin.banner.title"}}</label>
+        <input id="bn-title-ru" name="title_ru" value="{{.Form.TitleRU}}" maxlength="{{.MaxTitle}}" data-preview="title" data-lang="ru">
+      </div>
+      <div class="admin-field">
+        <label for="bn-button-ru">{{t "admin.banner.button"}}</label>
+        <input id="bn-button-ru" name="button_ru" value="{{.Form.ButtonRU}}" maxlength="{{.MaxButton}}" data-preview="button" data-lang="ru" aria-describedby="bn-button-hint">
+        <div class="bn-hint" id="bn-button-hint">{{t "admin.banner.button_hint"}}</div>
+      </div>
+
+      <div class="bn-section">{{t "admin.lang.ky_title"}}</div>
+      <div class="admin-field">
+        <label for="bn-eyebrow-ky">{{t "admin.banner.eyebrow"}}</label>
+        <input id="bn-eyebrow-ky" name="eyebrow_ky" value="{{.Form.EyebrowKY}}" maxlength="{{.MaxEyebrow}}" placeholder="{{t "admin.banner.ky_hint"}}">
+      </div>
+      <div class="admin-field">
+        <label for="bn-title-ky">{{t "admin.banner.title"}}</label>
+        <input id="bn-title-ky" name="title_ky" value="{{.Form.TitleKY}}" maxlength="{{.MaxTitle}}" placeholder="{{t "admin.banner.ky_hint"}}">
+      </div>
+      <div class="admin-field">
+        <label for="bn-button-ky">{{t "admin.banner.button"}}</label>
+        <input id="bn-button-ky" name="button_ky" value="{{.Form.ButtonKY}}" maxlength="{{.MaxButton}}" placeholder="{{t "admin.banner.ky_hint"}}">
+      </div>
+
+      <div class="bn-section">{{t "admin.banner.look"}}</div>
+      <div class="admin-field">
+        <label for="bn-link">{{t "admin.banner.link"}}</label>
+        <select id="bn-link" name="link_category_id">
+          <option value="">{{t "admin.banner.link_all"}}</option>
+          {{$cat := .Form.CategoryID}}
+          {{range .Categories}}<option value="{{.ID}}" {{if eq .ID $cat}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="bn-bg-color">{{t "admin.banner.bg_color"}}</label>
+          <div class="bn-color">
+            <input type="color" value="{{.Form.BgColor}}" data-color-for="bn-bg-color" aria-label="{{t "admin.banner.bg_color"}}">
+            <input type="text" id="bn-bg-color" name="bg_color" value="{{.Form.BgColor}}" required pattern="#[0-9A-Fa-f]{6}" maxlength="7" placeholder="#FFF3E9">
+          </div>
+        </div>
+        <div class="admin-field">
+          <label for="bn-text-color">{{t "admin.banner.text_color"}}</label>
+          <div class="bn-color">
+            <input type="color" value="{{.Form.TextColor}}" data-color-for="bn-text-color" aria-label="{{t "admin.banner.text_color"}}">
+            <input type="text" id="bn-text-color" name="text_color" value="{{.Form.TextColor}}" required pattern="#[0-9A-Fa-f]{6}" maxlength="7" placeholder="#1A1A1A">
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-field">
+        <label for="bn-image">{{t "admin.banner.image"}}</label>
+        <input type="file" id="bn-image" name="image" accept="image/jpeg,image/png,image/webp" aria-describedby="bn-image-hint">
+        <div class="bn-hint" id="bn-image-hint">{{t "admin.banner.image_hint"}}</div>
+        {{if .Form.ImageURL}}
+        <div class="bn-current">
+          <img src="{{.Form.ImageURL}}" alt="{{t "admin.banner.current"}}" id="bn-image-current">
+          <label><input type="checkbox" name="remove_image" value="1"> {{t "admin.banner.remove_image"}}</label>
+        </div>
+        {{end}}
+      </div>
+      <div class="admin-field">
+        <label for="bn-bg-image">{{t "admin.banner.bg_image"}}</label>
+        <input type="file" id="bn-bg-image" name="bg_image" accept="image/jpeg,image/png,image/webp" aria-describedby="bn-bg-image-hint">
+        <div class="bn-hint" id="bn-bg-image-hint">{{t "admin.banner.bg_image_hint"}}</div>
+        {{if .Form.BgImageURL}}
+        <div class="bn-current">
+          <img src="{{.Form.BgImageURL}}" alt="{{t "admin.banner.current"}}" id="bn-bg-image-current">
+          <label><input type="checkbox" name="remove_bg_image" value="1"> {{t "admin.banner.remove_image"}}</label>
+        </div>
+        {{end}}
+      </div>
+
+      <div class="admin-modal__actions" style="justify-content:flex-start">
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
+      </div>
+    </form>
+
+    <div class="bn-preview" aria-hidden="true">
+      <div class="bn-section">{{t "admin.banner.preview"}}</div>
+      <div class="bn-banner" id="bn-prev">
+        <div class="bn-banner__text">
+          <div class="bn-banner__eyebrow" id="bn-prev-eyebrow"></div>
+          <div class="bn-banner__title" id="bn-prev-title"></div>
+          <span class="bn-banner__btn" id="bn-prev-button"></span>
+        </div>
+        <img id="bn-prev-img" alt="" hidden>
+      </div>
+    </div>
+  </div>
+{{end}}
+</div>
+<script>
+(function () {
+  var form = document.getElementById("bn-form");
+  if (!form) return;
+  var hex = /^#[0-9A-Fa-f]{6}$/;
+  var $ = function (id) { return document.getElementById(id); };
+  var objectURLs = {};
+
+  // Color picker <-> hex text field, both ways.
+  form.querySelectorAll("input[data-color-for]").forEach(function (picker) {
+    var text = $(picker.getAttribute("data-color-for"));
+    picker.addEventListener("input", function () { text.value = picker.value.toUpperCase(); update(); });
+    text.addEventListener("input", function () { if (hex.test(text.value)) picker.value = text.value; update(); });
+  });
+
+  function fileURL(input, currentId, removeName) {
+    if (input.files && input.files[0]) {
+      if (objectURLs[input.id]) URL.revokeObjectURL(objectURLs[input.id]);
+      objectURLs[input.id] = URL.createObjectURL(input.files[0]);
+      return objectURLs[input.id];
+    }
+    var remove = form.querySelector("input[name=" + removeName + "]");
+    var current = $(currentId);
+    return current && !(remove && remove.checked) ? current.src : "";
+  }
+
+  function update() {
+    var prev = $("bn-prev");
+    var bg = $("bn-bg-color").value, ink = $("bn-text-color").value;
+    prev.style.backgroundColor = hex.test(bg) ? bg : "";
+    prev.style.color = hex.test(ink) ? ink : "";
+    var bgImage = fileURL($("bn-bg-image"), "bn-bg-image-current", "remove_bg_image");
+    prev.style.backgroundImage = bgImage ? "url(\"" + bgImage + "\")" : "";
+    prev.classList.toggle("bn-off", !$("bn-enabled").checked);
+    $("bn-prev-eyebrow").textContent = $("bn-eyebrow-ru").value;
+    $("bn-prev-title").textContent = $("bn-title-ru").value;
+    var button = $("bn-button-ru").value;
+    $("bn-prev-button").textContent = button;
+    $("bn-prev-button").hidden = !button;
+    var img = fileURL($("bn-image"), "bn-image-current", "remove_image");
+    $("bn-prev-img").hidden = !img;
+    if (img) $("bn-prev-img").src = img;
+  }
+
+  form.addEventListener("input", update);
+  form.addEventListener("change", update);
+  update();
+})();
+</script>
+{{end}}

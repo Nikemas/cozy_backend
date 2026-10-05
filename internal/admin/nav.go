@@ -21,6 +21,7 @@ const (
 	auditIconPath      = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8"
 	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
 	broadcastsIconPath = "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0"
+	bannerIconPath     = "M3 5h18v14H3z M8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 19"
 	deliveryIconPath   = "M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
 )
 
@@ -49,6 +50,7 @@ var navDefs = []navDef{
 	{"categories", "admin.nav.categories", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"reports", "admin.nav.reports", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"broadcasts", "admin.nav.broadcasts", broadcastsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
+	{"banner", "admin.nav.banner", bannerIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"points", "admin.nav.points", pointsIconPath, []staff.Role{staff.RoleOwner}},
 	{"delivery", "admin.nav.delivery", deliveryIconPath, []staff.Role{staff.RoleOwner}},
 	{"staff", "admin.nav.staff", staffIconPath, []staff.Role{staff.RoleOwner}},
