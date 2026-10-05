@@ -71,7 +71,8 @@ POST /api/v1/auth/refresh       { "refresh_token": "..." }
 | `FCM_PROJECT_ID` | переопределить `project_id` из ключа | берётся из ключа |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | бот от @BotFather и id группы персонала | сообщение только пишется в лог |
 | `PUBLIC_BASE_URL` | внешний адрес сайта для ссылки на заказ | ссылки в сообщении нет |
-| `APP_MIN_VERSION`, `APP_LATEST_VERSION`, `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID` | ответ `GET /api/v1/app/config` (минимальная и последняя версия приложения, ссылки на сторы) | `1.0.0` / `1.0.0` / `""` / `""` |
+| `APP_MIN_VERSION`, `APP_LATEST_VERSION`, `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID` | ответ `GET /api/v1/app/config` (минимальная и последняя версия приложения, ссылки на сторы); ссылки на сторы также выводятся на `/about` | `1.0.0` / `1.0.0` / `""` / `""` |
+| `SHOP_PHONE`, `SHOP_WHATSAPP`, `SHOP_TELEGRAM`, `SHOP_EMAIL`, `SHOP_HOURS`, `SHOP_BANK_DETAILS` | контакты магазина на `/contacts`, `/privacy`, `/terms`: телефон и WhatsApp (`+996 555 123 456`), Telegram (`@username`), e-mail, режим работы поддержки (свободный текст, общий для RU/KY), банковские реквизиты для оферты. Кривой формат — сервер не стартует | строка/блок на странице не выводится |
 
 Если ключ FCM задан, но не читается или битый, сервер всё равно стартует: в лог уходит `push: FCM misconfigured`, а push работает как no-op.
 
@@ -268,6 +269,7 @@ MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
 - [ ] `NIKITA_API_KEY` — боевой, `SMS_MOCK_OTP=false`
 - [ ] `FCM_CREDENTIALS_FILE=/secrets/firebase-service-account.json` (файл `chmod 644` в `./secrets`), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — группа персонала прода, не тестовая
 - [ ] `APP_MIN_VERSION`, `APP_LATEST_VERSION`, `APP_STORE_URL_IOS`, `APP_STORE_URL_ANDROID`
+- [ ] `SHOP_PHONE`, `SHOP_EMAIL`, `SHOP_HOURS`, `SHOP_BANK_DETAILS` (+ `SHOP_WHATSAPP`/`SHOP_TELEGRAM`, если есть) — иначе на `/contacts` нет контактов
 - [ ] `DELIVERY_FEE_SOM` и прочие новые переменные из `.env.example`
 - [ ] `LOG_FORMAT=json`
 - [ ] `.env` принадлежит root/deploy, `chmod 600`; в git не попадает

@@ -108,6 +108,10 @@ type Config struct {
 	// per line, for log shippers). LOG_FORMAT.
 	LogFormat string
 
+	// Contacts are the shop's public contact details for the storefront's
+	// info pages (SHOP_* variables, all optional) — see contacts.go.
+	Contacts Contacts
+
 	// Security holds the hardening knobs (cookie Secure flag, trusted
 	// proxies, body-size and auth rate limits) — see security.go.
 	Security Security
@@ -181,6 +185,9 @@ func Load() (*Config, error) {
 
 	var err error
 	if cfg.BakaiCurrencyID, err = getEnvInt("BAKAI_CURRENCY_ID", 417); err != nil { // 417 = KGS
+		return nil, err
+	}
+	if cfg.Contacts, err = loadContacts(); err != nil {
 		return nil, err
 	}
 	if cfg.Security, err = loadSecurity(cfg.Env); err != nil {

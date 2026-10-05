@@ -1,7 +1,7 @@
 {{define "content"}}
 <article class="static-page">
   <h1>Cozy дүкөнү жөнүндө</h1>
-  <p>Cozy — Бишкектеги ыңгайлуу бут кийим дүкөнү. <mark class="fill">[ЗАПОЛНИТЬ: коротко об истории магазина — год основания, сколько магазинов, чем отличаетесь]</mark></p>
+  <p>Cozy — Бишкектеги ыңгайлуу бут кийим дүкөнү.</p>
 
   <h2>Эмне үчүн Cozy</h2>
   <ul>
@@ -12,7 +12,7 @@
   </ul>
 
   <h2>Мобилдик тиркеме</h2>
-  <p>Cozy тиркемесинде буйрутма бериңиз жана алардын абалын көзөмөлдөңүз. <mark class="fill">[ЗАПОЛНИТЬ: ссылки на App Store и Google Play, когда приложение будет опубликовано]</mark></p>
+  <p>Cozy тиркемесинде буйрутма бериңиз жана алардын абалын көзөмөлдөңүз.{{if or .Data.StoreURLIOS .Data.StoreURLAndroid}} Жүктөп алуу:{{if .Data.StoreURLIOS}} <a href="{{.Data.StoreURLIOS}}" target="_blank" rel="noopener">App Store</a>{{end}}{{if and .Data.StoreURLIOS .Data.StoreURLAndroid}},{{end}}{{if .Data.StoreURLAndroid}} <a href="{{.Data.StoreURLAndroid}}" target="_blank" rel="noopener">Google Play</a>{{end}}.{{end}}</p>
 
   <p><a class="btn btn--primary" href="/">Каталогго өтүү</a></p>
 </article>

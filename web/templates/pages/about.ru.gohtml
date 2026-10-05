@@ -1,7 +1,7 @@
 {{define "content"}}
 <article class="static-page">
   <h1>О магазине Cozy</h1>
-  <p>Cozy — магазин удобной обуви в Бишкеке. <mark class="fill">[ЗАПОЛНИТЬ: коротко об истории магазина — год основания, сколько магазинов, чем отличаетесь]</mark></p>
+  <p>Cozy — магазин удобной обуви в Бишкеке.</p>
 
   <h2>Почему Cozy</h2>
   <ul>
@@ -12,7 +12,7 @@
   </ul>
 
   <h2>Мобильное приложение</h2>
-  <p>Оформляйте заказы и следите за их статусом в приложении Cozy. <mark class="fill">[ЗАПОЛНИТЬ: ссылки на App Store и Google Play, когда приложение будет опубликовано]</mark></p>
+  <p>Оформляйте заказы и следите за их статусом в приложении Cozy.{{if or .Data.StoreURLIOS .Data.StoreURLAndroid}} Скачать:{{if .Data.StoreURLIOS}} <a href="{{.Data.StoreURLIOS}}" target="_blank" rel="noopener">App Store</a>{{end}}{{if and .Data.StoreURLIOS .Data.StoreURLAndroid}},{{end}}{{if .Data.StoreURLAndroid}} <a href="{{.Data.StoreURLAndroid}}" target="_blank" rel="noopener">Google Play</a>{{end}}.{{end}}</p>
 
   <p><a class="btn btn--primary" href="/">Перейти в каталог</a></p>
 </article>

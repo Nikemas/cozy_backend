@@ -2,15 +2,18 @@
 <article class="static-page">
   <h1>Байланыш</h1>
 
+  {{with .Data.Contacts}}{{if .HasAny}}
   <div class="static-contacts">
-    <div class="static-contacts__item"><i class="ti ti-phone" aria-hidden="true"></i><div><div class="static-contacts__label">Телефон</div><mark class="fill">[ЗАПОЛНИТЬ: телефон]</mark></div></div>
-    <div class="static-contacts__item"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i><div><div class="static-contacts__label">WhatsApp / Telegram</div><mark class="fill">[ЗАПОЛНИТЬ: номер или ссылка]</mark></div></div>
-    <div class="static-contacts__item"><i class="ti ti-mail" aria-hidden="true"></i><div><div class="static-contacts__label">E-mail</div><mark class="fill">[ЗАПОЛНИТЬ: e-mail]</mark></div></div>
-    <div class="static-contacts__item"><i class="ti ti-clock" aria-hidden="true"></i><div><div class="static-contacts__label">Иш убактысы</div><mark class="fill">[ЗАПОЛНИТЬ: часы работы магазинов и поддержки]</mark></div></div>
+    {{if .Phone}}<div class="static-contacts__item"><i class="ti ti-phone" aria-hidden="true"></i><div><div class="static-contacts__label">Телефон</div><a href="tel:{{.PhoneDial}}">{{.Phone}}</a></div></div>{{end}}
+    {{if .WhatsApp}}<div class="static-contacts__item"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i><div><div class="static-contacts__label">WhatsApp</div><a href="{{.WhatsAppURL}}" target="_blank" rel="noopener">{{.WhatsApp}}</a></div></div>{{end}}
+    {{if .Telegram}}<div class="static-contacts__item"><i class="ti ti-brand-telegram" aria-hidden="true"></i><div><div class="static-contacts__label">Telegram</div><a href="{{.TelegramURL}}" target="_blank" rel="noopener">{{.TelegramHandle}}</a></div></div>{{end}}
+    {{if .Email}}<div class="static-contacts__item"><i class="ti ti-mail" aria-hidden="true"></i><div><div class="static-contacts__label">E-mail</div><a href="mailto:{{.Email}}">{{.Email}}</a></div></div>{{end}}
+    {{if .Hours}}<div class="static-contacts__item"><i class="ti ti-clock" aria-hidden="true"></i><div><div class="static-contacts__label">Колдоо кызматынын иш убактысы</div>{{.Hours}}</div></div>{{end}}
   </div>
+  {{end}}{{end}}
 
   <h2>Дүкөндөр</h2>
-  <p>Бардык дүкөндөрдүн даректери жана маршруттары — <a href="/branches">Филиалдар</a> барагында.</p>
+  <p>Бардык дүкөндөрдүн даректери, иш убактысы жана маршруттары — <a href="/branches">Филиалдар</a> барагында.</p>
 
   <h2>Реквизиттер</h2>
   <p>Жеке ишкер Айбек уулу Ардак<br>
