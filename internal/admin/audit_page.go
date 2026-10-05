@@ -311,6 +311,7 @@ var auditDetailLabels = map[string]string{
 	"role": "admin.audit.field.role", "size": "admin.audit.field.size", "color": "admin.audit.field.color",
 	"sku": "admin.audit.field.sku", "price_override": "admin.audit.field.price_override", "count": "admin.audit.field.quantity",
 	"slug": "admin.audit.field.slug", "sort_order": "admin.audit.field.sort_order", "parent_id": "admin.audit.field.parent",
+	"city": "admin.audit.field.city", "working_hours": "admin.audit.field.working_hours", "coordinates": "admin.audit.field.coordinates",
 }
 
 // auditDetailsText renders Details as "field: from → to; field: value",

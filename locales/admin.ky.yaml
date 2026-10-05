@@ -202,6 +202,7 @@ admin.reports.items_sold: Сатылган товарлар
 admin.reports.for_period: мезгил ичинде
 admin.reports.per_order: бир буйрутмага
 admin.reports.pcs: "%d даана"
+admin.reports.no_brand: Бренди жок
 admin.reports.build_failed: отчетту түзүү мүмкүн болбоду
 
 # Products: list, form, import
@@ -392,6 +393,9 @@ admin.audit.field.price_override: вариациянын баасы
 admin.audit.field.slug: slug
 admin.audit.field.sort_order: тартиби
 admin.audit.field.parent: негизги категория
+admin.audit.field.city: шаар
+admin.audit.field.working_hours: иш убактысы
+admin.audit.field.coordinates: координаттар
 admin.audit.err_from: башталыш күнү ЖЖЖЖ-АА-КК форматында болушу керек
 admin.audit.err_to: аяктоо күнү ЖЖЖЖ-АА-КК форматында болушу керек
 admin.audit.err_range: башталыш күнү аяктоо күнүнөн кеч
@@ -486,6 +490,8 @@ admin.apperr.too_many_attempts: кирүү аракеттери өтө көп, �
 admin.apperr.invalid_phone: номерди +996XXXXXXXXX форматында жазыңыз
 admin.apperr.invalid_name: аты (аталышы) көрсөтүлүшү керек
 admin.apperr.invalid_address: дареги көрсөтүлүшү керек
+admin.apperr.invalid_city: шаар көрсөтүлүшү керек
+admin.apperr.invalid_coordinates: туурасын да, узундугун да жол берилген чекте көрсөтүңүз
 admin.apperr.phone_taken: бул телефон номери колдонулуп жатат
 admin.apperr.last_owner: акыркы ээсинин ролун төмөндөтүүгө же аны активсиздештирүүгө болбойт
 admin.apperr.staff_not_found: кызматкер табылган жок
