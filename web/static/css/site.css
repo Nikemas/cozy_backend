@@ -707,7 +707,12 @@ button, input { font-family: inherit; }
 
 /* ---- Shop screen (COZY_WEB_DESIGN.md §3.1, Task 2) ---- */
 .shop-banner {
-  background: var(--cozy-accent-bg);
+  /* --banner-bg / --banner-ink come from the admin-edited banner
+     (inline style in shop.gohtml); unset = the design tokens. */
+  background-color: var(--banner-bg, var(--cozy-accent-bg));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border-radius: 20px;
   padding: 32px 36px;
   display: flex;
@@ -717,7 +722,13 @@ button, input { font-family: inherit; }
   margin-bottom: 24px;
 }
 .shop-banner__eyebrow { font-size: var(--cozy-fs-13); color: var(--cozy-accent); font-weight: 700; margin-bottom: 8px; letter-spacing: 0.02em; }
-.shop-banner__title { font-size: 28px; font-weight: 700; color: var(--cozy-ink); line-height: 1.25; }
+.shop-banner__title { font-size: 28px; font-weight: 700; color: var(--banner-ink, var(--cozy-ink)); line-height: 1.25; overflow-wrap: anywhere; }
+.shop-banner__text { flex: 1; min-width: 0; }
+.shop-banner__btn { margin-top: 16px; }
+.shop-banner__img { width: 240px; height: 160px; object-fit: contain; flex-shrink: 0; }
+/* A custom text color also recolors the eyebrow (the accent orange may
+   not read on the chosen background). */
+.shop-banner--ink .shop-banner__eyebrow { color: var(--banner-ink); }
 
 .shop-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .shop-chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1028,6 +1039,8 @@ button, input { font-family: inherit; }
   .shop-banner { padding: 20px; }
   .shop-banner__title { font-size: var(--cozy-fs-19); }
   .shop-banner svg { display: none; }
+  .shop-banner__img { width: 96px; height: 72px; }
+  .shop-banner__btn { margin-top: 12px; }
   .shop-toolbar__right { flex-wrap: wrap; justify-content: flex-end; }
   .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .product-card { padding: 10px; }
