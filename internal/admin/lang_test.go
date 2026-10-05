@@ -20,6 +20,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -317,7 +318,8 @@ func kyScreenFixtures() map[string]PageData {
 		Periods: reportPeriodOptions(kyTr, "custom"), Stats: buildStatCards(kyTr, nil),
 		Bars:        buildBars(nil, now, now),
 		TopProducts: buildTopProducts(kyTr, nil), Categories: buildCategoryBars(kyTr, nil),
-		Custom: true, Err: "x",
+		TopBrands: buildTopBrands(kyTr, []reports.Row{{Key: "Nike", Revenue: 2}, {Key: "", Revenue: 1}}),
+		Custom:    true, Err: "x",
 	}
 	out["reports"] = reportsPage
 
@@ -325,7 +327,7 @@ func kyScreenFixtures() map[string]PageData {
 	pointsPage.Data = pointsPageData{Rows: []pointRow{
 		newPointRow(kyTr, &points.Point{ID: "pt1", Name: "Main", Address: "Street 1", IsActive: true}),
 		newPointRow(kyTr, &points.Point{ID: "pt2", Name: "Dordoi", Address: "Street 2"}),
-	}, Error: "x"}
+	}, Error: appErrMessage(kyTr, apperr.BadRequest("invalid_coordinates", "укажите и широту, и долготу"))}
 	out["points"] = pointsPage
 
 	staffPage := shell("staff", "admin.nav.staff")
@@ -382,6 +384,9 @@ func kyScreenFixtures() map[string]PageData {
 				Summary: "x", Details: map[string]any{"base_price": map[string]any{"from": 1.0, "to": 2.0}, "is_active": true}},
 			{ID: "a2", At: now, Action: audit.ActionOrderStatus, EntityType: audit.EntityOrder, EntityID: "o1",
 				Summary: "COZY-1", Details: map[string]any{"from": "placed", "to": "confirmed"}},
+			{ID: "a3", At: now, Action: audit.ActionPointUpdate, EntityType: audit.EntityPoint, EntityID: "pt1",
+				Summary: "x", Details: map[string]any{"city": map[string]any{"from": "Osh", "to": "Bishkek"},
+					"working_hours": map[string]any{"from": "", "to": "10-20"}, "coordinates": map[string]any{"from": ", ", "to": "42.87, 74.59"}}},
 		}, 120, "x")
 	out["audit"] = auditPage
 	return out

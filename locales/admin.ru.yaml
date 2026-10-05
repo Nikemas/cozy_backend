@@ -205,6 +205,7 @@ admin.reports.items_sold: Продано товаров
 admin.reports.for_period: за период
 admin.reports.per_order: на заказ
 admin.reports.pcs: "%d шт."
+admin.reports.no_brand: Без бренда
 admin.reports.build_failed: не удалось построить отчёт
 
 # Products: list, form, import
@@ -395,6 +396,9 @@ admin.audit.field.price_override: цена вариации
 admin.audit.field.slug: slug
 admin.audit.field.sort_order: порядок
 admin.audit.field.parent: родитель
+admin.audit.field.city: город
+admin.audit.field.working_hours: время работы
+admin.audit.field.coordinates: координаты
 admin.audit.err_from: дата «с» должна быть в формате ГГГГ-ММ-ДД
 admin.audit.err_to: дата «по» должна быть в формате ГГГГ-ММ-ДД
 admin.audit.err_range: дата начала позже даты окончания
@@ -489,6 +493,8 @@ admin.apperr.too_many_attempts: слишком много попыток вхо�
 admin.apperr.invalid_phone: укажите номер в формате +996XXXXXXXXX
 admin.apperr.invalid_name: имя обязательно
 admin.apperr.invalid_address: адрес обязателен
+admin.apperr.invalid_city: город обязателен
+admin.apperr.invalid_coordinates: укажите и широту, и долготу в допустимом диапазоне
 admin.apperr.phone_taken: этот номер телефона уже используется
 admin.apperr.last_owner: нельзя понизить или деактивировать последнего владельца
 admin.apperr.staff_not_found: сотрудник не найден

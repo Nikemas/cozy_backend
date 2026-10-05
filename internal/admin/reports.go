@@ -60,12 +60,12 @@ func newReportsRepo(db *sql.DB) *reportsRepo {
 // total_amount — so brand rows sum to the same total as the "Топ товаров"
 // rows. Only orders that count as sales are included (reports.
 // SaleConditionSQL: not cancelled, online-card only once paid), same as
-// AggregateSales. Products
-// with no brand set (or an all-whitespace one) roll up into a "Без
-// бренда" bucket rather than being dropped.
+// AggregateSales. Products with no brand set (or an all-whitespace one)
+// roll up into one "" bucket rather than being dropped; buildTopBrands
+// labels it (admin.reports.no_brand) in the page language.
 func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error) {
 	q := `
-		SELECT COALESCE(NULLIF(TRIM(p.brand), ''), 'Без бренда') AS brand,
+		SELECT COALESCE(TRIM(p.brand), '') AS brand,
 		       COUNT(DISTINCT oi.order_id) AS order_count,
 		       COALESCE(SUM(oi.quantity), 0) AS item_count,
 		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
@@ -258,7 +258,7 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		ChartNote:         from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
 		Bars:              buildBars(dayRows, from, to),
 		TopProducts:       buildTopProducts(t, productRows),
-		TopBrands:         buildTopBrands(brandRows),
+		TopBrands:         buildTopBrands(t, brandRows),
 		Categories:        buildCategoryBars(t, categoryRows),
 	}, nil
 }
@@ -447,7 +447,7 @@ func buildTopProducts(t tr, productRows []reports.Row) []RankedRow {
 // buildTopBrands takes BrandSales' rows (already revenue-sorted by the
 // SQL query's ORDER BY) and derives each mini progress bar's width
 // relative to the top brand's revenue.
-func buildTopBrands(brandRows []reports.Row) []BrandBar {
+func buildTopBrands(t tr, brandRows []reports.Row) []BrandBar {
 	rows := brandRows
 	if len(rows) > reportsTopLimit {
 		rows = rows[:reportsTopLimit]
@@ -464,7 +464,11 @@ func buildTopBrands(brandRows []reports.Row) []BrandBar {
 		if maxRevenue > 0 {
 			pct = int(math.Round(row.Revenue / maxRevenue * 100))
 		}
-		out[i] = BrandBar{Name: row.Key, Sum: formatMoney(row.Revenue), WidthPct: pct}
+		name := row.Key
+		if name == "" {
+			name = t.T("admin.reports.no_brand")
+		}
+		out[i] = BrandBar{Name: name, Sum: formatMoney(row.Revenue), WidthPct: pct}
 	}
 	return out
 }

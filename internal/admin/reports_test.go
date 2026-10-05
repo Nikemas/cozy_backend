@@ -241,9 +241,9 @@ func TestBuildTopBrandsWidthRelativeToTopBrand(t *testing.T) {
 	rows := []reports.Row{
 		{Key: "Nike", Revenue: 1000},
 		{Key: "Adidas", Revenue: 500},
-		{Key: "Без бренда", Revenue: 250},
+		{Key: "", Revenue: 250},
 	}
-	brands := buildTopBrands(rows)
+	brands := buildTopBrands(ruTr, rows)
 	if len(brands) != 3 {
 		t.Fatalf("expected 3 rows, got %d", len(brands))
 	}
