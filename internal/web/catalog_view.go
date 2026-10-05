@@ -495,14 +495,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 	sizes := distinctInOrder(sizeVals)
 	colors := distinctInOrder(colorVals)
 
-	selectedSize := q.Get("size")
-	selectedColor := q.Get("color")
-	if selectedSize == "" && len(sizes) > 0 {
-		selectedSize = sizes[0]
-	}
-	if selectedColor == "" && len(colors) > 0 {
-		selectedColor = colors[0]
-	}
+	selectedSize, selectedColor := defaultQuickBuySelection(variantList, qtyByVariant, q.Get("size"), q.Get("color"))
 
 	name := pickName(product.NameRu, product.NameKy, lang)
 	productPath := ProductPath(product.ID, product.NameRu)
