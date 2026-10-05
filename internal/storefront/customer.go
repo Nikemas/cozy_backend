@@ -127,7 +127,7 @@ func (u *ProfileUpdate) validate() error {
 			return apperr.BadRequest("invalid_name", "укажите имя")
 		}
 		if utf8.RuneCountInString(name) > maxNameLen {
-			return apperr.BadRequest("invalid_name", "имя слишком длинное")
+			return apperr.BadRequest("invalid_name", "имя слишком длинное").WithVariant("too_long")
 		}
 		u.Name = &name
 	}

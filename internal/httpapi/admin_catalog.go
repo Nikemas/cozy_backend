@@ -371,7 +371,7 @@ func updateStockHandler(stock stockSetter) apperr.HandlerFunc {
 
 		pointID := r.PathValue("pointId")
 		if st.Role == staff.RolePointStaff && (st.PointID == nil || *st.PointID != pointID) {
-			return apperr.Forbidden("forbidden", "сотрудник точки может изменять остатки только своей точки")
+			return apperr.Forbidden("forbidden", "сотрудник точки может изменять остатки только своей точки").WithVariant("point_stock")
 		}
 
 		var req stockRequest

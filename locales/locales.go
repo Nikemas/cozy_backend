@@ -12,3 +12,11 @@ import "embed"
 //
 //go:embed admin.ru.yaml admin.ky.yaml
 var Admin embed.FS
+
+// Errors holds errors.ru.yaml and errors.ky.yaml — the client-facing
+// texts of internal/apperr error codes ("err.<code>[.<variant>]") and of
+// the product import report ("import.*"). Load with
+// i18n.LoadFS(locales.Errors, "errors.%s.yaml"); internal/apperr does.
+//
+//go:embed errors.ru.yaml errors.ky.yaml
+var Errors embed.FS

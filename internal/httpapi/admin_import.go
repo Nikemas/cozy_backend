@@ -46,7 +46,10 @@ func RegisterAdminImportRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.S
 
 // importProductsHandler extracts the uploaded file, detects its format and
 // runs catalog.ImportProducts. Per-row problems are part of the 200
-// response; only an unusable request/file is an HTTP error.
+// response; only an unusable request/file is an HTTP error. Both come in
+// the request's language (apperr.LangFromRequest: the import page sends
+// its own via Accept-Language, and Accept: application/json so file
+// errors are JSON rather than an HTML error page).
 func importProductsHandler(store catalog.ImportStore) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		r.Body = http.MaxBytesReader(w, r.Body, maxImportUploadSize)
@@ -70,6 +73,7 @@ func importProductsHandler(store catalog.ImportStore) apperr.HandlerFunc {
 		result, err := catalog.ImportProducts(r.Context(), file, format, store, catalog.ImportOptions{
 			DryRun:  dryRun,
 			PointID: r.FormValue("point_id"),
+			Lang:    apperr.LangFromRequest(r),
 		})
 		if err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -211,7 +212,8 @@ func cancelLockedTx(ctx context.Context, tx *sql.Tx, o *Order, actor Actor, note
 func transitionLockedTx(ctx context.Context, tx *sql.Tx, o *Order, to OrderStatus, actor Actor, note string) error {
 	if !validStatusTransition(o.Status, to) {
 		return apperr.BadRequest("invalid_status_transition",
-			fmt.Sprintf("нельзя перевести заказ из статуса %q в %q", o.Status, to))
+			fmt.Sprintf("нельзя перевести заказ из статуса %q в %q", o.Status, to)).
+			WithParams(map[string]string{"from": strconv.Quote(string(o.Status)), "to": strconv.Quote(string(to))})
 	}
 	if to == StatusConfirmed && !paymentAllowsConfirm(o) {
 		return apperr.Conflict("payment_not_completed",
@@ -267,7 +269,7 @@ func CustomerCanCancel(o Order) bool { return customerCanCancel(&o) }
 func (s *Service) AdminUpdateStatus(ctx context.Context, idOrNumber string, newStatus OrderStatus) (*Order, error) {
 	actor, ok := staffActor(ctx)
 	if !ok {
-		return nil, apperr.Forbidden("forbidden", "действие доступно только сотрудникам")
+		return nil, apperr.Forbidden("forbidden", "действие доступно только сотрудникам").WithVariant("staff_only")
 	}
 	if newStatus == StatusCancelled && actor.Role != staff.RoleOwner {
 		return nil, apperr.Forbidden("cancel_forbidden", "только владелец может отменить заказ")

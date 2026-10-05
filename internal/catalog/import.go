@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -88,6 +89,9 @@ type ImportOptions struct {
 	// PointID is the point of sale the quantity column is stored at. Empty
 	// means the first active point (by creation time).
 	PointID string
+	// Lang is the language ("ru"/"ky") of the report's row messages;
+	// anything else means Russian.
+	Lang string
 }
 
 // ImportProduct is the product-level data of one model.
@@ -207,7 +211,7 @@ func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, store
 	case ImportFormatXLSX:
 		rows, err = parseXLSXRows(r)
 	default:
-		return nil, apperr.BadRequest("unsupported_format", "неподдерживаемый формат файла импорта")
+		return nil, apperr.BadRequest("unsupported_format", "неподдерживаемый формат файла импорта").WithVariant("internal")
 	}
 	if err != nil {
 		return nil, err
@@ -226,6 +230,7 @@ func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, store
 	}
 
 	res := &ImportResult{DryRun: opts.DryRun, Rows: []ImportRowResult{}, Errors: []RowError{}}
+	lang := opts.Lang
 	if p.usedPoint {
 		res.PointID = &pointID
 	}
@@ -241,7 +246,7 @@ func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, store
 
 	for _, m := range models {
 		if m.failed() {
-			res.addModel(m, nil)
+			res.addModel(m, nil, lang)
 			continue
 		}
 		var out modelOutcome
@@ -258,10 +263,10 @@ func ImportProducts(ctx context.Context, r io.Reader, format ImportFormat, store
 				rf = &rowFailure{line: m.rows[0].line, msg: dbErrorMessage(err)}
 			}
 			m.fail(rf.line, rf.msg)
-			res.addModel(m, nil)
+			res.addModel(m, nil, lang)
 			continue
 		}
-		res.addModel(m, &out)
+		res.addModel(m, &out, lang)
 	}
 	sort.SliceStable(res.Rows, func(i, j int) bool { return res.Rows[i].Row < res.Rows[j].Row })
 	sort.SliceStable(res.Errors, func(i, j int) bool { return res.Errors[i].Row < res.Errors[j].Row })
@@ -281,7 +286,7 @@ func resolveTargetPoint(ctx context.Context, store ImportStore, requested string
 		return "", err
 	}
 	if !ok {
-		return "", apperr.BadRequest("invalid_point", "точка продаж не найдена или отключена")
+		return "", apperr.BadRequest("invalid_point", "точка продаж не найдена или отключена").WithVariant("inactive")
 	}
 	return requested, nil
 }
@@ -289,10 +294,10 @@ func resolveTargetPoint(ctx context.Context, store ImportStore, requested string
 // rowFailure is a failure attributed to one spreadsheet row.
 type rowFailure struct {
 	line int
-	msg  string
+	msg  importMsg
 }
 
-func (f *rowFailure) Error() string { return fmt.Sprintf("строка %d: %s", f.line, f.msg) }
+func (f *rowFailure) Error() string { return fmt.Sprintf("строка %d: %s", f.line, f.msg.Error()) }
 
 // modelOutcome is what importModel did, for the report.
 type modelOutcome struct {
@@ -339,7 +344,8 @@ func importModel(ctx context.Context, tx ImportTx, m *plannedModel, out *modelOu
 				return wrap(err)
 			}
 			if ref != nil && ref.ProductID != productID {
-				return &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q уже используется у другого товара", row.variant.SKU)}
+				return &rowFailure{line: row.line, msg: newImportMsg("import.sku_taken",
+					map[string]string{"sku": strconv.Quote(row.variant.SKU)})}
 			}
 		}
 		if ref == nil && !out.productCreated {
@@ -401,10 +407,12 @@ func findProduct(ctx context.Context, tx ImportTx, m *plannedModel) (string, err
 			continue
 		}
 		if m.product.ModelCode != "" && ref.ProductModelCode != "" && !strings.EqualFold(ref.ProductModelCode, m.product.ModelCode) {
-			return "", &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q уже используется у другого товара (артикул %s)", row.variant.SKU, ref.ProductModelCode)}
+			return "", &rowFailure{line: row.line, msg: newImportMsg("import.sku_taken_article",
+				map[string]string{"sku": strconv.Quote(row.variant.SKU), "article": ref.ProductModelCode})}
 		}
 		if bySKU != "" && ref.ProductID != bySKU {
-			return "", &rowFailure{line: row.line, msg: fmt.Sprintf("SKU %q относится к другому товару, чем остальные строки модели", row.variant.SKU)}
+			return "", &rowFailure{line: row.line, msg: newImportMsg("import.sku_other_product",
+				map[string]string{"sku": strconv.Quote(row.variant.SKU)})}
 		}
 		bySKU = ref.ProductID
 	}
@@ -423,33 +431,34 @@ func findProduct(ctx context.Context, tx ImportTx, m *plannedModel) (string, err
 		return ids[0], nil
 	default:
 		return "", &rowFailure{line: m.rows[0].line,
-			msg: fmt.Sprintf("найдено несколько товаров «%s» в этой категории — укажите артикул модели или SKU", m.product.NameRu)}
+			msg: newImportMsg("import.ambiguous_product", map[string]string{"name": m.product.NameRu})}
 	}
 }
 
 // dbErrorMessage turns a database error into admin-facing text. Constraint
 // violations are the expected cases (a size/color or SKU clash, a stale
 // point id); anything else is logged and reported generically.
-func dbErrorMessage(err error) string {
+func dbErrorMessage(err error) importMsg {
 	var ae *apperr.AppError
 	if errors.As(err, &ae) {
-		return ae.Message
+		return importMsg{appErr: ae}
 	}
 	switch pgErrCode(err) {
 	case pgUniqueViolation:
-		return "конфликт с существующими данными: такой размер/цвет, SKU или артикул уже есть у другого товара/вариации"
+		return newImportMsg("import.db_conflict", nil)
 	case pgForeignKeyViolation:
-		return "категория или точка продаж не найдена"
+		return newImportMsg("import.db_not_found", nil)
 	case pgCheckViolation:
-		return "значение вне допустимого диапазона"
+		return newImportMsg("import.db_out_of_range", nil)
 	}
 	slog.Error("catalog import: database error", "err", err)
-	return "внутренняя ошибка при сохранении — попробуйте ещё раз"
+	return newImportMsg("import.db_internal", nil)
 }
 
-// addModel records m's rows in the report. out is nil when the model was
-// not imported (its failing rows are errors, the rest skipped).
-func (res *ImportResult) addModel(m *plannedModel, out *modelOutcome) {
+// addModel records m's rows in the report, with messages in lang. out is
+// nil when the model was not imported (its failing rows are errors, the
+// rest skipped).
+func (res *ImportResult) addModel(m *plannedModel, out *modelOutcome, lang string) {
 	if out != nil {
 		if out.productCreated {
 			res.Summary.ProductsCreated++
@@ -468,11 +477,12 @@ func (res *ImportResult) addModel(m *plannedModel, out *modelOutcome) {
 		switch {
 		case out != nil:
 			r.Status = out.rowStatus[row.line]
-		case row.err != "":
-			r.Status, r.Message = RowStatusError, row.err
+		case len(row.errs) > 0:
+			r.Status, r.Message = RowStatusError, renderImportMsgs(lang, row.errs)
 		default:
 			r.Status = RowStatusSkipped
-			r.Message = fmt.Sprintf("модель не импортирована из-за ошибки в строке %d", m.firstErrLine())
+			r.Message = apperr.Translate(lang, "import.model_skipped",
+				map[string]string{"line": strconv.Itoa(m.firstErrLine())})
 		}
 		res.Summary.Rows++
 		switch r.Status {

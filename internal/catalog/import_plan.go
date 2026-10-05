@@ -2,8 +2,8 @@ package catalog
 
 import (
 	"context"
-	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -23,7 +23,7 @@ type plannedRow struct {
 	hasVariant bool
 	variant    ImportVariant
 	stock      []stockSet
-	err        string // validation error; non-empty fails the whole model
+	errs       []importMsg // validation errors; any fails the whole model
 }
 
 // plannedModel is one product to import: rows grouped by article, or by
@@ -38,7 +38,7 @@ func (m *plannedModel) failed() bool { return m.firstErrLine() != 0 }
 
 func (m *plannedModel) firstErrLine() int {
 	for _, r := range m.rows {
-		if r.err != "" {
+		if len(r.errs) > 0 {
 			return r.line
 		}
 	}
@@ -46,19 +46,19 @@ func (m *plannedModel) firstErrLine() int {
 }
 
 // fail attributes msg to the row at line (the first row if line is not in m).
-func (m *plannedModel) fail(line int, msg string) {
+func (m *plannedModel) fail(line int, msg importMsg) {
 	for _, r := range m.rows {
 		if r.line == line {
-			r.err = msg
+			r.errs = []importMsg{msg}
 			return
 		}
 	}
-	m.rows[0].err = msg
+	m.rows[0].errs = []importMsg{msg}
 }
 
 type categoryLookup struct {
 	id  string
-	err string
+	err *importMsg
 }
 
 // planner validates rows and groups them into models. It only reads from
@@ -81,7 +81,7 @@ type rawRow struct {
 	price, priceOverride  *float64
 	priceBad              bool // the price cell was present but invalid
 	planned               *plannedRow
-	errs                  []string
+	errs                  []importMsg
 }
 
 func (p *planner) plan(rows []importRow) ([]*plannedModel, error) {
@@ -101,7 +101,8 @@ func (p *planner) plan(rows []importRow) ([]*plannedModel, error) {
 
 		if sku := rr.planned.variant.SKU; sku != "" && rr.planned.hasVariant {
 			if first, dup := skuLines[sku]; dup {
-				rr.errs = append(rr.errs, fmt.Sprintf("SKU %q уже встречается в строке %d", sku, first))
+				rr.errs = append(rr.errs, newImportMsg("import.sku_duplicate_in_file",
+					map[string]string{"sku": strconv.Quote(sku), "line": strconv.Itoa(first)}))
 			} else {
 				skuLines[sku] = row.line
 			}
@@ -111,12 +112,12 @@ func (p *planner) plan(rows []importRow) ([]*plannedModel, error) {
 		if key == "" {
 			// No way to tell which model the row belongs to: report it alone.
 			if rr.nameRu == "" {
-				rr.errs = append(rr.errs, "не указано название (или артикул модели)")
+				rr.errs = append(rr.errs, newImportMsg("import.no_name_or_article", nil))
 			}
 			if rr.category == "" {
-				rr.errs = append(rr.errs, "не указана категория (или артикул модели)")
+				rr.errs = append(rr.errs, newImportMsg("import.no_category_or_article", nil))
 			}
-			rr.planned.err = strings.Join(rr.errs, "; ")
+			rr.planned.errs = rr.errs
 			models = append(models, &plannedModel{label: firstNonEmpty(rr.modelCode, rr.nameRu), rows: []*plannedRow{rr.planned}})
 			continue
 		}
@@ -168,7 +169,7 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 	if v := row.get(colPrice); v != "" {
 		f, err := parsePrice(v)
 		if err != nil {
-			rr.errs = append(rr.errs, err.Error())
+			rr.errs = append(rr.errs, asImportMsg(err))
 			rr.priceBad = true
 		} else {
 			rr.price = &f
@@ -177,7 +178,7 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 	if v := row.get(colPriceOverride); v != "" {
 		f, err := parsePrice(v)
 		if err != nil {
-			rr.errs = append(rr.errs, "цена варианта: "+err.Error())
+			rr.errs = append(rr.errs, newImportMsg("import.variant_price", nil).withReason(asImportMsg(err)))
 		} else {
 			rr.priceOverride = &f
 		}
@@ -191,20 +192,20 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 		rr.planned.hasVariant = true
 		rr.planned.variant = ImportVariant{Size: size, Color: color, SKU: sku}
 	case size != "" || color != "":
-		rr.errs = append(rr.errs, "для вариации нужны оба поля: размер и цвет")
+		rr.errs = append(rr.errs, newImportMsg("import.variant_needs_size_and_color", nil))
 	case sku != "":
-		rr.errs = append(rr.errs, "SKU указан без размера и цвета")
+		rr.errs = append(rr.errs, newImportMsg("import.sku_without_variant", nil))
 	}
 
 	if v := row.get(colQuantity); v != "" {
 		qty, err := parseQuantity(v)
 		switch {
 		case err != nil:
-			rr.errs = append(rr.errs, err.Error())
+			rr.errs = append(rr.errs, asImportMsg(err))
 		case !rr.planned.hasVariant:
-			rr.errs = append(rr.errs, "остаток указан без размера и цвета")
+			rr.errs = append(rr.errs, newImportMsg("import.stock_without_variant", nil))
 		case p.pointID == "":
-			rr.errs = append(rr.errs, "нет активной точки продаж, чтобы записать остаток")
+			rr.errs = append(rr.errs, newImportMsg("import.no_active_point", nil))
 		default:
 			p.usedPoint = true
 			rr.planned.stock = append(rr.planned.stock, stockSet{pointID: p.pointID, qty: qty})
@@ -226,11 +227,12 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 		}
 		qty, err := parseQuantity(v)
 		if err != nil {
-			rr.errs = append(rr.errs, fmt.Sprintf("остаток по точке %s: %s", pointID, err.Error()))
+			rr.errs = append(rr.errs, newImportMsg("import.point_stock",
+				map[string]string{"point": pointID}).withReason(asImportMsg(err)))
 			continue
 		}
 		if !rr.planned.hasVariant {
-			rr.errs = append(rr.errs, "остаток указан без размера и цвета")
+			rr.errs = append(rr.errs, newImportMsg("import.stock_without_variant", nil))
 			continue
 		}
 		ok, err := p.activePoint(pointID)
@@ -238,7 +240,7 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 			return nil, err
 		}
 		if !ok {
-			rr.errs = append(rr.errs, fmt.Sprintf("точка продаж %s не найдена или отключена", pointID))
+			rr.errs = append(rr.errs, newImportMsg("import.point_inactive", map[string]string{"point": pointID}))
 			continue
 		}
 		rr.planned.stock = append(rr.planned.stock, stockSet{pointID: pointID, qty: qty})
@@ -269,7 +271,8 @@ func (p *planner) category(raw string) categoryLookup {
 	id, err := p.store.ResolveCategory(p.ctx, raw)
 	c := categoryLookup{id: id}
 	if err != nil {
-		c = categoryLookup{err: dbErrorMessage(err)}
+		msg := dbErrorMessage(err)
+		c = categoryLookup{err: &msg}
 	}
 	p.categories[key] = c
 	return c
@@ -299,12 +302,12 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 	m.label = firstNonEmpty(prod.ModelCode, prod.NameRu)
 
 	if prod.NameRu == "" {
-		first.errs = append(first.errs, "не указано название")
+		first.errs = append(first.errs, newImportMsg("import.no_name", nil))
 	}
 	if cat := pick(func(r *rawRow) string { return r.category }); cat == "" {
-		first.errs = append(first.errs, "не указана категория")
-	} else if c := p.category(cat); c.err != "" {
-		first.errs = append(first.errs, c.err)
+		first.errs = append(first.errs, newImportMsg("import.no_category", nil))
+	} else if c := p.category(cat); c.err != nil {
+		first.errs = append(first.errs, *c.err)
 	} else {
 		prod.CategoryID = c.id
 	}
@@ -318,7 +321,7 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 	}
 	if base == nil {
 		if !hasBadPrice(rs) {
-			first.errs = append(first.errs, "не указана цена")
+			first.errs = append(first.errs, newImportMsg("import.no_price", nil))
 		}
 	} else {
 		prod.BasePrice = *base
@@ -330,13 +333,14 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 		pr := r.planned
 		if !pr.hasVariant {
 			if len(rs) > 1 {
-				r.errs = append(r.errs, "в модели несколько строк — у каждой нужны размер и цвет")
+				r.errs = append(r.errs, newImportMsg("import.multi_row_needs_variant", nil))
 			}
 			continue
 		}
 		k := strings.ToLower(pr.variant.Size) + "\x00" + strings.ToLower(pr.variant.Color)
 		if line, dup := sizes[k]; dup {
-			r.errs = append(r.errs, fmt.Sprintf("размер %s / цвет %s уже есть в строке %d", pr.variant.Size, pr.variant.Color, line))
+			r.errs = append(r.errs, newImportMsg("import.duplicate_variant", map[string]string{
+				"size": pr.variant.Size, "color": pr.variant.Color, "line": strconv.Itoa(line)}))
 		} else {
 			sizes[k] = r.row.line
 		}
@@ -350,7 +354,7 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 
 	for _, r := range rs {
 		if len(r.errs) > 0 {
-			r.planned.err = strings.Join(r.errs, "; ")
+			r.planned.errs = r.errs
 		}
 	}
 }

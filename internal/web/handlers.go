@@ -187,7 +187,7 @@ func (h *handlers) langScreen(w http.ResponseWriter, r *http.Request) error {
 // best-effort: a DB error is logged, the site keeps working off the cookie.
 func (h *handlers) setLang(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	lang := r.FormValue("lang")
 	if lang != i18n.LangRU && lang != i18n.LangKY {
@@ -248,7 +248,7 @@ func (h *handlers) renderProfileAuth(w http.ResponseWriter, r *http.Request, dat
 // surfaced as a raw JSON error page.
 func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	phone := r.FormValue("phone")
 
@@ -268,7 +268,7 @@ func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error
 // same otp step rather than as a raw JSON error.
 func (h *handlers) loginVerifyOTP(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	phone := r.FormValue("phone")
 	code := r.FormValue("code")
@@ -307,11 +307,11 @@ func (h *handlers) loginVerifyOTP(w http.ResponseWriter, r *http.Request) error 
 // cookie here.
 func (h *handlers) loginSetName(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return apperr.BadRequest("bad_request", "некорректная форма")
+		return apperr.BadRequest("bad_request", "некорректная форма").WithVariant("form")
 	}
 	customerID := CustomerID(r)
 	if customerID == "" {
-		return apperr.Unauthorized("unauthorized", "сессия истекла, войдите заново")
+		return apperr.Unauthorized("unauthorized", "сессия истекла, войдите заново").WithVariant("expired")
 	}
 
 	name := r.FormValue("name")

@@ -97,7 +97,7 @@ func errFileTooLarge() error {
 func readUploadFile(r *http.Request) ([]byte, error) {
 	mr, err := r.MultipartReader()
 	if err != nil {
-		return nil, apperr.BadRequest("bad_request", "ожидается multipart/form-data с полем file")
+		return nil, apperr.BadRequest("bad_request", "ожидается multipart/form-data с полем file").WithVariant("multipart")
 	}
 	for {
 		part, err := mr.NextPart()

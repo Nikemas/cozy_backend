@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -141,7 +142,8 @@ func validateCartQty(qty int) error {
 		return apperr.BadRequest("invalid_qty", "количество должно быть больше нуля")
 	}
 	if qty > MaxCartQty {
-		return apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара", MaxCartQty))
+		return apperr.BadRequest("qty_too_large", fmt.Sprintf("не больше %d шт. одного товара", MaxCartQty)).
+			WithParams(map[string]string{"max": strconv.Itoa(MaxCartQty)})
 	}
 	return nil
 }
@@ -164,7 +166,7 @@ func (r *CartRepo) Add(ctx context.Context, customerID, variantID string, qty in
 		`SELECT p.is_active FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.id = $1`,
 		variantID).Scan(&active)
 	if errors.Is(err, sql.ErrNoRows) {
-		return apperr.NotFound("variant_not_found", "товар не найден")
+		return apperr.NotFound("variant_not_found", "товар не найден").WithVariant("product")
 	}
 	if err != nil {
 		return err

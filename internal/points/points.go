@@ -56,13 +56,13 @@ type PointInput struct {
 
 func (in PointInput) validate() error {
 	if strings.TrimSpace(in.Name) == "" {
-		return apperr.BadRequest("invalid_name", "name обязателен")
+		return apperr.BadRequest("invalid_name", "name обязателен").WithVariant("field")
 	}
 	if strings.TrimSpace(in.City) == "" {
 		return apperr.BadRequest("invalid_city", "city обязателен")
 	}
 	if strings.TrimSpace(in.Address) == "" {
-		return apperr.BadRequest("invalid_address", "address обязателен")
+		return apperr.BadRequest("invalid_address", "address обязателен").WithVariant("field")
 	}
 	return validateCoords(in.Latitude, in.Longitude)
 }
@@ -73,7 +73,7 @@ func validateCoords(lat, lng *float64) error {
 		return nil
 	}
 	if lat == nil || lng == nil {
-		return apperr.BadRequest("invalid_coordinates", "укажите и широту, и долготу")
+		return apperr.BadRequest("invalid_coordinates", "укажите и широту, и долготу").WithVariant("pair")
 	}
 	if *lat < -90 || *lat > 90 || *lng < -180 || *lng > 180 {
 		return apperr.BadRequest("invalid_coordinates", "координаты вне допустимого диапазона")

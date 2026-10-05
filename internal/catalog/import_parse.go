@@ -140,7 +140,8 @@ func canonicalHeaders(raw []string) ([]string, error) {
 		}
 		if prev, dup := seen[col]; dup {
 			return nil, apperr.BadRequest("duplicate_column",
-				fmt.Sprintf("колонка %q повторяется (%q и %q)", col, prev, strings.TrimSpace(h)))
+				fmt.Sprintf("колонка %q повторяется (%q и %q)", col, prev, strings.TrimSpace(h))).
+				WithParams(map[string]string{"column": strconv.Quote(col), "first": strconv.Quote(prev), "second": strconv.Quote(strings.TrimSpace(h))})
 		}
 		seen[col] = strings.TrimSpace(h)
 		out[i] = col
@@ -153,7 +154,8 @@ func canonicalHeaders(raw []string) ([]string, error) {
 	}
 	if len(missing) > 0 {
 		return nil, apperr.BadRequest("missing_columns",
-			"в файле нет обязательных колонок: "+strings.Join(missing, ", ")+" — скачайте шаблон импорта")
+			"в файле нет обязательных колонок: "+strings.Join(missing, ", ")+" — скачайте шаблон импорта").
+			WithParams(map[string]string{"columns": strings.Join(missing, ", ")})
 	}
 	return out, nil
 }
@@ -199,7 +201,8 @@ func parseCSVRows(r io.Reader) ([]importRow, error) {
 		return nil, apperr.BadRequest("empty_file", "файл импорта пустой")
 	}
 	if err != nil {
-		return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error())
+		return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error()).
+			WithVariant("detail").WithParams(map[string]string{"detail": err.Error()})
 	}
 	headers, err := canonicalHeaders(header)
 	if err != nil {
@@ -214,7 +217,8 @@ func parseCSVRows(r io.Reader) ([]importRow, error) {
 			break
 		}
 		if err != nil {
-			return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error())
+			return nil, apperr.BadRequest("invalid_csv", "не удалось прочитать CSV: "+err.Error()).
+				WithVariant("detail").WithParams(map[string]string{"detail": err.Error()})
 		}
 		line++
 		rows = append(rows, buildRow(headers, record, line))
@@ -242,17 +246,19 @@ func parseXLSXRows(r io.Reader) ([]importRow, error) {
 		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
 	})
 	if err != nil {
-		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать Excel-файл: "+err.Error())
+		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать Excel-файл: "+err.Error()).
+			WithParams(map[string]string{"detail": err.Error()})
 	}
 	defer func() { _ = f.Close() }()
 
 	sheet := f.GetSheetName(0)
 	if sheet == "" {
-		return nil, apperr.BadRequest("empty_file", "в Excel-файле нет листов")
+		return nil, apperr.BadRequest("empty_file", "в Excel-файле нет листов").WithVariant("no_sheets")
 	}
 	allRows, err := f.GetRows(sheet, excelize.Options{RawCellValue: true})
 	if err != nil {
-		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать лист: "+err.Error())
+		return nil, apperr.BadRequest("invalid_xlsx", "не удалось прочитать лист: "+err.Error()).
+			WithVariant("sheet").WithParams(map[string]string{"detail": err.Error()})
 	}
 	if len(allRows) == 0 {
 		return nil, apperr.BadRequest("empty_file", "файл импорта пустой")
@@ -305,18 +311,18 @@ func compactNumber(s string) string {
 func parsePrice(raw string) (float64, error) {
 	s := compactNumber(raw)
 	if strings.HasPrefix(s, "-") {
-		return 0, fmt.Errorf("цена не может быть отрицательной: %q", raw)
+		return 0, newImportMsg("import.price_negative", map[string]string{"value": strconv.Quote(raw)})
 	}
 	if !decimalRE.MatchString(s) {
-		return 0, fmt.Errorf("цена не число: %q", raw)
+		return 0, newImportMsg("import.price_not_number", map[string]string{"value": strconv.Quote(raw)})
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, fmt.Errorf("цена не число: %q", raw)
+		return 0, newImportMsg("import.price_not_number", map[string]string{"value": strconv.Quote(raw)})
 	}
 	f = math.Round(f*100) / 100
 	if f > maxImportPrice {
-		return 0, fmt.Errorf("слишком большая цена: %q", raw)
+		return 0, newImportMsg("import.price_too_large", map[string]string{"value": strconv.Quote(raw)})
 	}
 	return f, nil
 }
@@ -326,17 +332,17 @@ func parsePrice(raw string) (float64, error) {
 func parseQuantity(raw string) (int, error) {
 	s := compactNumber(raw)
 	if strings.HasPrefix(s, "-") {
-		return 0, fmt.Errorf("остаток не может быть отрицательным: %q", raw)
+		return 0, newImportMsg("import.qty_negative", map[string]string{"value": strconv.Quote(raw)})
 	}
 	if !integerRE.MatchString(s) {
-		return 0, fmt.Errorf("остаток должен быть целым числом: %q", raw)
+		return 0, newImportMsg("import.qty_not_integer", map[string]string{"value": strconv.Quote(raw)})
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
 		s = s[:i]
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil || n > maxImportQuantity {
-		return 0, fmt.Errorf("слишком большой остаток: %q", raw)
+		return 0, newImportMsg("import.qty_too_large", map[string]string{"value": strconv.Quote(raw)})
 	}
 	return n, nil
 }

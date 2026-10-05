@@ -438,16 +438,16 @@ type ProductInput struct {
 
 func (in ProductInput) validate() error {
 	if strings.TrimSpace(in.CategoryID) == "" {
-		return apperr.BadRequest("invalid_category_id", "category_id обязателен")
+		return apperr.BadRequest("invalid_category_id", "category_id обязателен").WithVariant("field")
 	}
 	if strings.TrimSpace(in.NameRu) == "" {
-		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен")
+		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен").WithVariant("field")
 	}
 	if strings.TrimSpace(in.NameKy) == "" {
-		return apperr.BadRequest("invalid_name_ky", "name_ky обязателен")
+		return apperr.BadRequest("invalid_name_ky", "name_ky обязателен").WithVariant("field")
 	}
 	if in.BasePrice < 0 {
-		return apperr.BadRequest("invalid_base_price", "base_price не может быть отрицательным")
+		return apperr.BadRequest("invalid_base_price", "base_price не может быть отрицательным").WithVariant("field")
 	}
 	return nil
 }

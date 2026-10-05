@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -74,7 +75,8 @@ func (s *memStore) ResolveCategory(_ context.Context, raw string) (string, error
 	if id, ok := s.cats[strings.ToLower(raw)]; ok {
 		return id, nil
 	}
-	return "", apperr.BadRequest("category_not_found", fmt.Sprintf("категория %q не найдена", raw))
+	return "", apperr.BadRequest("category_not_found", fmt.Sprintf("категория %q не найдена", raw)).
+		WithVariant("named").WithParams(map[string]string{"name": strconv.Quote(raw)})
 }
 
 func (s *memStore) ActivePoint(_ context.Context, id string) (bool, error) { return s.points[id], nil }
