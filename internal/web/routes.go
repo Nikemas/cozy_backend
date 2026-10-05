@@ -14,6 +14,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/auth"
+	"github.com/Nikemas/cozy_backend/internal/banner"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpmw"
@@ -64,6 +65,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		variants:   catalog.NewVariantRepo(db),
 		stock:      catalog.NewStockRepo(db),
 		images:     catalog.NewImageRepo(db),
+		banners:    banner.NewStore(db),
 
 		cartRepo:  orders.NewCartRepo(db),
 		ordersSvc: orders.NewService(db),

@@ -573,3 +573,44 @@ admin.plural.position.many: позиция
 admin.plural.row.one: сап
 admin.plural.row.few: сап
 admin.plural.row.many: сап
+
+# feat/home-banner: Башкы беттеги баннер (banner_page.go, banner.gohtml)
+admin.nav.banner: Башкы беттеги баннер
+admin.banner.note: Сайттын башкы бетинин жана тиркеменин башкы экранынын жогору жагындагы баннер. Сакталгандан кийин бир мүнөттүн ичинде жаңырат.
+admin.banner.updated_at: Өзгөртүлгөн
+admin.banner.enabled: Баннерди көрсөтүү
+admin.banner.eyebrow: Үстүңкү жазуу
+admin.banner.title: Аталышы
+admin.banner.button: Баскычтын тексти
+admin.banner.button_hint: Бош болсо — баннер баскычсыз
+admin.banner.ky_hint: Бош болсо — орусча текст көрсөтүлөт
+admin.banner.look: Шилтеме жана көрүнүшү
+admin.banner.link: Баскыч кайда алып барат
+admin.banner.link_all: Бүт каталог
+admin.banner.bg_color: Фондун түсү
+admin.banner.eyebrow_color: Жазуунун түсү
+admin.banner.text_color: Тексттин түсү
+admin.banner.image: Оң жактагы сүрөт
+admin.banner.image_hint: Тунук фондуу PNG, JPEG же WEBP, 10 МБга чейин, кыска жагы 200 pxтен кем эмес
+admin.banner.bg_image: Фондогу сүрөт
+admin.banner.bg_image_hint: Милдеттүү эмес. JPEG, PNG же WEBP, 10 МБга чейин, кыска жагы 400 pxтен кем эмес; бүт баннерге жайылат
+admin.banner.current: Азыркы сүрөт
+admin.banner.remove_image: Өчүрүү
+admin.banner.preview: Алдын ала көрүү
+admin.banner.saved: Баннер сакталды
+admin.banner.load_failed: Баннерди жүктөө мүмкүн болбоду
+admin.audit.entity.banner: Башкы беттеги баннер
+admin.audit.summary.banner_updated: Башкы беттеги баннер өзгөртүлдү
+admin.audit.field.enabled: көрсөтүү
+admin.audit.field.banner_eyebrow_ru: үстүңкү жазуу (орус)
+admin.audit.field.banner_eyebrow_ky: үстүңкү жазуу (кырг)
+admin.audit.field.banner_title_ru: аталышы (орус)
+admin.audit.field.banner_title_ky: аталышы (кырг)
+admin.audit.field.banner_button_ru: баскыч (орус)
+admin.audit.field.banner_button_ky: баскыч (кырг)
+admin.audit.field.banner_link: шилтеме
+admin.audit.field.banner_bg_color: фондун түсү
+admin.audit.field.banner_eyebrow_color: үстүңкү жазуунун түсү
+admin.audit.field.banner_text_color: тексттин түсү
+admin.audit.field.banner_image: сүрөт
+admin.audit.field.banner_bg_image: фондогу сүрөт

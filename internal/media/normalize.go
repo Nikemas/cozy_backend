@@ -71,30 +71,10 @@ type normalizedImage struct {
 // with the input itself is returned as an apperr.BadRequest with a
 // Russian message meant to be shown to the admin as is.
 func normalizeImage(data []byte) (*normalizedImage, error) {
-	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || !acceptedFormats[format] {
-		return nil, errUnsupportedImage()
-	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxSourcePixels {
-		return nil, apperr.BadRequest("image_too_large",
-			fmt.Sprintf("слишком большое разрешение: %d×%d px (максимум %d Мп)", cfg.Width, cfg.Height, maxSourcePixels/1_000_000)).
-			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "max_mp": strconv.Itoa(maxSourcePixels / 1_000_000)})
-	}
-	// Rotation by EXIF only swaps width and height, so the shorter side
-	// is the same before and after — safe to check on the raw header.
-	if min(cfg.Width, cfg.Height) < minSourceSide {
-		return nil, apperr.BadRequest("image_too_small",
-			fmt.Sprintf("фото слишком маленькое: %d×%d px — меньшая сторона должна быть не меньше %d px", cfg.Width, cfg.Height, minSourceSide)).
-			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "min": strconv.Itoa(minSourceSide)})
-	}
-
-	src, _, err := image.Decode(bytes.NewReader(data))
+	src, err := decodeUpload(data, minSourceSide)
 	if err != nil {
-		// Header parsed but the body is truncated/corrupt.
-		return nil, errUnsupportedImage()
+		return nil, err
 	}
-
-	src = applyOrientation(src, exifOrientation(data))
 
 	full := fitOnWhiteSquare(src, fullSize)
 	// thumb is downscaled from the already-normalized full canvas: the
@@ -112,6 +92,38 @@ func normalizeImage(data []byte) (*normalizedImage, error) {
 		return nil, err
 	}
 	return &normalizedImage{Full: fullJPEG, Thumb: thumbJPEG}, nil
+}
+
+// decodeUpload is the input half of every upload normalization (product
+// photos here, banner pictures in banner.go): the real format is detected
+// by decoding (never from a client-supplied Content-Type), the pixel
+// count is capped before the full decode, a source whose shorter side is
+// below minSide is rejected, and EXIF orientation is applied. Errors are
+// apperr.BadRequest meant to be shown to the admin as is.
+func decodeUpload(data []byte, minSide int) (image.Image, error) {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || !acceptedFormats[format] {
+		return nil, errUnsupportedImage()
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxSourcePixels {
+		return nil, apperr.BadRequest("image_too_large",
+			fmt.Sprintf("слишком большое разрешение: %d×%d px (максимум %d Мп)", cfg.Width, cfg.Height, maxSourcePixels/1_000_000)).
+			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "max_mp": strconv.Itoa(maxSourcePixels / 1_000_000)})
+	}
+	// Rotation by EXIF only swaps width and height, so the shorter side
+	// is the same before and after — safe to check on the raw header.
+	if min(cfg.Width, cfg.Height) < minSide {
+		return nil, apperr.BadRequest("image_too_small",
+			fmt.Sprintf("фото слишком маленькое: %d×%d px — меньшая сторона должна быть не меньше %d px", cfg.Width, cfg.Height, minSide)).
+			WithParams(map[string]string{"width": strconv.Itoa(cfg.Width), "height": strconv.Itoa(cfg.Height), "min": strconv.Itoa(minSide)})
+	}
+
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		// Header parsed but the body is truncated/corrupt.
+		return nil, errUnsupportedImage()
+	}
+	return applyOrientation(src, exifOrientation(data)), nil
 }
 
 func errUnsupportedImage() error {

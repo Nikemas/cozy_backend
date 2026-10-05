@@ -9,6 +9,11 @@ err.amount_mismatch: төлөмдүн суммасы буйрутманын су
 err.bad_request: суроо-талаптын денеси туура эмес
 err.bad_request.form: форма туура эмес толтурулган
 err.bad_request.multipart: file талаасы бар multipart/form-data күтүлөт
+err.banner_text_too_long: баннердин тексти өтө узун
+err.banner_text_too_long.button: баннердеги баскычтын тексти 30 белгиден узун
+err.banner_text_too_long.eyebrow: баннердин үстүңкү жазуусу 60 белгиден узун
+err.banner_text_too_long.title: баннердин аталышы 120 белгиден узун
+err.banner_title_required: баннердин аталышын орусча жазыңыз
 err.body_too_large: суроо-талап өтө чоң
 err.broadcast_not_found: жөнөтмө табылган жок
 err.cancel_forbidden: буйрутманы ээси гана жокко чыгара алат
@@ -63,6 +68,9 @@ err.invalid_category_id.field: category_id милдеттүү
 err.invalid_category_id.required: категорияны тандаңыз
 err.invalid_city: city милдеттүү
 err.invalid_color: color милдеттүү
+err.invalid_color.banner_bg: "баннердин фонунун түсү #RRGGBB форматында болушу керек"
+err.invalid_color.banner_eyebrow: "баннердин үстүңкү жазуусунун түсү #RRGGBB форматында болушу керек"
+err.invalid_color.banner_text: "баннердин текстинин түсү #RRGGBB форматында болушу керек"
 err.invalid_coordinates: координаттар жол берилген чектен тышкары
 err.invalid_coordinates.pair: туурасын да, узундугун да көрсөтүңүз
 err.invalid_credentials: телефон же сырсөз туура эмес

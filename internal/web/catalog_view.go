@@ -71,8 +71,10 @@ type ShopData struct {
 	NextHref   string
 
 	// ShowBanner mirrors §3.1: the promo banner hides once a search,
-	// category or filter is active.
+	// category or filter is active. Banner is its content (nil when the
+	// owner switched it off) — see banner_view.go.
 	ShowBanner bool
+	Banner     *BannerView
 
 	// Categories backs both the shop's top chip bar and the aside's
 	// "Категории" pills — the real top-level category tree.
@@ -275,6 +277,9 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	}
 	sd.PrevHref = params.href(basePath, page-1)
 	sd.NextHref = params.href(basePath, page+1)
+	if sd.ShowBanner {
+		sd.Banner = h.homeBanner(ctx, lang)
+	}
 	return sd, nil
 }
 

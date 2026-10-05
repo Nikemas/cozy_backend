@@ -576,3 +576,44 @@ admin.plural.position.many: позиций
 admin.plural.row.one: строка
 admin.plural.row.few: строки
 admin.plural.row.many: строк
+
+# feat/home-banner: Баннер на главной (banner_page.go, banner.gohtml)
+admin.nav.banner: Баннер на главной
+admin.banner.note: Баннер вверху главной страницы сайта и главного экрана приложения. После сохранения обновится в течение минуты.
+admin.banner.updated_at: Изменён
+admin.banner.enabled: Показывать баннер
+admin.banner.eyebrow: Надзаголовок
+admin.banner.title: Заголовок
+admin.banner.button: Текст кнопки
+admin.banner.button_hint: Пусто — баннер без кнопки
+admin.banner.ky_hint: Пусто — покажем русский текст
+admin.banner.look: Ссылка и оформление
+admin.banner.link: Куда ведёт кнопка
+admin.banner.link_all: Весь каталог
+admin.banner.bg_color: Цвет фона
+admin.banner.eyebrow_color: Цвет надписи
+admin.banner.text_color: Цвет текста
+admin.banner.image: Картинка справа
+admin.banner.image_hint: PNG с прозрачным фоном, JPEG или WEBP, до 10 МБ, меньшая сторона от 200 px
+admin.banner.bg_image: Фоновое изображение
+admin.banner.bg_image_hint: Необязательно. JPEG, PNG или WEBP, до 10 МБ, меньшая сторона от 400 px; растягивается на весь баннер
+admin.banner.current: Текущее изображение
+admin.banner.remove_image: Удалить
+admin.banner.preview: Предпросмотр
+admin.banner.saved: Баннер сохранён
+admin.banner.load_failed: Не удалось загрузить баннер
+admin.audit.entity.banner: Баннер на главной
+admin.audit.summary.banner_updated: Изменён баннер на главной
+admin.audit.field.enabled: показ
+admin.audit.field.banner_eyebrow_ru: надзаголовок (рус)
+admin.audit.field.banner_eyebrow_ky: надзаголовок (кырг)
+admin.audit.field.banner_title_ru: заголовок (рус)
+admin.audit.field.banner_title_ky: заголовок (кырг)
+admin.audit.field.banner_button_ru: кнопка (рус)
+admin.audit.field.banner_button_ky: кнопка (кырг)
+admin.audit.field.banner_link: ссылка
+admin.audit.field.banner_bg_color: цвет фона
+admin.audit.field.banner_eyebrow_color: цвет надзаголовка
+admin.audit.field.banner_text_color: цвет текста
+admin.audit.field.banner_image: картинка
+admin.audit.field.banner_bg_image: фоновое изображение

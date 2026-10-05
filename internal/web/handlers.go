@@ -38,6 +38,8 @@ type handlers struct {
 	variants   *catalog.VariantRepo
 	stock      *catalog.StockRepo
 	images     *catalog.ImageRepo
+	// banners is the editable home-page promo banner (internal/banner).
+	banners bannerGetter
 
 	// Orders domain — Task 3's real implementation now. Named cartRepo
 	// (not cart) to avoid colliding with the /cart screen handler below.

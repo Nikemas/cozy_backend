@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/audit"
+	"github.com/Nikemas/cozy_backend/internal/banner"
 	"github.com/Nikemas/cozy_backend/internal/broadcasts"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
@@ -101,6 +102,12 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// W2 fix/promo-push: Рассылки (promo push) — broadcasts_page.go; the
 	// sending itself is broadcasts.Worker, started in cmd/server.
 	registerBroadcastRoutes(mux, h, broadcasts.NewRepo(db), ownerOrManager)
+	// feat/home-banner: Баннер на главной (site home + app home screen) —
+	// banner_page.go; same roles as Категории/Рассылки.
+	registerBannerRoutes(mux, &bannerPages{
+		h: h, store: banner.NewStore(db), images: mediaClient,
+		categoryTree: h.categories.Tree, objectURL: cfg.PublicObjectURL,
+	}, ownerOrManager)
 
 	// Категории: list + add/edit modals + delete, same RBAC as products —
 	// see categories_page.go. The JSON API at /admin/api/categories

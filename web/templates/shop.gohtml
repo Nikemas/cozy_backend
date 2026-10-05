@@ -24,20 +24,29 @@
 {{define "_shop_results"}}
 {{$d := .Data}}
 <div id="shop-results">
-  {{if $d.ShowBanner}}
-  <div class="shop-banner">
-    <div>
-      <div class="shop-banner__eyebrow">{{t "shop.banner.eyebrow"}}</div>
-      <div class="shop-banner__title">{{t "shop.banner.title"}}</div>
+  {{if $d.ShowBanner}}{{with $d.Banner}}
+  {{/* Editable at /admin/banner (internal/web/banner_view.go). Colors are
+       validated #RRGGBB; they only set custom properties site.css reads,
+       so an empty value keeps the stylesheet default. */}}
+  <div class="shop-banner"
+       {{- if or .BgColor .TextColor .EyebrowColor .BgImageURL}} style="{{if .BgColor}}--banner-bg: {{.BgColor}};{{end}}{{if .TextColor}} --banner-ink: {{.TextColor}};{{end}}{{if .EyebrowColor}} --banner-eyebrow: {{.EyebrowColor}};{{end}}{{if .BgImageURL}} background-image: url({{.BgImageURL}});{{end}}"{{end}}>
+    <div class="shop-banner__text">
+      {{if .Eyebrow}}<div class="shop-banner__eyebrow">{{.Eyebrow}}</div>{{end}}
+      <div class="shop-banner__title">{{.Title}}</div>
+      {{if .ButtonText}}<a class="btn btn--primary shop-banner__btn" href="{{.ButtonHref}}">{{.ButtonText}}</a>{{end}}
     </div>
+    {{if .ImageURL}}
+    <img class="shop-banner__img" src="{{.ImageURL}}" alt="{{.Title}}" width="240" height="160" loading="eager" fetchpriority="high" decoding="async">
+    {{else}}
     <svg width="130" height="86" viewBox="0 0 100 60" aria-hidden="true">
       <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent)" stroke-width="2"/>
       <path d="M20 33 L45 33" stroke="var(--cozy-accent)" stroke-width="3" stroke-linecap="round"/>
     </svg>
+    {{end}}
   </div>
-  {{end}}
+  {{end}}{{end}}
   <h1 class="shop-title">{{if $d.CategoryName}}{{$d.CategoryName}}{{else if $d.Query}}{{t "shop.search_results"}} «{{$d.Query}}»{{else}}{{t "shop.heading"}}{{end}}</h1>
-  <div class="shop-toolbar">
+  <div class="shop-toolbar" id="catalog">
     <nav class="shop-chips" aria-label="{{t "sidebar.categories"}}">
       {{range $d.Categories}}
       <a class="chip chip--tab{{if .Active}} chip--tab--active{{end}}"
