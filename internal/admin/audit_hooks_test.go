@@ -103,7 +103,7 @@ func TestProductStoreSaveJournalsInTx(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow("pB", "Дордой"))
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WithArgs("s1", audit.ActionProductUpdate, audit.EntityProduct, "p1", "Изменён товар «Nike»: цена",
-			`{"base_price":{"from":4000,"to":4500}}`, nil).
+			`{"base_price":{"from":4000,"to":4500},"msg_args":{"fields":["base_price"],"name":"Nike"},"msg_key":"admin.audit.summary.product_updated_fields"}`, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WithArgs("s1", audit.ActionStockUpdate, audit.EntityStock, "v1", "Остаток «Nike» 42 / Белый, Дордой: 3 → 2",

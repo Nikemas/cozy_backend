@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,8 @@ var kyTr = trFor(i18n.LangKY)
 
 // TestAdminLocaleKeySetsMatch: admin.ru.yaml and admin.ky.yaml define
 // exactly the same keys, every value is non-empty, and a format value has
-// the same number of %-verbs in both languages.
+// the same number of %-verbs and the same {named} placeholders in both
+// languages.
 func TestAdminLocaleKeySetsMatch(t *testing.T) {
 	ru, ky := adminBundle.Keys(i18n.LangRU), adminBundle.Keys(i18n.LangKY)
 	if len(ru) == 0 {
@@ -61,6 +63,9 @@ func TestAdminLocaleKeySetsMatch(t *testing.T) {
 		}
 		if a, b := len(verbs.FindAllString(rv, -1)), len(verbs.FindAllString(kv, -1)); a != b {
 			t.Errorf("key %q: %d format verbs in ru, %d in ky", k, a, b)
+		}
+		if a, b := placeholderSet(rv), placeholderSet(kv); !slices.Equal(a, b) {
+			t.Errorf("key %q: {placeholders} %v in ru, %v in ky", k, a, b)
 		}
 	}
 }

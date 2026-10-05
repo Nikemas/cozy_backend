@@ -66,13 +66,18 @@ const (
 
 // Entry is one journal line. Summary is the human-readable Russian line
 // shown in the journal; Details holds structured data (typically
-// {"field": {"from": x, "to": y}}) and is stored as JSONB.
+// {"field": {"from": x, "to": y}}) and is stored as JSONB. MsgKey/MsgArgs/
+// MsgVia are the translatable form of Summary (see messages.go), stored
+// in details next to the Details fields.
 type Entry struct {
 	Action     string
 	EntityType string
 	EntityID   string
 	Summary    string
 	Details    map[string]any
+	MsgKey     string
+	MsgArgs    Args
+	MsgVia     string
 }
 
 // Change is the conventional Details value for one changed field.
@@ -107,8 +112,8 @@ func insertArgs(ctx context.Context, e Entry) []any {
 		ip = v
 	}
 	details := "{}"
-	if len(e.Details) > 0 {
-		if b, err := json.Marshal(e.Details); err == nil {
+	if d := e.StoredDetails(); len(d) > 0 {
+		if b, err := json.Marshal(d); err == nil {
 			details = string(b)
 		}
 	}

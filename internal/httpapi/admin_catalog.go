@@ -196,8 +196,7 @@ func deleteProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.
 		if err := repo.Delete(r.Context(), r.PathValue("id")); err != nil {
 			return err
 		}
-		journal.Record(r.Context(), audit.Entry{Action: audit.ActionProductDelete, EntityType: audit.EntityProduct,
-			EntityID: r.PathValue("id"), Summary: "Товар удалён (скрыт из каталога) (API)"})
+		journal.Record(r.Context(), productDeletedEntry(r.PathValue("id")))
 		w.WriteHeader(http.StatusNoContent)
 		return nil
 	}
@@ -240,7 +239,7 @@ func createVariantHandler(products *catalog.ProductRepo, variants *catalog.Varia
 		if err != nil {
 			return err
 		}
-		journal.Record(r.Context(), variantEntry(audit.ActionVariantCreate, productID, v.ID, "Добавлена вариация "+v.Size+" / "+v.Color+" (API)", &req))
+		journal.Record(r.Context(), variantEntry(audit.ActionVariantCreate, productID, v.ID, v.Size, v.Color, "Добавлена вариация "+v.Size+" / "+v.Color+" (API)", &req))
 		return writeJSON(w, http.StatusCreated, v)
 	}
 }
@@ -277,7 +276,7 @@ func updateVariantHandler(variants *catalog.VariantRepo, journal *audit.Log) app
 		if err != nil {
 			return err
 		}
-		journal.Record(r.Context(), variantEntry(audit.ActionVariantUpdate, productID, v.ID, "Изменена вариация "+v.Size+" / "+v.Color+" (API)", &req))
+		journal.Record(r.Context(), variantEntry(audit.ActionVariantUpdate, productID, v.ID, v.Size, v.Color, "Изменена вариация "+v.Size+" / "+v.Color+" (API)", &req))
 		return writeJSON(w, http.StatusOK, v)
 	}
 }
@@ -294,7 +293,7 @@ func deleteVariantHandler(variants *catalog.VariantRepo, journal *audit.Log) app
 		if err := variants.Delete(r.Context(), variantID); err != nil {
 			return err
 		}
-		journal.Record(r.Context(), variantEntry(audit.ActionVariantDelete, productID, variantID, "Удалена вариация "+v.Size+" / "+v.Color+" (API)", nil))
+		journal.Record(r.Context(), variantEntry(audit.ActionVariantDelete, productID, variantID, v.Size, v.Color, "Удалена вариация "+v.Size+" / "+v.Color+" (API)", nil))
 		w.WriteHeader(http.StatusNoContent)
 		return nil
 	}
@@ -333,8 +332,7 @@ func replaceImagesHandler(products *catalog.ProductRepo, images *catalog.ImageRe
 		if err != nil {
 			return err
 		}
-		journal.Record(r.Context(), audit.Entry{Action: audit.ActionProductImages, EntityType: audit.EntityProduct, EntityID: productID,
-			Summary: fmt.Sprintf("Фото товара заменены: %d шт. (API)", len(inputs)), Details: map[string]any{"count": len(inputs)}})
+		journal.Record(r.Context(), productImagesEntry(productID, len(inputs)))
 		return writeJSON(w, http.StatusOK, result)
 	}
 }

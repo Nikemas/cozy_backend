@@ -413,6 +413,37 @@ admin.audit.q_placeholder: мисалы, 3f2a9c же COZY-20260924-001
 admin.audit.empty_title: Журнал бош
 admin.audit.empty_filtered_text: Чыпкаларды өзгөртүп көрүңүз
 admin.audit.empty_text: Бул жерде товарлардын, калдыктардын, буйрутмалардын, сатуу жайларынын жана кызматкерлердин өзгөрүүлөрү көрүнөт
+# Journal summaries in the viewer's language (details.msg_key/msg_args);
+# {placeholders} are filled from msg_args, {fields} is a translated list.
+admin.audit.summary.product_created: «{name}» товары түзүлдү
+admin.audit.summary.product_updated: «{name}» товары өзгөртүлдү
+admin.audit.summary.product_updated_fields: «{name}» товары өзгөртүлдү: {fields}
+admin.audit.summary.product_activated: «{name}» товары активдештирилди
+admin.audit.summary.product_deactivated: «{name}» товары активсиздештирилди
+admin.audit.summary.product_deleted: Товар өчүрүлдү (каталогдон жашырылды)
+admin.audit.summary.product_category: «{name}» товары: категория «{from}» → «{to}»
+admin.audit.summary.product_images: Товардын сүрөттөрү алмаштырылды: {count} даана
+admin.audit.summary.variant_changed: «{product}»: вариация {from_size} / {from_color} → {size} / {color}
+admin.audit.summary.variant_added: «{product}»: {size} / {color} вариациясы кошулду
+admin.audit.summary.variant_removed: «{product}»: {size} / {color} вариациясы өчүрүлдү
+admin.audit.summary.variant_created: {size} / {color} вариациясы кошулду
+admin.audit.summary.variant_updated: {size} / {color} вариациясы өзгөртүлдү
+admin.audit.summary.variant_deleted: {size} / {color} вариациясы өчүрүлдү
+admin.audit.summary.stock_changed: «{product}» {size} / {color} калдыгы, {point}: {from} → {to}
+admin.audit.summary.category_created: «{name}» категориясы түзүлдү
+admin.audit.summary.category_updated: «{name}» категориясы өзгөртүлдү
+admin.audit.summary.category_deleted: «{name}» категориясы өчүрүлдү
+admin.audit.summary.category_deleted_unnamed: Категория өчүрүлдү
+admin.audit.summary.point_created: «{name}» сатуу жайы түзүлдү
+admin.audit.summary.point_updated: «{name}» сатуу жайы өзгөртүлдү
+admin.audit.summary.point_enabled: «{name}» сатуу жайы күйгүзүлдү
+admin.audit.summary.point_disabled: «{name}» сатуу жайы өчүрүлдү
+admin.audit.summary.staff_created: «{name}» кызматкери кошулду
+admin.audit.summary.staff_enabled: «{name}» кызматкери күйгүзүлдү
+admin.audit.summary.staff_disabled: «{name}» кызматкери өчүрүлдү
+admin.audit.summary.staff_password_reset: «{name}» кызматкеринин сырсөзү жаңыланды
+admin.audit.summary.via.api: (API)
+admin.audit.summary.via.bulk: (массалык түрдө)
 admin.plural.record.one: жазуу
 admin.plural.record.few: жазуу
 admin.plural.record.many: жазуу

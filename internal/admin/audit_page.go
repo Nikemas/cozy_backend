@@ -261,7 +261,7 @@ func auditRowVM(t tr, row audit.Row) AuditRowVM {
 		ActionLabel: t.T(auditActionLabels[row.Action]),
 		EntityLabel: t.T(auditEntityLabel(row.EntityType)),
 		EntityID:    row.EntityID,
-		Summary:     row.Summary,
+		Summary:     localizedAuditSummary(t, row),
 		IP:          row.IP,
 	}
 	if vm.Staff == "" {
@@ -322,6 +322,8 @@ func auditDetailsText(t tr, details map[string]any) string {
 		switch k {
 		case "product_id", "point_id", "bulk", "category_id":
 			continue // ids: already in the summary / entity link
+		case audit.DetailMsgKey, audit.DetailMsgArgs, audit.DetailMsgVia:
+			continue // the translatable summary itself
 		}
 		keys = append(keys, k)
 	}
