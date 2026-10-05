@@ -16,12 +16,18 @@ import (
 // visitors on static pages, unknown URLs, redirects).
 func newTestMux(t *testing.T) *http.ServeMux {
 	t.Helper()
+	return newTestMuxWithConfig(t, &config.Config{JWTSecret: "test-secret-test-secret-test-secret", PublicBaseURL: "https://cozy.test"})
+}
+
+// newTestMuxWithConfig is newTestMux with a caller-supplied config (e.g.
+// shop contacts for the static pages).
+func newTestMuxWithConfig(t *testing.T, cfg *config.Config) *http.ServeMux {
+	t.Helper()
 	restore := chdir(t, repoRoot(t))
 	t.Cleanup(restore)
 	t.Cleanup(func() { apperr.SetHTMLRenderer(nil) })
 
 	mux := http.NewServeMux()
-	cfg := &config.Config{JWTSecret: "test-secret-test-secret-test-secret", PublicBaseURL: "https://cozy.test"}
 	if err := RegisterRoutes(mux, nil, cfg, nil, nil); err != nil {
 		t.Fatalf("RegisterRoutes: %v", err)
 	}
