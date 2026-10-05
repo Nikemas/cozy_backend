@@ -94,10 +94,8 @@ func buildListConditions(filter ListFilter) ([]string, []any) {
 		args = append(args, *filter.PriceMax)
 		conditions = append(conditions, fmt.Sprintf("%s <= $%d", minPriceExpr, len(args)))
 	}
-	if filter.Query != "" {
-		args = append(args, "%"+filter.Query+"%")
-		idx := len(args)
-		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d OR brand ILIKE $%d)", idx, idx, idx))
+	if cond, a := searchCondition(filter.Query, args); cond != "" {
+		conditions, args = append(conditions, cond), a
 	}
 	if filter.Size != "" || filter.Color != "" || filter.InStock {
 		variantConds := []string{"product_variants.product_id = products.id"}
@@ -227,10 +225,8 @@ func buildAdminListConditions(filter AdminListFilter) ([]string, []any) {
 		args = append(args, filter.CategoryIDs)
 		conditions = append(conditions, fmt.Sprintf("category_id = ANY($%d)", len(args)))
 	}
-	if filter.Query != "" {
-		args = append(args, "%"+filter.Query+"%")
-		idx := len(args)
-		conditions = append(conditions, fmt.Sprintf("(name_ru ILIKE $%d OR name_ky ILIKE $%d)", idx, idx))
+	if cond, a := searchCondition(filter.Query, args); cond != "" {
+		conditions, args = append(conditions, cond), a
 	}
 	if filter.OutOfStockAtPoint != "" {
 		args = append(args, filter.OutOfStockAtPoint)

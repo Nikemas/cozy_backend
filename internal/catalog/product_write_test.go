@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -71,7 +72,7 @@ func TestBuildAdminListConditionsCategoryIDs(t *testing.T) {
 
 func TestBuildAdminListConditionsQuery(t *testing.T) {
 	conditions, args := buildAdminListConditions(AdminListFilter{Query: "nike"})
-	if len(conditions) != 1 || conditions[0] != "(name_ru ILIKE $1 OR name_ky ILIKE $1)" {
+	if len(conditions) != 1 || !strings.HasPrefix(conditions[0], "(name_ru ILIKE $1 OR name_ky ILIKE $1 OR brand ILIKE $1") {
 		t.Fatalf("conditions = %v, want name_ru/name_ky ILIKE on $1", conditions)
 	}
 	if len(args) != 1 || args[0] != "%nike%" {
@@ -87,7 +88,7 @@ func TestBuildAdminListConditionsCategoryAndQueryUseSeparatePlaceholders(t *test
 	if conditions[0] != "category_id = ANY($1)" {
 		t.Errorf("conditions[0] = %q, want category_id = ANY($1)", conditions[0])
 	}
-	if conditions[1] != "(name_ru ILIKE $2 OR name_ky ILIKE $2)" {
+	if !strings.HasPrefix(conditions[1], "(name_ru ILIKE $2 OR name_ky ILIKE $2 OR brand ILIKE $2") {
 		t.Errorf("conditions[1] = %q, want name_ru/name_ky ILIKE on $2", conditions[1])
 	}
 	if len(args) != 2 {
