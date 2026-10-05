@@ -26,7 +26,7 @@ type sitemapURL struct {
 }
 
 // sitemapStaticPaths are the indexable non-catalog pages.
-var sitemapStaticPaths = []string{"/branches", "/about", "/delivery", "/contacts", "/terms", "/privacy"}
+var sitemapStaticPaths = []string{"/branches", "/about", "/delivery", "/contacts", "/terms", "/privacy", "/" + accountDeletionPage}
 
 // sitemap enumerates the home page, every category, every active product
 // and the info pages, with absolute URLs on the configured public origin
@@ -101,7 +101,7 @@ func walkCategories(nodes []*catalog.Category, fn func(*catalog.Category)) {
 // (the pages themselves also carry noindex).
 var robotsDisallow = []string{
 	"/api/", "/admin", "/cart", "/checkout", "/order/", "/orders", "/profile",
-	"/favorites", "/addresses", "/login/", "/logout", "/lang",
+	"/favorites", "/addresses", "/login/", "/logout", "/lang", "/account/",
 }
 
 // robots serves robots.txt with an absolute Sitemap URL on the public

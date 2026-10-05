@@ -47,6 +47,9 @@ type handlers struct {
 	// paySvc runs online card payment (checkout, /pay/*); nil when no
 	// provider was configured.
 	paySvc *payments.Service
+	// accounts deletes customer accounts (POST /account/delete) — the
+	// same auth.Service method the JSON API uses; an interface for tests.
+	accounts customerDeleter
 }
 
 // t translates key into lang — used by handlers that need a translated
@@ -67,6 +70,9 @@ type ProfileData struct {
 	Step  string
 	Phone string
 	Error string
+	// DeleteError explains, to a logged-in customer, why the account
+	// deletion they just requested didn't happen (?delete=… on /profile).
+	DeleteError string
 }
 
 // isHX reports whether r was issued by htmx (hx-post/hx-get/...) rather
@@ -166,7 +172,9 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 
 func (h *handlers) profile(w http.ResponseWriter, r *http.Request) error {
 	data := h.base(r, "profile")
-	if !data.Authed {
+	if data.Authed {
+		data.Data = ProfileData{DeleteError: h.deleteStatusText(data.Lang, r.URL.Query().Get("delete"))}
+	} else {
 		data.Data = ProfileData{
 			Step:  r.URL.Query().Get("step"),
 			Phone: r.URL.Query().Get("phone"),

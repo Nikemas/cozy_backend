@@ -187,6 +187,7 @@ screen.page_about.title: О магазине
 screen.page_contacts.title: Контакты
 screen.page_delivery.title: Доставка и оплата
 screen.page_privacy.title: Политика конфиденциальности
+screen.page_account-deletion.title: Удаление аккаунта
 screen.page_terms.title: Публичная оферта
 footer.nav_label: Информация о магазине
 
@@ -232,6 +233,7 @@ seo.page_about.description: Cozy — магазин удобной обуви в
 seo.page_contacts.description: Телефон, мессенджеры, e-mail и режим работы магазина обуви Cozy в Бишкеке.
 seo.page_delivery.description: Условия доставки по Бишкеку, бесплатный самовывоз из магазинов Cozy, способы оплаты, обмен и возврат.
 seo.page_privacy.description: Как интернет-магазин Cozy обрабатывает и защищает персональные данные покупателей.
+seo.page_account-deletion.description: Как удалить аккаунт Cozy и персональные данные — в приложении или на сайте, без установки приложения. Что удаляется и что хранится.
 seo.page_terms.description: Публичная оферта интернет-магазина обуви Cozy: оформление заказа, оплата, доставка, обмен и возврат.
 
 # Accessibility labels.
@@ -277,3 +279,13 @@ pay.return.my_orders: Мои заказы
 pay.return.show_qr: Показать QR
 pay.return.qr_alt: QR-код для оплаты
 pay.return.qr_hint: Отсканируйте QR в приложении вашего банка
+
+# Account deletion on the profile screen (internal/web/account_deletion.go).
+account_delete.title: Удаление аккаунта
+account_delete.text: Имя, телефон, адреса, избранное и корзина будут удалены без возможности восстановления. История заказов останется у магазина для учёта.
+account_delete.more: Подробнее об удалении аккаунта
+account_delete.confirm_label: Я понимаю, что аккаунт нельзя будет восстановить
+account_delete.confirm_dialog: Удалить аккаунт? Это действие нельзя отменить.
+account_delete.button: Удалить аккаунт
+account_delete.has_active_orders: Нельзя удалить аккаунт, пока есть незавершённые заказы. Дождитесь их выполнения или отмените их.
+account_delete.unconfirmed: Отметьте, что понимаете — удалённый аккаунт нельзя восстановить.

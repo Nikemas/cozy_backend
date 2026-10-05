@@ -37,11 +37,11 @@ var screenPages = map[string]string{
 }
 
 // staticPages are the legal/info pages (/about, /contacts, /delivery,
-// /privacy, /terms). Their long-form copy doesn't fit the flat
+// /privacy, /terms, /account-deletion). Their long-form copy doesn't fit the flat
 // one-line-per-key locales/*.yaml, so each has one content file per
 // language: web/templates/pages/<name>.<lang>.gohtml, registered as
 // screen "page_<name>".
-var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms"}
+var staticPages = []string{"about", "contacts", "delivery", "privacy", "terms", accountDeletionPage}
 
 // layoutPartials are parsed alongside every page: the shared chrome from
 // COZY_WEB_DESIGN.md §2 (header/aside/footer/toast), plus Task 4's
