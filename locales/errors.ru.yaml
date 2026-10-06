@@ -170,6 +170,7 @@ err.payment_not_retryable.too_many: слишком много попыток о�
 err.payment_not_retryable: этот заказ нельзя оплатить повторно
 err.payment_provider_not_found: платёжный провайдер не найден
 err.payments_not_configured: онлайн-оплата пока недоступна, выберите оплату при получении
+err.not_owner: "этот номер принадлежит сотруднику без роли владельца: смените роль в админке или укажите другой номер"
 err.phone_taken: этот номер телефона уже используется
 err.pickup_point_not_found: точка самовывоза не найдена
 err.point_id_forbidden: point_id должен быть пустым для роли owner/manager

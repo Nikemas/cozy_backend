@@ -13,6 +13,8 @@ import (
 // owner when none is passed; it can be changed later in the admin panel.
 const DefaultOwnerName = "Владелец"
 
+const notOwnerMessage = "этот номер принадлежит сотруднику без роли владельца: смените роль в админке или укажите другой номер"
+
 // EnsureOwnerInput is the input of EnsureOwner. Password is plaintext; it is
 // validated and bcrypt-hashed exactly like the admin panel does
 // (validatePassword + hashPassword) and never stored or logged as is.
@@ -70,8 +72,7 @@ func EnsureOwner(ctx context.Context, db *sql.DB, in EnsureOwnerInput) (EnsureOw
 			return err
 		}
 		if existing.Role != RoleOwner {
-			return apperr.Conflict("not_owner",
-				"с этим телефоном уже есть сотрудник с ролью "+string(existing.Role)+"; используйте другой номер или смените роль в админке")
+			return apperr.Conflict("not_owner", notOwnerMessage)
 		}
 		res = EnsureOwnerResult{StaffID: existing.ID, Phone: existing.Phone}
 		return resetOwner(ctx, tx, existing.ID, hash)
