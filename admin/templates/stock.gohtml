@@ -28,7 +28,7 @@
   {{if .NoPoint}}
   <div class="admin-card"><div class="admin-empty"><div class="admin-empty__title">{{.NoPoint}}</div></div></div>
   {{else}}
-  <form method="post" action="/admin/stock" class="admin-card" id="stock-form">
+  <form method="post" action="/admin/stock" class="admin-card" id="stock-form" data-dirty-guard>
     <input type="hidden" name="point" value="{{.PointID}}">
     <input type="hidden" name="q" value="{{.Query}}">
     <input type="hidden" name="page" value="{{.Page}}">
@@ -47,7 +47,7 @@
             <th scope="col">{{t "admin.common.size"}}</th>
             <th scope="col">{{t "admin.common.color"}}</th>
             <th scope="col">{{t "admin.common.stock"}}</th>
-            <th scope="col">{{t "admin.stock.col_level"}}</th>
+            <th scope="col" class="admin-stock__level">{{t "admin.stock.col_level"}}</th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +66,7 @@
               {{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}
               {{end}}
             </td>
-            <td><span class="admin-chip" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
+            <td class="admin-stock__level"><span class="admin-chip" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
           </tr>
           {{end}}
         </tbody>

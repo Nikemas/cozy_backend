@@ -25,6 +25,7 @@
 {{else}}
   {{template "content" .}}
 {{end}}
+{{with .FormRetry}}<script type="application/json" id="admin-form-retry">{{.}}</script>{{end}}
 {{template "_toast" .}}
 {{template "_confirm_modal" .}}
 <script>
@@ -34,6 +35,116 @@
 // @media (max-width: 767px) rules in admin.css. Called with no argument it
 // toggles; called with true/false it forces that state (used by the
 // backdrop's onclick to always close).
+// adminBack (header back arrow with a BackURL): go back in history when
+// the previous page is that same list (keeps its filters and scroll),
+// otherwise follow the link — e.g. right after a status change, where
+// history.back() would land on the stale pre-POST copy of this page.
+function adminBack(link) {
+  try {
+    var ref = document.referrer ? new URL(document.referrer) : null;
+    if (ref && ref.origin === location.origin && ref.pathname === link.pathname && history.length > 1) {
+      history.back();
+      return false;
+    }
+  } catch (e) { /* fall through to the link */ }
+  return true;
+}
+
+// Toasts: announce, hide after a few seconds, and drop ?toast= from the
+// address so a refresh or Back doesn't show the same message again.
+// adminToast(text) shows one from JS (copy buttons, import).
+var ADMIN_TOAST_MS = 5000;
+function adminToast(text) {
+  var slot = document.getElementById('admin-toast-slot');
+  if (!slot) return;
+  slot.innerHTML = '';
+  var el = document.createElement('div');
+  el.className = 'admin-toast';
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  slot.appendChild(el);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, ADMIN_TOAST_MS);
+}
+(function () {
+  var el = document.querySelector('#admin-toast-slot .admin-toast');
+  if (el) setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, ADMIN_TOAST_MS);
+  try {
+    var u = new URL(location.href);
+    if (u.searchParams.has('toast') || u.searchParams.has('status_error')) {
+      u.searchParams.delete('toast');
+      u.searchParams.delete('status_error');
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    }
+  } catch (e) { /* old browser: keep the URL */ }
+})();
+
+// [data-copy] buttons copy their value (a phone, an order number).
+document.addEventListener('click', function (evt) {
+  var btn = evt.target.closest ? evt.target.closest('[data-copy]') : null;
+  if (!btn) return;
+  evt.preventDefault();
+  var value = btn.getAttribute('data-copy');
+  var done = function () { adminToast({{t "admin.common.copied"}} + ': ' + value); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value).then(done, function () { window.prompt('', value); });
+  } else {
+    window.prompt('', value);
+  }
+});
+
+// #admin-form-retry (FormRetry, owner_ux.go): a modal form came back
+// with an error — reopen it with what the user typed.
+document.addEventListener('DOMContentLoaded', function () {
+  var el = document.getElementById('admin-form-retry');
+  if (!el) return;
+  var d;
+  try { d = JSON.parse(el.textContent); } catch (e) { return; }
+  var modal = document.getElementById(d.modal);
+  var form = modal && modal.querySelector('form');
+  if (!form) return;
+  if (d.action) form.setAttribute('action', d.action);
+  if (d.title) {
+    var title = modal.querySelector('.admin-modal__title');
+    if (title) title.textContent = d.title;
+  }
+  if (d.error) {
+    var box = document.createElement('div');
+    box.className = 'admin-form-error';
+    box.setAttribute('role', 'alert');
+    box.textContent = d.error;
+    form.insertBefore(box, form.firstChild);
+  }
+  Object.keys(d.values || {}).forEach(function (name) {
+    var field = form.elements[name];
+    if (!field || field.type === 'password' || field.type === 'file') return;
+    field.value = d.values[name];
+    if (field.tagName === 'SELECT') field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  modal.style.display = 'flex';
+});
+
+// form[data-dirty-guard] (Остатки, product form): leaving the page with
+// unsaved edits (Дальше, another point, Back, a menu link) asks first —
+// the browser's own "leave site?" prompt. Submitting the form itself
+// doesn't.
+(function () {
+  var dirty = false;
+  document.addEventListener('input', function (e) {
+    if (e.target.form && e.target.form.hasAttribute('data-dirty-guard')) dirty = true;
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.form && e.target.form.hasAttribute('data-dirty-guard')) dirty = true;
+  });
+  document.addEventListener('submit', function (e) {
+    if (!e.defaultPrevented && e.target.hasAttribute && e.target.hasAttribute('data-dirty-guard')) dirty = false;
+  });
+  window.addEventListener('beforeunload', function (e) {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+})();
+
 function toggleAdminDrawer(open) {
   if (typeof open === 'boolean') {
     document.body.classList.toggle('admin-drawer-open', open);

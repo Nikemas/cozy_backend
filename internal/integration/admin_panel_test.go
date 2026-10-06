@@ -206,7 +206,7 @@ func TestAdminPanelStaffAndPointsScreens(t *testing.T) {
 	w = a.do(t, req{method: http.MethodPost, path: "/admin/staff", cookies: c, form: url.Values{
 		"phone": {local}, "password": {"cashier-pass-1"}, "name": {"Кассир " + tag}, "role": {"point_staff"}, "point_id": {f.PointA},
 	}})
-	wantRedirect(t, w, "/admin/staff")
+	wantRedirect(t, w, "/admin/staff?done=created")
 	var id string
 	var pointID *string
 	if err := testDB.QueryRowContext(ctxT(t), `SELECT id, point_id FROM staff WHERE phone = $1`, canonical).Scan(&id, &pointID); err != nil {
@@ -223,11 +223,11 @@ func TestAdminPanelStaffAndPointsScreens(t *testing.T) {
 		}
 		return v
 	}
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/staff/" + id + "/toggle", cookies: c}), "/admin/staff")
+	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/staff/" + id + "/toggle", cookies: c}), "/admin/staff?done=deactivated")
 	if activeOf() {
 		t.Fatal("toggle should deactivate")
 	}
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/staff/" + id + "/toggle", cookies: c}), "/admin/staff")
+	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/staff/" + id + "/toggle", cookies: c}), "/admin/staff?done=activated")
 	if !activeOf() {
 		t.Fatal("second toggle should reactivate")
 	}
@@ -247,16 +247,16 @@ func TestAdminPanelStaffAndPointsScreens(t *testing.T) {
 	w = a.do(t, req{method: http.MethodPost, path: "/admin/points", cookies: c, form: url.Values{
 		"name": {"Панель точка " + tag}, "city": {"Бишкек"}, "address": {"ул. Панель, 1"}, "working_hours": {"9-18"}, "latitude": {"42.8"}, "longitude": {"74.6"},
 	}})
-	wantRedirect(t, w, "/admin/points")
+	wantRedirectPath(t, w, "/admin/points")
 	var pid string
 	if err := testDB.QueryRowContext(ctxT(t), `SELECT id FROM points_of_sale WHERE name = $1`, "Панель точка "+tag).Scan(&pid); err != nil {
 		t.Fatal(err)
 	}
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/points/" + pid, cookies: c, form: url.Values{
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/points/" + pid, cookies: c, form: url.Values{
 		"name": {"Панель точка " + tag}, "city": {"Ош"}, "address": {"ул. Панель, 2"},
 	}}), "/admin/points")
 	wantStatus(t, a.do(t, req{method: http.MethodPost, path: "/admin/points/" + pid, cookies: c, form: url.Values{"name": {""}}}), http.StatusOK)
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/points/" + pid + "/toggle", cookies: c}), "/admin/points")
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/points/" + pid + "/toggle", cookies: c}), "/admin/points")
 	var city string
 	var active bool
 	if err := testDB.QueryRowContext(ctxT(t), `SELECT city, is_active FROM points_of_sale WHERE id = $1`, pid).Scan(&city, &active); err != nil {
@@ -294,7 +294,7 @@ func TestAdminPanelOrdersStockAndCategories(t *testing.T) {
 	if loc, err := url.Parse(w.Header().Get("Location")); err != nil || loc.Path != "/admin/orders/"+o.ID || loc.Query().Get("status_error") == "" {
 		t.Fatalf("illegal placed→delivered should redirect with status_error, got %q", w.Header().Get("Location"))
 	}
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/orders/" + o.ID + "/status", cookies: c, form: url.Values{"status": {"confirmed"}}}), "/admin/orders/"+o.ID)
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/orders/" + o.ID + "/status", cookies: c, form: url.Values{"status": {"confirmed"}}}), "/admin/orders/"+o.ID)
 	var status string
 	if err := testDB.QueryRowContext(ctxT(t), `SELECT status FROM orders WHERE id = $1`, o.ID).Scan(&status); err != nil {
 		t.Fatal(err)
@@ -322,16 +322,16 @@ func TestAdminPanelOrdersStockAndCategories(t *testing.T) {
 	tag := uuid.NewString()[:8]
 	wantStatus(t, a.get(t, "/admin/categories", c...), http.StatusOK)
 	wantStatus(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories", cookies: c, form: url.Values{"name_ru": {""}}}), http.StatusOK)
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories", cookies: c, form: url.Values{
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories", cookies: c, form: url.Values{
 		"name_ru": {"Панель кат " + tag}, "name_ky": {"Кат"}, "slug": {"it-panel-" + tag}, "parent_id": {f.CategoryID}, "sort_order": {"2"},
 	}}), "/admin/categories")
 	var catID string
 	if err := testDB.QueryRowContext(ctxT(t), `SELECT id FROM categories WHERE slug = $1`, "it-panel-"+tag).Scan(&catID); err != nil {
 		t.Fatal(err)
 	}
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories/" + catID, cookies: c, form: url.Values{
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories/" + catID, cookies: c, form: url.Values{
 		"name_ru": {"Панель кат 2 " + tag}, "name_ky": {"Кат"}, "slug": {"it-panel-" + tag},
 	}}), "/admin/categories")
-	wantRedirect(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories/" + catID + "/delete", cookies: c}), "/admin/categories")
+	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories/" + catID + "/delete", cookies: c}), "/admin/categories")
 	wantStatus(t, a.do(t, req{method: http.MethodPost, path: "/admin/categories/" + f.CategoryID + "/delete", cookies: c}), http.StatusOK)
 }

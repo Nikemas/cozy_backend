@@ -725,9 +725,13 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-status-btn.admin-chip--delivered { background: #E8F5E9; color: #2E7D32; }
 .admin-status-btn.admin-chip--cancelled { background: #FFEBEE; color: #C62828; }
 
+/* Only a table that has a mobile card twin (Товары: .admin-cards right
+   after it) is swapped out below 768px. Every other .admin-table-wrap
+   (Остатки, the product form's Вариации, Журнал) stays visible and
+   scrolls sideways — hiding it left those screens empty on a phone. */
 @media (max-width: 767px) {
-  .admin-table-wrap { display: none; }
-  .admin-table-footer { display: none; }
+  .admin-table-wrap--has-cards { display: none; }
+  .admin-table-footer--has-cards { display: none; }
   .admin-cards { display: block; }
 }
 
@@ -945,3 +949,86 @@ img.admin-order-detail__thumb-box { display: block; object-fit: cover; backgroun
 .admin-audit-table td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; height: auto; }
 .admin-audit-table__details { font-size: 12px; color: var(--admin-muted); margin-top: 4px; word-break: break-word; }
 .admin-audit-table__id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--admin-muted); }
+
+/* ---------- fix/admin-owner-ux: phone-width usability ---------- */
+
+/* Unprocessed orders («Оформлен») on the sidebar's «Заказы» and on the
+   mobile menu button. */
+.admin-nav__item { position: relative; }
+.admin-nav__badge {
+  margin-left: auto;
+  min-width: 22px; height: 22px; padding: 0 7px;
+  border-radius: 11px;
+  background: var(--admin-primary); color: #FFFFFF;
+  font-size: 12px; font-weight: 700; line-height: 22px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.admin-header__hamburger { position: relative; }
+.admin-order-card__check { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -6px 0 -6px -6px; flex: none; cursor: pointer; }
+.admin-order-card__check input { width: 18px; height: 18px; }
+.admin-order-card__top .admin-order-card__num { margin-right: auto; }
+.admin-modal form > .admin-form-error:first-child { margin-bottom: 14px; }
+.admin-order-detail__name { font-size: 15px; font-weight: 600; color: var(--admin-text); margin-bottom: 4px; }
+a.admin-order-detail__phone { display: inline-block; color: var(--admin-text); text-decoration: none; }
+a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
+.admin-order-detail__contact { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.admin-chip-btn__count { display: inline-block; min-width: 20px; height: 20px; margin-left: 4px; padding: 0 6px; border-radius: 10px; background: var(--admin-primary); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; }
+.admin-header__hamburger-badge {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px;
+  background: var(--admin-primary); color: #FFFFFF;
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+@media (max-width: 1023px) and (min-width: 768px) {
+  .admin-nav__badge { position: absolute; top: 2px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; }
+}
+
+/* Buttons rendered as <a> (Импорт, Дальше, Экспорт в Excel, Сбросить)
+   had no flex centring, so their label sat at the top of the 44px box
+   and long labels spilled out of it on a phone. */
+.admin-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; white-space: nowrap; line-height: 1.2; }
+.admin-btn[hidden] { display: none; }
+
+@media (max-width: 767px) {
+  .admin-content { padding: 16px; }
+
+  /* Header: one row — the title shrinks with an ellipsis instead of
+     pushing the RU/KY switch onto a second line; the search box (Товары)
+     gets its own full-width row. */
+  .admin-header { flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
+  .admin-header__title { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 17px; }
+  .admin-header__spacer { display: none; }
+  .admin-header__search { order: 10; flex: 1 1 100%; max-width: none; }
+
+  /* Товары toolbar: category chips scroll sideways in one row (like the
+     order status chips) and the two actions share the row below. */
+  .admin-products__toolbar .admin-chipbar { flex: 1 1 100%; flex-wrap: nowrap; }
+  .admin-products__actions { flex: 1 1 100%; }
+  .admin-products__actions .admin-btn { flex: 1 1 0; }
+
+  /* Tables that stay on a phone: size to their content and scroll
+     sideways instead of a fixed 1040px canvas. */
+  .admin-table-wrap .admin-table { min-width: 0; }
+  .admin-stock__level { display: none; }
+  .admin-table td, .admin-table th { padding: 0 10px; }
+
+  /* Order detail: item rows fit a phone (qty/price columns were sized
+     for desktop and squeezed the name into three lines). */
+  .admin-order-detail__items td { padding: 10px 8px; height: auto; }
+  .admin-order-detail__items td:first-child { padding-left: 16px; width: 60px; }
+  .admin-order-detail__items td:last-child { padding-right: 16px; }
+  .admin-order-detail__thumb-box { width: 44px; height: 44px; }
+  .admin-order-detail__item-qty { width: auto; white-space: nowrap; }
+  .admin-order-detail__item-price { width: auto; white-space: nowrap; }
+  .admin-order-detail__title { font-size: 19px; word-break: break-word; }
+
+  /* Modals: two-column rows and the password + «Сгенерировать» row
+     overflowed a 390px screen. */
+  .admin-field-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .admin-password-row input { min-width: 0; }
+
+  /* Points/staff toolbars: note above, full-width add button below. */
+  .admin-list-toolbar { flex-wrap: wrap; }
+  .admin-list-toolbar > .admin-btn { flex: 1 1 100%; }
+}

@@ -73,6 +73,11 @@ type ProductsPageData struct {
 	PageSize  int
 	Page      int
 	PageCount int
+	// fix/admin-owner-ux: prev/next links (every filter kept) and
+	// "Страница 1 из 2" — the list used to stop at the first page.
+	PrevURL   string
+	NextURL   string
+	PageLabel string
 
 	NewURL    string
 	ImportURL string
@@ -215,6 +220,9 @@ type ImageRowVM struct {
 type ProductFormData struct {
 	IsEdit    bool
 	ProductID string
+	// ReturnURL (fix/admin-owner-ux) is the products list page the form
+	// was opened from (filters, page); Save/Отмена go back there.
+	ReturnURL string
 
 	NameRu string
 	NameKy string

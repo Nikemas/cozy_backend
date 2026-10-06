@@ -60,7 +60,7 @@ function ordersRangeChanged(sel) {
 <div class="admin-orders-filters">
   <div class="admin-orders-chips" role="group" aria-label="{{t "admin.orders.status_filter"}}">
     {{range .Data.StatusChips}}
-    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
+    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Count}} <span class="admin-chip-btn__count">{{.Count}}</span>{{end}}</a>
     {{end}}
   </div>
 </div>
@@ -122,6 +122,8 @@ function ordersRangeChanged(sel) {
     {{range .Data.Rows}}
     <div class="admin-order-card" onclick="location.href='{{.URL}}'">
       <div class="admin-order-card__top">
+        {{/* Bulk status on a phone too (the table's checkboxes are hidden there). */}}
+        <label class="admin-order-card__check" onclick="event.stopPropagation()"><input type="checkbox" class="js-bulk-item" form="orders-bulk" name="id" value="{{.ID}}" aria-label="{{tf "admin.bulk.select_order" .Number}}"></label>
         <a href="{{.URL}}" class="admin-order-card__num">{{.Number}}</a>
         <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>
       </div>

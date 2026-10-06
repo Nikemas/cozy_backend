@@ -121,6 +121,8 @@ func (h *handlers) renderCategoriesPage(w http.ResponseWriter, r *http.Request, 
 		Parents: flattenCategoryParentOptions(tree, 0),
 		Error:   errMsg,
 	}
+	data.FormRetry = withRetryError(categoriesFormRetry(r), errMsg)
+	data.Toast = r.URL.Query().Get("toast")
 	if err := h.render.Render(w, "categories", data); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
@@ -184,7 +186,7 @@ func (h *handlers) categoriesCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit.Record(ctx, entry)
 
-	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
+	redirectWithToast(w, r, "/admin/categories", t.T("admin.categories.toast_saved"))
 }
 
 // categoriesUpdate handles POST /admin/categories/{id} — the edit-modal
@@ -231,7 +233,7 @@ func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit.Record(ctx, entry)
 
-	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
+	redirectWithToast(w, r, "/admin/categories", t.T("admin.categories.toast_saved"))
 }
 
 // categoriesDelete handles POST /admin/categories/{id}/delete — the row's
@@ -250,5 +252,5 @@ func (h *handlers) categoriesDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditCategory(r.Context(), audit.ActionCategoryDelete, id, name, nil)
 
-	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
+	redirectWithToast(w, r, "/admin/categories", h.tr(r).T("admin.categories.toast_deleted"))
 }

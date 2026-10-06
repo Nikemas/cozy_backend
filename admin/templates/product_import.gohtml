@@ -19,10 +19,13 @@
   .admin-import__summary { font-size: 13px; font-weight: 500; margin-top: 6px; color: var(--admin-text); }
   .admin-import__report { max-height: 480px; overflow: auto; }
   .admin-import__report .admin-table { min-width: 0; }
-  .admin-import__status--created { color: #2E7D32; font-weight: 600; }
-  .admin-import__status--updated { color: #1565C0; font-weight: 600; }
-  .admin-import__status--skipped { color: #8A8A85; font-weight: 600; }
-  .admin-import__status--error { color: #C62828; font-weight: 600; }
+  /* td-qualified: .admin-table td's own colour used to win. */
+  .admin-import__report td.admin-import__status--created { color: #2E7D32; font-weight: 600; }
+  .admin-import__report td.admin-import__status--updated { color: #1565C0; font-weight: 600; }
+  .admin-import__report td.admin-import__status--skipped { color: #8A8A85; font-weight: 600; }
+  .admin-import__report td.admin-import__status--error { color: #C62828; font-weight: 600; }
+  .admin-import__report td { white-space: nowrap; }
+  .admin-import__report td:last-child { white-space: normal; min-width: 220px; }
 </style>
 <div class="admin-import">
   <div class="admin-card admin-card--pad">
@@ -111,6 +114,11 @@
     createdW: {{t "admin.import.st_created"}},
     updatedW: {{t "admin.import.st_updated"}},
     skippedW: {{t "admin.import.st_skipped"}},
+    willCreateW: {{t "admin.import.st_will_create"}},
+    willUpdateW: {{t "admin.import.st_will_update"}},
+    willSkipW: {{t "admin.import.st_will_skip"}},
+    working: {{t "admin.import.working"}},
+    confirmTitle: {{t "admin.common.confirm_title"}},
     withErrors: {{t "admin.import.with_errors"}},
     willNot: {{t "admin.import.will_not"}},
     notImported: {{t "admin.import.not_imported"}},
@@ -130,11 +138,24 @@
     return many;
   }
 
-  function setBusy(v) {
+  var checkLabel = checkBtn.textContent, runLabel = runBtn.textContent;
+  function setBusy(v, which) {
     busy = v;
     checkBtn.disabled = v || !chosenFile;
     runBtn.disabled = v || !chosenFile;
     dropzone.style.opacity = v ? '0.6' : '1';
+    checkBtn.textContent = v && which === 'check' ? L.working : checkLabel;
+    runBtn.textContent = v && which === 'run' ? L.working : runLabel;
+  }
+
+  // Errors go into the result area (in the page's style), not alert().
+  function showError(text) {
+    resultEl.hidden = false;
+    bannerEl.className = 'admin-form-error';
+    bannerEl.setAttribute('role', 'alert');
+    bannerEl.textContent = text;
+    errorsCard.hidden = true;
+    reportCard.hidden = true;
   }
 
   function chooseFile(file) {
@@ -189,6 +210,7 @@
     resultEl.hidden = false;
 
     bannerEl.className = (s.errors || s.skipped) ? 'admin-import__notice' : 'admin-import__success';
+    bannerEl.setAttribute('role', 'status');
     bannerEl.textContent = '';
     var head = document.createElement('div');
     if (dry) {
@@ -202,9 +224,11 @@
     bannerEl.appendChild(head);
     var line = document.createElement('div');
     line.className = 'admin-import__summary';
-    line.textContent = L.products + ': ' + L.createdW + ' ' + (s.products_created || 0) + ', ' + L.updatedW + ' ' + (s.products_updated || 0) +
-      ' · ' + L.variants + ': ' + L.createdW + ' ' + (s.variants_created || 0) + ', ' + L.updatedW + ' ' + (s.variants_updated || 0) +
-      ' · ' + L.rows + ': ' + (s.rows || 0) + ', ' + L.withErrors + ' ' + (s.errors || 0) + ', ' + L.skippedW + ' ' + (s.skipped || 0);
+    // A dry run wrote nothing: "будет создано", not "создано".
+    var cW = dry ? L.willCreateW : L.createdW, uW = dry ? L.willUpdateW : L.updatedW, sW = dry ? L.willSkipW : L.skippedW;
+    line.textContent = L.products + ': ' + cW + ' ' + (s.products_created || 0) + ', ' + uW + ' ' + (s.products_updated || 0) +
+      ' · ' + L.variants + ': ' + cW + ' ' + (s.variants_created || 0) + ', ' + uW + ' ' + (s.variants_updated || 0) +
+      ' · ' + L.rows + ': ' + (s.rows || 0) + ', ' + L.withErrors + ' ' + (s.errors || 0) + ', ' + sW + ' ' + (s.skipped || 0);
     bannerEl.appendChild(line);
 
     var rows = res.rows || [];
@@ -239,14 +263,20 @@
     reportCard.hidden = rows.length === 0;
   }
 
-  function send(dryRun) {
+  function send(dryRun, confirmed) {
     if (!chosenFile || busy) return;
-    if (!dryRun && !checkedOK && !confirm(L.confirmRun)) return;
+    if (!dryRun && !checkedOK && !confirmed) {
+      openConfirmModal(L.confirmTitle, L.confirmRun, null, {
+        confirmLabel: runLabel,
+        onConfirm: function () { closeConfirmModal(); send(false, true); }
+      });
+      return;
+    }
     var form = new FormData();
     form.append('file', chosenFile);
     form.append('dry_run', dryRun ? '1' : '0');
     if (pointSelect.value) form.append('point_id', pointSelect.value);
-    setBusy(true);
+    setBusy(true, dryRun ? 'check' : 'run');
     fetch(importURL, { method: 'POST', body: form, credentials: 'same-origin', headers: apiHeaders })
       .then(function (r) {
         if (!r.ok) {
@@ -264,7 +294,7 @@
       })
       .catch(function (err) {
         setBusy(false);
-        alert(err.message || L.runFailed);
+        showError(err.message || L.runFailed);
       });
   }
 

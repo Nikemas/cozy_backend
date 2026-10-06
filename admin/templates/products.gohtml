@@ -81,7 +81,7 @@
     </div>
     {{else}}
 
-    <div class="admin-table-wrap">
+    <div class="admin-table-wrap admin-table-wrap--has-cards">
       <table class="admin-table">
         <thead>
           <tr>
@@ -164,9 +164,11 @@
       <div class="admin-cards__count">{{.CountLabel}}</div>
     </div>
 
-    <div class="admin-table-footer">
+    <div class="admin-table-footer admin-table-footer--has-cards">
       <div class="admin-table__muted">{{.CountLabel}}</div>
       <form method="get" action="/admin/products" class="admin-pagesize">
+        {{if .CatSlug}}<input type="hidden" name="cat" value="{{.CatSlug}}">{{end}}
+        {{if .SubSlug}}<input type="hidden" name="sub" value="{{.SubSlug}}">{{end}}
         {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
         {{if .PointID}}<input type="hidden" name="point" value="{{.PointID}}">{{end}}
         {{if .OutOfStockOnly}}<input type="hidden" name="oos" value="1">{{end}}
@@ -177,6 +179,15 @@
         </select>
       </form>
     </div>
+    {{if or .PrevURL .NextURL}}
+    <nav class="admin-orders-footer" aria-label="{{t "admin.products.pages"}}">
+      <div class="admin-orders-count">{{.PageLabel}}</div>
+      <div class="admin-orders-pager">
+        {{if .PrevURL}}<a href="{{.PrevURL}}" class="admin-btn admin-btn--secondary" rel="prev">{{t "admin.common.prev"}}</a>{{end}}
+        {{if .NextURL}}<a href="{{.NextURL}}" class="admin-btn admin-btn--secondary" rel="next">{{t "admin.common.next"}}</a>{{end}}
+      </div>
+    </nav>
+    {{end}}
     {{end}}
   </div>
 </div>

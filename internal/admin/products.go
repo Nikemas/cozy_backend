@@ -198,6 +198,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		PageSize:      pageSize,
 		Page:          page,
 		PageCount:     pageCount,
+		PageLabel:     h.tr(r).F("admin.audit.page_of", page, pageCount),
 		NewURL:        "/admin/products/new",
 		ImportURL:     "/admin/products/import",
 
@@ -210,6 +211,13 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		BulkURL:        "/admin/products/bulk",
 		ReturnURL:      r.URL.RequestURI(),
 		BulkCategories: flatCategoryOptions(tree),
+	}
+
+	if page > 1 {
+		data.PrevURL = productsPageURL(query, page-1)
+	}
+	if page < pageCount {
+		data.NextURL = productsPageURL(query, page+1)
 	}
 
 	pageData := h.productsShellData("products", "admin.nav.products", st)
@@ -302,6 +310,7 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		StockPointsJSON: marshalJS(stockPoints),
 		CanDelete:       st.Role == staff.RoleOwner,
 	}
+	data.ReturnURL = listReturnURL(r.Referer(), r.Host, productsListPath)
 	h.renderProductForm(w, st, "admin.product.new_title", data)
 }
 
@@ -403,12 +412,17 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data.StockPoints = stockPoints
 	data.StockPointsJSON = marshalJS(stockPoints)
+	data.ReturnURL = listReturnURL(r.Referer(), r.Host, productsListPath)
 	h.renderProductForm(w, st, "admin.product.edit_title", data)
 }
 
 func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, title string, data ProductFormData) {
 	pageData := h.productsShellData("product_form", title, st)
 	pageData.ShowBack = true
+	pageData.BackURL = productsListPath
+	if data.ReturnURL != "" {
+		pageData.BackURL = data.ReturnURL
+	}
 	pageData.Data = data
 	if err := h.render.Render(w, "product_form", pageData); err != nil {
 		http.Error(w, trFromWriter(w).T("admin.err.render"), http.StatusInternalServerError)
@@ -486,7 +500,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 		return
 	}
 
-	redirectWithToast(w, r, "/admin/products", h.tr(r).T("admin.product.toast_saved"))
+	redirectWithToast(w, r, safeReturnURL(r.FormValue("back"), productsListPath), h.tr(r).T("admin.product.toast_saved"))
 }
 
 // rerenderFormOnError redisplays the form with whatever the staff member
@@ -554,6 +568,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 	if data.IsEdit {
 		title = "admin.product.edit_title"
 	}
+	data.ReturnURL = safeReturnURL(r.FormValue("back"), productsListPath)
 	h.renderProductForm(w, st, title, data)
 }
 
@@ -642,6 +657,7 @@ func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
 
 	pageData := h.productsShellData("product_import", "admin.import.title", st)
 	pageData.ShowBack = true
+	pageData.BackURL = productsListPath
 	pageData.Data = data
 	if err := h.render.Render(w, "product_import", pageData); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)

@@ -631,3 +631,27 @@ admin.audit.field.banner_text_color: цвет текста
 admin.audit.field.banner_image: картинка
 admin.audit.field.banner_bg_image: фоновое изображение
 admin.audit.field.image: фото
+
+# fix/admin-owner-ux
+admin.products.pages: Страницы списка товаров
+admin.nav.new_orders: "Новых заказов: %d"
+admin.order.action.confirmed: Подтвердить заказ
+admin.order.action.courier_assigned: Передать курьеру
+admin.order.action.delivered: Отметить доставленным
+admin.order.action.cancelled: Отменить заказ
+admin.order.status_changed: "Статус заказа: %s"
+admin.order.delivered_confirm_text: Заказ %s будет отмечен доставленным. Изменить статус после этого будет нельзя.
+admin.order.delivered_confirm_title: Заказ доставлен?
+admin.order.delivered_confirm_label: Да, доставлен
+admin.order.call: Позвонить
+admin.common.copy: Копировать
+admin.common.copied: Скопировано
+admin.points.toast_saved: Точка сохранена
+admin.points.toast_activated: Точка активирована
+admin.points.toast_deactivated: Точка деактивирована
+admin.categories.toast_saved: Категория сохранена
+admin.categories.toast_deleted: Категория удалена
+admin.staff.notice_created: Сотрудник добавлен. Передайте ему телефон и пароль для входа.
+admin.staff.notice_activated: Сотрудник активирован
+admin.staff.notice_deactivated: Сотрудник деактивирован — доступ к админке закрыт.
+admin.import.working: Обрабатываем файл…

@@ -99,7 +99,10 @@ type staffPageData struct {
 // the list can ask for via ?done=... — a fixed map, so the query string
 // can't inject text.
 var staffNotices = map[string]string{
-	"password": "admin.staff.notice_password",
+	"password":    "admin.staff.notice_password",
+	"created":     "admin.staff.notice_created",
+	"activated":   "admin.staff.notice_activated",
+	"deactivated": "admin.staff.notice_deactivated",
 }
 
 // staffPage handles GET /admin/staff.
@@ -147,6 +150,7 @@ func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Requ
 
 	data := h.shellPageData("staff", "admin.nav.staff", st)
 	data.Data = staffPageData{Rows: rows, Points: pts, Error: errMsg, Notice: notice, MinPasswordLength: staff.MinPasswordLength}
+	data.FormRetry = withRetryError(staffFormRetry(r), errMsg)
 	if err := h.render.Render(w, "staff", data); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
@@ -188,7 +192,7 @@ func (h *handlers) staffCreate(w http.ResponseWriter, r *http.Request) {
 	h.auditStaff(r.Context(), audit.ActionStaffCreate, created.ID, created.Name,
 		map[string]any{"phone": created.Phone, "role": string(created.Role), "point_id": deref(created.PointID)})
 
-	http.Redirect(w, r, "/admin/staff", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/staff?done=created", http.StatusSeeOther)
 }
 
 // staffToggle handles POST /admin/staff/{id}/toggle — the row's "toggle
@@ -236,7 +240,11 @@ func (h *handlers) staffToggle(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditStaff(r.Context(), staffAction, id, target.Name, map[string]any{"is_active": audit.Change{From: target.IsActive, To: in.IsActive}})
 
-	http.Redirect(w, r, "/admin/staff", http.StatusSeeOther)
+	done := "deactivated"
+	if in.IsActive {
+		done = "activated"
+	}
+	http.Redirect(w, r, "/admin/staff?done="+done, http.StatusSeeOther)
 }
 
 // staffResetPassword handles POST /admin/staff/{id}/password — the owner
