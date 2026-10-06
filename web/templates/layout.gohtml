@@ -23,6 +23,7 @@
   <link rel="icon" type="image/png" sizes="64x64" href="{{asset "img/logo-64.png"}}">
   <meta name="theme-color" content="#FF7A1A">
   {{if .SEO.JSONLD}}<script type="application/ld+json">{{.SEO.JSONLD}}</script>{{end}}
+  {{if .SEO.BreadcrumbJSONLD}}<script type="application/ld+json">{{.SEO.BreadcrumbJSONLD}}</script>{{end}}
   {{/* Open the third-party connections the render-blocking stylesheets
        (and the fonts they pull in, which are CORS requests — hence the
        second, crossorigin preconnect) need while the HTML is still

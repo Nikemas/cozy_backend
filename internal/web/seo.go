@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
@@ -28,6 +29,9 @@ type SEOMeta struct {
 	OGLocale string
 	// JSONLD is a pre-encoded schema.org JSON-LD document ("" → omitted).
 	JSONLD template.JS
+	// BreadcrumbJSONLD is a schema.org BreadcrumbList for category and
+	// product pages ("" → omitted).
+	BreadcrumbJSONLD template.JS
 }
 
 // privateScreens are account/transactional screens search engines must
@@ -180,5 +184,57 @@ func websiteJSONLD(siteURL string) template.JS {
 			"target":      siteURL + "/?q={search_term_string}",
 			"query-input": "required name=search_term_string",
 		},
+	})
+}
+
+// Crumb is one step of a breadcrumb trail: a display name and a
+// site-relative path.
+type Crumb struct {
+	Name string
+	Path string
+}
+
+// categoryTrail returns the root→category chain of crumbs for the
+// category with id in tree (nil if it isn't there), names in lang.
+func categoryTrail(tree []*catalog.Category, id, lang string) []Crumb {
+	for _, c := range tree {
+		here := Crumb{Name: pickName(c.NameRu, c.NameKy, lang), Path: "/catalog/" + c.Slug}
+		if c.ID == id {
+			return []Crumb{here}
+		}
+		if rest := categoryTrail(c.Children, id, lang); rest != nil {
+			return append([]Crumb{here}, rest...)
+		}
+	}
+	return nil
+}
+
+// localizedURL is the absolute URL of path in the request's language
+// version (?lang=ky kept, like setCanonical), for structured data.
+func (h *handlers) localizedURL(r *http.Request, path string) string {
+	u := h.absURL(r, path)
+	if r.URL.Query().Get("lang") == i18n.LangKY {
+		return withLangParam(u, i18n.LangKY)
+	}
+	return u
+}
+
+// breadcrumbJSONLD is the schema.org BreadcrumbList for home → trail. The
+// last crumb's URL is the page itself.
+func (h *handlers) breadcrumbJSONLD(r *http.Request, lang string, trail []Crumb) template.JS {
+	all := append([]Crumb{{Name: h.t(lang, "nav.catalog"), Path: "/"}}, trail...)
+	items := make([]map[string]any, 0, len(all))
+	for i, c := range all {
+		items = append(items, map[string]any{
+			"@type":    "ListItem",
+			"position": i + 1,
+			"name":     c.Name,
+			"item":     h.localizedURL(r, c.Path),
+		})
+	}
+	return jsonLD(map[string]any{
+		"@context":        "https://schema.org",
+		"@type":           "BreadcrumbList",
+		"itemListElement": items,
 	})
 }
