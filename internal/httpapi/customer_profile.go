@@ -64,17 +64,22 @@ type customerProfileResponse struct {
 	Name  *string `json:"name,omitempty"`
 	// Lang is "ru" or "ky" — the language pushes are sent in.
 	Lang string `json:"lang"`
-	// PromoPush: the customer receives promo broadcasts (default true).
+	// PromoPush: the customer receives promo broadcasts (opt-in, default
+	// false).
 	PromoPush bool `json:"promo_push"`
+	// PromoPushAsked: the customer has answered the promo opt-in (set
+	// promo_push via PUT at least once); the app asks until it is true.
+	PromoPushAsked bool `json:"promo_push_asked"`
 }
 
 func newCustomerProfileResponse(c storefront.Customer) customerProfileResponse {
 	return customerProfileResponse{
-		ID:        c.ID,
-		Phone:     c.Phone,
-		Name:      c.Name,
-		Lang:      c.Lang,
-		PromoPush: c.PromoPush,
+		ID:             c.ID,
+		Phone:          c.Phone,
+		Name:           c.Name,
+		Lang:           c.Lang,
+		PromoPush:      c.PromoPush,
+		PromoPushAsked: c.PromoPushAsked,
 	}
 }
 

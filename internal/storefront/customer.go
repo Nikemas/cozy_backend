@@ -22,19 +22,24 @@ type Customer struct {
 	// broadcasts are rendered in it.
 	Lang string
 	// PromoPush is the "Акции и скидки" opt-in for promo broadcasts
-	// (default true). Order-status pushes ignore it.
+	// (default false since migration 000041 — marketing pushes are
+	// opt-in). Order-status pushes ignore it.
 	PromoPush bool
+	// PromoPushAsked reports whether the customer has ever explicitly set
+	// PromoPush (customers.promo_push_asked_at IS NOT NULL) — the app shows
+	// the opt-in prompt until it is true.
+	PromoPushAsked bool
 }
 
 // customerColumns is the SELECT/RETURNING list every Customer scan uses,
 // in scanCustomer's order.
-const customerColumns = `id, phone, name, lang, promo_push`
+const customerColumns = `id, phone, name, lang, promo_push, promo_push_asked_at IS NOT NULL`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanCustomer(row rowScanner) (*Customer, error) {
 	var c Customer
-	if err := row.Scan(&c.ID, &c.Phone, &c.Name, &c.Lang, &c.PromoPush); err != nil {
+	if err := row.Scan(&c.ID, &c.Phone, &c.Name, &c.Lang, &c.PromoPush, &c.PromoPushAsked); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -142,7 +147,9 @@ func (u *ProfileUpdate) validate() error {
 const maxNameLen = 100
 
 // UpdateProfile applies u to customer id in one UPDATE and returns the
-// updated row. An empty update just returns the current row.
+// updated row. An empty update just returns the current row. Setting
+// PromoPush (either way) is the customer's explicit consent answer, so it
+// also stamps promo_push_asked_at.
 func (r *CustomerRepo) UpdateProfile(ctx context.Context, id string, u ProfileUpdate) (*Customer, error) {
 	if err := u.validate(); err != nil {
 		return nil, err
@@ -159,7 +166,8 @@ func (r *CustomerRepo) UpdateProfile(ctx context.Context, id string, u ProfileUp
 		UPDATE customers SET
 			name       = COALESCE($2, name),
 			lang       = COALESCE($3, lang),
-			promo_push = COALESCE($4, promo_push),
+			promo_push = COALESCE($4::boolean, promo_push),
+			promo_push_asked_at = CASE WHEN $4::boolean IS NULL THEN promo_push_asked_at ELSE now() END,
 			updated_at = now()
 		WHERE id = $1
 		RETURNING ` + customerColumns

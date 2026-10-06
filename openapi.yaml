@@ -520,6 +520,13 @@ paths:
         unchanged — e.g. `{"promo_push": false}` from the "Акции и скидки"
         switch, or `{"lang": "ky"}` when the app language changes. An empty
         object changes nothing and returns the current profile.
+
+        Promo pushes are opt-in (App Store guideline 4.5.4): a new customer
+        has `promo_push: false, promo_push_asked: false`. The app shows its
+        consent prompt while `promo_push_asked` is false and sends the
+        answer as `{"promo_push": true|false}`; any request that includes
+        `promo_push` (either value) marks the customer as asked, so the
+        response carries `promo_push_asked: true`.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
@@ -530,7 +537,7 @@ paths:
               properties:
                 name: { type: string, maxLength: 100, example: "Айбек" }
                 lang: { type: string, enum: [ru, ky], description: "Language of order-status and promo pushes." }
-                promo_push: { type: boolean, description: "Receive promo broadcasts (default true). Order-status pushes are not affected." }
+                promo_push: { type: boolean, description: "Receive promo broadcasts (opt-in, default false). Setting it either way also sets `promo_push_asked`. Order-status pushes are not affected." }
       responses:
         "200":
           description: Updated profile.
@@ -1872,13 +1879,14 @@ components:
 
     CustomerProfile:
       type: object
-      required: [id, phone, lang, promo_push]
+      required: [id, phone, lang, promo_push, promo_push_asked]
       properties:
         id: { type: string, format: uuid }
         phone: { type: string, example: "+996700123456" }
         name: { type: string, description: "Omitted until the customer sets it." }
         lang: { type: string, enum: [ru, ky], description: "Language order-status and promo pushes are sent in (default `ru`); also set by the website's language switch." }
-        promo_push: { type: boolean, description: "Receives promo broadcasts (default true)." }
+        promo_push: { type: boolean, description: "Receives promo broadcasts (opt-in, default false for new customers)." }
+        promo_push_asked: { type: boolean, description: "True once the customer has answered the promo opt-in (set `promo_push` via PUT /api/v1/customer at least once). While false the app should show its consent prompt." }
 
     Category:
       type: object

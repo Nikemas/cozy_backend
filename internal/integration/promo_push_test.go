@@ -30,8 +30,8 @@ func TestCustomerLangAndPromoPush(t *testing.T) {
 	repo := storefront.NewCustomerRepo(testDB)
 
 	c, err := repo.GetByID(ctx, f.CustomerID)
-	if err != nil || c.Lang != "ru" || !c.PromoPush {
-		t.Fatalf("defaults = %+v, %v; want lang ru, promo_push true", c, err)
+	if err != nil || c.Lang != "ru" || c.PromoPush {
+		t.Fatalf("defaults = %+v, %v; want lang ru, promo_push false (opt-in)", c, err)
 	}
 
 	lang, off := "ky", false
@@ -87,8 +87,8 @@ func TestFavoritesMatchProductDetail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if customer.Lang != "ru" || !customer.PromoPush {
-		t.Errorf("new customer = %+v, want lang ru and promo_push on", customer)
+	if customer.Lang != "ru" || customer.PromoPush || customer.PromoPushAsked {
+		t.Errorf("new customer = %+v, want lang ru, promo_push off and not asked", customer)
 	}
 	if err := storefront.NewFavoriteRepo(testDB).Add(ctx, customer.ID, f.ProductID); err != nil {
 		t.Fatal(err)
@@ -130,7 +130,8 @@ func TestFavoritesMatchProductDetail(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+access)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"promo_push":false`) || !strings.Contains(w.Body.String(), `"lang":"ru"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"promo_push":false`) ||
+		!strings.Contains(w.Body.String(), `"promo_push_asked":true`) || !strings.Contains(w.Body.String(), `"lang":"ru"`) {
 		t.Fatalf("PUT /customer: %d %s", w.Code, w.Body.String())
 	}
 }
@@ -209,18 +210,21 @@ func TestBroadcastWorkerEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := newFixture(t, 1, 1)
-	optedOut, ky := newCustomer(t), newCustomer(t)
+	optedOut, ky, neverAsked := newCustomer(t), newCustomer(t), newCustomer(t)
 	mustExec := func(q string, args ...any) {
 		t.Helper()
 		if _, err := testDB.ExecContext(ctx, q, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// promo_push is opt-in (migration 000041): only customers who said yes
+	// are in the audience; neverAsked keeps the column default (false).
+	mustExec(`UPDATE customers SET promo_push = true WHERE id = ANY($1::uuid[])`, "{"+f.CustomerID+","+ky+"}")
 	mustExec(`UPDATE customers SET promo_push = false WHERE id = $1`, optedOut)
 	mustExec(`UPDATE customers SET lang = 'ky' WHERE id = $1`, ky)
 	mustExec(`INSERT INTO device_tokens (customer_id, fcm_token, platform) VALUES
-		($1, 'ru-1', 'android'), ($1, 'dead-1', 'ios'), ($2, 'optout-1', 'android'), ($3, 'ky-1', 'ios')`,
-		f.CustomerID, optedOut, ky)
+		($1, 'ru-1', 'android'), ($1, 'dead-1', 'ios'), ($2, 'optout-1', 'android'), ($3, 'ky-1', 'ios'), ($4, 'never-1', 'ios')`,
+		f.CustomerID, optedOut, ky, neverAsked)
 
 	repo := broadcasts.NewRepo(testDB)
 	in := broadcasts.Input{TitleRU: "Скидки", BodyRU: "−20%", TitleKY: "Арзандатуу",
@@ -258,6 +262,9 @@ func TestBroadcastWorkerEndToEnd(t *testing.T) {
 	}
 	if p.has("optout-1") {
 		t.Error("customer with promo_push=false got the promo")
+	}
+	if p.has("never-1") {
+		t.Error("customer who was never asked (default promo_push) got the promo")
 	}
 	if got := p.get("ky-1"); got.Title != "Арзандатуу" {
 		t.Errorf("ky-1 title = %q", got.Title)
