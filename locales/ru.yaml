@@ -182,6 +182,18 @@ error.code.address_in_use: Этот адрес использован в зак�
 error.code.pickup_point_not_found: Точка самовывоза не найдена
 error.code.order_not_found: Заказ не найден
 error.code.order_not_cancellable: Этот заказ уже нельзя отменить
+# Site error texts for codes that previously fell back to the generic
+# message on the KY site (fix/ky-completeness).
+error.code.otp_invalid: Неверный код. Проверьте SMS и попробуйте ещё раз.
+error.code.otp_attempts_exceeded: Слишком много неверных попыток. Запросите новый код.
+error.code.otp_daily_limit: Вход по SMS временно недоступен. Попробуйте позже.
+error.code.invalid_payment_method: Выберите способ оплаты
+error.code.payments_not_configured: Онлайн-оплата пока недоступна. Выберите оплату при получении.
+error.code.payment_create_failed: Не удалось создать платёж. Попробуйте ещё раз.
+error.code.delivery_zone_required: Выберите зону доставки
+error.code.invalid_delivery_zone: Зона доставки больше не обслуживается. Выберите другую.
+error.code.invalid_item: Выберите размер и цвет
+error.code.invalid_variant_id: Такого размера или цвета нет в наличии
 
 # Legal/info pages (web/templates/pages/*) and footer.
 screen.page_about.title: О магазине
