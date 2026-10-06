@@ -8,6 +8,7 @@
 package points
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"errors"
@@ -179,7 +180,7 @@ func (r *PointsRepo) Delete(ctx context.Context, id string) error {
 
 	var hasStock bool
 	if err := r.db.QueryRowContext(ctx, stockQ, id).Scan(&hasStock); err != nil {
-		return err
+		return fmt.Errorf("check stock of point %s: %w", id, err)
 	}
 	if hasStock {
 		return pointInUse()
