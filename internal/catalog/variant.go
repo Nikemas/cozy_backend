@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -125,8 +126,11 @@ func (in VariantInput) validate() error {
 	if strings.TrimSpace(in.Color) == "" {
 		return apperr.BadRequest("invalid_color", "color обязателен")
 	}
-	if in.PriceOverride != nil && *in.PriceOverride < 0 {
-		return apperr.BadRequest("invalid_price_override", "price_override не может быть отрицательным")
+	// nil = no override (base price applies). Otherwise the amount, as
+	// NUMERIC(10,2) stores it (rounded to 2 decimals), must be positive: a 0
+	// override would sell the variant for free. !(x > 0) also rejects NaN.
+	if p := in.PriceOverride; p != nil && (math.IsInf(*p, 0) || !(math.Round(*p*100)/100 > 0)) {
+		return apperr.BadRequest("invalid_price_override", "price_override должен быть больше нуля")
 	}
 	return nil
 }

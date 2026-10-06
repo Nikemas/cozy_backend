@@ -1913,7 +1913,7 @@ components:
         size: { type: string }
         color: { type: string }
         sku: { type: string, nullable: true }
-        price_override: { type: number, format: double, nullable: true }
+        price_override: { type: number, format: double, nullable: true, exclusiveMinimum: true, minimum: 0, description: "null = the product's base price applies; otherwise > 0 after rounding to 2 decimals (400 invalid_price_override)." }
 
     ProductImage:
       type: object
