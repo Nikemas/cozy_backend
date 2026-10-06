@@ -56,7 +56,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		images:     catalog.NewImageRepo(db),
 		stock:      catalog.NewStockRepo(db),
 		media:      mediaClient,
-		cfg:        cfg,
+		// feat/category-photo: the Категории screen's photo uploads.
+		categoryImages: mediaClient,
+		cfg:            cfg,
 
 		productStore: &productStore{db: db, audit: auditLog},
 		stockStore:   &stockPageRepo{db: db, audit: auditLog},

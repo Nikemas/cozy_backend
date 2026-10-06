@@ -6,10 +6,13 @@
 // /admin/api/categories. Owner/manager only, same RBAC as products (see
 // routes.go's ownerOrManager). Follows points_page.go's list+modal pattern:
 // plain <form method="post">, POST-redirect-GET on success, re-render with
-// an error banner on failure.
+// an error banner on failure. The create/edit forms are multipart and
+// carry the optional category photo (feat/category-photo) — see
+// categories_image.go.
 package admin
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -17,6 +20,16 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
+
+// categoryRepo is the subset of *catalog.CategoryRepo the admin panel
+// uses (the Категории screen plus the category pickers of other screens).
+type categoryRepo interface {
+	Tree(ctx context.Context) ([]*catalog.Category, error)
+	Create(ctx context.Context, in catalog.CategoryInput) (*catalog.Category, error)
+	Update(ctx context.Context, id string, in catalog.CategoryInput) (*catalog.Category, error)
+	Delete(ctx context.Context, id string) error
+	SetImage(ctx context.Context, id string, key *string) (previous *string, err error)
+}
 
 // categoryRow is one row of the flattened category tree, indented by Depth
 // so categories.gohtml only ranges and prints — no tree-walking in the
@@ -29,7 +42,8 @@ type categoryRow struct {
 	Slug      string
 	SortOrder int
 	Depth     int
-	IndentPx  int // Depth*20, precomputed since templates can't do arithmetic
+	IndentPx  int    // Depth*20, precomputed since templates can't do arithmetic
+	ImageURL  string // public URL of the category photo; "" = none
 }
 
 // categoryParentOption is one <select name="parent_id"> option — every
@@ -40,8 +54,9 @@ type categoryParentOption struct {
 	Name string
 }
 
-// flattenCategoryRows walks tree depth-first into an indented list.
-func flattenCategoryRows(tree []*catalog.Category, depth int) []categoryRow {
+// flattenCategoryRows walks tree depth-first into an indented list;
+// objectURL turns a photo's object key into its public URL.
+func flattenCategoryRows(tree []*catalog.Category, depth int, objectURL func(string) string) []categoryRow {
 	rows := make([]categoryRow, 0, len(tree))
 	for _, c := range tree {
 		parentID := ""
@@ -57,8 +72,9 @@ func flattenCategoryRows(tree []*catalog.Category, depth int) []categoryRow {
 			SortOrder: c.SortOrder,
 			Depth:     depth,
 			IndentPx:  depth * 20,
+			ImageURL:  objectURL(deref(c.ImageKey)),
 		})
-		rows = append(rows, flattenCategoryRows(c.Children, depth+1)...)
+		rows = append(rows, flattenCategoryRows(c.Children, depth+1, objectURL)...)
 	}
 	return rows
 }
@@ -101,7 +117,7 @@ func (h *handlers) renderCategoriesPage(w http.ResponseWriter, r *http.Request, 
 
 	data := h.shellPageData("categories", "admin.nav.categories", st)
 	data.Data = categoriesPageData{
-		Rows:    flattenCategoryRows(tree, 0),
+		Rows:    flattenCategoryRows(tree, 0, h.cfg.PublicObjectURL),
 		Parents: flattenCategoryParentOptions(tree, 0),
 		Error:   errMsg,
 	}
@@ -127,40 +143,93 @@ func categoryInputFromForm(r *http.Request) catalog.CategoryInput {
 	return in
 }
 
-// categoriesCreate handles POST /admin/categories — the add-modal form.
+// categoriesCreate handles POST /admin/categories — the add-modal form
+// (multipart, with an optional "image" file).
 func (h *handlers) categoriesCreate(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		h.renderCategoriesPage(w, r, h.tr(r).T("admin.err.form"))
+	ctx := r.Context()
+	t := h.tr(r)
+	form, ok := h.parseCategoryForm(w, r)
+	if !ok {
+		return
+	}
+	defer form.cleanup()
+
+	in := categoryInputFromForm(r)
+	if err := in.Validate(); err != nil {
+		h.renderCategoriesPage(w, r, appErrMessage(t, err))
+		return
+	}
+	upload, err := h.uploadCategoryImage(ctx, r)
+	if err != nil {
+		h.renderCategoriesPage(w, r, h.categoryImageErr(ctx, t, err))
 		return
 	}
 
-	in := categoryInputFromForm(r)
-	created, err := h.categories.Create(r.Context(), in)
+	created, err := h.categories.Create(ctx, in)
 	if err != nil {
-		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
+		h.removeCategoryUpload(ctx, upload)
+		h.renderCategoriesPage(w, r, appErrMessage(t, err))
 		return
 	}
-	h.auditCategory(r.Context(), audit.ActionCategoryCreate, created.ID, in.NameRu, &in)
+	entry := categoryAuditEntry(audit.ActionCategoryCreate, created.ID, in.NameRu, &in)
+	if upload != "" {
+		if _, err := h.categories.SetImage(ctx, created.ID, &upload); err != nil {
+			// The category itself is saved; only its photo is missing.
+			h.removeCategoryUpload(ctx, upload)
+			h.audit.Record(ctx, entry)
+			h.renderCategoriesPage(w, r, h.categoryImageErr(ctx, t, err))
+			return
+		}
+		entry = withCategoryImageChange(entry, nil, &upload)
+	}
+	h.audit.Record(ctx, entry)
 
 	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
 }
 
 // categoriesUpdate handles POST /admin/categories/{id} — the edit-modal
-// form, prefilled client-side from the row's data-* attributes (see
-// categories.gohtml).
+// form, prefilled client-side from the row's data (see categories.gohtml).
+// The photo is replaced by a new "image" file, removed by the
+// "remove_image" box, and otherwise left as it is.
 func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		h.renderCategoriesPage(w, r, h.tr(r).T("admin.err.form"))
+	ctx := r.Context()
+	t := h.tr(r)
+	form, ok := h.parseCategoryForm(w, r)
+	if !ok {
 		return
 	}
+	defer form.cleanup()
 
 	id := r.PathValue("id")
 	in := categoryInputFromForm(r)
-	if _, err := h.categories.Update(r.Context(), id, in); err != nil {
-		h.renderCategoriesPage(w, r, appErrMessage(h.tr(r), err))
+	if err := in.Validate(); err != nil {
+		h.renderCategoriesPage(w, r, appErrMessage(t, err))
 		return
 	}
-	h.auditCategory(r.Context(), audit.ActionCategoryUpdate, id, in.NameRu, &in)
+	upload, err := h.uploadCategoryImage(ctx, r)
+	if err != nil {
+		h.renderCategoriesPage(w, r, h.categoryImageErr(ctx, t, err))
+		return
+	}
+
+	if _, err := h.categories.Update(ctx, id, in); err != nil {
+		h.removeCategoryUpload(ctx, upload)
+		h.renderCategoriesPage(w, r, appErrMessage(t, err))
+		return
+	}
+	entry := categoryAuditEntry(audit.ActionCategoryUpdate, id, in.NameRu, &in)
+	if upload != "" || r.FormValue("remove_image") == "1" {
+		next := nilIfEmpty(upload)
+		previous, err := h.categories.SetImage(ctx, id, next)
+		if err != nil {
+			h.removeCategoryUpload(ctx, upload)
+			h.audit.Record(ctx, entry)
+			h.renderCategoriesPage(w, r, h.categoryImageErr(ctx, t, err))
+			return
+		}
+		entry = withCategoryImageChange(entry, previous, next)
+	}
+	h.audit.Record(ctx, entry)
 
 	http.Redirect(w, r, "/admin/categories", http.StatusSeeOther)
 }
@@ -169,7 +238,9 @@ func (h *handlers) categoriesUpdate(w http.ResponseWriter, r *http.Request) {
 // delete button (via the shared confirm modal). CategoryRepo.Delete already
 // turns "still referenced by a product or subcategory" into
 // apperr.Conflict, which appErrMessage surfaces as the banner instead of a
-// raw 500.
+// raw 500. The category's photo object stays in the bucket, like a
+// replaced banner picture or a removed product photo (see
+// categories_image.go).
 func (h *handlers) categoriesDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	name := h.categoryName(r.Context(), id)

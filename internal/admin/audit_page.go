@@ -322,6 +322,7 @@ var auditDetailLabels = map[string]string{
 	"banner_bg_color": "admin.audit.field.banner_bg_color", "banner_text_color": "admin.audit.field.banner_text_color",
 	"banner_eyebrow_color": "admin.audit.field.banner_eyebrow_color",
 	"banner_image":         "admin.audit.field.banner_image", "banner_bg_image": "admin.audit.field.banner_bg_image",
+	"image": "admin.audit.field.image",
 }
 
 // auditDetailsText renders Details as "field: from → to; field: value",

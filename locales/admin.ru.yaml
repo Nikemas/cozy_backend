@@ -129,6 +129,10 @@ admin.categories.sort_order: Порядок
 admin.categories.parent: Родительская категория
 admin.categories.no_parent: — нет (корневая) —
 admin.categories.load_failed: не удалось загрузить категории
+admin.categories.image: Фото категории
+admin.categories.image_hint: JPEG, PNG или WEBP до 10 МБ, меньшая сторона не меньше 200 px. Показывается на плитке категории в приложении
+admin.categories.current_image: Текущее фото
+admin.categories.remove_image: Удалить фото
 admin.points.note: Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются.
 admin.points.add: Добавить точку
 admin.points.empty: Пока нет точек продаж
@@ -626,3 +630,4 @@ admin.audit.field.banner_eyebrow_color: цвет надзаголовка
 admin.audit.field.banner_text_color: цвет текста
 admin.audit.field.banner_image: картинка
 admin.audit.field.banner_bg_image: фоновое изображение
+admin.audit.field.image: фото

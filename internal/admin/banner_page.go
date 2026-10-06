@@ -135,10 +135,10 @@ func (p *bannerPages) render(w http.ResponseWriter, r *http.Request, form banner
 	}
 }
 
-// bannerErrMessage is the admin-facing text of a save error: an apperr
+// localizedErrMessage is the admin-facing text of a save error: an apperr
 // in the page language with its variant and params (errors.<lang>.yaml),
 // anything else a generic line (details only in the log).
-func bannerErrMessage(t tr, err error) string {
+func localizedErrMessage(t tr, err error) string {
 	var ae *apperr.AppError
 	if errors.As(err, &ae) {
 		return apperr.Localize(t.Lang(), ae)
@@ -157,7 +157,7 @@ func (p *bannerPages) save(w http.ResponseWriter, r *http.Request) {
 	t := p.h.tr(r)
 	r.Body = http.MaxBytesReader(w, r.Body, bannerFormMaxBytes)
 	if err := r.ParseMultipartForm(bannerFormMemory); err != nil && !errors.Is(err, http.ErrNotMultipart) {
-		p.rerenderStored(w, r, bannerParseError(t, err))
+		p.rerenderStored(w, r, uploadParseError(t, err))
 		return
 	}
 	if r.MultipartForm != nil {
@@ -174,7 +174,7 @@ func (p *bannerPages) save(w http.ResponseWriter, r *http.Request) {
 	in := bannerInputFromForm(r, current).Normalized()
 	form := stickyBannerForm(in, current, p.objectURL)
 	if err := in.Validate(); err != nil {
-		p.render(w, r, form, bannerErrMessage(t, err), "")
+		p.render(w, r, form, localizedErrMessage(t, err), "")
 		return
 	}
 
@@ -184,7 +184,7 @@ func (p *bannerPages) save(w http.ResponseWriter, r *http.Request) {
 		if !isAppErr(err) {
 			slog.ErrorContext(ctx, "admin: uploading banner picture failed", "err", err)
 		}
-		p.render(w, r, form, bannerErrMessage(t, err), "")
+		p.render(w, r, form, localizedErrMessage(t, err), "")
 		return
 	}
 
@@ -194,7 +194,7 @@ func (p *bannerPages) save(w http.ResponseWriter, r *http.Request) {
 		if !isAppErr(err) {
 			slog.ErrorContext(ctx, "admin: saving banner failed", "err", err)
 		}
-		p.render(w, r, form, bannerErrMessage(t, err), "")
+		p.render(w, r, form, localizedErrMessage(t, err), "")
 		return
 	}
 	p.h.audit.Record(ctx, bannerAuditEntry(current, saved))
@@ -219,10 +219,10 @@ func (p *bannerPages) rerenderStored(w http.ResponseWriter, r *http.Request, err
 	p.render(w, r, newBannerForm(b, p.objectURL), errMsg, "")
 }
 
-func bannerParseError(t tr, err error) string {
+func uploadParseError(t tr, err error) string {
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		return bannerErrMessage(t, apperr.BadRequest("file_too_large", "файл больше 10 МБ"))
+		return localizedErrMessage(t, apperr.BadRequest("file_too_large", "файл больше 10 МБ"))
 	}
 	return t.T("admin.err.form")
 }
@@ -310,16 +310,16 @@ func (p *bannerPages) uploadPictures(ctx context.Context, r *http.Request) (pict
 
 // uploadPicture stores the named file as kind; "" when no file was chosen.
 func (p *bannerPages) uploadPicture(ctx context.Context, r *http.Request, field string, kind media.BannerImageKind) (string, error) {
-	data, err := readBannerFile(r, field)
+	data, err := readUploadFile(r, field)
 	if err != nil || data == nil {
 		return "", err
 	}
 	return p.images.StoreBannerImage(ctx, data, kind)
 }
 
-// readBannerFile returns the bytes of the named file part, or nil when
+// readUploadFile returns the bytes of the named file part, or nil when
 // none was chosen. Files over the media limit are rejected here already.
-func readBannerFile(r *http.Request, field string) ([]byte, error) {
+func readUploadFile(r *http.Request, field string) ([]byte, error) {
 	if r.MultipartForm == nil {
 		return nil, nil
 	}

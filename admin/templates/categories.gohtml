@@ -5,8 +5,18 @@
      HTML forms, mirroring points.gohtml/staff.gohtml's list+modal pattern —
      the one addition here is a second (edit) modal, since a category
      (unlike a point or staff account) has no single "toggle" action: name,
-     slug, parent and sort order can all change. */}}
+     slug, parent and sort order can all change. Both modals are multipart:
+     they carry the optional category photo (feat/category-photo,
+     internal/admin/categories_image.go) shown on the app's category tiles. */}}
 {{define "content"}}
+<style>
+  .admin-field input[type=file] { height: auto; padding: 10px 14px; }
+  img.admin-thumb { display: block; object-fit: contain; }
+  .cat-hint { font-size: 12px; color: var(--admin-muted); }
+  .cat-current { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--admin-muted); margin-top: 4px; }
+  .cat-current img { width: 64px; height: 64px; object-fit: contain; border: 1px solid var(--admin-border); border-radius: 8px; background: #F3F2EF; }
+  .cat-current label { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13px; }
+</style>
 {{$pdata := .Data}}
 <div class="admin-screen-narrow">
   <div class="admin-list-toolbar admin-list-toolbar--end">
@@ -22,14 +32,18 @@
     {{end}}
     {{range .Rows}}
     <div class="admin-row">
-      <div class="admin-row__info" style="padding-left:{{.IndentPx}}px">
+      <div style="padding-left:{{.IndentPx}}px">
+        {{if .ImageURL}}<img class="admin-thumb" src="{{.ImageURL}}" alt="" loading="lazy">{{else}}<div class="admin-thumb admin-thumb--empty"></div>{{end}}
+      </div>
+      <div class="admin-row__info">
         <div class="admin-row__title">{{.NameRu}}</div>
         <div class="admin-row__subtitle">{{.Slug}} · {{.NameKy}}</div>
       </div>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
         onclick="openCategoryEditModal({
           id: {{.ID}}, parentId: {{.ParentID}}, nameRu: {{.NameRu}},
-          nameKy: {{.NameKy}}, slug: {{.Slug}}, sortOrder: {{.SortOrder}}
+          nameKy: {{.NameKy}}, slug: {{.Slug}}, sortOrder: {{.SortOrder}},
+          imageUrl: {{.ImageURL}}
         })">{{t "admin.common.edit"}}</button>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
         onclick="openConfirmModal({{t "admin.categories.delete_title"}}, {{tf "admin.categories.delete_text" .NameRu}}, '/admin/categories/{{.ID}}/delete')">{{t "admin.common.delete"}}</button>
@@ -45,7 +59,7 @@
 <div id="admin-category-create-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-create-title">
     <div class="admin-modal__title" id="admin-category-create-title">{{t "admin.categories.new_title"}}</div>
-    <form method="post" action="/admin/categories">
+    <form method="post" action="/admin/categories" enctype="multipart/form-data">
       <div class="admin-field-row">
         <div class="admin-field">
           <label for="cat-create-name-ru">{{t "admin.common.name_ru"}}</label>
@@ -73,6 +87,11 @@
           {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
       </div>
+      <div class="admin-field">
+        <label for="cat-create-image">{{t "admin.categories.image"}}</label>
+        <input type="file" id="cat-create-image" name="image" accept="image/jpeg,image/png,image/webp" aria-describedby="cat-create-image-hint">
+        <div class="cat-hint" id="cat-create-image-hint">{{t "admin.categories.image_hint"}}</div>
+      </div>
       <div class="admin-modal__actions">
         <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryCreateModal()">{{t "admin.common.cancel"}}</button>
         <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
@@ -88,7 +107,7 @@
 <div id="admin-category-edit-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-category-edit-title">
     <div class="admin-modal__title" id="admin-category-edit-title">{{t "admin.categories.edit_title"}}</div>
-    <form method="post" id="admin-category-edit-form">
+    <form method="post" id="admin-category-edit-form" enctype="multipart/form-data">
       <div class="admin-field-row">
         <div class="admin-field">
           <label for="cat-edit-name-ru">{{t "admin.common.name_ru"}}</label>
@@ -116,6 +135,15 @@
           {{if $pdata}}{{range $pdata.Parents}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
       </div>
+      <div class="admin-field">
+        <label for="cat-edit-image">{{t "admin.categories.image"}}</label>
+        <input type="file" id="cat-edit-image" name="image" accept="image/jpeg,image/png,image/webp" aria-describedby="cat-edit-image-hint">
+        <div class="cat-hint" id="cat-edit-image-hint">{{t "admin.categories.image_hint"}}</div>
+        <div class="cat-current" id="cat-edit-current" style="display:none">
+          <img id="cat-edit-current-img" src="" alt="{{t "admin.categories.current_image"}}">
+          <label><input type="checkbox" id="cat-edit-remove-image" name="remove_image" value="1"> {{t "admin.categories.remove_image"}}</label>
+        </div>
+      </div>
       <div class="admin-modal__actions">
         <button type="button" class="admin-btn admin-btn--secondary" onclick="closeCategoryEditModal()">{{t "admin.common.cancel"}}</button>
         <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
@@ -142,6 +170,17 @@ function openCategoryEditModal(cat) {
     parentSelect.options[i].disabled = parentSelect.options[i].value === cat.id;
   }
   parentSelect.value = cat.parentId || '';
+  document.getElementById('cat-edit-image').value = '';
+  document.getElementById('cat-edit-remove-image').checked = false;
+  var current = document.getElementById('cat-edit-current');
+  var currentImg = document.getElementById('cat-edit-current-img');
+  if (cat.imageUrl) {
+    currentImg.src = cat.imageUrl;
+    current.style.display = 'flex';
+  } else {
+    currentImg.removeAttribute('src');
+    current.style.display = 'none';
+  }
   document.getElementById('admin-category-edit-modal').style.display = 'flex';
 }
 function closeCategoryEditModal() { document.getElementById('admin-category-edit-modal').style.display = 'none'; }
