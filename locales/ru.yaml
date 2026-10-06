@@ -145,6 +145,7 @@ checkout.pickup_free: Самовывоз — бесплатно
 
 done.total: Итого
 done.delivery_window: Курьер свяжется для уточнения времени доставки
+done.pickup_window: Мы сообщим, когда заказ будет готов к выдаче
 
 # Error pages / messages (internal/web/errors.go).
 error.not_found.title: Страница не найдена
@@ -208,6 +209,7 @@ shop.search_results: Результаты поиска
 shop.price_from: от %s
 shop.sort.label: Сортировка
 shop.sort.newest: Сначала новые
+shop.sort.popular: Сначала популярные
 shop.sort.price_asc: Сначала дешевле
 shop.sort.price_desc: Сначала дороже
 filter.size: Размер

@@ -207,7 +207,7 @@ func parseListFilter(q url.Values) (filter catalog.ListFilter, categoryParam str
 	}
 
 	switch sort := q.Get("sort"); sort {
-	case "", catalog.SortNewest, catalog.SortPriceAsc, catalog.SortPriceDesc:
+	case "", catalog.SortNewest, catalog.SortPriceAsc, catalog.SortPriceDesc, catalog.SortPopular:
 		filter.Sort = sort
 	default:
 		return filter, "", apperr.BadRequest("invalid_sort", "некорректный sort")

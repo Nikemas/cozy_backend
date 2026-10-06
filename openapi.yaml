@@ -269,7 +269,8 @@ paths:
           schema: { type: string }
         - name: sort
           in: query
-          schema: { type: string, enum: [newest, price_asc, price_desc], default: newest }
+          schema: { type: string, enum: [newest, price_asc, price_desc, popular], default: newest }
+          description: "`popular` = most units sold across non-cancelled orders first, newest first among equals."
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }

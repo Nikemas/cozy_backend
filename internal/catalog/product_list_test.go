@@ -62,6 +62,12 @@ func TestListOrderBy(t *testing.T) {
 	if got := listOrderBy(SortPriceDesc); !strings.HasPrefix(got, minPriceExpr+" DESC") {
 		t.Errorf("price_desc = %q", got)
 	}
+	if got := listOrderBy(SortPopular); !strings.HasPrefix(got, popularityExpr+" DESC, created_at DESC") {
+		t.Errorf("popular = %q, want units sold desc, then newest", got)
+	}
+	if !strings.Contains(popularityExpr, "<> 'cancelled'") {
+		t.Errorf("popularityExpr must exclude cancelled orders: %s", popularityExpr)
+	}
 	if got := listOrderBy("bogus"); !strings.HasPrefix(got, "created_at DESC") {
 		t.Errorf("unknown sort = %q, want newest first", got)
 	}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -112,6 +113,11 @@ func (h *handlers) onlinePaymentAvailable() bool {
 type DoneData struct {
 	OrderNumber string
 	Total       float64
+	// Pickup: a self-pickup order (no delivery address), so the screen
+	// says the store will notify when it's ready instead of promising a
+	// courier call. PickupPointName is that store, when known.
+	Pickup          bool
+	PickupPointName string
 }
 
 // checkoutForm renders the checkout screen: pick a delivery address or a
@@ -325,9 +331,32 @@ func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	done := DoneData{OrderNumber: order.OrderNumber, Total: order.TotalAmount, Pickup: order.AddressID == nil}
+	if done.Pickup && order.PointID != nil {
+		name, err := pointName(r.Context(), h.db, *order.PointID)
+		if err != nil {
+			return err
+		}
+		done.PickupPointName = name
+	}
+
 	data := h.base(r, "done")
-	data.Data = DoneData{OrderNumber: order.OrderNumber, Total: order.TotalAmount}
+	data.Data = done
 	return h.render.Render(w, "done", data)
+}
+
+// pointName is the name of the point of sale id, or "" if it no longer
+// exists.
+func pointName(ctx context.Context, db *sql.DB, id string) (string, error) {
+	var name string
+	err := db.QueryRowContext(ctx, `SELECT name FROM points_of_sale WHERE id = $1`, id).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("load pickup point %s: %w", id, err)
+	}
+	return name, nil
 }
 
 func listCustomerAddresses(ctx context.Context, db *sql.DB, customerID string) ([]AddressView, error) {

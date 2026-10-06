@@ -141,6 +141,40 @@ func TestRenderDoneExecutes(t *testing.T) {
 	}
 }
 
+// TestRenderDoneDeliveryVsPickup: the confirmation hint matches how the
+// order is fulfilled — a courier call for delivery, a ready-for-pickup
+// notice (with the point's name) for self-pickup.
+func TestRenderDoneDeliveryVsPickup(t *testing.T) {
+	cases := []struct {
+		name    string
+		data    DoneData
+		want    string
+		notWant string
+	}{
+		{"delivery", DoneData{OrderNumber: "COZY-1", Total: 100}, "Курьер свяжется", "готов к выдаче"},
+		{"pickup", DoneData{OrderNumber: "COZY-2", Total: 100, Pickup: true, PickupPointName: "Cozy Дордой"}, "готов к выдаче", "Курьер свяжется"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rr := newTestRenderer(t)
+			w := httptest.NewRecorder()
+			if err := rr.Render(w, "done", PageData{Lang: i18n.LangRU, Screen: "done", Authed: true, Data: c.data}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			body := w.Body.String()
+			if !strings.Contains(body, c.want) {
+				t.Errorf("body missing %q", c.want)
+			}
+			if strings.Contains(body, c.notWant) {
+				t.Errorf("body unexpectedly contains %q", c.notWant)
+			}
+			if c.data.PickupPointName != "" && !strings.Contains(body, c.data.PickupPointName) {
+				t.Errorf("body missing pickup point name %q", c.data.PickupPointName)
+			}
+		})
+	}
+}
+
 func TestPluralForm(t *testing.T) {
 	cases := map[int]string{0: "many", 1: "one", 2: "few", 4: "few", 5: "many", 11: "many", 12: "many", 14: "many", 21: "one", 22: "few", 25: "many", 101: "one", 111: "many"}
 	for n, want := range cases {

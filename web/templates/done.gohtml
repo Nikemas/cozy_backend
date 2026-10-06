@@ -4,11 +4,14 @@
   <h1>{{t "screen.done.title"}}</h1>
   {{if .Data.OrderNumber}}<p class="done-screen__number">{{.Data.OrderNumber}}</p>{{end}}
   <p class="done-screen__total">{{t "done.total"}}: {{money .Data.Total}}</p>
-  {{/* TODO(delivery-window): COZY_WEB_DESIGN.md §3.9 hardcodes "сегодня
-       18:00—21:00" in the canvas prototype; there's no real delivery-slot
-       calculation specified yet (see web-plan Open Questions), so this is
-       a generic placeholder rather than an invented time window. */}}
+  {{/* No delivery-slot calculation is specified (the design prototype's
+       "сегодня 18:00—21:00" was illustrative), so the hint states who
+       gets in touch next rather than inventing a time window. */}}
+  {{if .Data.Pickup}}
+  <p class="muted">{{t "done.pickup_window"}}{{with .Data.PickupPointName}}: {{.}}{{end}}</p>
+  {{else}}
   <p class="muted">{{t "done.delivery_window"}}</p>
+  {{end}}
   <a class="btn btn--primary" href="/">{{t "common.back_home"}}</a>
 </div>
 {{end}}
