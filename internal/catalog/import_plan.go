@@ -168,10 +168,16 @@ func (p *planner) parseRow(row importRow) (*rawRow, error) {
 
 	if v := row.get(colPrice); v != "" {
 		f, err := parsePrice(v)
-		if err != nil {
+		switch {
+		case err != nil:
 			rr.errs = append(rr.errs, asImportMsg(err))
 			rr.priceBad = true
-		} else {
+		case f <= 0:
+			// A 0 price (or one that rounds to 0.00) could become the
+			// model's base price and sell it for free — never meaningful.
+			rr.errs = append(rr.errs, newImportMsg("import.price_not_positive", map[string]string{"value": strconv.Quote(v)}))
+			rr.priceBad = true
+		default:
 			rr.price = &f
 		}
 	}
@@ -344,14 +350,15 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 		} else {
 			sizes[k] = r.row.line
 		}
-		// A 0 variant price means "no override", like an empty cell: a
-		// stored price_override of 0 would sell the variant for free.
+		// A 0 price_override means "no override", like an empty cell: a
+		// stored price_override of 0 would sell the variant for free. (A
+		// 0 in the price column is already a row error, see parseRow.)
 		switch {
 		case r.priceOverride != nil:
 			if *r.priceOverride > 0 {
 				pr.variant.PriceOverride = r.priceOverride
 			}
-		case r.price != nil && base != nil && *r.price != *base && *r.price > 0:
+		case r.price != nil && base != nil && *r.price != *base:
 			pr.variant.PriceOverride = r.price
 		}
 	}
