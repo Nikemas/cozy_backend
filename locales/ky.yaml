@@ -182,6 +182,18 @@ error.code.address_in_use: Бул дарек буйрутмада колдону
 error.code.pickup_point_not_found: Алып кетүүчү дүкөн табылган жок
 error.code.order_not_found: Буйрутма табылган жок
 error.code.order_not_cancellable: Бул буйрутманы мындан ары жокко чыгарууга болбойт
+# Site error texts for codes that previously fell back to the generic
+# message on the KY site (fix/ky-completeness).
+error.code.otp_invalid: Код туура эмес. SMSти текшерип, кайра аракет кылыңыз.
+error.code.otp_attempts_exceeded: Туура эмес аракеттер өтө көп болду. Жаңы код сураңыз.
+error.code.otp_daily_limit: SMS аркылуу кирүү убактылуу жеткиликсиз. Кийинчерээк аракет кылыңыз.
+error.code.invalid_payment_method: Төлөө ыкмасын тандаңыз
+error.code.payments_not_configured: Онлайн-төлөм азырынча жеткиликсиз. Алганда төлөөнү тандаңыз.
+error.code.payment_create_failed: Төлөмдү түзүү мүмкүн болгон жок. Кайра аракет кылыңыз.
+error.code.delivery_zone_required: Жеткирүү аймагын тандаңыз
+error.code.invalid_delivery_zone: Бул жеткирүү аймагы мындан ары тейленбейт. Башкасын тандаңыз.
+error.code.invalid_item: Өлчөмдү жана түстү тандаңыз
+error.code.invalid_variant_id: Мындай өлчөм же түс азыр жок
 
 # Legal/info pages (web/templates/pages/*) and footer.
 screen.page_about.title: Дүкөн жөнүндө
