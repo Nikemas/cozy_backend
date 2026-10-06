@@ -12,7 +12,7 @@
 # files are baked into this image.
 
 # ---- Stage 1: builder -------------------------------------------------
-# Version must track the `go` directive in go.mod (currently 1.26.4).
+# Version must track the `go` directive in go.mod (currently 1.26.6).
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
