@@ -229,6 +229,7 @@ import.point_inactive: точка продаж {point} не найдена ил�
 import.point_stock: "остаток по точке {point}: {reason}"
 import.price_negative: "цена не может быть отрицательной: {value}"
 import.price_not_number: "цена не число: {value}"
+import.price_not_positive: "цена должна быть больше нуля: {value}"
 import.price_too_large: "слишком большая цена: {value}"
 import.qty_negative: "остаток не может быть отрицательным: {value}"
 import.qty_not_integer: "остаток должен быть целым числом: {value}"

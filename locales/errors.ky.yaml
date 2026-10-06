@@ -222,6 +222,7 @@ import.point_inactive: сатуу жайы {point} табылган жок же 
 import.point_stock: "{point} сатуу жайындагы калдык: {reason}"
 import.price_negative: "баасы терс болбошу керек: {value}"
 import.price_not_number: "баасы сан эмес: {value}"
+import.price_not_positive: "баасы нөлдөн чоң болушу керек: {value}"
 import.price_too_large: "баасы өтө чоң: {value}"
 import.qty_negative: "калдык терс болбошу керек: {value}"
 import.qty_not_integer: "калдык бүтүн сан болушу керек: {value}"

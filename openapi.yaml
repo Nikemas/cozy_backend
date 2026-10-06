@@ -1534,7 +1534,9 @@ paths:
         size + color is one variant. The first non-empty value of each
         product field in the model wins; `price` of the first row is the
         base price, a row whose `price` differs gets it as `price_override`
-        (an explicit `price_override` column wins).
+        (an explicit `price_override` column wins). A `price` of 0 is a
+        row error (`import.price_not_positive`); a `price_override` of 0
+        means no override.
 
         **Re-import updates, never duplicates.** A product is matched by
         article, then by any of its rows' SKUs, then by brand + name +
