@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/netip"
 	"os"
 	"strconv"
@@ -34,7 +35,32 @@ type Security struct {
 	MaxUploadBytes int64
 
 	Auth AuthLimits
+
+	// RateLimit is the global per-client-IP request limit in front of
+	// every route (see httpmw.RateLimit).
+	RateLimit RateLimit
 }
+
+// RateLimit is a token bucket per client IP: RPS tokens per second refill
+// a bucket of Burst. RATE_LIMIT_RPS=0 disables the limiter.
+type RateLimit struct {
+	// RPS — sustained requests per second per client IP (RATE_LIMIT_RPS,
+	// default DefaultRateLimitRPS; fractions allowed).
+	RPS float64
+	// Burst — requests a client may make at once before RPS kicks in
+	// (RATE_LIMIT_BURST, default DefaultRateLimitBurst, min 1 when on).
+	Burst int
+}
+
+const (
+	// DefaultRateLimitRPS / DefaultRateLimitBurst leave plenty of room for
+	// a real shopper or the mobile app (a screen fires a handful of
+	// parallel API calls; images and /static are not counted) and for
+	// several customers sharing one carrier-NAT IP, while stopping a
+	// single scraper or flood from monopolising the backend.
+	DefaultRateLimitRPS   = 20
+	DefaultRateLimitBurst = 60
+)
 
 // AuthLimits are the abuse limits of the customer OTP login and staff
 // login. A zero per-IP/global limit disables that particular check.
@@ -105,6 +131,10 @@ func loadSecurity(env string) (Security, error) {
 	}
 	s.MaxBodyBytes, s.MaxUploadBytes = int64(maxBody), int64(maxUpload)
 
+	if s.RateLimit, err = loadRateLimit(); err != nil {
+		return s, err
+	}
+
 	a := &s.Auth
 	for _, f := range []struct {
 		key      string
@@ -133,6 +163,26 @@ func loadSecurity(env string) (Security, error) {
 		return s, fmt.Errorf("OTP_RETENTION_DAYS must be at least %d", MinOTPRetentionDays)
 	}
 	return s, nil
+}
+
+func loadRateLimit() (RateLimit, error) {
+	rl := RateLimit{RPS: DefaultRateLimitRPS}
+	if v := strings.TrimSpace(os.Getenv("RATE_LIMIT_RPS")); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f < 0 || math.IsNaN(f) || math.IsInf(f, 0) {
+			return rl, fmt.Errorf("RATE_LIMIT_RPS must be a non-negative number, got %q", v)
+		}
+		rl.RPS = f
+	}
+	burst, err := getEnvInt("RATE_LIMIT_BURST", DefaultRateLimitBurst)
+	if err != nil {
+		return rl, err
+	}
+	if rl.RPS > 0 && burst == 0 {
+		return rl, fmt.Errorf("RATE_LIMIT_BURST must be at least 1 (or set RATE_LIMIT_RPS=0 to disable the limiter)")
+	}
+	rl.Burst = burst
+	return rl, nil
 }
 
 // parsePrefixes parses a comma-separated list of CIDRs or bare IPs.
