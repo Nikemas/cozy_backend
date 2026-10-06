@@ -1,0 +1,12 @@
+DROP TRIGGER IF EXISTS product_variants_product_sales ON product_variants;
+DROP TRIGGER IF EXISTS orders_product_sales_delete ON orders;
+DROP TRIGGER IF EXISTS orders_product_sales_status ON orders;
+DROP TRIGGER IF EXISTS order_items_product_sales ON order_items;
+DROP FUNCTION IF EXISTS product_variants_product_sales();
+DROP FUNCTION IF EXISTS orders_product_sales_delete();
+DROP FUNCTION IF EXISTS orders_product_sales_status();
+DROP FUNCTION IF EXISTS order_items_product_sales();
+DROP FUNCTION IF EXISTS product_sales_item_counts(UUID);
+DROP FUNCTION IF EXISTS product_sales_apply_order(UUID, INT);
+DROP FUNCTION IF EXISTS product_sales_add(UUID, BIGINT);
+DROP TABLE IF EXISTS product_sales;

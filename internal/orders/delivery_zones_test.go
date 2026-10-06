@@ -98,7 +98,7 @@ func expectZonedDeliveryUntilInsert(mock sqlmock.Sqlmock, zoneFee float64, freeF
 		WithArgs(testZone).
 		WillReturnRows(sqlmock.NewRows(zoneColumnNames).AddRow(testZone, "Бишкек", "Бишкек", zoneFee, freeFrom, true, 0))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
-		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "42", "Черный", nil, "Air Max", 5000.0, true))
+		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "product-1", "42", "Черный", nil, "Air Max", 5000.0, true))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM points_of_sale WHERE is_active = true")).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("point-1"))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT quantity FROM stock WHERE variant_id = $1 AND point_id = $2")).

@@ -76,18 +76,12 @@ const (
 // JOINed to units sold per product — the total quantity of its variants
 // across order_items of every order that wasn't cancelled (an order in any
 // other status — placed, confirmed, courier_assigned, delivered — counts as
-// demand). Aggregated once with a GROUP BY rather than a correlated
-// subquery per product row; the derived table only exposes product_id and
-// units_sold, neither of which is a products column, so the unqualified
-// columns in the WHERE/SELECT stay unambiguous.
-const popularityJoin = `products LEFT JOIN (
-		SELECT pv.product_id, SUM(oi.quantity) AS units_sold
-		FROM order_items oi
-		JOIN product_variants pv ON pv.id = oi.variant_id
-		JOIN orders o ON o.id = oi.order_id
-		WHERE o.status <> 'cancelled'
-		GROUP BY pv.product_id
-	) popularity ON popularity.product_id = products.id`
+// demand). That sum is kept up to date by triggers in product_sales
+// (migration 000042) instead of being aggregated over all order_items on
+// every request; product_sales only exposes product_id and units_sold,
+// neither of which is a products column, so the unqualified columns in the
+// WHERE/SELECT stay unambiguous.
+const popularityJoin = `products LEFT JOIN product_sales popularity ON popularity.product_id = products.id`
 
 // listFrom is List's FROM clause for sort: the popularity join only when
 // it's needed for ORDER BY. The COUNT query never uses it.

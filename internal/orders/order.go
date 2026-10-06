@@ -124,6 +124,7 @@ func NewService(db *sql.DB) *Service {
 // underlying product_variants/products tables directly instead of adding
 // one there.
 type variantSnapshot struct {
+	ProductID   string
 	ProductName string
 	Size        string
 	Color       string
@@ -363,7 +364,11 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 			INSERT INTO order_items (order_id, variant_id, product_name_snapshot, size_snapshot, color_snapshot, quantity, price)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			RETURNING id`
-		for i := range orderItems {
+		// Inserted in product order: each insert bumps product_sales
+		// (migration 000042) under a row lock, and a fixed order means two
+		// concurrent checkouts can never wait on each other's rows in a
+		// cycle. orderItems itself keeps its (variant id) order.
+		for _, i := range itemsInProductOrder(orderItems, snapshots) {
 			orderItems[i].OrderID = order.ID
 			err := tx.QueryRowContext(ctx, insertItemQ,
 				order.ID, orderItems[i].VariantID, orderItems[i].ProductNameSnapshot,
@@ -768,7 +773,7 @@ func loadVariantSnapshots(ctx context.Context, tx *sql.Tx, variantIDs []string) 
 	}
 
 	q := fmt.Sprintf(`
-		SELECT pv.id, pv.size, pv.color, pv.price_override, p.name_ru, p.base_price, p.is_active
+		SELECT pv.id, pv.product_id, pv.size, pv.color, pv.price_override, p.name_ru, p.base_price, p.is_active
 		FROM product_variants pv
 		JOIN products p ON p.id = pv.product_id
 		WHERE pv.id IN (%s)`, strings.Join(placeholders, ", "))
@@ -781,23 +786,40 @@ func loadVariantSnapshots(ctx context.Context, tx *sql.Tx, variantIDs []string) 
 
 	out := make(map[string]variantSnapshot, len(variantIDs))
 	for rows.Next() {
-		var id, size, color, name string
+		var id, productID, size, color, name string
 		var override *float64
 		var base float64
 		var active bool
-		if err := rows.Scan(&id, &size, &color, &override, &name, &base, &active); err != nil {
+		if err := rows.Scan(&id, &productID, &size, &color, &override, &name, &base, &active); err != nil {
 			return nil, err
 		}
 		price := base
 		if override != nil {
 			price = *override
 		}
-		out[id] = variantSnapshot{ProductName: name, Size: size, Color: color, Price: price, Active: active}
+		out[id] = variantSnapshot{ProductID: productID, ProductName: name, Size: size, Color: color, Price: price, Active: active}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// itemsInProductOrder returns the indexes of items sorted by product id,
+// then variant id.
+func itemsInProductOrder(items []OrderItem, snapshots map[string]variantSnapshot) []int {
+	idx := make([]int, len(items))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(a, b int) bool {
+		pa, pb := snapshots[items[idx[a]].VariantID].ProductID, snapshots[items[idx[b]].VariantID].ProductID
+		if pa != pb {
+			return pa < pb
+		}
+		return items[idx[a]].VariantID < items[idx[b]].VariantID
+	})
+	return idx
 }
 
 // pickFulfillmentPoint chooses which points_of_sale a delivery order gets
