@@ -1,7 +1,9 @@
 package web
 
 import (
+	"context"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,9 +12,9 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
-// sitemapPageSize is a generous upper bound on how many products a
-// sitemap enumerates in one go. catalog.ProductRepo.List still paginates
-// internally; this just asks for effectively "all of them" in one page.
+// sitemapPageSize is how many products one catalog query fetches while
+// the sitemap walks the catalog page by page (allSitemapProducts), so a
+// catalog of any size is listed in full.
 const sitemapPageSize = 5000
 
 type sitemapURLSet struct {
@@ -50,7 +52,9 @@ func (h *handlers) sitemap(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	products, _, err := h.products.List(ctx, catalog.ListFilter{Page: 1, PageSize: sitemapPageSize})
+	products, err := allSitemapProducts(ctx, func(ctx context.Context, page, size int) ([]catalog.Product, int, error) {
+		return h.products.List(ctx, catalog.ListFilter{Page: page, PageSize: size})
+	})
 	if err != nil {
 		return err
 	}
@@ -67,6 +71,22 @@ func (h *handlers) sitemap(w http.ResponseWriter, r *http.Request) error {
 	}
 	_, err = w.Write(out)
 	return err
+}
+
+// allSitemapProducts collects every active product by walking list page
+// by page until a short page or the reported total is reached.
+func allSitemapProducts(ctx context.Context, list func(ctx context.Context, page, size int) ([]catalog.Product, int, error)) ([]catalog.Product, error) {
+	var all []catalog.Product
+	for page := 1; ; page++ {
+		batch, total, err := list(ctx, page, sitemapPageSize)
+		if err != nil {
+			return nil, fmt.Errorf("list sitemap products page %d: %w", page, err)
+		}
+		all = append(all, batch...)
+		if len(batch) < sitemapPageSize || len(all) >= total {
+			return all, nil
+		}
+	}
 }
 
 // buildSitemap is the pure part of sitemap: home (lastmod = newest

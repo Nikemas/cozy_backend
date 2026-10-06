@@ -24,6 +24,11 @@
 -- inserts its items in product order for the same reason
 -- (orders.Service.CreateOrder).
 
+-- Creating the triggers takes SHARE ROW EXCLUSIVE locks on orders,
+-- order_items and product_variants; don't wait forever behind an in-flight
+-- checkout during a deploy — fail fast and let the deploy retry.
+SET lock_timeout = '10s';
+
 CREATE TABLE product_sales (
   product_id UUID PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
   units_sold BIGINT NOT NULL DEFAULT 0
