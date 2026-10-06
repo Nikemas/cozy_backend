@@ -654,3 +654,4 @@ admin.categories.toast_deleted: Категория удалена
 admin.staff.notice_created: Сотрудник добавлен. Передайте ему телефон и пароль для входа.
 admin.staff.notice_activated: Сотрудник активирован
 admin.staff.notice_deactivated: Сотрудник деактивирован — доступ к админке закрыт.
+admin.import.working: Обрабатываем файл…

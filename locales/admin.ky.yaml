@@ -651,3 +651,4 @@ admin.categories.toast_deleted: Категория өчүрүлдү
 admin.staff.notice_created: Кызматкер кошулду. Ага кирүү үчүн телефонду жана сырсөздү бериңиз.
 admin.staff.notice_activated: Кызматкер активдештирилди
 admin.staff.notice_deactivated: Кызматкер активсиздештирилди — админкага кирүү жабылды.
+admin.import.working: Файл иштетилүүдө…
