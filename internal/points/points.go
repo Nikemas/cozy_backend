@@ -8,10 +8,10 @@
 package points
 
 import (
-	"fmt"
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
