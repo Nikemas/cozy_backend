@@ -121,6 +121,10 @@ type PageData struct {
 	// on the sidebar's «Заказы» and the mobile menu button. Render fills it.
 	NewOrders int
 
+	// FormRetry reopens a modal with the user's input after a failed
+	// POST (owner_ux.go); nil otherwise.
+	FormRetry *FormRetry
+
 	Data any
 }
 

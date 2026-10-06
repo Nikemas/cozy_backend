@@ -25,6 +25,7 @@
 {{else}}
   {{template "content" .}}
 {{end}}
+{{with .FormRetry}}<script type="application/json" id="admin-form-retry">{{.}}</script>{{end}}
 {{template "_toast" .}}
 {{template "_confirm_modal" .}}
 <script>
@@ -89,6 +90,37 @@ document.addEventListener('click', function (evt) {
   } else {
     window.prompt('', value);
   }
+});
+
+// #admin-form-retry (FormRetry, owner_ux.go): a modal form came back
+// with an error — reopen it with what the user typed.
+document.addEventListener('DOMContentLoaded', function () {
+  var el = document.getElementById('admin-form-retry');
+  if (!el) return;
+  var d;
+  try { d = JSON.parse(el.textContent); } catch (e) { return; }
+  var modal = document.getElementById(d.modal);
+  var form = modal && modal.querySelector('form');
+  if (!form) return;
+  if (d.action) form.setAttribute('action', d.action);
+  if (d.title) {
+    var title = modal.querySelector('.admin-modal__title');
+    if (title) title.textContent = d.title;
+  }
+  if (d.error) {
+    var box = document.createElement('div');
+    box.className = 'admin-form-error';
+    box.setAttribute('role', 'alert');
+    box.textContent = d.error;
+    form.insertBefore(box, form.firstChild);
+  }
+  Object.keys(d.values || {}).forEach(function (name) {
+    var field = form.elements[name];
+    if (!field || field.type === 'password' || field.type === 'file') return;
+    field.value = d.values[name];
+    if (field.tagName === 'SELECT') field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  modal.style.display = 'flex';
 });
 
 function toggleAdminDrawer(open) {

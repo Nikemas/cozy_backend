@@ -964,6 +964,7 @@ img.admin-order-detail__thumb-box { display: block; object-fit: cover; backgroun
   font-variant-numeric: tabular-nums;
 }
 .admin-header__hamburger { position: relative; }
+.admin-modal form > .admin-form-error:first-child { margin-bottom: 14px; }
 .admin-order-detail__name { font-size: 15px; font-weight: 600; color: var(--admin-text); margin-bottom: 4px; }
 a.admin-order-detail__phone { display: inline-block; color: var(--admin-text); text-decoration: none; }
 a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
@@ -1018,6 +1019,11 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   .admin-order-detail__item-qty { width: auto; white-space: nowrap; }
   .admin-order-detail__item-price { width: auto; white-space: nowrap; }
   .admin-order-detail__title { font-size: 19px; word-break: break-word; }
+
+  /* Modals: two-column rows and the password + «Сгенерировать» row
+     overflowed a 390px screen. */
+  .admin-field-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .admin-password-row input { min-width: 0; }
 
   /* Points/staff toolbars: note above, full-width add button below. */
   .admin-list-toolbar { flex-wrap: wrap; }

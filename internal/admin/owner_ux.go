@@ -211,3 +211,84 @@ func displayPhone(raw string) string {
 	}
 	return raw
 }
+
+// ---------- keep typed input when a modal form fails ----------
+
+// FormRetry reopens a list screen's add/edit modal after its POST failed
+// validation, with what the user typed — the error banner used to come
+// back over a closed, empty modal. Rendered as JSON by layout.gohtml and
+// applied by its script. Passwords and files are never echoed back.
+type FormRetry struct {
+	Modal  string            `json:"modal"`  // the .admin-modal-backdrop id
+	Action string            `json:"action"` // the form's action (edit modals have none until opened)
+	Title  string            `json:"title,omitempty"`
+	Error  string            `json:"error,omitempty"` // shown inside the reopened modal
+	Values map[string]string `json:"values"`
+}
+
+// withRetryError returns a copy of fr carrying errMsg (nil stays nil).
+func withRetryError(fr *FormRetry, errMsg string) *FormRetry {
+	if fr == nil {
+		return nil
+	}
+	out := *fr
+	out.Error = errMsg
+	return &out
+}
+
+// newFormRetry copies fields from r's parsed form (r.PostForm/r.Form).
+func newFormRetry(r *http.Request, modal, action, title string, fields ...string) *FormRetry {
+	values := make(map[string]string, len(fields))
+	for _, f := range fields {
+		if v, ok := r.Form[f]; ok && len(v) > 0 {
+			values[f] = v[0]
+		}
+	}
+	return &FormRetry{Modal: modal, Action: action, Title: title, Values: values}
+}
+
+// isFormRetryRequest: only a failed add/edit POST reopens its modal.
+func isFormRetryRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.Form != nil
+}
+
+// pointsFormRetry: POST /admin/points (new) or /admin/points/{id} (edit).
+func pointsFormRetry(r *http.Request, t tr) *FormRetry {
+	if !isFormRetryRequest(r) {
+		return nil
+	}
+	fields := []string{"name", "city", "address", "working_hours", "latitude", "longitude"}
+	switch {
+	case r.URL.Path == "/admin/points":
+		return newFormRetry(r, "admin-point-modal", r.URL.Path, t.T("admin.points.new_title"), fields...)
+	case strings.HasPrefix(r.URL.Path, "/admin/points/") && strings.Count(r.URL.Path, "/") == 3:
+		return newFormRetry(r, "admin-point-modal", r.URL.Path, t.T("admin.points.edit_title"), fields...)
+	default:
+		return nil
+	}
+}
+
+// staffFormRetry: POST /admin/staff (add). The password is not kept.
+func staffFormRetry(r *http.Request) *FormRetry {
+	if !isFormRetryRequest(r) || r.URL.Path != "/admin/staff" {
+		return nil
+	}
+	return newFormRetry(r, "admin-staff-modal", r.URL.Path, "", "name", "phone", "role", "point_id")
+}
+
+// categoriesFormRetry: POST /admin/categories (add) or
+// /admin/categories/{id} (edit). The photo has to be chosen again.
+func categoriesFormRetry(r *http.Request) *FormRetry {
+	if !isFormRetryRequest(r) {
+		return nil
+	}
+	fields := []string{"name_ru", "name_ky", "slug", "sort_order", "parent_id"}
+	switch {
+	case r.URL.Path == "/admin/categories":
+		return newFormRetry(r, "admin-category-create-modal", r.URL.Path, "", fields...)
+	case strings.HasPrefix(r.URL.Path, "/admin/categories/") && strings.Count(r.URL.Path, "/") == 3:
+		return newFormRetry(r, "admin-category-edit-modal", r.URL.Path, "", fields...)
+	default:
+		return nil
+	}
+}

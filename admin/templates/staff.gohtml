@@ -35,7 +35,7 @@
               data-staff-id="{{.ID}}" data-staff-name="{{.Name}}"
               onclick="openStaffPasswordModal(this)">{{t "admin.staff.change_password"}}</button>
       <form method="post" action="/admin/staff/{{.ID}}/toggle"
-            {{if .IsActive}}data-confirm="{{tf "admin.staff.deactivate_confirm" .Name}}" onsubmit="return confirmStaffAction(this)"{{end}}>
+            {{if .IsActive}}data-confirm="{{tf "admin.staff.deactivate_confirm" .Name}}" data-confirm-label="{{t "admin.common.deactivate"}}" data-confirm-danger="1"{{end}}>
         <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
       </form>
     </div>
@@ -123,7 +123,6 @@
   </div>
 </div>
 <script>
-function confirmStaffAction(form) { return window.confirm(form.dataset.confirm); }
 function openStaffPasswordModal(btn) {
   var form = document.getElementById('staff-password-form');
   form.action = '/admin/staff/' + encodeURIComponent(btn.dataset.staffId) + '/password';

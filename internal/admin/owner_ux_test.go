@@ -295,3 +295,94 @@ func TestOrderDetailShowsToastParam(t *testing.T) {
 		t.Error("toast not rendered")
 	}
 }
+
+func postForm(target string, st *staff.Staff, body url.Values) *http.Request {
+	return requestAs(http.MethodPost, target, st, body)
+}
+
+func TestFormRetryForPointsKeepsTypedValues(t *testing.T) {
+	r := postForm("/admin/points/p1", nil, url.Values{"name": {"ЦУМ"}, "city": {"Ош"}, "latitude": {"abc"}, "longitude": {"1"}})
+	_ = r.ParseForm()
+	got := pointsFormRetry(r, ruTr)
+	if got == nil || got.Modal != "admin-point-modal" || got.Action != "/admin/points/p1" {
+		t.Fatalf("retry = %+v", got)
+	}
+	if got.Values["name"] != "ЦУМ" || got.Values["latitude"] != "abc" || got.Values["city"] != "Ош" {
+		t.Errorf("values = %v", got.Values)
+	}
+	if got.Title != ruTr.T("admin.points.edit_title") {
+		t.Errorf("title = %q", got.Title)
+	}
+	toggle := postForm("/admin/points/p1/toggle", nil, url.Values{})
+	_ = toggle.ParseForm()
+	if pointsFormRetry(toggle, ruTr) != nil {
+		t.Error("toggle failure must not reopen the form")
+	}
+	get := httptest.NewRequest(http.MethodGet, "/admin/points", nil)
+	if pointsFormRetry(get, ruTr) != nil {
+		t.Error("GET must not reopen the form")
+	}
+}
+
+func TestStaffCreateErrorReopensModalWithoutPassword(t *testing.T) {
+	r := postForm("/admin/staff", nil, url.Values{"name": {"Айгерим"}, "phone": {"+996555000777"}, "role": {"point_staff"}, "point_id": {"pt1"}, "password": {"secret-123456"}})
+	_ = r.ParseForm()
+	got := staffFormRetry(r)
+	if got == nil || got.Modal != "admin-staff-modal" {
+		t.Fatalf("retry = %+v", got)
+	}
+	if _, ok := got.Values["password"]; ok {
+		t.Error("password must never be echoed back into the page")
+	}
+	if got.Values["phone"] != "+996555000777" || got.Values["role"] != "point_staff" || got.Values["point_id"] != "pt1" {
+		t.Errorf("values = %v", got.Values)
+	}
+}
+
+func TestCategoriesFormRetryPicksModal(t *testing.T) {
+	create := postForm("/admin/categories", nil, url.Values{"name_ru": {"Кеды"}, "slug": {"keds"}})
+	_ = create.ParseForm()
+	if got := categoriesFormRetry(create); got == nil || got.Modal != "admin-category-create-modal" || got.Values["slug"] != "keds" {
+		t.Errorf("create retry = %+v", got)
+	}
+	edit := postForm("/admin/categories/c1", nil, url.Values{"name_ru": {"Кеды"}})
+	_ = edit.ParseForm()
+	if got := categoriesFormRetry(edit); got == nil || got.Modal != "admin-category-edit-modal" || got.Action != "/admin/categories/c1" {
+		t.Errorf("edit retry = %+v", got)
+	}
+	del := postForm("/admin/categories/c1/delete", nil, url.Values{})
+	_ = del.ParseForm()
+	if categoriesFormRetry(del) != nil {
+		t.Error("delete failure must not reopen a form")
+	}
+}
+
+func TestFormRetryRenderedAsJSON(t *testing.T) {
+	rr := newTestRenderer(t)
+	owner := &staff.Staff{ID: "s1", Name: "Owner", Role: staff.RoleOwner, IsActive: true}
+	h := &handlers{render: rr}
+	pd := h.shellPageData("points", "admin.nav.points", owner)
+	pd.FormRetry = &FormRetry{Modal: "admin-point-modal", Action: "/admin/points", Values: map[string]string{"name": `</script><b>"x"`}}
+	rec := httptest.NewRecorder()
+	if err := rr.Render(rec, "points", pd); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="admin-form-retry"`) || !strings.Contains(body, `"modal":"admin-point-modal"`) {
+		t.Errorf("retry JSON missing:\n%s", body)
+	}
+	if strings.Contains(body, `</script><b>`) {
+		t.Error("retry values not escaped inside <script>")
+	}
+}
+
+func TestWithRetryErrorCopies(t *testing.T) {
+	if withRetryError(nil, "x") != nil {
+		t.Error("nil retry must stay nil")
+	}
+	in := &FormRetry{Modal: "m"}
+	out := withRetryError(in, "занято")
+	if out.Error != "занято" || in.Error != "" {
+		t.Errorf("out=%+v in=%+v", out, in)
+	}
+}

@@ -646,3 +646,11 @@ admin.order.delivered_confirm_label: Да, доставлен
 admin.order.call: Позвонить
 admin.common.copy: Копировать
 admin.common.copied: Скопировано
+admin.points.toast_saved: Точка сохранена
+admin.points.toast_activated: Точка активирована
+admin.points.toast_deactivated: Точка деактивирована
+admin.categories.toast_saved: Категория сохранена
+admin.categories.toast_deleted: Категория удалена
+admin.staff.notice_created: Сотрудник добавлен. Передайте ему телефон и пароль для входа.
+admin.staff.notice_activated: Сотрудник активирован
+admin.staff.notice_deactivated: Сотрудник деактивирован — доступ к админке закрыт.
