@@ -167,13 +167,23 @@ func (r *PointsRepo) Update(ctx context.Context, id string, in PointInput) (*Poi
 }
 
 // Delete removes a point of sale. A point still referenced by
-// staff.point_id, stock.point_id or orders.point_id can't be removed
-// without breaking that reference; Postgres raises a foreign key violation
-// (SQLSTATE 23503) for that, which translateDeleteErr turns into
-// apperr.Conflict instead of letting it leak as a raw 500 or silently
-// cascade.
+// staff.point_id or orders.point_id can't be removed without breaking that
+// reference; Postgres raises a foreign key violation (SQLSTATE 23503) for
+// that, which translateDeleteErr turns into apperr.Conflict instead of
+// letting it leak as a raw 500. stock.point_id is ON DELETE CASCADE, so a
+// point that still holds goods (quantity > 0) is refused here explicitly —
+// otherwise its stock would be wiped silently. Empty stock rows cascade.
 func (r *PointsRepo) Delete(ctx context.Context, id string) error {
+	const stockQ = `SELECT EXISTS (SELECT 1 FROM stock WHERE point_id = $1 AND quantity > 0)`
 	const q = `DELETE FROM points_of_sale WHERE id = $1`
+
+	var hasStock bool
+	if err := r.db.QueryRowContext(ctx, stockQ, id).Scan(&hasStock); err != nil {
+		return err
+	}
+	if hasStock {
+		return pointInUse()
+	}
 
 	res, err := r.db.ExecContext(ctx, q, id)
 	if err != nil {
@@ -195,7 +205,11 @@ func (r *PointsRepo) Delete(ctx context.Context, id string) error {
 // fake *pgconn.PgError without a database.
 func translateDeleteErr(err error) error {
 	if pgErrCode(err) == pgForeignKeyViolation {
-		return apperr.Conflict("point_in_use", "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы")
+		return pointInUse()
 	}
 	return err
+}
+
+func pointInUse() error {
+	return apperr.Conflict("point_in_use", "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы")
 }
