@@ -7,6 +7,23 @@
 # postgres+minio, no backend/caddy). Secrets live in a server-side .env,
 # never committed — see .env.example for the full variable list.
 #
+# One file serves both environments (scripts/env.sh, DEPLOY_ENV). Variables
+# interpolated here, all with staging defaults so a staging run is unchanged:
+#   ENV_FILE       env file relative to the repo root    (default .env)
+#   CADDYFILE      file in docker/ mounted into caddy    (default Caddyfile;
+#                  production: Caddyfile.prod)
+#   BACKEND_IMAGE  backend image name                    (default cozy-backend;
+#                  production: cozy-backend-prod)
+# Production additionally runs under its own compose project name
+# (`-p cozy-prod`, set by scripts/env.sh), so its containers and volumes
+# never collide with staging's. Staging keeps compose's default project
+# name ("docker", this file's directory) — changing it would detach the
+# existing volumes. By hand, for production:
+#
+#   DEPLOY_ENV=production bash scripts/deploy.sh   # or, raw:
+#   CADDYFILE=Caddyfile.prod BACKEND_IMAGE=cozy-backend-prod \
+#     docker compose -p cozy-prod -f docker/docker-compose.prod.yml --env-file .env ps
+#
 # Normally driven by scripts/deploy.sh, which builds the backend image
 # tagged with the git SHA (BACKEND_TAG) and can roll back to the previous
 # tag. Third-party images are pinned to exact versions: bump them
@@ -26,7 +43,7 @@ services:
     # Built on the VPS (no registry). deploy.sh sets BACKEND_TAG to the
     # commit SHA; a plain `docker compose up -d --build` by hand gets
     # :latest.
-    image: cozy-backend:${BACKEND_TAG:-latest}
+    image: ${BACKEND_IMAGE:-cozy-backend}:${BACKEND_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -37,7 +54,7 @@ services:
     stop_grace_period: 30s
     # No healthcheck: the distroless image has no shell/curl to run one.
     # deploy.sh checks /readyz through Caddy instead.
-    env_file: ../.env
+    env_file: ../${ENV_FILE:-.env}
     environment:
       DATABASE_URL: postgres://cozy:${POSTGRES_PASSWORD}@postgres:5432/cozy?sslmode=disable
       # Internal Docker hostname — only the backend container needs to
@@ -123,12 +140,12 @@ services:
     # placeholder, injected as X-Webhook-Token on the Bakai webhook route —
     # see Caddyfile); the whole file is passed rather than picking one var
     # out because compose has no per-service env filtering.
-    env_file: ../.env
+    env_file: ../${ENV_FILE:-.env}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

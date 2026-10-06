@@ -1,0 +1,85 @@
+# PRODUCTION Caddyfile (the live shop, e.g. cozy.kg). Selected by
+# DEPLOY_ENV=production (scripts/env.sh sets CADDYFILE=Caddyfile.prod for
+# docker/docker-compose.prod.yml). Staging keeps using docker/Caddyfile.
+#
+# No hostname or IP is hard-coded: they come from the production env file,
+# which the caddy container receives via env_file and Caddy substitutes at
+# load time:
+#   SITE_HOST   site + API + admin, e.g. cozy.kg
+#   MEDIA_HOST  public photo host (MinIO), e.g. media.cozy.kg — must equal
+#               MINIO_PUBLIC_ENDPOINT (with MINIO_PUBLIC_USE_SSL=true)
+# www.SITE_HOST permanently redirects to SITE_HOST.
+# scripts/deploy.sh refuses to deploy production while SITE_HOST or
+# MEDIA_HOST is empty.
+#
+# DNS (before the first deploy — otherwise Caddy keeps retrying ACME for a
+# host that doesn't resolve here): A records for SITE_HOST, www.SITE_HOST
+# and MEDIA_HOST pointing at the PRODUCTION server.
+#
+# Differences from the staging Caddyfile: no `noindex` (the shop must be
+# indexed), no bare-IP fallback, plus the www redirect. The snippets are
+# otherwise the same — keep security_headers / backend_proxy and the Bakai
+# webhook rule in sync with docker/Caddyfile when changing either file.
+
+(security_headers) {
+	header {
+		# 1 year, this host only (no includeSubDomains/preload: other
+		# subdomains of the client's zone are not ours to pin).
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+		defer
+	}
+	header ?X-Frame-Options "DENY"
+	header ?Content-Security-Policy "frame-ancestors 'none'"
+	header ?Referrer-Policy "strict-origin-when-cross-origin"
+}
+
+(backend_proxy) {
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy backend:8080 {
+		lb_try_duration 15s
+		lb_try_interval 250ms
+	}
+}
+
+# --- site + API + admin -------------------------------------------------------
+{$SITE_HOST} {
+	import security_headers
+	encode zstd gzip
+
+	# Bakai payment webhook: tag requests to this exact, unpublished path
+	# with the shared token (see docker/Caddyfile for the full story).
+	# Register the bare URL https://SITE_HOST/api/v1/payments/bakai/webhook
+	# with the bank, no query string.
+	@bakai_webhook path /api/v1/payments/bakai/webhook
+	handle @bakai_webhook {
+		reverse_proxy backend:8080 {
+			header_up X-Webhook-Token {$BAKAI_WEBHOOK_TOKEN}
+			lb_try_duration 15s
+			lb_try_interval 250ms
+		}
+	}
+
+	handle {
+		import backend_proxy
+	}
+}
+
+# --- www -> apex ----------------------------------------------------------------
+www.{$SITE_HOST} {
+	import security_headers
+	redir https://{$SITE_HOST}{uri} permanent
+}
+
+# --- media (MinIO, public photo GETs only) -------------------------------------
+{$MEDIA_HOST} {
+	import security_headers
+	@not_read not method GET HEAD
+	respond @not_read 405
+	@minio_api path /minio/*
+	respond @minio_api 404
+	reverse_proxy minio:9000
+}

@@ -36,6 +36,7 @@
 #   RCLONE_CONFIG           rclone config file           (default ~/.config/rclone/rclone.conf)
 #   RCLONE_IMAGE            rclone image when no host `rclone` (default rclone/rclone:1.75.1)
 #   BACKUP_HEALTHCHECK_URL  ping URL, e.g. https://hc-ping.com/<uuid>; empty = no pings
+#   DEPLOY_ENV              staging | production (scripts/env.sh)  (default staging)
 #
 # Exit code is non-zero on any failure, and errors go to stderr as well as
 # the log, so cron mails them (MAILTO) when stdout is discarded.
@@ -43,7 +44,11 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCKER="${DOCKER:-docker}" # overridable only so the script can be dry-run tested
-COMPOSE=("$DOCKER" compose -f "$REPO_DIR/docker/docker-compose.prod.yml" --env-file "$REPO_DIR/.env")
+# DEPLOY_ENV=production selects the production compose project and env
+# file (scripts/env.sh); default staging.
+# shellcheck source=scripts/env.sh
+. "$REPO_DIR/scripts/env.sh"
+COMPOSE=("$DOCKER" "${COMPOSE[@]:1}")
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/cozy}"
 BACKUP_LOG="${BACKUP_LOG:-$BACKUP_DIR/backup.log}"
@@ -94,13 +99,13 @@ for v in KEEP_DAYS BACKUP_RCLONE_KEEP_DAYS; do
     ''|*[!0-9]*) die "$v must be a whole number of days, got '${!v}'" ;;
   esac
 done
-[ -f "$REPO_DIR/.env" ] || die "$REPO_DIR/.env is missing"
+[ -f "$ENV_PATH" ] || die "$ENV_PATH is missing"
 
 # envval KEY: value of KEY from the server's .env (first match, surrounding
 # quotes stripped). Read with grep instead of `source` so a stray shell
 # metacharacter in some unrelated secret can't execute anything.
 envval() {
-  grep -E "^$1=" "$REPO_DIR/.env" | head -n1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'
+  envfile_val "$1"
 }
 
 mkdir -p "$BACKUP_DIR/postgres" "$(dirname "$BACKUP_LOG")"
