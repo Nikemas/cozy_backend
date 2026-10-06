@@ -66,14 +66,26 @@ func (c *Client) StoreBannerImage(ctx context.Context, data []byte, kind BannerI
 }
 
 func storeBannerImage(ctx context.Context, store objectStore, data []byte, kind BannerImageKind) (string, error) {
+	profile, ok := bannerProfiles[kind]
+	if !ok {
+		return "", fmt.Errorf("media: unknown banner image kind %d", kind)
+	}
+	return storeFittedImage(ctx, store, data, profile, bannerKeyPrefix)
+}
+
+// storeFittedImage normalizes data to profile (normalizeFitted) and
+// uploads it under prefix + a fresh UUID — the shared tail of the banner
+// and category picture pipelines. Oversized files are rejected before
+// decoding.
+func storeFittedImage(ctx context.Context, store objectStore, data []byte, profile bannerProfile, prefix string) (string, error) {
 	if len(data) > maxUploadFileBytes {
 		return "", errFileTooLarge()
 	}
-	img, err := normalizeBannerImage(data, kind)
+	img, err := normalizeFitted(data, profile)
 	if err != nil {
 		return "", err
 	}
-	key := bannerKeyPrefix + uuid.NewString() + img.Ext
+	key := prefix + uuid.NewString() + img.Ext
 	if err := store.PutObject(ctx, key, img.Data, img.ContentType); err != nil {
 		return "", fmt.Errorf("put %s: %w", key, err)
 	}
@@ -89,6 +101,13 @@ func normalizeBannerImage(data []byte, kind BannerImageKind) (*encodedImage, err
 	if !ok {
 		return nil, fmt.Errorf("media: unknown banner image kind %d", kind)
 	}
+	return normalizeFitted(data, profile)
+}
+
+// normalizeFitted is normalizeBannerImage for an explicit profile: decode,
+// scale down into the profile's box, keep alpha as PNG when the profile
+// allows it, otherwise flatten onto white as JPEG.
+func normalizeFitted(data []byte, profile bannerProfile) (*encodedImage, error) {
 	src, err := decodeUpload(data, profile.minSide)
 	if err != nil {
 		return nil, err

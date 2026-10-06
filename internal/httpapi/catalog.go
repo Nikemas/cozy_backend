@@ -51,7 +51,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, tree)
+		return writeJSON(w, http.StatusOK, catalog.WithImageURLs(tree, cfg.PublicObjectURL))
 	})))
 
 	mux.Handle("GET /api/v1/products", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {

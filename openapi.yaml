@@ -1889,6 +1889,16 @@ components:
         name_ky: { type: string }
         slug: { type: string }
         sort_order: { type: integer }
+        image_url:
+          type: string
+          nullable: true
+          description: >
+            Absolute public URL of the category photo for the app's catalog
+            category tiles (uploaded in the admin panel, normalized to fit
+            800×800 px; JPEG, or PNG when it has transparency), built from
+            MINIO_PUBLIC_ENDPOINT like product photo URLs. null when the
+            category has no photo. Always present.
+          example: https://media.cozy.kg/cozy-media/categories/2b0f6c1e-5d3a-4f7e-9c41-8a1d2e3f4b5c.jpg
         children:
           type: array
           items: { $ref: "#/components/schemas/Category" }

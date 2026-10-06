@@ -126,6 +126,10 @@ admin.categories.sort_order: Тартиби
 admin.categories.parent: Негизги категория
 admin.categories.no_parent: — жок (башкы) —
 admin.categories.load_failed: категорияларды жүктөө мүмкүн болбоду
+admin.categories.image: Категориянын сүрөтү
+admin.categories.image_hint: JPEG, PNG же WEBP, 10 МБга чейин, кыска жагы 200 pxтен кем эмес. Тиркемедеги категориянын плиткасында көрсөтүлөт
+admin.categories.current_image: Азыркы сүрөт
+admin.categories.remove_image: Сүрөттү өчүрүү
 admin.points.note: Калдыктар ар бир сатуу жайы боюнча өзүнчө эсептелет (товардын карточкасы, «Калдыктар» бөлүмү). Активсиздештирилген сатуу жайы сатып алуучуларга көрсөтүлбөйт, бирок анын буйрутмалар тарыхы жана калдыктары сакталат.
 admin.points.add: Сатуу жайын кошуу
 admin.points.empty: Азырынча сатуу жайлары жок
@@ -623,3 +627,4 @@ admin.audit.field.banner_eyebrow_color: үстүңкү жазуунун түсү
 admin.audit.field.banner_text_color: тексттин түсү
 admin.audit.field.banner_image: сүрөт
 admin.audit.field.banner_bg_image: фондогу сүрөт
+admin.audit.field.image: сүрөт

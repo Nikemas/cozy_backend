@@ -196,8 +196,8 @@ func expectFormLookups(mock sqlmock.Sqlmock) {
 			AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, true, time.Now())
 	}
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
-	mock.ExpectQuery(`FROM categories`).WillReturnRows(sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).
-		AddRow("cat1", nil, "Мужская", "Эркек", "men", 0))
+	mock.ExpectQuery(`FROM categories`).WillReturnRows(sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order", "image_key"}).
+		AddRow("cat1", nil, "Мужская", "Эркек", "men", 0, nil))
 	mock.ExpectQuery(`SELECT DISTINCT brand FROM products`).WillReturnRows(sqlmock.NewRows([]string{"brand"}))
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
 }

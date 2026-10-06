@@ -36,13 +36,15 @@ type handlers struct {
 	addresses *storefront.AddressRepo
 
 	// Task 2 (products: list/form/import) — see products.go.
-	categories *catalog.CategoryRepo
-	products   *catalog.ProductRepo
-	variants   *catalog.VariantRepo
-	images     *catalog.ImageRepo
-	stock      *catalog.StockRepo
-	media      *media.Client
-	cfg        *config.Config
+	categories categoryRepo
+	// feat/category-photo: category photo uploads (categories_image.go).
+	categoryImages categoryImageStore
+	products       *catalog.ProductRepo
+	variants       *catalog.VariantRepo
+	images         *catalog.ImageRepo
+	stock          *catalog.StockRepo
+	media          *media.Client
+	cfg            *config.Config
 
 	// fix/admin (B5): transactional product-form save (product_store.go)
 	// and the per-point Остатки screen (stock_page.go).
