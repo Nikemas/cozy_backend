@@ -32,6 +32,7 @@ type reportsBackend interface {
 	LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error)
 	BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
+	PointNames(ctx context.Context) (map[string]string, error)
 }
 
 // reportsRepo adapts *reports.Repo (Wave 3, Task O) for this screen,
@@ -247,6 +248,14 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 	if err != nil {
 		return ReportsData{}, err
 	}
+	pointNames, err := h.reports.PointNames(ctx)
+	if err != nil {
+		return ReportsData{}, err
+	}
+	pointRows, err := reports.AggregateSales(ordersList, reports.GroupByPoint, pointNames)
+	if err != nil {
+		return ReportsData{}, err
+	}
 
 	t := trFromContext(ctx)
 	return ReportsData{
@@ -254,12 +263,14 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		ExportURL: reportExportURL(from, to),
 		// fix/admin-ops: the category report as xlsx (same numbers).
 		CategoryExportURL: strings.Replace(reportExportURL(from, to), "group_by=day", "group_by=category", 1),
+		PointExportURL:    strings.Replace(reportExportURL(from, to), "group_by=day", "group_by=point", 1),
 		Stats:             buildStatCards(t, dayRows),
 		ChartNote:         from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
 		Bars:              buildBars(dayRows, from, to),
 		TopProducts:       buildTopProducts(t, productRows),
 		TopBrands:         buildTopBrands(t, brandRows),
 		Categories:        buildCategoryBars(t, categoryRows),
+		Points:            buildPointBars(t, pointRows),
 	}, nil
 }
 
@@ -273,6 +284,7 @@ type ReportsData struct {
 	Periods           []PeriodOption
 	ExportURL         string
 	CategoryExportURL string
+	PointExportURL    string
 
 	Stats []StatCard
 
@@ -282,6 +294,7 @@ type ReportsData struct {
 	TopProducts []RankedRow
 	TopBrands   []BrandBar
 	Categories  []CategoryBar
+	Points      []CategoryBar // "По точкам продаж": same columns as categories
 
 	// Custom-period state: Custom shows the from/to inputs, From/To are
 	// the resolved range (YYYY-MM-DD), Err a rejected custom range.
@@ -352,9 +365,8 @@ func reportPeriodOptions(t tr, selected string) []PeriodOption {
 // reportExportURL builds the "Экспорт в Excel" link's target — the
 // already-working /admin/api/reports/sales.xlsx endpoint (Wave 3), with
 // the currently selected period's date range. group_by=day matches the
-// "Продажи по дням" section this page leads with; a manager wanting the
-// product/point breakdown instead can still hit the JSON/xlsx API's own
-// group_by param directly.
+// "Продажи по дням" section this page leads with; the category and point
+// sections link to the same endpoint with group_by=category / point.
 func reportExportURL(from, to time.Time) string {
 	v := url.Values{}
 	v.Set("from", from.Format("2006-01-02"))
@@ -497,6 +509,23 @@ func buildCategoryBars(t tr, rows []reports.Row) []CategoryBar {
 			Qty:      t.F("admin.reports.pcs", row.ItemCount),
 			Orders:   t.N(row.OrderCount, "admin.plural.order"),
 			WidthPct: pct,
+		}
+	}
+	return out
+}
+
+// buildPointBars shapes AggregateSales' GroupByPoint rows (key-sorted) into
+// the "По точкам продаж" table: re-ranked by revenue, every point listed
+// (a shop has a handful), orders with no point labelled in the page
+// language. Revenue here is the orders' total_amount — the same figure the
+// group_by=point JSON/xlsx export reports.
+func buildPointBars(t tr, pointRows []reports.Row) []CategoryBar {
+	rows := append([]reports.Row(nil), pointRows...)
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Revenue > rows[j].Revenue })
+	out := buildCategoryBars(t, rows)
+	for i, row := range rows {
+		if row.Key == reports.UnknownPointKey {
+			out[i].Name = t.T("admin.reports.no_point")
 		}
 	}
 	return out

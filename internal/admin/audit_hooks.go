@@ -43,12 +43,13 @@ func loadProductSnapshotTx(ctx context.Context, tx *sql.Tx, productID string) (*
 
 // variantSnapshot is a variant row as it was before a form save.
 type variantSnapshot struct {
-	Size  string
-	Color string
+	Size          string
+	Color         string
+	PriceOverride *float64
 }
 
 func loadVariantSnapshotsTx(ctx context.Context, tx *sql.Tx, productID string) (map[string]variantSnapshot, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id, size, color FROM product_variants WHERE product_id = $1`, productID)
+	rows, err := tx.QueryContext(ctx, `SELECT id, size, color, price_override FROM product_variants WHERE product_id = $1`, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func loadVariantSnapshotsTx(ctx context.Context, tx *sql.Tx, productID string) (
 	for rows.Next() {
 		var id string
 		var v variantSnapshot
-		if err := rows.Scan(&id, &v.Size, &v.Color); err != nil {
+		if err := rows.Scan(&id, &v.Size, &v.Color, &v.PriceOverride); err != nil {
 			return nil, err
 		}
 		out[id] = v
@@ -167,15 +168,8 @@ func productSaveEntries(productID string, in productSaveInput, old *productSnaps
 		prev, existed := oldVariants[id]
 		if row.ID != "" && existed {
 			kept[id] = true
-			if prev.Size != row.Size || prev.Color != row.Color {
-				out = append(out, audit.Entry{
-					Action: audit.ActionVariantUpdate, EntityType: audit.EntityVariant, EntityID: id,
-					Summary: fmt.Sprintf("«%s»: вариация %s / %s → %s / %s", name, prev.Size, prev.Color, row.Size, row.Color),
-					MsgKey:  audit.MsgVariantChanged, MsgArgs: audit.Args{"product": name,
-						"from_size": prev.Size, "from_color": prev.Color, "size": row.Size, "color": row.Color},
-					Details: map[string]any{"product_id": productID,
-						"size": audit.Change{From: prev.Size, To: row.Size}, "color": audit.Change{From: prev.Color, To: row.Color}},
-				})
+			if e, ok := variantUpdateEntry(productID, name, id, prev, row); ok {
+				out = append(out, e)
 			}
 			continue
 		}
@@ -466,4 +460,52 @@ func (h *handlers) auditStaff(ctx context.Context, action, id, name string, deta
 	}[action]
 	h.audit.Record(ctx, audit.Entry{Action: action, EntityType: audit.EntityStaff, EntityID: id,
 		Summary: fmt.Sprintf(summary, name), Details: details, MsgKey: msg, MsgArgs: audit.Args{"name": name}})
+}
+
+// variantUpdateEntry journals an edit of an existing variant: a size/color
+// change (MsgVariantChanged) and/or a price_override change (Details
+// "price_override"; MsgVariantUpdated when size/color stayed the same).
+// ok is false when nothing changed.
+func variantUpdateEntry(productID, name, id string, prev variantSnapshot, row variantRowInput) (audit.Entry, bool) {
+	renamed := prev.Size != row.Size || prev.Color != row.Color
+	repriced := row.PriceSet && !sameMoneyPtr(prev.PriceOverride, row.PriceOverride)
+	if !renamed && !repriced {
+		return audit.Entry{}, false
+	}
+	details := map[string]any{"product_id": productID}
+	if repriced {
+		details["price_override"] = audit.Change{From: moneyPtrValue(prev.PriceOverride), To: moneyPtrValue(row.PriceOverride)}
+	}
+	if !renamed {
+		return audit.Entry{
+			Action: audit.ActionVariantUpdate, EntityType: audit.EntityVariant, EntityID: id,
+			Summary: fmt.Sprintf("«%s»: изменена цена вариации %s / %s", name, row.Size, row.Color),
+			MsgKey:  audit.MsgVariantUpdated, MsgArgs: audit.Args{"size": row.Size, "color": row.Color},
+			Details: details,
+		}, true
+	}
+	details["size"] = audit.Change{From: prev.Size, To: row.Size}
+	details["color"] = audit.Change{From: prev.Color, To: row.Color}
+	return audit.Entry{
+		Action: audit.ActionVariantUpdate, EntityType: audit.EntityVariant, EntityID: id,
+		Summary: fmt.Sprintf("«%s»: вариация %s / %s → %s / %s", name, prev.Size, prev.Color, row.Size, row.Color),
+		MsgKey:  audit.MsgVariantChanged, MsgArgs: audit.Args{"product": name,
+			"from_size": prev.Size, "from_color": prev.Color, "size": row.Size, "color": row.Color},
+		Details: details,
+	}, true
+}
+
+func sameMoneyPtr(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// moneyPtrValue is a nullable price for a journal Change (nil = no override).
+func moneyPtrValue(p *float64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }

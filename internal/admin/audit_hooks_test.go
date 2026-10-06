@@ -45,7 +45,7 @@ func TestProductSaveEntriesVariants(t *testing.T) {
 		},
 	}
 	old := &productSnapshot{CategoryID: "c1", NameRu: "Кеды", NameKy: "Кеды", BasePrice: 100}
-	oldVariants := map[string]variantSnapshot{"v1": {"42", "Белый"}, "v2": {"43", "Чёрный"}, "v3": {"45", "Белый"}}
+	oldVariants := map[string]variantSnapshot{"v1": {Size: "42", Color: "Белый"}, "v2": {Size: "43", Color: "Чёрный"}, "v3": {Size: "45", Color: "Белый"}}
 	entries := productSaveEntries("p1", in, old, oldVariants, map[string]string{"v1": "v1", "v2": "v2", "n1": "vNew"})
 
 	var actions []string
@@ -87,8 +87,8 @@ func TestProductStoreSaveJournalsInTx(t *testing.T) {
 		WithArgs("p1").
 		WillReturnRows(sqlmock.NewRows([]string{"category_id", "name_ru", "name_ky", "description_ru", "description_ky", "brand", "base_price"}).
 			AddRow("cat1", "Nike", "Nike", nil, nil, nil, 4000.0))
-	mock.ExpectQuery(`SELECT id, size, color FROM product_variants WHERE product_id = \$1`).WithArgs("p1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "size", "color"}).AddRow("v1", "42", "Белый"))
+	mock.ExpectQuery(`SELECT id, size, color, price_override FROM product_variants WHERE product_id = \$1`).WithArgs("p1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "size", "color", "price_override"}).AddRow("v1", "42", "Белый", nil))
 	mock.ExpectExec(`RELEASE SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`UPDATE products`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("p1"))
 	mock.ExpectQuery(`SELECT id FROM product_variants WHERE product_id = \$1`).WithArgs("p1").

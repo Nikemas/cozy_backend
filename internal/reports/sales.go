@@ -139,9 +139,12 @@ func orderDayKey(o orders.Order) string {
 	return o.CreatedAt.In(Location).Format(dateLayout)
 }
 
+// UnknownPointKey is GroupByPoint's key for orders with no point of sale.
+const UnknownPointKey = "unknown"
+
 func pointKey(o orders.Order, pointNames map[string]string) string {
 	if o.PointID == nil || *o.PointID == "" {
-		return "unknown"
+		return UnknownPointKey
 	}
 	if name, ok := pointNames[*o.PointID]; ok && name != "" {
 		return name

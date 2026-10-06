@@ -183,6 +183,8 @@ admin.qty.err_too_big: слишком большое количество
 admin.price.err_empty: укажите цену
 admin.price.err_not_number: цена должна быть числом
 admin.price.err_negative: цена не может быть отрицательной
+admin.price.err_not_positive: цена должна быть больше нуля
+admin.price.err_too_big: слишком большая цена
 admin.range.this_month: Текущий месяц
 admin.range.prev_month: Прошлый месяц
 admin.reports.from: с
@@ -195,6 +197,9 @@ admin.reports.top_products: Топ товаров
 admin.reports.no_sales: Нет продаж за выбранный период
 admin.reports.by_brand: По брендам
 admin.reports.by_category: По категориям
+admin.reports.by_point: По точкам продаж
+admin.reports.by_point_hint: "Выручка — суммы заказов (с доставкой): самовывоз — по точке выдачи, доставка — по точке, с которой отгружен заказ."
+admin.reports.no_point: Без точки
 admin.reports.col_share: Доля
 admin.reports.col_orders: Заказов
 admin.reports.col_sold: Продано
@@ -248,6 +253,9 @@ admin.product.photos_hint: Первое фото — главное. JPEG, PNG �
 admin.product.add_photo: Добавить фото
 admin.product.variants: Вариации
 admin.product.variants_hint: "Размер × цвет и остаток на каждой точке продаж. Сохраняются только изменённые ячейки: если остаток успел измениться (продажа, другой сотрудник), форма покажет актуальное значение вместо перезаписи."
+admin.product.variant_price: Цена, сом
+admin.product.variant_price_hint: "Цена вариации: оставьте пустой — будет действовать базовая цена товара."
+admin.product.variant_price_placeholder: базовая
 admin.product.no_points_hint: Точек продаж пока нет — остатки можно будет указать после создания точки в разделе «Склад и точки».
 admin.product.color_photos: Фото цвета
 admin.product.color_photos_of: Фото цвета «%s»
@@ -279,6 +287,7 @@ admin.product.price_label: Цена
 admin.product.err_duplicate_row: Форма повреждена (повтор строки вариации) — обновите страницу
 admin.product.err_size_color: У каждой вариации должны быть размер и цвет
 admin.product.err_stock_cell: "Остаток %s / %s, «%s»: %s"
+admin.product.err_variant_price: "Цена вариации %s / %s: %s"
 admin.product.err_stale_form: форма повреждена — обновите страницу
 admin.product.err_stale_form_banner: Форма повреждена — обновите страницу
 admin.import.title: Импорт товаров

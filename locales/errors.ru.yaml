@@ -125,6 +125,7 @@ err.invalid_point_id: точка продаж не найдена
 err.invalid_price_max: некорректный price_max
 err.invalid_price_min: некорректный price_min
 err.invalid_price_override: price_override не может быть отрицательным
+err.invalid_variant_price: цена вариации должна быть больше нуля
 err.invalid_product_id: товар не найден
 err.invalid_qty.format: некорректное количество
 err.invalid_qty: количество должно быть больше нуля
