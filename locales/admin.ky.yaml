@@ -527,7 +527,7 @@ admin.err.render: баракты көрсөтүүдө ката кетти
 admin.err.internal: ички ката
 admin.apperr.invalid_credentials: телефон же сырсөз туура эмес
 admin.apperr.too_many_attempts: кирүү аракеттери өтө көп, кийинчерээк аракет кылыңыз
-admin.apperr.invalid_phone: номерди +996XXXXXXXXX форматында жазыңыз
+admin.apperr.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
 admin.apperr.invalid_name: аты (аталышы) көрсөтүлүшү керек
 admin.apperr.invalid_address: дареги көрсөтүлүшү керек
 admin.apperr.invalid_city: шаар көрсөтүлүшү керек

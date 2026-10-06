@@ -530,7 +530,7 @@ admin.err.render: ошибка рендеринга страницы
 admin.err.internal: внутренняя ошибка
 admin.apperr.invalid_credentials: неверный телефон или пароль
 admin.apperr.too_many_attempts: слишком много попыток входа, попробуйте позже
-admin.apperr.invalid_phone: укажите номер в формате +996XXXXXXXXX
+admin.apperr.invalid_phone: укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
 admin.apperr.invalid_name: имя обязательно
 admin.apperr.invalid_address: адрес обязателен
 admin.apperr.invalid_city: город обязателен
