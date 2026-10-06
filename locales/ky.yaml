@@ -160,7 +160,7 @@ error.code.rate_limited: Аракеттер өтө көп. Бир аз күтү�
 error.code.bad_request: Туура эмес суроо. Баракты жаңылап, кайра аракет кылыңыз.
 error.code.unauthorized: Улантуу үчүн аккаунтка кириңиз.
 error.code.unauthenticated: Улантуу үчүн аккаунтка кириңиз.
-error.code.invalid_phone: Номерди +996XXXXXXXXX форматында жазыңыз
+error.code.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
 error.code.otp_cooldown: Код жиберилди. Жаңы кодду бир аздан кийин сурай аласыз.
 error.code.otp_rate_limited: Код өтө көп суралды. Кийинчерээк аракет кылыңыз.
 error.code.otp_expired: Код туура эмес же эскирген. Жаңы код сураңыз.

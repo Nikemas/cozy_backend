@@ -108,7 +108,7 @@ err.invalid_parent_id.self: категория өзүнө өзү негизги 
 err.invalid_password: сырсөз кеминде 8 белгиден турушу керек
 err.invalid_password.too_long: сырсөз өтө узун (эң көп 72 байт)
 err.invalid_payment_method: белгисиз төлөм ыкмасы
-err.invalid_phone: номерди +996XXXXXXXXX форматында жазыңыз
+err.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
 err.invalid_phone.provider: телефон номери туура эмес
 err.invalid_phone.required: телефон милдеттүү
 err.invalid_platform: platform ios же android болушу керек

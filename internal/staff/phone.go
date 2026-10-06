@@ -20,7 +20,7 @@ const phoneLookupSuffixLen = 9
 func normalizeStaffPhone(raw string) (string, error) {
 	p, ok := phonenorm.E164(raw)
 	if !ok {
-		return "", apperr.BadRequest("invalid_phone", "укажите номер в формате +996XXXXXXXXX")
+		return "", apperr.BadRequest("invalid_phone", "укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456")
 	}
 	return p, nil
 }

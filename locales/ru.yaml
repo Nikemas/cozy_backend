@@ -160,7 +160,7 @@ error.code.rate_limited: Слишком много попыток. Подожд�
 error.code.bad_request: Некорректный запрос. Обновите страницу и попробуйте снова.
 error.code.unauthorized: Войдите в аккаунт, чтобы продолжить.
 error.code.unauthenticated: Войдите в аккаунт, чтобы продолжить.
-error.code.invalid_phone: Укажите номер в формате +996XXXXXXXXX
+error.code.invalid_phone: Укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
 error.code.otp_cooldown: Код уже отправлен. Запросить новый можно чуть позже.
 error.code.otp_rate_limited: Слишком много запросов кода. Попробуйте позже.
 error.code.otp_expired: Код неверный или устарел. Запросите новый.
