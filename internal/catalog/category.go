@@ -16,6 +16,12 @@ import (
 
 // Category mirrors the `categories` table. Children is populated only by
 // Tree, not by row scans.
+//
+// ImageKey is the MinIO object key of the category photo (migration
+// 000040; nil = no photo) and is never serialized: clients get ImageURL,
+// the absolute public URL, which only WithImageURL / WithImageURLs fill —
+// the repo has no config to build it from. An unfilled ImageURL encodes as
+// "image_url": null.
 type Category struct {
 	ID        string      `json:"id"`
 	ParentID  *string     `json:"parent_id,omitempty"`
@@ -23,7 +29,50 @@ type Category struct {
 	NameKy    string      `json:"name_ky"`
 	Slug      string      `json:"slug"`
 	SortOrder int         `json:"sort_order"`
+	ImageKey  *string     `json:"-"`
+	ImageURL  *string     `json:"image_url"`
 	Children  []*Category `json:"children,omitempty"`
+}
+
+// categoryColumns is the column list every category read returns, in
+// scanCategory's order.
+const categoryColumns = `id, parent_id, name_ru, name_ky, slug, sort_order, image_key`
+
+func scanCategory(row interface{ Scan(dest ...any) error }) (*Category, error) {
+	var c Category
+	if err := row.Scan(&c.ID, &c.ParentID, &c.NameRu, &c.NameKy, &c.Slug, &c.SortOrder, &c.ImageKey); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// WithImageURL returns a copy of c whose ImageURL is objectURL(ImageKey),
+// or nil when there is no photo (a nil or blank key). Children are left
+// as they are — see WithImageURLs for a whole tree.
+func (c Category) WithImageURL(objectURL func(objectKey string) string) *Category {
+	out := c
+	out.ImageURL = nil
+	if c.ImageKey != nil && *c.ImageKey != "" {
+		u := objectURL(*c.ImageKey)
+		out.ImageURL = &u
+	}
+	return &out
+}
+
+// WithImageURLs returns a deep copy of tree with every category's ImageURL
+// filled (WithImageURL). tree itself is not modified, so a cached tree can
+// be shared.
+func WithImageURLs(tree []*Category, objectURL func(objectKey string) string) []*Category {
+	out := make([]*Category, 0, len(tree))
+	for _, c := range tree {
+		cp := c.WithImageURL(objectURL)
+		cp.Children = nil
+		if len(c.Children) > 0 {
+			cp.Children = WithImageURLs(c.Children, objectURL)
+		}
+		out = append(out, cp)
+	}
+	return out
 }
 
 type CategoryRepo struct {
@@ -37,10 +86,7 @@ func NewCategoryRepo(db *sql.DB) *CategoryRepo {
 // Tree returns all categories arranged into a forest by parent_id. Built in
 // Go from a flat, sort_order-ordered SELECT rather than a recursive CTE.
 func (r *CategoryRepo) Tree(ctx context.Context) ([]*Category, error) {
-	const q = `
-		SELECT id, parent_id, name_ru, name_ky, slug, sort_order
-		FROM categories
-		ORDER BY sort_order`
+	const q = `SELECT ` + categoryColumns + ` FROM categories ORDER BY sort_order`
 
 	rows, err := r.db.QueryContext(ctx, q)
 	if err != nil {
@@ -50,11 +96,11 @@ func (r *CategoryRepo) Tree(ctx context.Context) ([]*Category, error) {
 
 	var flat []*Category
 	for rows.Next() {
-		var c Category
-		if err := rows.Scan(&c.ID, &c.ParentID, &c.NameRu, &c.NameKy, &c.Slug, &c.SortOrder); err != nil {
+		c, err := scanCategory(rows)
+		if err != nil {
 			return nil, err
 		}
-		flat = append(flat, &c)
+		flat = append(flat, c)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -124,7 +170,10 @@ type CategoryInput struct {
 	SortOrder int
 }
 
-func (in CategoryInput) validate() error {
+// Validate checks the required fields (Create and Update call it too);
+// exported so the admin form can reject a bad submit before uploading a
+// photo.
+func (in CategoryInput) Validate() error {
 	if strings.TrimSpace(in.NameRu) == "" {
 		return apperr.BadRequest("invalid_name_ru", "name_ru обязателен").WithVariant("field")
 	}
@@ -139,29 +188,27 @@ func (in CategoryInput) validate() error {
 
 // Create inserts a new category and returns the row as stored.
 func (r *CategoryRepo) Create(ctx context.Context, in CategoryInput) (*Category, error) {
-	if err := in.validate(); err != nil {
+	if err := in.Validate(); err != nil {
 		return nil, err
 	}
 
 	const q = `
 		INSERT INTO categories (parent_id, name_ru, name_ky, slug, sort_order)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, parent_id, name_ru, name_ky, slug, sort_order`
+		RETURNING ` + categoryColumns
 
-	var c Category
-	err := r.db.QueryRowContext(ctx, q, in.ParentID, in.NameRu, in.NameKy, in.Slug, in.SortOrder).
-		Scan(&c.ID, &c.ParentID, &c.NameRu, &c.NameKy, &c.Slug, &c.SortOrder)
+	c, err := scanCategory(r.db.QueryRowContext(ctx, q, in.ParentID, in.NameRu, in.NameKy, in.Slug, in.SortOrder))
 	if err != nil {
 		return nil, translateCategoryUpsertErr(err)
 	}
-	return &c, nil
+	return c, nil
 }
 
 // Update replaces every writable field of the category with the given id.
 // Returns apperr.NotFound if no such category exists, and apperr.BadRequest
 // if parentID would make the category its own parent.
 func (r *CategoryRepo) Update(ctx context.Context, id string, in CategoryInput) (*Category, error) {
-	if err := in.validate(); err != nil {
+	if err := in.Validate(); err != nil {
 		return nil, err
 	}
 	if in.ParentID != nil && *in.ParentID == id {
@@ -172,18 +219,46 @@ func (r *CategoryRepo) Update(ctx context.Context, id string, in CategoryInput) 
 		UPDATE categories
 		SET parent_id = $2, name_ru = $3, name_ky = $4, slug = $5, sort_order = $6
 		WHERE id = $1
-		RETURNING id, parent_id, name_ru, name_ky, slug, sort_order`
+		RETURNING ` + categoryColumns
 
-	var c Category
-	err := r.db.QueryRowContext(ctx, q, id, in.ParentID, in.NameRu, in.NameKy, in.Slug, in.SortOrder).
-		Scan(&c.ID, &c.ParentID, &c.NameRu, &c.NameKy, &c.Slug, &c.SortOrder)
+	c, err := scanCategory(r.db.QueryRowContext(ctx, q, id, in.ParentID, in.NameRu, in.NameKy, in.Slug, in.SortOrder))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperr.NotFound("category_not_found", "категория не найдена")
+		return nil, errCategoryNotFound()
 	}
 	if err != nil {
 		return nil, translateCategoryUpsertErr(err)
 	}
-	return &c, nil
+	return c, nil
+}
+
+// SetImage sets (key != nil) or clears (key == nil) the category's photo
+// and returns the key it replaced (nil when there was none). The photo is
+// kept out of CategoryInput on purpose: Update replaces every field of
+// CategoryInput, and the JSON admin API (which knows nothing about
+// photos) must not wipe one. The replaced object is not removed from the
+// bucket — see the admin handler for why.
+func (r *CategoryRepo) SetImage(ctx context.Context, id string, key *string) (previous *string, err error) {
+	if key != nil && strings.TrimSpace(*key) == "" {
+		key = nil
+	}
+	const q = `
+		UPDATE categories c SET image_key = $2
+		FROM (SELECT id, image_key FROM categories WHERE id = $1 FOR UPDATE) old
+		WHERE c.id = old.id
+		RETURNING old.image_key`
+
+	err = r.db.QueryRowContext(ctx, q, id, key).Scan(&previous)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errCategoryNotFound()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return previous, nil
+}
+
+func errCategoryNotFound() error {
+	return apperr.NotFound("category_not_found", "категория не найдена")
 }
 
 // Delete removes a category. Categories are hard-deleted (unlike products,
