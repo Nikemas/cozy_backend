@@ -131,9 +131,16 @@ func buildListConditions(filter ListFilter) ([]string, []any) {
 			variantConds = append(variantConds, fmt.Sprintf("color = $%d", len(args)))
 		}
 		if filter.InStock {
+			// OFFSET 0 keeps this a per-variant probe of stock's
+			// (variant_id, point_id) primary key. Without it the planner
+			// flattens it into a semi-join and, for the COUNT, hashes every
+			// in-stock row of the whole stock table on each request — work
+			// that grows with variants × points, while the probes stop at
+			// the first in-stock variant of each product
+			// (docs/performance.md).
 			variantConds = append(variantConds, `EXISTS (SELECT 1 FROM stock
 				JOIN points_of_sale ON points_of_sale.id = stock.point_id AND points_of_sale.is_active
-				WHERE stock.variant_id = product_variants.id AND stock.quantity > 0)`)
+				WHERE stock.variant_id = product_variants.id AND stock.quantity > 0 OFFSET 0)`)
 		}
 		conditions = append(conditions, fmt.Sprintf(
 			"EXISTS (SELECT 1 FROM product_variants WHERE %s)", strings.Join(variantConds, " AND "),
