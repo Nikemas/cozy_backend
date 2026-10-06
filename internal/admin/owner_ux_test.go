@@ -284,7 +284,7 @@ func TestOrderStatusUpdateSuccessShowsToast(t *testing.T) {
 		t.Fatalf("got %d %q, want redirect to detail with a toast", w.Code, loc)
 	}
 	u, _ := url.Parse(loc)
-	if got := u.Query().Get("toast"); !strings.Contains(got, "Подтверждён") {
+	if got := toastFromQuery(ruTr, u.Query()); !strings.Contains(got, "Подтверждён") {
 		t.Errorf("toast = %q, want the new status", got)
 	}
 }

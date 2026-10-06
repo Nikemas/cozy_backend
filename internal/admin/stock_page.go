@@ -246,7 +246,7 @@ func (h *handlers) resolveStockPoint(ctx context.Context, st *staff.Staff, reque
 // stockPage handles GET /admin/stock.
 func (h *handlers) stockPage(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	h.renderStockPage(w, r, q.Get("point"), strings.TrimSpace(q.Get("q")), parsePositiveInt(q.Get("page"), 1), q.Get("toast"), nil)
+	h.renderStockPage(w, r, q.Get("point"), strings.TrimSpace(q.Get("q")), parsePositiveInt(q.Get("page"), 1), h.pageToast(r), nil)
 }
 
 // stockOverlay carries a failed submission back into the re-rendered page.
@@ -400,9 +400,9 @@ func (h *handlers) stockSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toast := h.tr(r).T("admin.stock.no_changes")
+	toast := toastKey("stock_no_changes")
 	if len(changes) > 0 {
-		toast = h.tr(r).F("admin.stock.saved", h.tr(r).N(len(changes), "admin.plural.position"))
+		toast = toastCount("stock_saved", len(changes))
 	}
 	redirectWithToast(w, r, stockPageURL(pointID, query, page, data.CanChoosePoint), toast)
 }

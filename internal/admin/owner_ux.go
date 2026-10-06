@@ -19,21 +19,11 @@ import (
 // productsListPath is the Товары list screen.
 const productsListPath = "/admin/products"
 
-// productsStaleParams are one-shot query params (a toast, a bulk
-// result) that must not follow the user onto another page of the list.
-var productsStaleParams = []string{"toast", "bulk_fail"}
-
 // productsPageURL is the products list URL for page, keeping every filter
 // in q (category, subcategory, search, point, out-of-stock, page size).
 // q is not modified.
 func productsPageURL(q url.Values, page int) string {
-	next := url.Values{}
-	for k, v := range q {
-		next[k] = append([]string(nil), v...)
-	}
-	for _, k := range productsStaleParams {
-		next.Del(k)
-	}
+	next := stripOneShotParams(q)
 	if page > 1 {
 		next.Set("page", strconv.Itoa(page))
 	} else {

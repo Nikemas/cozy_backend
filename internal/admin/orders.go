@@ -13,7 +13,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -395,13 +394,13 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	if params.Point == "" {
 		data.StatusChips = withPlacedCount(data.StatusChips, newOrdersFromWriter(w))
 	}
-	data.Notes = append(notes, r.URL.Query()["bulk_fail"]...)
+	data.Notes = append(notes, bulkFailureNotes(h.tr(r), r.URL.Query())...)
 	data.BulkStatuses = bulkStatusOptions(h.tr(r), st.Role)
 	data.BulkURL = "/admin/orders/bulk-status"
-	data.ReturnURL = r.URL.RequestURI()
+	data.ReturnURL = returnURL(r)
 
 	pageData := h.shellPageData("orders", "admin.nav.orders", st)
-	pageData.Toast = r.URL.Query().Get("toast")
+	pageData.Toast = h.pageToast(r)
 	pageData.Data = data
 	if err := h.render.Render(w, "orders", pageData); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
@@ -576,10 +575,7 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	pageData.Screen = "order_detail"
 	pageData.ShowBack = true
 	pageData.BackURL = "/admin/orders"
-	pageData.Toast = r.URL.Query().Get("toast")
-	if msg := r.URL.Query().Get("status_error"); msg != "" {
-		pageData.Toast = msg
-	}
+	pageData.Toast = h.pageToast(r)
 	pageData.Data = data
 
 	if err := h.render.Render(w, "order_detail", pageData); err != nil {
@@ -690,16 +686,16 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 
 // orderStatusUpdate handles POST /admin/orders/{id}/status: the "Сменить
 // статус" buttons on the detail page. Success redirects back to the (now
-// updated) detail page; a rejected transition or an unauthorized cancel
-// redirects back with ?status_error=... so orderDetailPage surfaces it as
-// a toast instead of a raw error page.
+// updated) detail page with a toast; a rejected transition or an
+// unauthorized cancel redirects back with an error toast (keys only, see
+// toast.go) instead of a raw error page.
 func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 	id := r.PathValue("id")
 	detailURL := "/admin/orders/" + id
 
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.err.form")), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, toastKey("form_error"))
 		return
 	}
 	newStatus := orders.OrderStatus(r.FormValue("status"))
@@ -709,7 +705,7 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	// comment): hiding the button isn't enough on its own, since nothing
 	// stops a manager from POSTing status=cancelled directly.
 	if newStatus == orders.StatusCancelled && st.Role != staff.RoleOwner {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.apperr.cancel_forbidden")), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, toastKey("cancel_forbidden"))
 		return
 	}
 
@@ -723,12 +719,13 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus)
 	if err != nil {
-		msg := h.tr(r).T("admin.order.status_change_failed")
+		f := toastForErr(err)
 		var appErr *apperr.AppError
-		if errors.As(err, &appErr) {
-			msg = appErrMessage(h.tr(r), err)
+		if !errors.As(err, &appErr) {
+			slog.ErrorContext(r.Context(), "admin: order status change failed", "order_id", id, "err", err)
+			f = toastKey("status_change_failed")
 		}
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(msg), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, f)
 		return
 	}
 
@@ -737,8 +734,7 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	if updated != nil {
 		shown = updated.Status
 	}
-	t := h.tr(r)
-	redirectWithToast(w, r, detailURL, t.F("admin.order.status_changed", orderStatusMetaFor(t, shown).Label))
+	redirectWithToast(w, r, detailURL, toastOrderStatus(shown))
 }
 
 // staffCanSeeOrder is the point-based RBAC rule for one order: owner and

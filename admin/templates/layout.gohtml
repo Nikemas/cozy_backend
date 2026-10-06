@@ -50,7 +50,7 @@ function adminBack(link) {
   return true;
 }
 
-// Toasts: announce, hide after a few seconds, and drop ?toast= from the
+// Toasts: announce, hide after a few seconds, and drop ?toast=… from the
 // address so a refresh or Back doesn't show the same message again.
 // adminToast(text) shows one from JS (copy buttons, import).
 var ADMIN_TOAST_MS = 5000;
@@ -70,9 +70,10 @@ function adminToast(text) {
   if (el) setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, ADMIN_TOAST_MS);
   try {
     var u = new URL(location.href);
-    if (u.searchParams.has('toast') || u.searchParams.has('status_error')) {
-      u.searchParams.delete('toast');
-      u.searchParams.delete('status_error');
+    var stale = [];
+    u.searchParams.forEach(function (_, k) { if (k.indexOf('toast') === 0) stale.push(k); });
+    if (stale.length) {
+      stale.forEach(function (k) { u.searchParams.delete(k); });
       history.replaceState(history.state, '', u.pathname + u.search + u.hash);
     }
   } catch (e) { /* old browser: keep the URL */ }

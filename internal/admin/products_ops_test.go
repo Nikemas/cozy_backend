@@ -24,30 +24,31 @@ const (
 )
 
 func TestBulkIDs(t *testing.T) {
-	ids, msg := bulkIDs(ruTr, []string{uuid1, " " + uuid1, "junk", uuid2})
-	if msg != "" || len(ids) != 2 {
-		t.Fatalf("ids=%v msg=%q", ids, msg)
+	ids, msg := bulkIDs([]string{uuid1, " " + uuid1, "junk", uuid2})
+	if msg.Key != "" || len(ids) != 2 {
+		t.Fatalf("ids=%v msg=%+v", ids, msg)
 	}
-	if _, msg := bulkIDs(ruTr, []string{"junk"}); msg == "" {
+	if _, msg := bulkIDs([]string{"junk"}); msg.Key != "bulk_none" {
 		t.Error("no valid ids accepted")
 	}
 	many := make([]string, maxBulkItems+1)
 	for i := range many {
 		many[i] = fmt.Sprintf("%08d-1111-1111-1111-111111111111", i)
 	}
-	if _, msg := bulkIDs(ruTr, many); msg == "" {
+	if _, msg := bulkIDs(many); msg.Key != "bulk_too_many" {
 		t.Error("over the cap accepted")
 	}
 }
 
 func TestSafeReturnURL(t *testing.T) {
 	cases := map[string]string{
-		"/admin/products?cat=men&toast=x&point=p1": "/admin/products?cat=men&point=p1",
-		"https://evil.example/admin/products":      "/admin/products",
-		"//evil.example/admin/products":            "/admin/products",
-		"/admin/orders?status=placed":              "/admin/products",
-		"":                                         "/admin/products",
-		"/admin/products?toast=only":               "/admin/products",
+		"/admin/products?cat=men&toast=x&point=p1":          "/admin/products?cat=men&point=p1",
+		"https://evil.example/admin/products":               "/admin/products",
+		"//evil.example/admin/products":                     "/admin/products",
+		"/admin/orders?status=placed":                       "/admin/products",
+		"":                                                  "/admin/products",
+		"/admin/products?toast=only":                        "/admin/products",
+		"/admin/products?toast=x&toast_n=1&bulk_more=2&q=a": "/admin/products?q=a",
 	}
 	for in, want := range cases {
 		if got := safeReturnURL(in, "/admin/products"); got != want {
@@ -218,7 +219,8 @@ func TestProductsBulkHandler(t *testing.T) {
 		t.Fatalf("deactivate: code=%d ops=%+v", w.Code, ops)
 	}
 	loc := w.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/admin/products?cat=men&toast=") || !strings.Contains(loc, url.QueryEscape("изменено 2 из 2")) {
+	locURL, _ := url.Parse(loc)
+	if !strings.HasPrefix(loc, "/admin/products?cat=men&toast=") || !strings.Contains(toastFromQuery(ruTr, locURL.Query()), "изменено 2 из 2") {
 		t.Errorf("Location = %q", loc)
 	}
 
