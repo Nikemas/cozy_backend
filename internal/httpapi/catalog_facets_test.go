@@ -62,13 +62,10 @@ func TestProductFacetsRouteWinsOverProductID(t *testing.T) {
 			AddRow("11111111-1111-1111-1111-111111111111", nil, "Кроссовки", "Кроссовки", "sneakers", 0, nil).
 			AddRow("22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111", "Беговые", "Беговые", "running", 0, nil))
 	subtree := []string{"11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"}
-	mock.ExpectQuery(`SELECT DISTINCT pv.size, pv.color.*category_id = ANY\(\$1\)`).
+	mock.ExpectQuery(`SELECT pv.size, pv.color,.*category_id = ANY\(\$1\)`).
 		WithArgs(subtree, "%nike%").
-		WillReturnRows(sqlmock.NewRows([]string{"size", "color"}).
-			AddRow("42", "Черный").AddRow("38,5", "белый").AddRow("38,5", "Черный"))
-	mock.ExpectQuery(`SELECT MIN\(`).
-		WithArgs(subtree, "%nike%").
-		WillReturnRows(sqlmock.NewRows([]string{"min", "max"}).AddRow(2500.0, 9000.0))
+		WillReturnRows(sqlmock.NewRows([]string{"size", "color", "min", "max"}).
+			AddRow("42", "Черный", 2500.0, 9000.0).AddRow("38,5", "белый", 3000.0, 3000.0).AddRow("38,5", "Черный", 2600.0, 4000.0))
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/products/facets?category=sneakers&q=nike&size=40", nil))
@@ -99,8 +96,7 @@ func TestProductFacetsRouteWinsOverProductID(t *testing.T) {
 
 func TestProductFacetsEmptyScopeReturnsEmptyArraysAndNullPrices(t *testing.T) {
 	mux, mock := newFacetsMux(t)
-	mock.ExpectQuery(`SELECT DISTINCT`).WillReturnRows(sqlmock.NewRows([]string{"size", "color"}))
-	mock.ExpectQuery(`SELECT MIN\(`).WillReturnRows(sqlmock.NewRows([]string{"min", "max"}).AddRow(nil, nil))
+	mock.ExpectQuery(`SELECT pv.size, pv.color,`).WillReturnRows(sqlmock.NewRows([]string{"size", "color", "min", "max"}))
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/products/facets", nil))

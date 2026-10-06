@@ -54,16 +54,16 @@ func TestFacetsCollectsDistinctSortedValuesAndPriceRange(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	mock.ExpectQuery(`SELECT DISTINCT pv.size, pv.color\s+FROM product_variants pv\s+WHERE pv.product_id IN \(SELECT id FROM products WHERE is_active = true AND category_id = \$1\)`).
+	// One pass: (size, color) pairs with their price range; a product
+	// without variants comes back as a NULL size/color row.
+	mock.ExpectQuery(`SELECT pv.size, pv.color,\s+MIN\(COALESCE\(pv.price_override, products.base_price\)\),\s+MAX\(COALESCE\(pv.price_override, products.base_price\)\)\s+FROM products\s+LEFT JOIN product_variants pv ON pv.product_id = products.id\s+WHERE is_active = true AND category_id = \$1\s+GROUP BY pv.size, pv.color`).
 		WithArgs("c1").
-		WillReturnRows(sqlmock.NewRows([]string{"size", "color"}).
-			AddRow("42", "Черный").
-			AddRow("38", "Чёрный").
-			AddRow("38", "белый").
-			AddRow("", "")) // blank values never become options
-	mock.ExpectQuery(`SELECT MIN\(.*\), MAX\(.*\) FROM products WHERE is_active = true AND category_id = \$1`).
-		WithArgs("c1").
-		WillReturnRows(sqlmock.NewRows([]string{"min", "max"}).AddRow(1500.0, 7000.0))
+		WillReturnRows(sqlmock.NewRows([]string{"size", "color", "min", "max"}).
+			AddRow("42", "Черный", 2000.0, 7000.0).
+			AddRow("38", "Чёрный", 1800.0, 1800.0).
+			AddRow("38", "белый", 2500.0, 2600.0).
+			AddRow(nil, nil, 1500.0, 1500.0). // product without variants
+			AddRow("", "", 3000.0, 3000.0))   // blank values never become options
 
 	got, err := NewProductRepo(db).Facets(context.Background(), FacetFilter{CategoryID: "c1"})
 	if err != nil {
@@ -90,8 +90,7 @@ func TestFacetsEmptyScopeHasNoPriceRange(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	mock.ExpectQuery(`SELECT DISTINCT`).WillReturnRows(sqlmock.NewRows([]string{"size", "color"}))
-	mock.ExpectQuery(`SELECT MIN`).WillReturnRows(sqlmock.NewRows([]string{"min", "max"}).AddRow(nil, nil))
+	mock.ExpectQuery(`SELECT pv.size, pv.color`).WillReturnRows(sqlmock.NewRows([]string{"size", "color", "min", "max"}))
 
 	got, err := NewProductRepo(db).Facets(context.Background(), FacetFilter{})
 	if err != nil {
