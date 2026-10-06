@@ -3,11 +3,13 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -45,6 +47,9 @@ type Service struct {
 	sms       notify.OTPSender
 	jwtSecret []byte
 
+	// review is the opt-in store-review account (zero value = disabled).
+	review config.ReviewLogin
+
 	limits      config.AuthLimits
 	verifyFails *windowLimiter // wrong OTP codes per client IP per hour
 	refreshIP   *windowLimiter // /auth/refresh calls per client IP per minute
@@ -54,7 +59,7 @@ type Service struct {
 
 // NewService wires the customer auth service. limits come from
 // config.Security.Auth (env-configurable, see .env.example).
-func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits config.AuthLimits) *Service {
+func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits config.AuthLimits, review config.ReviewLogin) *Service {
 	return &Service{
 		otp:         newOTPRepo(db),
 		refresh:     newRefreshRepo(db),
@@ -62,6 +67,7 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		accounts:    &accountRepo{db: db},
 		sms:         sms,
 		jwtSecret:   jwtSecret,
+		review:      review,
 		limits:      limits,
 		verifyFails: newWindowLimiter(limits.OTPVerifyFailsPerIPPerHour, time.Hour),
 		refreshIP:   newWindowLimiter(limits.RefreshPerIPPerMinute, time.Minute),
@@ -98,6 +104,15 @@ func (s *Service) RequestOTP(ctx context.Context, rawPhone string) error {
 	})
 	if err != nil {
 		return err
+	}
+
+	if s.isReviewPhone(phone) {
+		// The row was reserved above, so cooldown/hourly/IP/daily limits
+		// applied. No SMS; the marker token routes verification to the
+		// configured code. The code itself is never stored or logged.
+		slog.InfoContext(ctx, "auth: store-review OTP requested, SMS skipped",
+			"phone", phone, "client_ip", httpmw.ClientIPFromContext(ctx))
+		return s.otp.setToken(ctx, id, reviewTokenPrefix+transactionID)
 	}
 
 	token, err := s.sms.SendCode(ctx, forNikita(phone), transactionID)
@@ -156,7 +171,7 @@ func (s *Service) VerifyOTP(ctx context.Context, rawPhone, code string) (accessT
 		return "", "", nil, errOTPAttemptsExceeded()
 	}
 
-	if err := s.sms.VerifyCode(ctx, active.Token, code); err != nil {
+	if err := s.verifyCode(ctx, phone, active.Token, code); err != nil {
 		var ae *apperr.AppError
 		if errors.As(err, &ae) && ae.Status < http.StatusInternalServerError {
 			// A wrong/expired code, not a provider outage.
@@ -188,6 +203,30 @@ func (s *Service) VerifyOTP(ctx context.Context, rawPhone, code string) (accessT
 		return "", "", nil, err
 	}
 	return accessToken, refreshTokenStr, customer, nil
+}
+
+// reviewTokenPrefix marks an OTP row issued for the store-review phone.
+const reviewTokenPrefix = "review:"
+
+// isReviewPhone reports whether phone (already normalized) is the
+// configured store-review account. False whenever the feature is off.
+func (s *Service) isReviewPhone(phone string) bool {
+	return s.review.Enabled() && phone == s.review.Phone
+}
+
+// verifyCode checks code for the OTP row of phone. The review shortcut
+// applies only when BOTH the phone is the review phone AND the row carries
+// the review marker (issued by RequestOTP for that phone), so no other
+// phone — or a row from before the feature was enabled — can ever be
+// verified against the review code. Everything else goes to the provider.
+func (s *Service) verifyCode(ctx context.Context, phone, token, code string) error {
+	if s.isReviewPhone(phone) && strings.HasPrefix(token, reviewTokenPrefix) {
+		if subtle.ConstantTimeCompare([]byte(code), []byte(s.review.Code)) != 1 {
+			return apperr.BadRequest("otp_invalid", "неверный код")
+		}
+		return nil
+	}
+	return s.sms.VerifyCode(ctx, token, code)
 }
 
 func errRefreshInvalid() error {

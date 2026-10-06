@@ -78,7 +78,7 @@ func TestFavoritesMatchProductDetail(t *testing.T) {
 	cfg := &config.Config{MinIOEndpoint: "media.test", MinIOBucket: "cozy-media"}
 	authSvc := auth.NewService(testDB, notify.NewMockClient(), []byte("0123456789abcdef0123456789abcdef"), config.AuthLimits{
 		OTPPerIPPerHour: 100, OTPPerDay: 1000, OTPVerifyMaxAttempts: 5, OTPVerifyFailsPerIPPerHour: 100, RefreshPerIPPerMinute: 100,
-	})
+	}, config.ReviewLogin{})
 	phone := uniquePhone()
 	if err := authSvc.RequestOTP(ctx, phone); err != nil {
 		t.Fatal(err)

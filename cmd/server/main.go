@@ -70,7 +70,10 @@ func run() error {
 	} else {
 		sms = notify.NewNikitaClient(cfg.NikitaAPIKey)
 	}
-	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth)
+	if cfg.Review.Enabled() {
+		slog.Warn("auth: store-review login is ENABLED — one phone logs in with a fixed code without SMS", "phone", cfg.Review.Phone)
+	}
+	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth, cfg.Review)
 
 	mediaClient, err := media.NewClient(cfg)
 	if err != nil {

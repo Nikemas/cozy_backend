@@ -75,6 +75,10 @@ type Config struct {
 	// login on the live site accepting code 0000.
 	SMSMockOTP bool
 
+	// Review is the opt-in store-review login (REVIEW_PHONE +
+	// REVIEW_OTP_CODE); zero value = disabled. See ReviewLogin.
+	Review ReviewLogin
+
 	// FCMCredentialsFile is the path to a Firebase service-account JSON
 	// key; empty disables push (notifications are logged instead).
 	// FCMProjectID overrides the key file's project_id when set.
@@ -188,6 +192,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.Contacts, err = loadContacts(); err != nil {
+		return nil, err
+	}
+	if cfg.Review, err = loadReviewLogin(); err != nil {
 		return nil, err
 	}
 	if cfg.Security, err = loadSecurity(cfg.Env); err != nil {
