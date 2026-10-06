@@ -1056,6 +1056,7 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   .admin-order-detail__history-table tr { padding: 10px 0; border-top: 1px solid var(--admin-border); }
   .admin-order-detail__history-table tr:first-child { border-top: 0; padding-top: 0; }
   .admin-order-detail__history-table td { padding: 2px 0; border-top: 0; width: auto; }
+  .admin-order-detail__history-table td:empty { display: none; }
 
   .admin-order-detail__actions {
     position: sticky; bottom: 0; z-index: 20;
@@ -1069,3 +1070,4 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   .admin-order-detail__actions .admin-status-btn { width: 100%; padding: 0 8px; white-space: normal; line-height: 1.15; }
   body:has(.admin-order-detail__actions) .admin-toast { bottom: 96px; }
 }
+.admin-order-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }

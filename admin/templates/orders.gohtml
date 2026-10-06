@@ -125,8 +125,10 @@ function ordersRangeChanged(sel) {
         {{/* Bulk status on a phone too (the table's checkboxes are hidden there). */}}
         <label class="admin-order-card__check" onclick="event.stopPropagation()"><input type="checkbox" class="js-bulk-item" form="orders-bulk" name="id" value="{{.ID}}" aria-label="{{tf "admin.bulk.select_order" .Number}}"></label>
         <a href="{{.URL}}" class="admin-order-card__num">{{.Number}}</a>
-        <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>{{if .AwaitingPayment}}
-        <span class="admin-chip admin-chip--awaiting-pay">{{t "admin.order.awaiting_payment"}}</span>{{end}}
+        <span class="admin-order-card__chips">
+          <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>{{if .AwaitingPayment}}
+          <span class="admin-chip admin-chip--awaiting-pay">{{t "admin.order.awaiting_payment"}}</span>{{end}}
+        </span>
       </div>
       <div class="admin-order-card__phone">{{if .ThumbURL}}<img class="admin-orders-thumb" src="{{.ThumbURL}}" alt="" width="36" height="36" loading="lazy">{{end}}{{.Phone}}</div>
       <div class="admin-order-card__meta">
