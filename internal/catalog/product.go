@@ -72,18 +72,31 @@ const (
 		FROM product_variants pv WHERE pv.product_id = products.id), products.base_price)`
 )
 
-// popularityExpr is a product's popularity: the total quantity of its
-// variants across order_items of every order that wasn't cancelled (an
-// order in any other status — placed, confirmed, courier_assigned,
-// delivered — counts as demand). Correlated like minPriceExpr, so it's
-// evaluated only for rows that pass the WHERE; the joins are served by
-// product_variants' UNIQUE (product_id, size, color),
-// idx_order_items_variant and the orders PK.
-const popularityExpr = `COALESCE((SELECT SUM(oi.quantity)
+// popularityJoin is List's FROM clause for sort=popular: products LEFT
+// JOINed to units sold per product — the total quantity of its variants
+// across order_items of every order that wasn't cancelled (an order in any
+// other status — placed, confirmed, courier_assigned, delivered — counts as
+// demand). Aggregated once with a GROUP BY rather than a correlated
+// subquery per product row; the derived table only exposes product_id and
+// units_sold, neither of which is a products column, so the unqualified
+// columns in the WHERE/SELECT stay unambiguous.
+const popularityJoin = `products LEFT JOIN (
+		SELECT pv.product_id, SUM(oi.quantity) AS units_sold
 		FROM order_items oi
 		JOIN product_variants pv ON pv.id = oi.variant_id
 		JOIN orders o ON o.id = oi.order_id
-		WHERE pv.product_id = products.id AND o.status <> 'cancelled'), 0)`
+		WHERE o.status <> 'cancelled'
+		GROUP BY pv.product_id
+	) popularity ON popularity.product_id = products.id`
+
+// listFrom is List's FROM clause for sort: the popularity join only when
+// it's needed for ORDER BY. The COUNT query never uses it.
+func listFrom(sort string) string {
+	if sort == SortPopular {
+		return popularityJoin
+	}
+	return "products"
+}
 
 // buildListConditions turns filter into List's WHERE fragments and their
 // positional args — a pure function so the query shape is unit-testable
@@ -145,7 +158,7 @@ func listOrderBy(sort string) string {
 	case SortPriceDesc:
 		return minPriceExpr + " DESC, id"
 	case SortPopular:
-		return popularityExpr + " DESC, created_at DESC, id"
+		return "COALESCE(popularity.units_sold, 0) DESC, products.created_at DESC, products.id"
 	default:
 		return "created_at DESC, id"
 	}
@@ -186,10 +199,10 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 	listQuery := fmt.Sprintf(`
 		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
 		       brand, base_price, is_active, created_at, updated_at
-		FROM products
+		FROM %s
 		%s
 		ORDER BY %s
-		LIMIT $%d OFFSET $%d`, where, orderBy, len(args)+1, len(args)+2)
+		LIMIT $%d OFFSET $%d`, listFrom(filter.Sort), where, orderBy, len(args)+1, len(args)+2)
 
 	rows, err := r.db.QueryContext(ctx, listQuery, limitArgs...)
 	if err != nil {

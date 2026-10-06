@@ -78,4 +78,24 @@ func TestListSortPopular(t *testing.T) {
 			t.Errorf("position %d = %s (%s), want %s", i, p.ID, p.NameRu, want[i])
 		}
 	}
+
+	// Combined with every filter (search, price range, size/color,
+	// in-stock): the popularity join must not make any column ambiguous,
+	// and the COUNT must match the page.
+	minPrice, maxPrice := 1.0, 100000.0
+	products, total, err = catalog.NewProductRepo(testDB).List(ctx, catalog.ListFilter{
+		CategoryIDs: []string{f.CategoryID}, Sort: catalog.SortPopular, Query: "Хит",
+		PriceMin: &minPrice, PriceMax: &maxPrice, Size: "40", Color: "white",
+	})
+	if err != nil {
+		t.Fatalf("List with filters: %v", err)
+	}
+	if total != 1 || len(products) != 1 || products[0].ID != hit {
+		t.Errorf("filtered popular = %d/%v, want just %s", total, products, hit)
+	}
+	if _, _, err := catalog.NewProductRepo(testDB).List(ctx, catalog.ListFilter{
+		CategoryID: f.CategoryID, Sort: catalog.SortPopular, InStock: true,
+	}); err != nil {
+		t.Fatalf("List popular in-stock: %v", err)
+	}
 }
