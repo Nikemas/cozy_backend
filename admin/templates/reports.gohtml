@@ -1,7 +1,7 @@
 {{/* reports.gohtml — Отчёты (Task 4, Wave 4), replacing Foundation's stub.
      Cozy Admin.dc.html lines 558-618: period select + Excel export, 4 stat
      cards, a per-day CSS bar chart, "Топ товаров" and "По брендам" ranked
-     lists, plus (fix/admin) a custom date range and "По категориям". .Data is a *internal/admin/reports.go's ReportsData, built by
+     lists, plus (fix/admin) a custom date range, "По категориям" and (A3) "По точкам продаж". .Data is a *internal/admin/reports.go's ReportsData, built by
      handlers.buildReportsData — see that file for how each field here is
      computed from internal/reports.AggregateSales' output. */}}
 {{define "content"}}
@@ -99,6 +99,30 @@
       </thead>
       <tbody>
         {{range .Data.Categories}}
+        <tr>
+          <td>{{.Name}}</td>
+          <td><div class="admin-brand-bar" aria-hidden="true"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div></td>
+          <td class="admin-table__muted">{{.Orders}}</td>
+          <td class="admin-table__muted">{{.Qty}}</td>
+          <td class="admin-table__num">{{.Sum}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="admin-ranked-list__empty">{{t "admin.reports.no_sales"}}</div>
+    {{end}}
+  </div>
+  <div class="admin-reports__card admin-ranked-list" id="report-points">
+    <div class="admin-ranked-list__title">{{t "admin.reports.by_point"}}{{if .Data.PointExportURL}} · <a href="{{.Data.PointExportURL}}">Excel</a>{{end}}</div>
+    <div class="admin-reports__chart-note">{{t "admin.reports.by_point_hint"}}</div>
+    {{if .Data.Points}}
+    <table class="admin-table admin-category-report">
+      <thead>
+        <tr><th scope="col">{{t "admin.common.point_of_sale"}}</th><th scope="col">{{t "admin.reports.col_share"}}</th><th scope="col">{{t "admin.reports.col_orders"}}</th><th scope="col">{{t "admin.reports.col_sold"}}</th><th scope="col" class="admin-table__num-col">{{t "admin.reports.revenue"}}</th></tr>
+      </thead>
+      <tbody>
+        {{range .Data.Points}}
         <tr>
           <td>{{.Name}}</td>
           <td><div class="admin-brand-bar" aria-hidden="true"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div></td>

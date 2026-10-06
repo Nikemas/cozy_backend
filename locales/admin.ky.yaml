@@ -192,6 +192,9 @@ admin.reports.top_products: Эң көп сатылган товарлар
 admin.reports.no_sales: Тандалган мезгилде сатуу болгон жок
 admin.reports.by_brand: Бренддер боюнча
 admin.reports.by_category: Категориялар боюнча
+admin.reports.by_point: Сатуу жайлары боюнча
+admin.reports.by_point_hint: Түшкөн акча — сатуу жайына катталган буйрутмалардын суммасы боюнча.
+admin.reports.no_point: Сатуу жайы жок
 admin.reports.col_share: Үлүшү
 admin.reports.col_orders: Буйрутмалар
 admin.reports.col_sold: Сатылды

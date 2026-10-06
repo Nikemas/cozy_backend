@@ -21,6 +21,8 @@ type fakeReportsBackend struct {
 	loadErr   error
 
 	categoryRows []reports.Row
+	pointNames   map[string]string
+	pointErr     error
 	brandErr     error
 	lastFrom     time.Time
 	lastTo       time.Time
@@ -33,6 +35,13 @@ func (f *fakeReportsBackend) LoadOrders(_ context.Context, from, to time.Time) (
 		return nil, f.loadErr
 	}
 	return f.orders, nil
+}
+
+func (f *fakeReportsBackend) PointNames(_ context.Context) (map[string]string, error) {
+	if f.pointErr != nil {
+		return nil, f.pointErr
+	}
+	return f.pointNames, nil
 }
 
 func (f *fakeReportsBackend) CategorySales(_ context.Context, _, _ time.Time) ([]reports.Row, error) {

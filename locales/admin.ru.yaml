@@ -195,6 +195,9 @@ admin.reports.top_products: Топ товаров
 admin.reports.no_sales: Нет продаж за выбранный период
 admin.reports.by_brand: По брендам
 admin.reports.by_category: По категориям
+admin.reports.by_point: По точкам продаж
+admin.reports.by_point_hint: Выручка — по суммам заказов, оформленных на точку.
+admin.reports.no_point: Без точки
 admin.reports.col_share: Доля
 admin.reports.col_orders: Заказов
 admin.reports.col_sold: Продано
