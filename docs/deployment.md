@@ -63,21 +63,30 @@ Container registry не используется: образ собираетс�
 | Оплата | `PAYMENTS_PROVIDER=mock` допустим | только `bakai` (`mock` — отказ старта) |
 | SMS | `SMS_MOCK_OTP=true` допустим (код всегда `0000`) | `SMS_MOCK_OTP=true` — отказ старта |
 | Поисковики | `X-Robots-Tag: noindex` на всех хостах | без `noindex` |
-| Деплой | автоматически на каждый push в `main` (`.github/workflows/deploy.yml`) | вручную / отдельный workflow с подтверждением |
+| Деплой | автоматически на каждый push в `main` (`.github/workflows/deploy.yml`) | только вручную: `.github/workflows/deploy-prod.yml` (тег/SHA, подтверждение в Environment `production`) |
+| Стек на сервере | compose-проект `docker` (имя по умолчанию), `docker/Caddyfile`, образ `cozy-backend` | compose-проект `cozy-prod`, `docker/Caddyfile.prod` (хосты из `SITE_HOST`/`MEDIA_HOST`), образ `cozy-backend-prod` |
 | Бэкапы | `scripts/backup.sh` по cron | то же, свой off-site remote и свой чек healthchecks |
 
 Почему prod нельзя «просто добавить» вторым доменом в staging-`Caddyfile`:
 покупатели работали бы со staging-базой и mock-оплатой. Prod — отдельный
 стек со своей базой, своим MinIO, своим `.env` и своими секретами.
 
-> **Ограничение текущей версии.** `scripts/deploy.sh` использует жёстко
-> заданные `docker/docker-compose.prod.yml` и `docker/Caddyfile` и не задаёт
-> имя compose-проекта (по умолчанию проект называется `docker` — по имени
-> каталога). Поэтому два стека на одном VPS столкнутся томами и контейнерами.
-> Prod — на **отдельном VPS**. `docker/Caddyfile` в репозитории сейчас
-> содержит только staging-хосты, а `deploy.yml` деплоит только в staging. Перед
-> запуском prod нужно добавить в репозиторий prod-вариант Caddyfile (раздел
-> 5.4) и отдельный workflow (раздел 7.3).
+Какой стек обслуживают скрипты, задаёт переменная `DEPLOY_ENV`
+(`scripts/env.sh`, общий для `deploy.sh`, `migrate.sh`, `backup.sh`):
+
+| | `DEPLOY_ENV=staging` (по умолчанию) | `DEPLOY_ENV=production` |
+|---|---|---|
+| compose-проект | не задаётся (`docker`, как и раньше — тома staging не меняются) | `cozy-prod` (или `COMPOSE_PROJECT_NAME`) |
+| env-файл | `.env` (или `ENV_FILE`) | `.env` (или `ENV_FILE`) |
+| Caddyfile | `docker/Caddyfile` | `docker/Caddyfile.prod` |
+| образ backend | `cozy-backend:<sha>` | `cozy-backend-prod:<sha>` |
+| `DEPLOY_REF` | по умолчанию `origin/main` | **обязателен** (тег или SHA) |
+| `HEALTH_URL` | `https://cozy.erpsystemsales.com/readyz` | `https://$SITE_HOST/readyz` |
+| доп. проверки | — | в env-файле заданы `SITE_HOST`, `MEDIA_HOST`, `APP_ENV=prod` |
+
+Prod всё равно ставится на **отдельный VPS**: оба стека слушают 80/443, и
+два Caddy на одном сервере не уживутся. Имена проекта и образов разведены,
+чтобы ошибочная команда на чужом сервере не задела чужие тома.
 
 ---
 
@@ -217,6 +226,7 @@ Container registry не используется: образ собираетс�
 - [ ] `APP_ENV=prod`, `LOG_FORMAT=json`
 - [ ] `POSTGRES_PASSWORD`, `JWT_SECRET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `BAKAI_WEBHOOK_TOKEN` — новые случайные значения, **не** такие же, как на staging
 - [ ] `PUBLIC_BASE_URL=https://cozy.kg`
+- [ ] `SITE_HOST=cozy.kg`, `MEDIA_HOST=media.cozy.kg` — хосты для `docker/Caddyfile.prod` (`www.SITE_HOST` редиректит на `SITE_HOST`); без них `deploy.sh` не стартует
 - [ ] `MINIO_PUBLIC_ENDPOINT=media.cozy.kg`, `MINIO_PUBLIC_USE_SSL=true`
 - [ ] `PAYMENTS_PROVIDER=bakai`, `BAKAI_API_TOKEN` — боевой токен **мерчант-аккаунта заказчика** (не общий с другими проектами)
 - [ ] `NIKITA_API_KEY` — ключ кабинета Nikita заказчика, `SMS_MOCK_OTP=false`
@@ -230,11 +240,22 @@ Container registry не используется: образ собираетс�
 
 ## 5. Развёртывание с нуля
 
-Команды выполняются на VPS. Для краткости:
+Команды выполняются на prod-VPS. Чтобы все команды ниже (и ручные
+`scripts/*.sh`) работали с prod-стеком, один раз добавьте в
+`~deploy/.profile` (и выполните в текущей сессии):
+
+```bash
+export DEPLOY_ENV=production COMPOSE_PROJECT_NAME=cozy-prod \
+  CADDYFILE=Caddyfile.prod BACKEND_IMAGE=cozy-backend-prod
+```
+
+Для краткости:
 
 ```bash
 C="docker compose -f docker/docker-compose.prod.yml --env-file .env"
 ```
+
+На staging-VPS эти переменные **не** задаются — там всё как раньше.
 
 ### 5.1. Подготовка сервера (под root)
 
@@ -310,59 +331,23 @@ xlsx хватает).
 
 ### 5.4. Caddyfile для prod
 
-`docker/Caddyfile` в репозитории описывает staging (`cozy.erpsystemsales.com`,
-`media.cozy.erpsystemsales.com`, резервный блок по IP `95.215.244.199` и
-`default_sni` с этим IP) и включает заголовок `noindex`. Для prod нужен свой
-файл. Пример (сниппеты `security_headers` и `backend_proxy` скопировать без
-изменений из текущего `docker/Caddyfile`, блок `noindex`, блок по IP и
-глобальный `default_sni` — убрать):
+Готовый файл — `docker/Caddyfile.prod`; при `DEPLOY_ENV=production` compose
+монтирует именно его (`CADDYFILE=Caddyfile.prod`). Хосты в нём не зашиты:
+Caddy берёт их из `.env` (контейнер caddy получает его через `env_file`):
 
-```caddyfile
-# ... (security_headers) и (backend_proxy) — как в docker/Caddyfile ...
+- `{$SITE_HOST}` — сайт, API, админка, вебхук Bakai (заголовок
+  `X-Webhook-Token` ставится так же, как на staging);
+- `www.{$SITE_HOST}` — постоянный редирект на `https://SITE_HOST`;
+- `{$MEDIA_HOST}` — фото из MinIO, только GET/HEAD.
 
-www.cozy.kg {
-	redir https://cozy.kg{uri} permanent
-}
-
-cozy.kg {
-	import security_headers
-	encode zstd gzip
-
-	@bakai_webhook path /api/v1/payments/bakai/webhook
-	handle @bakai_webhook {
-		reverse_proxy backend:8080 {
-			header_up X-Webhook-Token {$BAKAI_WEBHOOK_TOKEN}
-			lb_try_duration 15s
-			lb_try_interval 250ms
-		}
-	}
-
-	handle {
-		import backend_proxy
-	}
-}
-
-media.cozy.kg {
-	import security_headers
-	@not_read not method GET HEAD
-	respond @not_read 405
-	@minio_api path /minio/*
-	respond @minio_api 404
-	reverse_proxy minio:9000
-}
-```
-
-Compose монтирует именно `docker/Caddyfile`, а `deploy.sh` при каждом деплое
-делает `git reset --hard` — поэтому правка файла прямо на сервере будет
-стёрта. Варианты: (а) держать prod-ветку/форк с prod-`Caddyfile`;
-(б) добавить в репозиторий `docker/Caddyfile.prod` и параметр в compose
-(например, `${CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro`) — это
-небольшая доработка, которую нужно сделать до запуска prod.
-
-Проверить синтаксис:
+Отличия от staging: нет `noindex`, нет резервного блока по IP. Сниппеты
+`security_headers`/`backend_proxy` совпадают с `docker/Caddyfile` — правьте
+оба файла синхронно. `deploy.sh` проверяет файл (`caddy validate` с
+переменными из `.env`) при первом prod-деплое и при каждом его изменении.
+Проверить вручную:
 
 ```bash
-docker run --rm -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine \
+docker run --rm --env-file .env -v "$PWD/docker/Caddyfile.prod:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
@@ -370,12 +355,12 @@ docker run --rm -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-
 
 `deploy.sh` подходит и для первого запуска: соберёт образ, поднимет
 Postgres, применит все миграции на пустую базу, запустит остальные сервисы и
-дождётся `/readyz`. На prod обязательно передайте `HEALTH_URL` — по
-умолчанию скрипт проверяет staging-адрес:
+дождётся `/readyz` (`https://$SITE_HOST/readyz`). Обычно первый запуск —
+это просто первый прогон workflow «Deploy production» (раздел 7.3); вручную:
 
 ```bash
 cd /opt/cozy
-HEALTH_URL=https://cozy.kg/readyz bash scripts/deploy.sh
+DEPLOY_ENV=production DEPLOY_REF=v1.0.0 bash scripts/deploy.sh   # тег или SHA из main
 ```
 
 Проверка:
@@ -392,29 +377,33 @@ bash scripts/smoke.sh https://cozy.kg   # с рабочей машины: тол
 ### 5.6. Первый владелец админки
 
 Экрана регистрации нет: сотрудников создаёт владелец в разделе «Сотрудники»,
-а самого первого владельца нужно добавить в базу вручную.
+а самого первого владельца создаёт команда `create-owner` того же бинарника
+сервера (она же — восстановление доступа, если владелец забыл пароль):
 
 ```bash
 cd /opt/cozy
-$C exec postgres psql -U cozy -d cozy
+read -rs -p 'Пароль владельца: ' PW; echo
+printf '%s\n' "$PW" | $C exec -T backend /app/server create-owner --phone '+996XXXXXXXXX' --name 'Имя Владельца'
+unset PW
 ```
 
-В psql (телефон — ровно в том виде, в каком его будут вводить на странице
-входа; рекомендуется `+996XXXXXXXXX` без пробелов — сравнение точное):
+- Пароль читается **только из stdin** (первая строка) — его нет ни в
+  аргументах (`ps`), ни в истории shell, команда его не печатает. От 8
+  символов, не длиннее 72 байт.
+- Телефон — в любом формате КР (`0700 123 456`, `996700123456`,
+  `+996700123456`), сохраняется как `+996XXXXXXXXX`; на странице входа его
+  тоже можно вводить в любом из этих форматов.
+- Хеш — bcrypt, ровно как при создании сотрудника в админке.
+- Повторный запуск безопасен: если владелец с этим номером уже есть — ему
+  ставится новый пароль, аккаунт активируется, все его сессии
+  завершаются (`--name` при этом игнорируется). Если номер принадлежит
+  менеджеру или сотруднику точки — команда откажет (`not_owner`): роль
+  меняет владелец в админке.
+- Вывод: `create-owner: created owner <id> (phone +996…)` или
+  `reset password of owner <id> …`; код выхода не 0 при ошибке.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-INSERT INTO staff (phone, password_hash, name, role)
-VALUES ('+996XXXXXXXXX', crypt('временный-пароль', gen_salt('bf', 10)), 'Имя Владельца', 'owner');
-DROP EXTENSION pgcrypto;
-\q
-```
-
-Если расширение `pgcrypto` недоступно, хеш можно получить так и вставить
-его строкой: `docker run --rm httpd:2.4-alpine htpasswd -nbBC 10 x 'временный-пароль' | cut -d: -f2`.
-
-Затем войти на `https://cozy.kg/admin/login` и сразу сменить пароль
-(«Сотрудники» → «Сменить пароль»). Пароль сотрудника — от 8 символов.
+Затем войти на `https://cozy.kg/admin/login` и при желании сменить пароль
+(«Сотрудники» → «Сменить пароль»).
 
 ### 5.7. Подключение внешних сервисов
 
@@ -467,26 +456,29 @@ bash scripts/migrate.sh down 1      # откатить последнюю (мо�
 Запускается на VPS из `/opt/cozy`. Шаги (старая версия обслуживает
 запросы до шага 6):
 
-0. проверки: есть `.env`, `git`, `docker compose`, `curl`; одновременно идёт только один деплой (`flock`);
-1. `git fetch` и `git reset --hard` на `DEPLOY_REF` (по умолчанию `origin/main`);
-2. если менялся `docker/Caddyfile` — проверка `caddy validate`;
-3. сборка образа `cozy-backend:<первые 12 символов SHA>`; образ, на котором backend работал до деплоя, помечается `cozy-backend:previous`;
+0. проверки: есть env-файл, `git`, `docker compose`, `curl`; для prod — `DEPLOY_REF`, `SITE_HOST`, `MEDIA_HOST`, `APP_ENV=prod`; одновременно идёт только один деплой (`flock`);
+1. `git fetch` и `git reset --hard` на `DEPLOY_REF` (staging: по умолчанию `origin/main`; prod: обязателен, подтягиваются теги);
+2. если менялся Caddyfile окружения (`docker/Caddyfile` / `docker/Caddyfile.prod`; на prod — и при первом запуске) — проверка `caddy validate`;
+3. сборка образа `cozy-backend:<первые 12 символов SHA>` (prod: `cozy-backend-prod:…`); образ, на котором backend работал до деплоя, помечается `:previous`;
 4. Postgres поднят и здоров; если миграции в состоянии `dirty` — стоп с инструкцией;
 5. применение миграций;
 6. переключение на новый образ (`up -d`), перезапуск Caddy, если менялся его конфиг;
 7. ожидание `HEALTH_URL` (до `HEALTH_TIMEOUT`=90 с). Не поднялся — логи и **автоматический откат** на `:previous`;
 8. новый образ получает тег `:latest`; хранятся `KEEP_IMAGES`=5 последних образов.
 
-Параметры (переменные окружения при запуске): `DEPLOY_REF`, `HEALTH_URL`
-(по умолчанию `https://cozy.erpsystemsales.com/readyz`), `HEALTH_TIMEOUT`,
-`KEEP_IMAGES`, `MIGRATE_IMAGE`.
+Параметры (переменные окружения при запуске): `DEPLOY_ENV` (`staging` по
+умолчанию / `production`, см. раздел 2), `DEPLOY_REF`, `ENV_FILE`,
+`HEALTH_URL` (staging: `https://cozy.erpsystemsales.com/readyz`, prod:
+`https://$SITE_HOST/readyz`), `HEALTH_TIMEOUT`, `KEEP_IMAGES`,
+`MIGRATE_IMAGE`.
 
 Ручной деплой:
 
 ```bash
-ssh deploy@<IP> 'cd /opt/cozy && HEALTH_URL=https://cozy.kg/readyz bash scripts/deploy.sh'
-# конкретный коммит:
-ssh deploy@<IP> 'cd /opt/cozy && DEPLOY_REF=<sha> HEALTH_URL=https://cozy.kg/readyz bash scripts/deploy.sh'
+# staging (как раньше):
+ssh deploy@<staging-IP> 'cd /opt/cozy && bash scripts/deploy.sh'
+# prod — тег или SHA обязателен:
+ssh deploy@<prod-IP> 'cd /opt/cozy && DEPLOY_ENV=production DEPLOY_REF=v1.0.1 bash scripts/deploy.sh'
 ```
 
 ### 7.2. Откат
@@ -495,7 +487,7 @@ ssh deploy@<IP> 'cd /opt/cozy && DEPLOY_REF=<sha> HEALTH_URL=https://cozy.kg/rea
 
 ```bash
 cd /opt/cozy
-docker image ls cozy-backend          # previous, latest и <sha12> последних деплоев
+docker image ls cozy-backend-prod     # previous, latest и <sha12> последних деплоев (staging: cozy-backend)
 BACKEND_TAG=previous $C up -d --no-build --no-deps backend
 curl -fsS https://cozy.kg/readyz
 ```
@@ -524,12 +516,30 @@ curl -fsS https://cozy.kg/readyz
 | `DEPLOY_PATH` | `/opt/cozy` |
 | `DEPLOY_SSH_PORT` | необязательно, по умолчанию 22 |
 
-Для prod рекомендуется отдельный workflow (например, `deploy-prod.yml`,
-запуск вручную `workflow_dispatch` или по тегу), GitHub Environment
-`production` с обязательным подтверждением (required reviewers), свои
-секреты `DEPLOY_*` уровня environment и передача
-`HEALTH_URL=https://cozy.kg/readyz` в `deploy.sh`. В текущем репозитории его
-ещё нет.
+- `.github/workflows/deploy-prod.yml` — **prod, только вручную**: Actions →
+  «Deploy production» → Run workflow → поле `ref` (тег, например `v1.0.0`,
+  или SHA). Сам по себе никогда не запускается. Шаги: ref → точный SHA
+  (обязан быть в истории `main`) → весь CI на этом SHA → ожидание
+  подтверждения в GitHub Environment `production` → по SSH
+  `DEPLOY_ENV=production DEPLOY_REF=<sha> scripts/deploy.sh` на prod-сервере.
+- Настройка один раз: Settings → Environments → New environment
+  `production` → Required reviewers (кто подтверждает выкладку), Deployment
+  branches and tags — по желанию. Секреты prod задаются **в этом
+  Environment** (не на уровне репозитория), чтобы их видела только
+  подтверждённая джоба:
+
+| Секрет (Environment `production`) | Значение |
+|---|---|
+| `PROD_DEPLOY_HOST` | IP/имя prod-сервера |
+| `PROD_DEPLOY_USER` | `deploy` |
+| `PROD_DEPLOY_SSH_KEY` | приватный ключ отдельной пары ed25519 только для prod-деплоя |
+| `PROD_DEPLOY_SSH_FINGERPRINT` | отпечаток ECDSA host-ключа prod-сервера (обязателен) |
+| `PROD_DEPLOY_PATH` | `/opt/cozy` |
+| `PROD_DEPLOY_SSH_PORT` | необязательно, по умолчанию 22 |
+
+Выпуск релиза: `git tag -a v1.0.0 -m "..." <sha в main> && git push origin v1.0.0`,
+затем запустить «Deploy production» с `ref=v1.0.0`. Откат кода — раздел 7.2
+(или запуск workflow с предыдущим тегом, если новых миграций не было).
 
 Остановить автодеплой staging на время (например, на демо):
 `gh workflow disable Deploy`, вернуть — `gh workflow enable Deploy`.
@@ -590,10 +600,11 @@ curl -fsS https://cozy.kg/readyz
 
 ```cron
 MAILTO=admin@example.kg
-30 3 * * * BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<uuid> BACKUP_RCLONE_REMOTE=b2:cozy-backups/prod KEEP_DAYS=14 /opt/cozy/scripts/backup.sh >/dev/null
+30 3 * * * DEPLOY_ENV=production BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<uuid> BACKUP_RCLONE_REMOTE=b2:cozy-backups/prod KEEP_DAYS=14 /opt/cozy/scripts/backup.sh >/dev/null
 ```
 
-Каждую ночь в 03:30 по времени сервера. stdout отбрасывается (он уже в
+Каждую ночь в 03:30 по времени сервера. `DEPLOY_ENV=production` в строке
+cron обязателен на prod (cron не читает `~/.profile`); на staging его нет. stdout отбрасывается (он уже в
 `backup.log`), ошибки cron отправит на `MAILTO` (если на сервере настроена
 почта); основной алерт — healthchecks.io (период 1 день, grace 2 часа).
 
