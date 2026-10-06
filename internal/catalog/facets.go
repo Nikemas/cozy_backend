@@ -106,3 +106,35 @@ func sortedNonEmpty(set map[string]bool) []string {
 	sort.Strings(out)
 	return out
 }
+
+// SubtreeIDs returns id plus the ids of all its descendants in tree (a
+// parent category's facets cover its subcategories' products, as on the
+// website's category page). An id missing from tree yields just [id].
+func SubtreeIDs(tree []*Category, id string) []string {
+	var find func(nodes []*Category) *Category
+	find = func(nodes []*Category) *Category {
+		for _, c := range nodes {
+			if c.ID == id {
+				return c
+			}
+			if found := find(c.Children); found != nil {
+				return found
+			}
+		}
+		return nil
+	}
+	root := find(tree)
+	if root == nil {
+		return []string{id}
+	}
+	var ids []string
+	var walk func(c *Category)
+	walk = func(c *Category) {
+		ids = append(ids, c.ID)
+		for _, child := range c.Children {
+			walk(child)
+		}
+	}
+	walk(root)
+	return ids
+}

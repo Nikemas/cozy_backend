@@ -17,8 +17,8 @@ import (
 )
 
 // GET /api/v1/products/facets returns the sizes/colors/price range of the
-// active products in scope (category by slug, search q) — and the route is
-// not shadowed by GET /api/v1/products/{id}.
+// active products in scope (category by id or slug incl. subcategories,
+// search q) — and the route is not shadowed by GET /api/v1/products/{id}.
 func TestProductFacetsEndpoint(t *testing.T) {
 	t.Parallel()
 	ctx := ctxT(t)
@@ -43,7 +43,11 @@ func TestProductFacetsEndpoint(t *testing.T) {
 	otherCategory := mustScan(`INSERT INTO categories (name_ru, name_ky, slug) VALUES ($1, $1, $2) RETURNING id`,
 		"Другое "+tag, "it-other-"+tag)
 
+	subCategory := mustScan(`INSERT INTO categories (parent_id, name_ru, name_ky, slug) VALUES ($1, $2, $2, $3) RETURNING id`,
+		f.CategoryID, "Подраздел "+tag, "it-sub-"+tag)
+
 	addProduct(f.CategoryID, "Ботинки фасет "+tag, true, "39,5", "Чёрный", 1800)
+	addProduct(subCategory, "Детские фасет "+tag, true, "33", "белый", nil)
 	addProduct(f.CategoryID, "Скрытый фасет "+tag, false, "45", "red", 100)
 	addProduct(otherCategory, "Чужой фасет "+tag, true, "44", "green", nil)
 
@@ -67,14 +71,22 @@ func TestProductFacetsEndpoint(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status = %d", code)
 	}
+	// Parent category by slug includes its subcategory's products.
 	want := map[string]any{
-		"sizes":     []any{"39,5", "40", "41"},
-		"colors":    []any{"black", "Чёрный"},
+		"sizes":     []any{"33", "39,5", "40", "41"},
+		"colors":    []any{"black", "Чёрный", "белый"},
 		"price_min": 1800.0,
 		"price_max": 3000.0,
 	}
 	if !reflect.DeepEqual(body, want) {
 		t.Errorf("category facets = %v, want %v", body, want)
+	}
+
+	// The subcategory alone.
+	_, body = get(url.Values{"category": {subCategory}})
+	want = map[string]any{"sizes": []any{"33"}, "colors": []any{"белый"}, "price_min": 2000.0, "price_max": 2000.0}
+	if !reflect.DeepEqual(body, want) {
+		t.Errorf("subcategory facets = %v, want %v", body, want)
 	}
 
 	// Category by id + search narrows to the fixture product only.

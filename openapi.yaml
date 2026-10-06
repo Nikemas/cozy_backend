@@ -294,8 +294,10 @@ paths:
       summary: Filter options (sizes, colors, price range) for a product scope
       description: |
         The sizes, colors and effective price range (variant `price_override`,
-        else `base_price`) of the active products that `GET /api/v1/products`
-        would return for the same `category`/`q`. Filter params (`size`,
+        else `base_price`) of the active products matching `category`/`q`
+        like `GET /api/v1/products`, except that a parent `category` also
+        covers its subcategories (as the website's category page does), so
+        one call serves a screen that lists several subcategories. Filter params (`size`,
         `color`, `price_*`, `in_stock`) are ignored — facets list every option
         in the scope. Same short public `Cache-Control` as the product list.
         Takes precedence over `/api/v1/products/{id}` (ServeMux picks the
@@ -303,7 +305,7 @@ paths:
       parameters:
         - name: category
           in: query
-          description: Category `id` (UUID) or `slug` — same matching as the product list.
+          description: Category `id` (UUID) or `slug`; includes all of its subcategories.
           schema: { type: string }
         - name: q
           in: query

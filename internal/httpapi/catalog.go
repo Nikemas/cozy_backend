@@ -109,7 +109,12 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 			if err != nil {
 				return err
 			}
-			filter.CategoryID = id
+			tree, err := categories.Tree(r.Context())
+			if err != nil {
+				return err
+			}
+			// A parent category's facets include its subcategories'.
+			filter.CategoryID, filter.CategoryIDs = "", catalog.SubtreeIDs(tree, id)
 		}
 		facets, err := products.Facets(r.Context(), filter)
 		if err != nil {

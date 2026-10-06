@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,9 +16,20 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/config"
 )
 
+// stringSliceConverter lets sqlmock accept the []string arg the facets query
+// binds for category_id = ANY($1) (lib/pq handles it in production).
+type stringSliceConverter struct{}
+
+func (stringSliceConverter) ConvertValue(v any) (driver.Value, error) {
+	if s, ok := v.([]string); ok {
+		return s, nil
+	}
+	return driver.DefaultParameterConverter.ConvertValue(v)
+}
+
 func newFacetsMux(t *testing.T) (*http.ServeMux, sqlmock.Sqlmock) {
 	t.Helper()
-	db, mock, err := sqlmock.New()
+	db, mock, err := sqlmock.New(sqlmock.ValueConverterOption(stringSliceConverter{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,12 +57,17 @@ func TestProductFacetsRouteWinsOverProductID(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT id FROM categories WHERE slug = \$1`).WithArgs("sneakers").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("11111111-1111-1111-1111-111111111111"))
-	mock.ExpectQuery(`SELECT DISTINCT pv.size, pv.color`).
-		WithArgs("11111111-1111-1111-1111-111111111111", "%nike%").
+	mock.ExpectQuery(`FROM categories\s+ORDER BY sort_order`).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).
+			AddRow("11111111-1111-1111-1111-111111111111", nil, "Кроссовки", "Кроссовки", "sneakers", 0).
+			AddRow("22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111", "Беговые", "Беговые", "running", 0))
+	subtree := []string{"11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"}
+	mock.ExpectQuery(`SELECT DISTINCT pv.size, pv.color.*category_id = ANY\(\$1\)`).
+		WithArgs(subtree, "%nike%").
 		WillReturnRows(sqlmock.NewRows([]string{"size", "color"}).
 			AddRow("42", "Черный").AddRow("38,5", "белый").AddRow("38,5", "Черный"))
 	mock.ExpectQuery(`SELECT MIN\(`).
-		WithArgs("11111111-1111-1111-1111-111111111111", "%nike%").
+		WithArgs(subtree, "%nike%").
 		WillReturnRows(sqlmock.NewRows([]string{"min", "max"}).AddRow(2500.0, 9000.0))
 
 	rec := httptest.NewRecorder()

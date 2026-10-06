@@ -104,3 +104,24 @@ func TestFacetsEmptyScopeHasNoPriceRange(t *testing.T) {
 		t.Errorf("want nil price range, got %v..%v", got.PriceMin, got.PriceMax)
 	}
 }
+
+func TestSubtreeIDs(t *testing.T) {
+	leaf := &Category{ID: "leaf"}
+	mid := &Category{ID: "mid", Children: []*Category{leaf}}
+	tree := []*Category{{ID: "top", Children: []*Category{mid, {ID: "sib"}}}, {ID: "other"}}
+
+	tests := []struct {
+		id   string
+		want []string
+	}{
+		{"top", []string{"top", "mid", "leaf", "sib"}},
+		{"mid", []string{"mid", "leaf"}},
+		{"leaf", []string{"leaf"}},
+		{"missing", []string{"missing"}},
+	}
+	for _, tt := range tests {
+		if got := SubtreeIDs(tree, tt.id); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("SubtreeIDs(%q) = %v, want %v", tt.id, got, tt.want)
+		}
+	}
+}
