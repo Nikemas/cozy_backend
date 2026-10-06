@@ -96,11 +96,15 @@ func (h *handlers) errorText(lang string, appErr *apperr.AppError) string {
 	case appErr.Status >= http.StatusInternalServerError:
 		return h.t(lang, "error.internal.text")
 	}
-	// A 4xx whose code has no translation yet: the domain message is
-	// Russian and meant for customers, so show it on the RU site; the KY
-	// site gets the generic text rather than a Russian sentence.
+	// A 4xx with no site key: the domain message is Russian and meant for
+	// customers, so show it on the RU site. Other languages get the shared
+	// error bundle's translation (with its parameters filled) when there is
+	// one, else the generic text rather than a Russian sentence.
 	if lang == "ru" && appErr.Message != "" {
 		return appErr.Message
+	}
+	if apperr.HasTranslation(lang, appErr.MessageKey()) {
+		return apperr.Localize(lang, appErr)
 	}
 	return h.t(lang, "error.generic.text")
 }
