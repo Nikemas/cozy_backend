@@ -310,6 +310,7 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 		StockPointsJSON: marshalJS(stockPoints),
 		CanDelete:       st.Role == staff.RoleOwner,
 	}
+	data.ReturnURL = listReturnURL(r.Referer(), r.Host, productsListPath)
 	h.renderProductForm(w, st, "admin.product.new_title", data)
 }
 
@@ -411,6 +412,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data.StockPoints = stockPoints
 	data.StockPointsJSON = marshalJS(stockPoints)
+	data.ReturnURL = listReturnURL(r.Referer(), r.Host, productsListPath)
 	h.renderProductForm(w, st, "admin.product.edit_title", data)
 }
 
@@ -418,6 +420,9 @@ func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, tit
 	pageData := h.productsShellData("product_form", title, st)
 	pageData.ShowBack = true
 	pageData.BackURL = productsListPath
+	if data.ReturnURL != "" {
+		pageData.BackURL = data.ReturnURL
+	}
 	pageData.Data = data
 	if err := h.render.Render(w, "product_form", pageData); err != nil {
 		http.Error(w, trFromWriter(w).T("admin.err.render"), http.StatusInternalServerError)
@@ -495,7 +500,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 		return
 	}
 
-	redirectWithToast(w, r, "/admin/products", h.tr(r).T("admin.product.toast_saved"))
+	redirectWithToast(w, r, safeReturnURL(r.FormValue("back"), productsListPath), h.tr(r).T("admin.product.toast_saved"))
 }
 
 // rerenderFormOnError redisplays the form with whatever the staff member
@@ -563,6 +568,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 	if data.IsEdit {
 		title = "admin.product.edit_title"
 	}
+	data.ReturnURL = safeReturnURL(r.FormValue("back"), productsListPath)
 	h.renderProductForm(w, st, title, data)
 }
 

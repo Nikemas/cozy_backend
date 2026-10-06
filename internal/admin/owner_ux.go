@@ -292,3 +292,20 @@ func categoriesFormRetry(r *http.Request) *FormRetry {
 		return nil
 	}
 }
+
+// ---------- product form: return to the list the user came from ----------
+
+// listReturnURL is the same-site list page (path listPath, with its
+// filters/page) that referer points to, or "" for anything else — so
+// saving a product returns to where the owner was in the list instead of
+// page 1 of every category.
+func listReturnURL(referer, host, listPath string) string {
+	if referer == "" {
+		return ""
+	}
+	u, err := url.Parse(referer)
+	if err != nil || u.Host != host || u.Path != listPath {
+		return ""
+	}
+	return safeReturnURL(u.RequestURI(), listPath)
+}

@@ -220,6 +220,9 @@ type ImageRowVM struct {
 type ProductFormData struct {
 	IsEdit    bool
 	ProductID string
+	// ReturnURL (fix/admin-owner-ux) is the products list page the form
+	// was opened from (filters, page); Save/Отмена go back there.
+	ReturnURL string
 
 	NameRu string
 	NameKy string

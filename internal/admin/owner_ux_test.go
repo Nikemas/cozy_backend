@@ -386,3 +386,48 @@ func TestWithRetryErrorCopies(t *testing.T) {
 		t.Errorf("out=%+v in=%+v", out, in)
 	}
 }
+
+func TestListReturnURLFromReferer(t *testing.T) {
+	cases := []struct{ ref, want string }{
+		{"http://admin.test/admin/products?cat=men&page=2&toast=x", "/admin/products?cat=men&page=2"},
+		{"http://admin.test/admin/products", "/admin/products"},
+		{"http://evil.test/admin/products?cat=men", ""},
+		{"http://admin.test/admin/orders", ""},
+		{"", ""},
+		{"::bad", ""},
+	}
+	for _, c := range cases {
+		if got := listReturnURL(c.ref, "admin.test", productsListPath); got != c.want {
+			t.Errorf("listReturnURL(%q) = %q, want %q", c.ref, got, c.want)
+		}
+	}
+}
+
+func TestSaveProductReturnsToListPage(t *testing.T) {
+	saver := &fakeSaver{}
+	h, mock := newProductFormHandlers(t, saver)
+	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}))
+
+	form := url.Values{
+		"category_id": {"cat1"}, "name_ru": {"Nike"}, "name_ky": {"Nike"}, "base_price": {"4500"},
+		"back": {"/admin/products?cat=men&page=2"},
+	}
+	w := postProductForm(h, form)
+
+	if !saver.called {
+		t.Fatalf("not saved: %d %.300s", w.Code, w.Body.String())
+	}
+	loc := w.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/admin/products?cat=men&page=2&toast=") {
+		t.Errorf("Location = %q, want the list page it came from", loc)
+	}
+
+	saver2 := &fakeSaver{}
+	h2, mock2 := newProductFormHandlers(t, saver2)
+	mock2.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}))
+	form.Set("back", "https://evil.test/admin/products")
+	w = postProductForm(h2, form)
+	if loc := w.Header().Get("Location"); !strings.HasPrefix(loc, "/admin/products?toast=") {
+		t.Errorf("open redirect: Location = %q", loc)
+	}
+}
