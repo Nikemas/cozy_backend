@@ -28,6 +28,16 @@ type fakeSalesRepo struct {
 	lastFrom, lastTo time.Time
 }
 
+// Sales mirrors reports.Repo.Sales over the fake's orders, using the
+// in-memory reference aggregation.
+func (f *fakeSalesRepo) Sales(ctx context.Context, from, to time.Time, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error) {
+	list, err := f.LoadOrders(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return reports.AggregateSales(list, groupBy, pointNames)
+}
+
 func (f *fakeSalesRepo) LoadOrders(_ context.Context, from, to time.Time) ([]orders.Order, error) {
 	f.lastFrom, f.lastTo = from, to
 	if f.loadErr != nil {

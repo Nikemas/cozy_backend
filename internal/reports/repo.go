@@ -132,22 +132,26 @@ func (r *Repo) PointNames(ctx context.Context) (map[string]string, error) {
 // over [from, to): a product filed under a subcategory counts toward its
 // parent. Only orders that count as sales (SaleConditionSQL) are included;
 // revenue is line price × quantity, like AggregateSales' GroupByProduct.
-// Rows are sorted by revenue, highest first.
+// Rows are sorted by revenue, highest first (ties by name in the database
+// collation, as before; the grouping itself uses COLLATE "C" — same
+// groups, byte comparisons, see Sales).
 func (r *Repo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, error) {
 	const q = `
-		SELECT COALESCE(parent.name_ru, c.name_ru) AS category,
-		       COUNT(DISTINCT oi.order_id) AS order_count,
-		       COALESCE(SUM(oi.quantity), 0) AS item_count,
-		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
-		FROM order_items oi
-		JOIN orders o ON o.id = oi.order_id
-		JOIN product_variants pv ON pv.id = oi.variant_id
-		JOIN products p ON p.id = pv.product_id
-		JOIN categories c ON c.id = p.category_id
-		LEFT JOIN categories parent ON parent.id = c.parent_id
-		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
-		GROUP BY 1
-		ORDER BY revenue DESC, category`
+		SELECT category, order_count, item_count, revenue FROM (
+			SELECT COALESCE(parent.name_ru, c.name_ru) COLLATE "C" AS category,
+			       COUNT(DISTINCT oi.order_id) AS order_count,
+			       COALESCE(SUM(oi.quantity), 0) AS item_count,
+			       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			JOIN product_variants pv ON pv.id = oi.variant_id
+			JOIN products p ON p.id = pv.product_id
+			JOIN categories c ON c.id = p.category_id
+			LEFT JOIN categories parent ON parent.id = c.parent_id
+			WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
+			GROUP BY 1
+		) sales
+		ORDER BY revenue DESC, category COLLATE "default"`
 
 	rows, err := r.db.QueryContext(ctx, q, from, to)
 	if err != nil {
