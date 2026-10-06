@@ -78,6 +78,7 @@ func TestParseListFilterInvalidValues(t *testing.T) {
 		{"bad page not a number", url.Values{"page": {"abc"}}},
 		{"bad page zero", url.Values{"page": {"0"}}},
 		{"bad page negative", url.Values{"page": {"-1"}}},
+		{"bad in_stock", url.Values{"in_stock": {"maybe"}}},
 	}
 
 	for _, c := range cases {
@@ -106,6 +107,34 @@ func TestParseListFilterAcceptsEverySortValue(t *testing.T) {
 			}
 			if filter.Sort != sort {
 				t.Errorf("Sort = %q, want %q", filter.Sort, sort)
+			}
+		})
+	}
+}
+
+func TestParseListFilterInStock(t *testing.T) {
+	cases := []struct {
+		value string
+		want  bool
+	}{
+		{"", false},
+		{"0", false},
+		{"false", false},
+		{"1", true},
+		{"true", true},
+	}
+	for _, c := range cases {
+		t.Run(c.value, func(t *testing.T) {
+			q := url.Values{}
+			if c.value != "" {
+				q.Set("in_stock", c.value)
+			}
+			filter, _, err := parseListFilter(q)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if filter.InStock != c.want {
+				t.Errorf("InStock = %v, want %v", filter.InStock, c.want)
 			}
 		})
 	}

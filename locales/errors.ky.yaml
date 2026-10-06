@@ -116,6 +116,7 @@ err.invalid_point: сатуу жайы табылган жок
 err.invalid_point.inactive: сатуу жайы табылган жок же өчүрүлгөн
 err.invalid_point_id: сатуу жайы табылган жок
 err.invalid_price_max: price_max туура эмес
+err.invalid_in_stock: in_stock туура эмес
 err.invalid_price_min: price_min туура эмес
 err.invalid_price_override: price_override терс болбошу керек
 err.invalid_variant_price: вариациянын баасы нөлдөн чоң болушу керек

@@ -19,6 +19,11 @@ type appConfigResponse struct {
 	// DeliveryFee is the flat delivery charge (som) added to a delivery
 	// order's total_amount (DELIVERY_FEE_SOM). Self-pickup is free.
 	DeliveryFee float64 `json:"delivery_fee"`
+	// Shop support contacts (SHOP_PHONE, SHOP_WHATSAPP, SHOP_EMAIL) for the
+	// app's «Поддержка» sheet; an empty string hides that action.
+	ShopPhone    string `json:"shop_phone"`
+	ShopWhatsApp string `json:"shop_whatsapp"`
+	ShopEmail    string `json:"shop_email"`
 }
 
 // RegisterAppConfigRoutes mounts the public GET /api/v1/app/config.
@@ -33,6 +38,9 @@ func appConfigHandler(cfg *config.Config) apperr.HandlerFunc {
 		StoreURLIOS:     cfg.AppStoreURLIOS,
 		StoreURLAndroid: cfg.AppStoreURLAndroid,
 		DeliveryFee:     orders.CurrentSettings().DeliveryFee,
+		ShopPhone:       cfg.Contacts.Phone,
+		ShopWhatsApp:    cfg.Contacts.WhatsApp,
+		ShopEmail:       cfg.Contacts.Email,
 	}
 	return func(w http.ResponseWriter, r *http.Request) error {
 		// Short cache: a bumped APP_MIN_VERSION should reach clients within
