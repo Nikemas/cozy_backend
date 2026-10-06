@@ -18,7 +18,7 @@ type shopParams struct {
 	Size     string
 	Color    string
 	InStock  bool
-	Sort     string // "" (newest), catalog.SortPriceAsc, catalog.SortPriceDesc
+	Sort     string // "" (newest), catalog.SortPriceAsc, catalog.SortPriceDesc, catalog.SortPopular
 	PriceMin int    // 0 = no lower bound
 	PriceMax int    // 0 = no upper bound
 	Page     int    // >= 1
@@ -43,7 +43,7 @@ func parseShopParams(q url.Values) shopParams {
 		p.InStock = true
 	}
 	switch v := q.Get("sort"); v {
-	case catalog.SortPriceAsc, catalog.SortPriceDesc:
+	case catalog.SortPriceAsc, catalog.SortPriceDesc, catalog.SortPopular:
 		p.Sort = v
 	}
 	p.PriceMin = positiveInt(q.Get("price_min"))

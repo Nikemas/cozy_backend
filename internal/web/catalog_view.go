@@ -26,6 +26,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
@@ -259,21 +260,17 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		PriceMax:     params.PriceMax,
 		SizeOptions:  filterOptions(facets.Sizes, params.Size),
 		ColorOptions: filterOptions(facets.Colors, params.Color),
-		SortOptions: []FilterOption{
-			{Value: "", Label: h.bundle.T(lang, "shop.sort.newest"), Selected: params.Sort == ""},
-			{Value: catalog.SortPriceAsc, Label: h.bundle.T(lang, "shop.sort.price_asc"), Selected: params.Sort == catalog.SortPriceAsc},
-			{Value: catalog.SortPriceDesc, Label: h.bundle.T(lang, "shop.sort.price_desc"), Selected: params.Sort == catalog.SortPriceDesc},
-		},
-		HasFilters: params.hasFilters(),
-		Page:       page,
-		TotalPages: totalPages,
-		HasPrev:    page > 1,
-		HasNext:    page < totalPages,
-		ShowBanner: params.Query == "" && categorySlug == "" && !params.hasFilters() && page == 1,
-		Categories: chips,
-		Products:   cards,
-		Total:      total,
-		NoResults:  len(cards) == 0,
+		SortOptions:  sortOptions(h.bundle, lang, params.Sort),
+		HasFilters:   params.hasFilters(),
+		Page:         page,
+		TotalPages:   totalPages,
+		HasPrev:      page > 1,
+		HasNext:      page < totalPages,
+		ShowBanner:   params.Query == "" && categorySlug == "" && !params.hasFilters() && page == 1,
+		Categories:   chips,
+		Products:     cards,
+		Total:        total,
+		NoResults:    len(cards) == 0,
 	}
 	sd.PrevHref = params.href(basePath, page-1)
 	sd.NextHref = params.href(basePath, page+1)
@@ -787,4 +784,20 @@ func (h *handlers) applyProductDelivery(ctx context.Context, pd *ProductData) er
 	}
 	pd.DeliveryFee, pd.DeliveryFrom = page.DeliveryFee, page.DeliveryFrom
 	return nil
+}
+
+// sortOptions is the catalog's sort dropdown ("" is the default, newest
+// first), with selected marked.
+func sortOptions(bundle *i18n.Bundle, lang, selected string) []FilterOption {
+	opts := []struct{ value, key string }{
+		{"", "shop.sort.newest"},
+		{catalog.SortPopular, "shop.sort.popular"},
+		{catalog.SortPriceAsc, "shop.sort.price_asc"},
+		{catalog.SortPriceDesc, "shop.sort.price_desc"},
+	}
+	out := make([]FilterOption, 0, len(opts))
+	for _, o := range opts {
+		out = append(out, FilterOption{Value: o.value, Label: bundle.T(lang, o.key), Selected: selected == o.value})
+	}
+	return out
 }

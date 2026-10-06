@@ -208,6 +208,7 @@ shop.search_results: Результаты поиска
 shop.price_from: от %s
 shop.sort.label: Сортировка
 shop.sort.newest: Сначала новые
+shop.sort.popular: Сначала популярные
 shop.sort.price_asc: Сначала дешевле
 shop.sort.price_desc: Сначала дороже
 filter.size: Размер

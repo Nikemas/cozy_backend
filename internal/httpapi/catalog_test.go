@@ -96,3 +96,17 @@ func TestParseListFilterInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func TestParseListFilterAcceptsEverySortValue(t *testing.T) {
+	for _, sort := range []string{"", catalog.SortNewest, catalog.SortPriceAsc, catalog.SortPriceDesc, catalog.SortPopular} {
+		t.Run("sort="+sort, func(t *testing.T) {
+			filter, _, err := parseListFilter(url.Values{"sort": {sort}})
+			if err != nil {
+				t.Fatalf("parseListFilter: %v", err)
+			}
+			if filter.Sort != sort {
+				t.Errorf("Sort = %q, want %q", filter.Sort, sort)
+			}
+		})
+	}
+}

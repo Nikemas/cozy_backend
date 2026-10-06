@@ -208,6 +208,7 @@ shop.search_results: Издөө жыйынтыктары
 shop.price_from: %sдон
 shop.sort.label: Иреттөө
 shop.sort.newest: Адегенде жаңылары
+shop.sort.popular: Адегенде популярдуулары
 shop.sort.price_asc: Адегенде арзандары
 shop.sort.price_desc: Адегенде кымбаттары
 filter.size: Өлчөм

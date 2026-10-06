@@ -32,6 +32,9 @@ const (
 	SortNewest    = "newest"
 	SortPriceAsc  = "price_asc"
 	SortPriceDesc = "price_desc"
+	// SortPopular orders by units sold (see popularityExpr), newest first
+	// among equals.
+	SortPopular = "popular"
 )
 
 const DefaultPageSize = 20
@@ -68,6 +71,19 @@ const (
 	maxPriceExpr = `COALESCE((SELECT MAX(COALESCE(pv.price_override, products.base_price))
 		FROM product_variants pv WHERE pv.product_id = products.id), products.base_price)`
 )
+
+// popularityExpr is a product's popularity: the total quantity of its
+// variants across order_items of every order that wasn't cancelled (an
+// order in any other status — placed, confirmed, courier_assigned,
+// delivered — counts as demand). Correlated like minPriceExpr, so it's
+// evaluated only for rows that pass the WHERE; the joins are served by
+// product_variants' UNIQUE (product_id, size, color),
+// idx_order_items_variant and the orders PK.
+const popularityExpr = `COALESCE((SELECT SUM(oi.quantity)
+		FROM order_items oi
+		JOIN product_variants pv ON pv.id = oi.variant_id
+		JOIN orders o ON o.id = oi.order_id
+		WHERE pv.product_id = products.id AND o.status <> 'cancelled'), 0)`
 
 // buildListConditions turns filter into List's WHERE fragments and their
 // positional args — a pure function so the query shape is unit-testable
@@ -128,6 +144,8 @@ func listOrderBy(sort string) string {
 		return minPriceExpr + " ASC, id"
 	case SortPriceDesc:
 		return minPriceExpr + " DESC, id"
+	case SortPopular:
+		return popularityExpr + " DESC, created_at DESC, id"
 	default:
 		return "created_at DESC, id"
 	}

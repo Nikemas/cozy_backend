@@ -138,3 +138,44 @@ func TestRenderShopWithFilters(t *testing.T) {
 		}
 	}
 }
+
+func TestParseShopParamsAcceptsPopularSort(t *testing.T) {
+	p := parseShopParams(url.Values{"sort": {catalog.SortPopular}})
+	if p.Sort != catalog.SortPopular {
+		t.Fatalf("Sort = %q, want %q", p.Sort, catalog.SortPopular)
+	}
+	if f := p.listFilter(nil, 20); f.Sort != catalog.SortPopular {
+		t.Fatalf("listFilter.Sort = %q, want %q", f.Sort, catalog.SortPopular)
+	}
+}
+
+func TestSortOptionsIncludePopularInBothLanguages(t *testing.T) {
+	restore := chdir(t, repoRoot(t))
+	defer restore()
+	bundle, err := i18n.Load("locales")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		opts := sortOptions(bundle, lang, catalog.SortPopular)
+		var found bool
+		for _, o := range opts {
+			if o.Value != catalog.SortPopular {
+				if o.Selected {
+					t.Errorf("%s: %q selected, want only popular", lang, o.Value)
+				}
+				continue
+			}
+			found = true
+			if !o.Selected {
+				t.Errorf("%s: popular not selected", lang)
+			}
+			if o.Label == "" || o.Label == "shop.sort.popular" {
+				t.Errorf("%s: popular label untranslated: %q", lang, o.Label)
+			}
+		}
+		if !found {
+			t.Errorf("%s: no popular option in %+v", lang, opts)
+		}
+	}
+}
