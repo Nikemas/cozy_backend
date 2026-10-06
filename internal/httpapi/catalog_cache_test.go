@@ -23,8 +23,8 @@ func TestPublicCatalogRoutesSendCacheControlOnlyOnSuccess(t *testing.T) {
 	RegisterCatalogRoutes(mux, db, &config.Config{})
 
 	mock.ExpectQuery("FROM categories").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).
-			AddRow("c1", nil, "Обувь", "Бут кийим", "shoes", 0),
+		sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order", "image_key"}).
+			AddRow("c1", nil, "Обувь", "Бут кийим", "shoes", 0, nil),
 	)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/categories", nil))

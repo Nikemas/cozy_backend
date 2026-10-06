@@ -260,7 +260,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	staffSvc.SetLoginIPLimit(cfg.Security.Auth.StaffLoginPerIP)
 	staff.RegisterRoutes(mux, staffSvc)
 	media.RegisterRoutes(mux, mediaClient, staffSvc, cfg)
-	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc)
+	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc, cfg.PublicObjectURL)
 	points.RegisterRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminReportsRoutes(mux, db, staffSvc)

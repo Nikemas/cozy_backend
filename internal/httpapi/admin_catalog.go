@@ -29,8 +29,9 @@ type stockSetter interface {
 // products, variants and images are owner/manager only, while stock is
 // additionally open to point_staff — but only at their own point
 // (staff.PointID), enforced inside updateStockHandler after RequireRole
-// lets the role itself through.
-func RegisterAdminCatalogRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
+// lets the role itself through. objectURL builds the public URL of a
+// stored object (config.PublicObjectURL) for the categories' image_url.
+func RegisterAdminCatalogRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, objectURL func(objectKey string) string) {
 	categories := catalog.NewCategoryRepo(db)
 	products := catalog.NewProductRepo(db)
 	variants := catalog.NewVariantRepo(db)
@@ -40,8 +41,8 @@ func RegisterAdminCatalogRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.
 
 	managerOnly := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
 
-	mux.Handle("POST /admin/api/categories", managerOnly(apperr.Wrap(createCategoryHandler(categories, journal))))
-	mux.Handle("PUT /admin/api/categories/{id}", managerOnly(apperr.Wrap(updateCategoryHandler(categories, journal))))
+	mux.Handle("POST /admin/api/categories", managerOnly(apperr.Wrap(createCategoryHandler(categories, journal, objectURL))))
+	mux.Handle("PUT /admin/api/categories/{id}", managerOnly(apperr.Wrap(updateCategoryHandler(categories, journal, objectURL))))
 	mux.Handle("DELETE /admin/api/categories/{id}", managerOnly(apperr.Wrap(deleteCategoryHandler(categories, journal))))
 
 	mux.Handle("POST /admin/api/products", managerOnly(apperr.Wrap(createProductHandler(products, journal))))
@@ -81,7 +82,11 @@ func (req categoryRequest) toInput() catalog.CategoryInput {
 	}
 }
 
-func createCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log) apperr.HandlerFunc {
+// The category handlers answer with the same Category shape as GET
+// /api/v1/categories, image_url included. Photos themselves are managed
+// only from the admin HTML screen (/admin/categories), so these endpoints
+// neither take nor clear one.
+func createCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log, objectURL func(string) string) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		var req categoryRequest
 		if err := decodeJSON(r, &req); err != nil {
@@ -93,11 +98,11 @@ func createCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log) apper
 			return err
 		}
 		journal.Record(r.Context(), categoryEntry(audit.ActionCategoryCreate, c.ID, "Создана категория «"+req.NameRu+"» (API)", &req))
-		return writeJSON(w, http.StatusCreated, c)
+		return writeJSON(w, http.StatusCreated, c.WithImageURL(objectURL))
 	}
 }
 
-func updateCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log) apperr.HandlerFunc {
+func updateCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log, objectURL func(string) string) apperr.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		var req categoryRequest
 		if err := decodeJSON(r, &req); err != nil {
@@ -109,7 +114,7 @@ func updateCategoryHandler(repo *catalog.CategoryRepo, journal *audit.Log) apper
 			return err
 		}
 		journal.Record(r.Context(), categoryEntry(audit.ActionCategoryUpdate, c.ID, "Изменена категория «"+req.NameRu+"» (API)", &req))
-		return writeJSON(w, http.StatusOK, c)
+		return writeJSON(w, http.StatusOK, c.WithImageURL(objectURL))
 	}
 }
 

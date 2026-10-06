@@ -58,9 +58,9 @@ func TestProductFacetsRouteWinsOverProductID(t *testing.T) {
 	mock.ExpectQuery(`SELECT id FROM categories WHERE slug = \$1`).WithArgs("sneakers").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("11111111-1111-1111-1111-111111111111"))
 	mock.ExpectQuery(`FROM categories\s+ORDER BY sort_order`).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order"}).
-			AddRow("11111111-1111-1111-1111-111111111111", nil, "Кроссовки", "Кроссовки", "sneakers", 0).
-			AddRow("22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111", "Беговые", "Беговые", "running", 0))
+		sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order", "image_key"}).
+			AddRow("11111111-1111-1111-1111-111111111111", nil, "Кроссовки", "Кроссовки", "sneakers", 0, nil).
+			AddRow("22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111", "Беговые", "Беговые", "running", 0, nil))
 	subtree := []string{"11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"}
 	mock.ExpectQuery(`SELECT DISTINCT pv.size, pv.color.*category_id = ANY\(\$1\)`).
 		WithArgs(subtree, "%nike%").
