@@ -266,6 +266,11 @@ func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error
 		return h.renderProfileAuth(w, r, ProfileData{Step: "", Phone: phone, Error: h.errText(h.resolveLang(r), err)})
 	}
 
+	// Show (and carry in the hidden fields) the canonical +996… form, not
+	// whatever local spelling the visitor typed (0700 …, 700 …).
+	if canonical, err := auth.NormalizePhone(phone); err == nil {
+		phone = canonical
+	}
 	return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone})
 }
 
