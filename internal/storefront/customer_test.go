@@ -43,8 +43,8 @@ func TestUpdateProfilePartialSingleUpdate(t *testing.T) {
 	lang, off := "ky", false
 	mock.ExpectQuery(regexp.QuoteMeta("UPDATE customers SET")).
 		WithArgs("c1", nil, "ky", false).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "phone", "name", "lang", "promo_push"}).
-			AddRow("c1", "+996700000000", "Айбек", "ky", false))
+		WillReturnRows(sqlmock.NewRows(customerRowColumns).
+			AddRow("c1", "+996700000000", "Айбек", "ky", false, true))
 
 	c, err := NewCustomerRepo(db).UpdateProfile(context.Background(), "c1", ProfileUpdate{Lang: &lang, PromoPush: &off})
 	if err != nil {
