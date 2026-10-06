@@ -76,11 +76,14 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// /admin/no-access only requires being logged in as SOME staff member
 	// — it's the landing page for a role that isn't allowed on any of the
 	// screens below, not a page with its own stricter role requirement.
-	anyRole := requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff)
+	// fix/admin-owner-ux: every staff page also counts the viewer's
+	// unprocessed orders for the sidebar badge (withNavBadges, GET only).
+	badges := withNavBadges(orderBadgeRepo{db: db})
+	anyRole := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff), badges)
 	mux.HandleFunc("GET /admin/no-access", anyRole(h.noAccessPage))
 
-	ownerOrManager := requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager)
-	ownerOnly := requireStaffRole(staffSvc, staff.RoleOwner)
+	ownerOrManager := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager), badges)
+	ownerOnly := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner), badges)
 
 	// The 5 real screens + /admin/products/import, all stubbed for now
 	// per Wave 4 Task 1's acceptance criteria ("RegisterRoutes регистрирует

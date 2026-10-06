@@ -80,6 +80,7 @@ type NavItem struct {
 	IconPath string // SVG <path d="...">, copied verbatim from the design canvas
 	URL      string
 	Active   bool
+	Badge    int // fix/admin-owner-ux: unprocessed orders on «Заказы» (0 = none)
 }
 
 // PageData is the payload every admin page template renders against.
@@ -95,6 +96,11 @@ type PageData struct {
 	PageTitle   string
 	ShowSidebar bool // false only for "login"/"no_access", which have no chrome
 	ShowBack    bool
+	// BackURL (fix/admin-owner-ux) is where the header's back arrow goes
+	// when the previous page isn't that list (after a form POST, or a
+	// shared link) — history.back() alone returned to the stale pre-POST
+	// page. Empty keeps the plain history.back().
+	BackURL     string
 	ShowSearch  bool
 	SearchQuery string
 
@@ -110,6 +116,10 @@ type PageData struct {
 	Err   string
 
 	Toast string
+
+	// NewOrders is the unprocessed-orders count (withNavBadges), shown
+	// on the sidebar's «Заказы» and the mobile menu button. Render fills it.
+	NewOrders int
 
 	Data any
 }
@@ -181,6 +191,12 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 		data.Lang = langFromWriter(w)
 	}
 	data.Lang = supportedLang(data.Lang)
+	if data.ShowSidebar {
+		if n := newOrdersFromWriter(w); n > 0 {
+			data.NewOrders = n
+			data.NavItems = withOrdersBadge(data.NavItems, n)
+		}
+	}
 	t, ok := rr.tmpl[data.Lang][screen]
 	if !ok {
 		return fmt.Errorf("admin: no template registered for screen %q", screen)

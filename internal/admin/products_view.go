@@ -73,6 +73,11 @@ type ProductsPageData struct {
 	PageSize  int
 	Page      int
 	PageCount int
+	// fix/admin-owner-ux: prev/next links (every filter kept) and
+	// "Страница 1 из 2" — the list used to stop at the first page.
+	PrevURL   string
+	NextURL   string
+	PageLabel string
 
 	NewURL    string
 	ImportURL string

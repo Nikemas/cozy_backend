@@ -46,6 +46,7 @@ type StatusChipLink struct {
 	URL    string
 	Class  string
 	Active bool
+	Count  int // fix/admin-owner-ux: unprocessed orders on «Оформлен» (0 = not shown)
 }
 
 // RangeOptionLink is one <option> of the date-range select.
@@ -130,6 +131,8 @@ type OrderDetailData struct {
 	StatusLabel   string
 	StatusClass   string
 	Phone         string
+	CustomerName  string       // fix/admin-owner-ux: "" when the customer gave none
+	Contact       PhoneContact // fix/admin-owner-ux: call / WhatsApp / copy
 	PaymentLabel  string
 	AddressText   string
 	ZoneName      string // delivery zone, in the admin's language ("" = none)
@@ -287,7 +290,9 @@ func buildStatusButtons(t tr, from orders.OrderStatus, role staff.Role) []Status
 			continue
 		}
 		meta := orderStatusMetaFor(t, s)
-		buttons = append(buttons, StatusButtonView{Label: meta.Label, Value: string(s), Class: meta.Class})
+		// fix/admin-owner-ux: the button says what it does ("Подтвердить
+		// заказ"), not the status it leads to ("Подтверждён").
+		buttons = append(buttons, StatusButtonView{Label: t.T("admin.order.action." + string(s)), Value: string(s), Class: meta.Class})
 	}
 	return buttons
 }
@@ -387,6 +392,9 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	data := h.buildOrdersListViewFor(ctx, list, total, params)
 	data.CanChoosePoint = canChoosePoint
 	data.Points = pointOpts
+	if params.Point == "" {
+		data.StatusChips = withPlacedCount(data.StatusChips, newOrdersFromWriter(w))
+	}
 	data.Notes = append(notes, r.URL.Query()["bulk_fail"]...)
 	data.BulkStatuses = bulkStatusOptions(h.tr(r), st.Role)
 	data.BulkURL = "/admin/orders/bulk-status"
@@ -447,7 +455,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 			ThumbURL:     h.photoURL(thumbs[o.ID]),
 			Number:       o.OrderNumber,
 			DateLabel:    o.CreatedAt.In(reports.Location).Format("02.01.2006"),
-			Phone:        phones[o.CustomerID],
+			Phone:        displayPhone(phones[o.CustomerID]),
 			ItemsCount:   itemsCount,
 			ItemsLabel:   t.N(itemsCount, "admin.plural.product"),
 			TotalLabel:   formatSom(o.TotalAmount),
@@ -567,6 +575,8 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	pageData := h.shellPageData("orders", h.tr(r).F("admin.order.title", order.OrderNumber), st)
 	pageData.Screen = "order_detail"
 	pageData.ShowBack = true
+	pageData.BackURL = "/admin/orders"
+	pageData.Toast = r.URL.Query().Get("toast")
 	if msg := r.URL.Query().Get("status_error"); msg != "" {
 		pageData.Toast = msg
 	}
@@ -582,9 +592,12 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	t := trFromContext(ctx)
 	meta := orderStatusMetaFor(t, o.Status)
 
-	phone := ""
+	phone, customerName := "", ""
 	if c, err := h.customers.GetByID(ctx, o.CustomerID); err == nil && c != nil {
 		phone = c.Phone
+		if c.Name != nil {
+			customerName = strings.TrimSpace(*c.Name)
+		}
 	}
 
 	addressText, comment := h.orderDeliveryInfo(ctx, o)
@@ -624,6 +637,8 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		StatusLabel:      meta.Label,
 		StatusClass:      meta.Class,
 		Phone:            phone,
+		CustomerName:     customerName,
+		Contact:          phoneContact(phone),
 		PaymentLabel:     paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 		AddressText:      addressText,
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
@@ -706,7 +721,8 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus); err != nil {
+	updated, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus)
+	if err != nil {
 		msg := h.tr(r).T("admin.order.status_change_failed")
 		var appErr *apperr.AppError
 		if errors.As(err, &appErr) {
@@ -716,7 +732,13 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, detailURL, http.StatusSeeOther)
+	// fix/admin-owner-ux: say it worked (the page used to just reload).
+	shown := newStatus
+	if updated != nil {
+		shown = updated.Status
+	}
+	t := h.tr(r)
+	redirectWithToast(w, r, detailURL, t.F("admin.order.status_changed", orderStatusMetaFor(t, shown).Label))
 }
 
 // staffCanSeeOrder is the point-based RBAC rule for one order: owner and

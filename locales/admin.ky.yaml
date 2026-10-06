@@ -628,3 +628,18 @@ admin.audit.field.banner_text_color: тексттин түсү
 admin.audit.field.banner_image: сүрөт
 admin.audit.field.banner_bg_image: фондогу сүрөт
 admin.audit.field.image: сүрөт
+
+# fix/admin-owner-ux
+admin.products.pages: Товарлар тизмесинин барактары
+admin.nav.new_orders: "Жаңы буйрутмалар: %d"
+admin.order.action.confirmed: Буйрутманы ырастоо
+admin.order.action.courier_assigned: Курьерге берүү
+admin.order.action.delivered: Жеткирилди деп белгилөө
+admin.order.action.cancelled: Буйрутманы жокко чыгаруу
+admin.order.status_changed: "Буйрутманын абалы: %s"
+admin.order.delivered_confirm_text: "%s буйрутмасы жеткирилди деп белгиленет. Андан кийин абалын өзгөртүүгө болбойт."
+admin.order.delivered_confirm_title: Буйрутма жеткирилдиби?
+admin.order.delivered_confirm_label: Ооба, жеткирилди
+admin.order.call: Чалуу
+admin.common.copy: Көчүрүү
+admin.common.copied: Көчүрүлдү

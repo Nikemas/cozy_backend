@@ -5,6 +5,6 @@
      target it explicitly from every button. */}}
 {{define "_toast"}}
 <div id="admin-toast-slot">
-{{if .Toast}}<div class="admin-toast">{{.Toast}}</div>{{end}}
+{{if .Toast}}<div class="admin-toast" role="status">{{.Toast}}</div>{{end}}
 </div>
 {{end}}

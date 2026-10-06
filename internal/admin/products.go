@@ -198,6 +198,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		PageSize:      pageSize,
 		Page:          page,
 		PageCount:     pageCount,
+		PageLabel:     h.tr(r).F("admin.audit.page_of", page, pageCount),
 		NewURL:        "/admin/products/new",
 		ImportURL:     "/admin/products/import",
 
@@ -210,6 +211,13 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		BulkURL:        "/admin/products/bulk",
 		ReturnURL:      r.URL.RequestURI(),
 		BulkCategories: flatCategoryOptions(tree),
+	}
+
+	if page > 1 {
+		data.PrevURL = productsPageURL(query, page-1)
+	}
+	if page < pageCount {
+		data.NextURL = productsPageURL(query, page+1)
 	}
 
 	pageData := h.productsShellData("products", "admin.nav.products", st)
@@ -409,6 +417,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) renderProductForm(w http.ResponseWriter, st *staff.Staff, title string, data ProductFormData) {
 	pageData := h.productsShellData("product_form", title, st)
 	pageData.ShowBack = true
+	pageData.BackURL = productsListPath
 	pageData.Data = data
 	if err := h.render.Render(w, "product_form", pageData); err != nil {
 		http.Error(w, trFromWriter(w).T("admin.err.render"), http.StatusInternalServerError)
@@ -642,6 +651,7 @@ func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
 
 	pageData := h.productsShellData("product_import", "admin.import.title", st)
 	pageData.ShowBack = true
+	pageData.BackURL = productsListPath
 	pageData.Data = data
 	if err := h.render.Render(w, "product_import", pageData); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
