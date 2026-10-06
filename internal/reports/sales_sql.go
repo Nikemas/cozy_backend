@@ -26,9 +26,11 @@ import (
 func (r *Repo) Sales(ctx context.Context, from, to time.Time, groupBy GroupBy, pointNames map[string]string) ([]Row, error) {
 	switch groupBy {
 	case GroupByDay:
-		return r.salesByOrder(ctx, `to_char(o.created_at AT TIME ZONE '`+locationName+`', 'YYYY-MM-DD')`, from, to, nil)
+		// Grouped by the date value, formatted afterwards: hashing dates is
+		// cheaper than sorting the formatted strings in the locale collation.
+		return r.salesByOrder(ctx, `(o.created_at AT TIME ZONE '`+locationName+`')::date`, `to_char(k, 'YYYY-MM-DD')`, from, to, nil)
 	case GroupByPoint:
-		return r.salesByOrder(ctx, `COALESCE(o.point_id::text, '')`, from, to, func(pointID string) string {
+		return r.salesByOrder(ctx, `o.point_id`, `COALESCE(k::text, '')`, from, to, func(pointID string) string {
 			if pointID == "" {
 				return UnknownPointKey
 			}
@@ -48,21 +50,24 @@ func (r *Repo) Sales(ctx context.Context, from, to time.Time, groupBy GroupBy, p
 // the day boundaries match orderDayKey's).
 const locationName = "Asia/Bishkek"
 
-// salesByOrder groups whole orders by keyExpr (an SQL expression over
-// orders o); mapKey, when set, maps the SQL key to the report key (rows
-// mapping to the same key are merged).
-func (r *Repo) salesByOrder(ctx context.Context, keyExpr string, from, to time.Time, mapKey func(string) string) ([]Row, error) {
+// salesByOrder groups whole orders by groupExpr (an SQL expression over
+// orders o), then renders each group value k as text with keyExpr;
+// mapKey, when set, maps that text to the report key (rows mapping to the
+// same key are merged).
+func (r *Repo) salesByOrder(ctx context.Context, groupExpr, keyExpr string, from, to time.Time, mapKey func(string) string) ([]Row, error) {
 	q := `
-		SELECT ` + keyExpr + ` AS key,
-		       COUNT(*) AS order_count,
-		       COALESCE(SUM(items.qty), 0) AS item_count,
-		       COALESCE(SUM(o.total_amount), 0) AS revenue
-		FROM orders o
-		LEFT JOIN LATERAL (
-			SELECT SUM(oi.quantity) AS qty FROM order_items oi WHERE oi.order_id = o.id
-		) items ON true
-		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
-		GROUP BY 1`
+		SELECT ` + keyExpr + ` AS key, order_count, item_count, revenue FROM (
+			SELECT ` + groupExpr + ` AS k,
+			       COUNT(*) AS order_count,
+			       COALESCE(SUM(items.qty), 0) AS item_count,
+			       COALESCE(SUM(o.total_amount), 0) AS revenue
+			FROM orders o
+			LEFT JOIN LATERAL (
+				SELECT SUM(oi.quantity) AS qty FROM order_items oi WHERE oi.order_id = o.id
+			) items ON true
+			WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
+			GROUP BY 1
+		) sales`
 	return r.querySalesRows(ctx, q, from, to, mapKey)
 }
 
