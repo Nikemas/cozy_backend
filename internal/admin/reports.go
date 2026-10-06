@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
-	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -29,7 +28,7 @@ import (
 // the handler can be tested with a fake instead of a live database.
 // *reportsRepo satisfies it against a real *sql.DB.
 type reportsBackend interface {
-	LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error)
+	Sales(ctx context.Context, from, to time.Time, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error)
 	BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 	PointNames(ctx context.Context) (map[string]string, error)
@@ -63,10 +62,12 @@ func newReportsRepo(db *sql.DB) *reportsRepo {
 // SaleConditionSQL: not cancelled, online-card only once paid), same as
 // AggregateSales. Products with no brand set (or an all-whitespace one)
 // roll up into one "" bucket rather than being dropped; buildTopBrands
-// labels it (admin.reports.no_brand) in the page language.
+// labels it (admin.reports.no_brand) in the page language. The brand is
+// grouped under COLLATE "C" (same groups, byte comparisons — see
+// reports.Repo.Sales).
 func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error) {
 	q := `
-		SELECT COALESCE(TRIM(p.brand), '') AS brand,
+		SELECT COALESCE(TRIM(p.brand), '') COLLATE "C" AS brand,
 		       COUNT(DISTINCT oi.order_id) AS order_count,
 		       COALESCE(SUM(oi.quantity), 0) AS item_count,
 		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
@@ -75,7 +76,7 @@ func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]rep
 		JOIN product_variants pv ON pv.id = oi.variant_id
 		JOIN products p ON p.id = pv.product_id
 		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + reports.SaleConditionSQL + `
-		GROUP BY brand
+		GROUP BY 1
 		ORDER BY revenue DESC`
 
 	rows, err := r.db.QueryContext(ctx, q, from, to)
@@ -218,25 +219,20 @@ func parseCustomReportRange(fromStr, toStr string) (from, to time.Time, err erro
 	return from, to, nil
 }
 
-// buildReportsData loads orders for [from, to] (both inclusive from the
-// caller's point of view) and shapes them into everything the template
-// needs. Day/product groupings reuse the exact same []orders.Order load
-// (one query), since the stat cards, bar chart and "Топ товаров" are all
-// just different views of it; BrandSales is the one extra query, for the
-// one dimension AggregateSales doesn't group by.
+// buildReportsData aggregates sales for [from, to] (both inclusive from
+// the caller's point of view) and shapes them into everything the template
+// needs. Every grouping is aggregated in Postgres (reports.Repo.Sales,
+// BrandSales, CategorySales) — loading a year of orders with their items
+// into memory took ~1 s per page view on the perf dataset
+// (docs/performance.md).
 func (h *handlers) buildReportsData(ctx context.Context, period string, from, to time.Time) (ReportsData, error) {
-	loadTo := to.AddDate(0, 0, 1) // LoadOrders' range is [from, to) — see reports.Repo.LoadOrders
+	loadTo := to.AddDate(0, 0, 1) // Sales' range is [from, to) — see reports.Repo.LoadOrders
 
-	ordersList, err := h.reports.LoadOrders(ctx, from, loadTo)
+	dayRows, err := h.reports.Sales(ctx, from, loadTo, reports.GroupByDay, nil)
 	if err != nil {
 		return ReportsData{}, err
 	}
-
-	dayRows, err := reports.AggregateSales(ordersList, reports.GroupByDay, nil)
-	if err != nil {
-		return ReportsData{}, err
-	}
-	productRows, err := reports.AggregateSales(ordersList, reports.GroupByProduct, nil)
+	productRows, err := h.reports.Sales(ctx, from, loadTo, reports.GroupByProduct, nil)
 	if err != nil {
 		return ReportsData{}, err
 	}
@@ -252,7 +248,7 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 	if err != nil {
 		return ReportsData{}, err
 	}
-	pointRows, err := reports.AggregateSales(ordersList, reports.GroupByPoint, pointNames)
+	pointRows, err := h.reports.Sales(ctx, from, loadTo, reports.GroupByPoint, pointNames)
 	if err != nil {
 		return ReportsData{}, err
 	}

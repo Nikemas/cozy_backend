@@ -10,7 +10,6 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
-	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -19,7 +18,7 @@ import (
 // handler-level tests can inject a fake instead of a live database —
 // mirrors stockUpserter in admin_catalog.go.
 type salesRepo interface {
-	LoadOrders(ctx context.Context, from, to time.Time) ([]orders.Order, error)
+	Sales(ctx context.Context, from, to time.Time, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error)
 	PointNames(ctx context.Context) (map[string]string, error)
 	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 }
@@ -135,20 +134,16 @@ func loadSalesRows(ctx context.Context, repo salesRepo, from, to time.Time, grou
 		return rows, err
 	}
 
-	ordersList, err := repo.LoadOrders(ctx, from, loadTo)
-	if err != nil {
-		return nil, err
-	}
-
 	var pointNames map[string]string
 	if groupBy == reports.GroupByPoint {
+		var err error
 		pointNames, err = repo.PointNames(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return reports.AggregateSales(ordersList, groupBy, pointNames)
+	return repo.Sales(ctx, from, loadTo, groupBy, pointNames)
 }
 
 // --- JSON representation ---

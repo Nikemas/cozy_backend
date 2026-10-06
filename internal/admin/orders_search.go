@@ -212,14 +212,21 @@ func (r *orderListMetaRepo) Search(ctx context.Context, f orderSearchFilter) ([]
 		numberArg := len(args)
 		if digits := phoneDigits(f.Query); digits != "" {
 			args = append(args, "%"+digits+"%")
+			// The phone match is a subquery rather than a JOIN filter so the
+			// digits expression is evaluated per customer (and can use
+			// idx_customers_phone_digits_trgm), not once per order row.
 			conds = append(conds, fmt.Sprintf(
-				"(o.order_number ILIKE $%d OR regexp_replace(c.phone, '[^0-9]', '', 'g') LIKE $%d)", numberArg, len(args)))
+				"(o.order_number ILIKE $%d OR o.customer_id IN (SELECT c.id FROM customers c WHERE regexp_replace(c.phone, '[^0-9]', '', 'g') LIKE $%d))",
+				numberArg, len(args)))
 		} else {
 			conds = append(conds, fmt.Sprintf("o.order_number ILIKE $%d", numberArg))
 		}
 	}
 
-	from := `FROM orders o JOIN customers c ON c.id = o.customer_id WHERE ` + strings.Join(conds, " AND ")
+	// orders alone: customer_id is NOT NULL REFERENCES customers, so the
+	// former JOIN customers never dropped a row — it only made the COUNT
+	// scan both tables on every page view.
+	from := `FROM orders o WHERE ` + strings.Join(conds, " AND ")
 
 	var total int
 	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) "+from, args...).Scan(&total); err != nil {

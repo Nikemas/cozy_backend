@@ -104,7 +104,7 @@ func TestOrderSearchSQLByPhoneAndNumber(t *testing.T) {
 	status := orders.StatusPlaced
 	f := orderSearchFilter{Status: &status, PointID: &point, Query: "+996 555", Page: 1}
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders o JOIN customers c ON c.id = o.customer_id WHERE TRUE AND o.status = \$1 AND o.point_id = \$2 AND \(o.order_number ILIKE \$3 OR regexp_replace\(c.phone, '\[\^0-9\]', '', 'g'\) LIKE \$4\)`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders o WHERE TRUE AND o.status = \$1 AND o.point_id = \$2 AND \(o.order_number ILIKE \$3 OR o.customer_id IN \(SELECT c.id FROM customers c WHERE regexp_replace\(c.phone, '\[\^0-9\]', '', 'g'\) LIKE \$4\)\)`).
 		WithArgs("placed", "pA", "%+996 555%", "%996555%").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	now := time.Now()

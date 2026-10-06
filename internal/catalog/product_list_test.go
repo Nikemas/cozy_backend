@@ -80,8 +80,8 @@ func TestBuildListConditionsCategoryIDsTakePrecedence(t *testing.T) {
 	}
 }
 
-// sort=popular aggregates units sold once (a LEFT JOIN to a GROUP BY
-// subquery) instead of a correlated subquery per product row; every other
+// sort=popular joins the precomputed units sold (product_sales) instead
+// of aggregating order_items per request; every other
 // sort reads products alone.
 func TestListFrom(t *testing.T) {
 	for _, sort := range []string{"", SortNewest, SortPriceAsc, SortPriceDesc, "bogus"} {
@@ -89,16 +89,11 @@ func TestListFrom(t *testing.T) {
 			t.Errorf("listFrom(%q) = %q, want bare products", sort, got)
 		}
 	}
+	// Units sold come from the trigger-maintained product_sales table
+	// (migration 000042), not a per-request aggregate over order_items.
 	got := listFrom(SortPopular)
-	for _, want := range []string{
-		"LEFT JOIN (", "SUM(oi.quantity) AS units_sold", "GROUP BY pv.product_id",
-		"o.status <> 'cancelled'", ") popularity ON popularity.product_id = products.id",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("listFrom(popular) missing %q:\n%s", want, got)
-		}
-	}
-	if strings.Count(got, "products.id") != 1 {
-		t.Errorf("the aggregate must not be correlated with products:\n%s", got)
+	want := "products LEFT JOIN product_sales popularity ON popularity.product_id = products.id"
+	if got != want {
+		t.Errorf("listFrom(popular) = %q, want %q", got, want)
 	}
 }

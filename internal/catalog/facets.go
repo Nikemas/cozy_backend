@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,38 +40,54 @@ func buildFacetConditions(f FacetFilter) (string, []any) {
 }
 
 // Facets returns the sizes, colors and price range offered by the active
-// products in f's scope.
+// products in f's scope — one pass over their variants: every distinct
+// (size, color) with that pair's effective price range. A product with no
+// variants contributes one row with NULL size/color and its base_price,
+// exactly as minPriceExpr/maxPriceExpr fall back to base_price for it, so
+// the min/max over the rows equal the min/max of the per-product ranges.
 func (r *ProductRepo) Facets(ctx context.Context, f FacetFilter) (Facets, error) {
 	where, args := buildFacetConditions(f)
 
-	variantQuery := `
-		SELECT DISTINCT pv.size, pv.color
-		FROM product_variants pv
-		WHERE pv.product_id IN (SELECT id FROM products ` + where + `)`
-	rows, err := r.db.QueryContext(ctx, variantQuery, args...)
+	q := `
+		SELECT pv.size, pv.color,
+		       MIN(COALESCE(pv.price_override, products.base_price)),
+		       MAX(COALESCE(pv.price_override, products.base_price))
+		FROM products
+		LEFT JOIN product_variants pv ON pv.product_id = products.id
+		` + where + `
+		GROUP BY pv.size, pv.color`
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return Facets{}, err
 	}
 	defer func() { _ = rows.Close() }()
 
 	sizes, colors := map[string]bool{}, map[string]bool{}
+	var out Facets
 	for rows.Next() {
-		var size, color string
-		if err := rows.Scan(&size, &color); err != nil {
+		var size, color sql.NullString
+		var lo, hi float64
+		if err := rows.Scan(&size, &color, &lo, &hi); err != nil {
 			return Facets{}, err
 		}
-		sizes[size] = true
-		colors[color] = true
+		if size.Valid {
+			sizes[size.String] = true
+		}
+		if color.Valid {
+			colors[color.String] = true
+		}
+		if out.PriceMin == nil || lo < *out.PriceMin {
+			out.PriceMin = &lo
+		}
+		if out.PriceMax == nil || hi > *out.PriceMax {
+			out.PriceMax = &hi
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return Facets{}, err
 	}
 
-	out := Facets{Sizes: SortedSizes(sizes), Colors: sortedNonEmpty(colors)}
-	priceQuery := `SELECT MIN(` + minPriceExpr + `), MAX(` + maxPriceExpr + `) FROM products ` + where
-	if err := r.db.QueryRowContext(ctx, priceQuery, args...).Scan(&out.PriceMin, &out.PriceMax); err != nil {
-		return Facets{}, err
-	}
+	out.Sizes, out.Colors = SortedSizes(sizes), sortedNonEmpty(colors)
 	return out, nil
 }
 

@@ -24,7 +24,7 @@ var orderColumnNames = []string{"id", "order_number", "customer_id", "address_id
 	"payment_status", "total_amount", "delivery_fee", "refund_required", "comment", "created_at", "updated_at",
 	"delivery_zone_id", "zone_name_ru", "zone_name_ky"}
 
-var variantColumns = []string{"id", "size", "color", "price_override", "name_ru", "base_price", "is_active"}
+var variantColumns = []string{"id", "product_id", "size", "color", "price_override", "name_ru", "base_price", "is_active"}
 
 // orderRow is one scripted orders row for sqlmock.
 type orderRow struct {
@@ -77,7 +77,7 @@ func expectPickupLine(mock sqlmock.Sqlmock, variantID string, price float64, sto
 		WithArgs("point-1").WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
 		WithArgs(variantID).
-		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(variantID, "42", "Черный", nil, "Air Max", price, true))
+		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(variantID, "product-1", "42", "Черный", nil, "Air Max", price, true))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT quantity FROM stock WHERE variant_id = $1 AND point_id = $2 FOR UPDATE")).
 		WithArgs(variantID, "point-1").WillReturnRows(sqlmock.NewRows([]string{"quantity"}).AddRow(stock))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE stock SET quantity")).

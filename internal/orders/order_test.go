@@ -183,7 +183,7 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM delivery_zones WHERE is_active)")).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
-		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "42", "Черный", nil, "Air Max", 5000.0, true))
+		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "product-1", "42", "Черный", nil, "Air Max", 5000.0, true))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM points_of_sale WHERE is_active = true")).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("point-1"))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT quantity FROM stock WHERE variant_id = $1 AND point_id = $2")).
@@ -228,7 +228,7 @@ func TestCreateOrderInsufficientStockRollsBack(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
 		WithArgs(testVar1).
-		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "42", "Черный", nil, "Air Max", 5000.0, true))
+		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "product-1", "42", "Черный", nil, "Air Max", 5000.0, true))
 	// Only 1 in stock, but the order asks for 2.
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT quantity FROM stock")).
 		WithArgs(testVar1, "point-1").
@@ -291,7 +291,7 @@ func TestCreateOrderInactiveProductNamesIt(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
 		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
-		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "40", "Белый", nil, "Old Boot", 3000.0, false))
+		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "product-1", "40", "Белый", nil, "Old Boot", 3000.0, false))
 	mock.ExpectRollback()
 
 	pickupID := "point-1"

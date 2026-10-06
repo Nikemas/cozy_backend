@@ -76,18 +76,12 @@ const (
 // JOINed to units sold per product — the total quantity of its variants
 // across order_items of every order that wasn't cancelled (an order in any
 // other status — placed, confirmed, courier_assigned, delivered — counts as
-// demand). Aggregated once with a GROUP BY rather than a correlated
-// subquery per product row; the derived table only exposes product_id and
-// units_sold, neither of which is a products column, so the unqualified
-// columns in the WHERE/SELECT stay unambiguous.
-const popularityJoin = `products LEFT JOIN (
-		SELECT pv.product_id, SUM(oi.quantity) AS units_sold
-		FROM order_items oi
-		JOIN product_variants pv ON pv.id = oi.variant_id
-		JOIN orders o ON o.id = oi.order_id
-		WHERE o.status <> 'cancelled'
-		GROUP BY pv.product_id
-	) popularity ON popularity.product_id = products.id`
+// demand). That sum is kept up to date by triggers in product_sales
+// (migration 000042) instead of being aggregated over all order_items on
+// every request; product_sales only exposes product_id and units_sold,
+// neither of which is a products column, so the unqualified columns in the
+// WHERE/SELECT stay unambiguous.
+const popularityJoin = `products LEFT JOIN product_sales popularity ON popularity.product_id = products.id`
 
 // listFrom is List's FROM clause for sort: the popularity join only when
 // it's needed for ORDER BY. The COUNT query never uses it.
@@ -137,9 +131,16 @@ func buildListConditions(filter ListFilter) ([]string, []any) {
 			variantConds = append(variantConds, fmt.Sprintf("color = $%d", len(args)))
 		}
 		if filter.InStock {
+			// OFFSET 0 keeps this a per-variant probe of stock's
+			// (variant_id, point_id) primary key. Without it the planner
+			// flattens it into a semi-join and, for the COUNT, hashes every
+			// in-stock row of the whole stock table on each request — work
+			// that grows with variants × points, while the probes stop at
+			// the first in-stock variant of each product
+			// (docs/performance.md).
 			variantConds = append(variantConds, `EXISTS (SELECT 1 FROM stock
 				JOIN points_of_sale ON points_of_sale.id = stock.point_id AND points_of_sale.is_active
-				WHERE stock.variant_id = product_variants.id AND stock.quantity > 0)`)
+				WHERE stock.variant_id = product_variants.id AND stock.quantity > 0 OFFSET 0)`)
 		}
 		conditions = append(conditions, fmt.Sprintf(
 			"EXISTS (SELECT 1 FROM product_variants WHERE %s)", strings.Join(variantConds, " AND "),
