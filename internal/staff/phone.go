@@ -39,7 +39,7 @@ func canonicalPhoneKey(raw string) string {
 
 // phoneDigitsSuffix returns the last phoneLookupSuffixLen digits of phone
 // (all of them if there are fewer) — the SQL pre-filter value matched
-// against right(regexp_replace(phone, '\D', ”, 'g'), 9).
+// against the last 9 digits of the stored phone in GetByPhone's query.
 func phoneDigitsSuffix(phone string) string {
 	var b strings.Builder
 	for _, r := range phone {
