@@ -235,6 +235,17 @@ func wantRedirect(t *testing.T, w *httptest.ResponseRecorder, location string) {
 	}
 }
 
+// wantRedirectPath is wantRedirect ignoring the query (a ?toast= success
+// message, list filters).
+func wantRedirectPath(t *testing.T, w *httptest.ResponseRecorder, path string) {
+	t.Helper()
+	wantStatus(t, w, http.StatusSeeOther)
+	loc, err := url.Parse(w.Header().Get("Location"))
+	if err != nil || loc.Path != path {
+		t.Fatalf("Location = %q, want path %q", w.Header().Get("Location"), path)
+	}
+}
+
 // wantBody asserts every substring appears in w's body.
 func wantBody(t *testing.T, w *httptest.ResponseRecorder, subs ...string) {
 	t.Helper()
