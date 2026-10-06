@@ -20,7 +20,11 @@
     var itemSel = 'input.js-bulk-item[form="' + id + '"]';
     var all = document.querySelector('input.js-bulk-all[data-bulk-for="' + id + '"]');
 
-    function items() { return Array.prototype.slice.call(document.querySelectorAll(itemSel)); }
+    // Only the checkboxes on screen count: Заказы renders one set in the
+    // desktop table and one in the phone cards, and CSS hides one of them.
+    function allItems() { return Array.prototype.slice.call(document.querySelectorAll(itemSel)); }
+    function visible(c) { return c.offsetParent !== null; }
+    function items() { return allItems().filter(visible); }
     function checkedCount() { return items().filter(function (c) { return c.checked; }).length; }
     function sync() {
       var list = items();
@@ -47,6 +51,8 @@
       btn.addEventListener('click', function () {
         var n = checkedCount();
         if (n === 0) return;
+        // A box ticked before a resize may sit in the hidden set now.
+        allItems().forEach(function (c) { if (!visible(c)) c.checked = false; });
         var req = btn.getAttribute('data-bulk-requires');
         if (req) {
           var field = form.elements[req];

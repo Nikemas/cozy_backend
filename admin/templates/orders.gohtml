@@ -122,6 +122,8 @@ function ordersRangeChanged(sel) {
     {{range .Data.Rows}}
     <div class="admin-order-card" onclick="location.href='{{.URL}}'">
       <div class="admin-order-card__top">
+        {{/* Bulk status on a phone too (the table's checkboxes are hidden there). */}}
+        <label class="admin-order-card__check" onclick="event.stopPropagation()"><input type="checkbox" class="js-bulk-item" form="orders-bulk" name="id" value="{{.ID}}" aria-label="{{tf "admin.bulk.select_order" .Number}}"></label>
         <a href="{{.URL}}" class="admin-order-card__num">{{.Number}}</a>
         <span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span>
       </div>
