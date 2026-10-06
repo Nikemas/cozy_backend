@@ -76,7 +76,8 @@ func run() error {
 	if cfg.Review.Enabled() {
 		slog.Warn("auth: store-review login is ENABLED — one phone logs in with a fixed code without SMS", "phone", cfg.Review.Phone)
 	}
-	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth, cfg.Review)
+	staffMessenger := buildStaffMessenger(cfg)
+	authSvc := auth.NewService(db, sms, []byte(cfg.JWTSecret), cfg.Security.Auth, cfg.Review, staffMessenger)
 
 	mediaClient, err := media.NewClient(cfg)
 	if err != nil {
@@ -95,7 +96,7 @@ func run() error {
 	// Must be installed before any orders.Service is constructed/used by
 	// the route registrations below.
 	pushSender := buildPushSender(cfg)
-	notifier, err := buildNotifications(db, cfg, pushSender)
+	notifier, err := buildNotifications(db, cfg, pushSender, staffMessenger)
 	if err != nil {
 		return err
 	}

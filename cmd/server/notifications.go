@@ -20,7 +20,7 @@ import (
 // stopping the server: notifications are a side channel, and the shop
 // must keep taking orders without them (e.g. before the Firebase project
 // exists).
-func buildNotifications(db *sql.DB, cfg *config.Config, pushSender push.Sender) (*notifications.Dispatcher, error) {
+func buildNotifications(db *sql.DB, cfg *config.Config, pushSender push.Sender, staffMessenger notify.StaffMessenger) (*notifications.Dispatcher, error) {
 	smsFallback, err := smsStatusFallbackFromEnv(os.LookupEnv)
 	if err != nil {
 		return nil, err
@@ -30,14 +30,6 @@ func buildNotifications(db *sql.DB, cfg *config.Config, pushSender push.Sender) 
 	var smsSender notify.SMSSender = notify.NopSMSSender{}
 	if smsFallback {
 		slog.Warn("notify: SMS_STATUS_FALLBACK is on, but no plain-SMS provider is configured — fallback SMS are only logged")
-	}
-
-	var staffMessenger notify.StaffMessenger = notify.NopStaffMessenger{}
-	if cfg.TelegramBotToken != "" && cfg.TelegramChatID != "" {
-		staffMessenger = notify.NewTelegramClient(cfg.TelegramBotToken, cfg.TelegramChatID)
-		slog.Info("notify: Telegram staff notifications enabled")
-	} else {
-		slog.Warn("notify: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set, new-order alerts are only logged")
 	}
 
 	return notifications.NewDispatcher(notifications.Config{
@@ -50,6 +42,18 @@ func buildNotifications(db *sql.DB, cfg *config.Config, pushSender push.Sender) 
 		SMSFallback:  smsFallback,
 		AdminBaseURL: cfg.PublicBaseURL,
 	}), nil
+}
+
+// buildStaffMessenger returns the Telegram staff-chat client, or a logging
+// no-op when TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are unset. Shared by
+// order alerts and security alerts (store-review lockout).
+func buildStaffMessenger(cfg *config.Config) notify.StaffMessenger {
+	if cfg.TelegramBotToken != "" && cfg.TelegramChatID != "" {
+		slog.Info("notify: Telegram staff notifications enabled")
+		return notify.NewTelegramClient(cfg.TelegramBotToken, cfg.TelegramChatID)
+	}
+	slog.Warn("notify: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set, new-order and security alerts are only logged")
+	return notify.NopStaffMessenger{}
 }
 
 // smsStatusFallbackFromEnv parses SMS_STATUS_FALLBACK (default false).

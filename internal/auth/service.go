@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -49,6 +48,10 @@ type Service struct {
 
 	// review is the opt-in store-review account (zero value = disabled).
 	review config.ReviewLogin
+	// reviewLock disables review after reviewMaxFailures wrong codes.
+	reviewLock reviewGuard
+	// opsAlerts receives the one-off review lockout alert (nil = log only).
+	opsAlerts notify.StaffMessenger
 
 	limits      config.AuthLimits
 	verifyFails *windowLimiter // wrong OTP codes per client IP per hour
@@ -58,8 +61,9 @@ type Service struct {
 }
 
 // NewService wires the customer auth service. limits come from
-// config.Security.Auth (env-configurable, see .env.example).
-func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits config.AuthLimits, review config.ReviewLogin) *Service {
+// config.Security.Auth (env-configurable, see .env.example). opsAlerts
+// (may be nil) gets security alerts such as the store-review lockout.
+func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits config.AuthLimits, review config.ReviewLogin, opsAlerts notify.StaffMessenger) *Service {
 	return &Service{
 		otp:         newOTPRepo(db),
 		refresh:     newRefreshRepo(db),
@@ -68,6 +72,7 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		sms:         sms,
 		jwtSecret:   jwtSecret,
 		review:      review,
+		opsAlerts:   opsAlerts,
 		limits:      limits,
 		verifyFails: newWindowLimiter(limits.OTPVerifyFailsPerIPPerHour, time.Hour),
 		refreshIP:   newWindowLimiter(limits.RefreshPerIPPerMinute, time.Minute),
@@ -106,7 +111,7 @@ func (s *Service) RequestOTP(ctx context.Context, rawPhone string) error {
 		return err
 	}
 
-	if s.isReviewPhone(phone) {
+	if s.isReviewPhone(phone) && !s.reviewLock.disabled() {
 		// The row was reserved above, so cooldown/hourly/IP/daily limits
 		// applied. No SMS; the marker token routes verification to the
 		// configured code. The code itself is never stored or logged.
@@ -219,9 +224,15 @@ func (s *Service) isReviewPhone(phone string) bool {
 // the review marker (issued by RequestOTP for that phone), so no other
 // phone — or a row from before the feature was enabled — can ever be
 // verified against the review code. Everything else goes to the provider.
+// Wrong review codes feed reviewLock; once it trips, review-marked rows
+// are always rejected (see reviewGuard).
 func (s *Service) verifyCode(ctx context.Context, phone, token, code string) error {
 	if s.isReviewPhone(phone) && strings.HasPrefix(token, reviewTokenPrefix) {
-		if subtle.ConstantTimeCompare([]byte(code), []byte(s.review.Code)) != 1 {
+		ok, _, justTripped := s.reviewLock.check(code, s.review.Code)
+		if justTripped {
+			s.reviewLockedOut(ctx, phone)
+		}
+		if !ok {
 			return apperr.BadRequest("otp_invalid", "неверный код")
 		}
 		return nil
