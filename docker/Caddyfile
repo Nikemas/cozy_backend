@@ -39,7 +39,8 @@
 # that name the IP itself.
 #
 # Every host imports the snippets below:
-#   security_headers — HSTS, nosniff, anti-framing, Referrer-Policy. The
+#   security_headers — HSTS, nosniff, anti-framing (+ base-uri/object-src),
+#     Referrer-Policy, Permissions-Policy. The
 #     anti-framing/Referrer-Policy ones use `?` (set only if the backend
 #     didn't send its own), so the app can override them per page.
 #   noindex — staging must never end up in search results next to the
@@ -71,8 +72,14 @@
 	# header), one directive each so the backend can override any of them
 	# independently.
 	header ?X-Frame-Options "DENY"
-	header ?Content-Security-Policy "frame-ancestors 'none'"
+	# Not a full CSP: the templates rely on inline <script>, onclick=,
+	# htmx hx-on (eval) and CDN assets, so script-src would have to allow
+	# 'unsafe-inline' 'unsafe-eval' anyway. Only directives nothing here
+	# uses: no framing, no <base> hijack, no plugins.
+	header ?Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 	header ?Referrer-Policy "strict-origin-when-cross-origin"
+	# Powerful browser APIs the shop never asks for.
+	header ?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 }
 
 (noindex) {
