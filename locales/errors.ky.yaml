@@ -178,6 +178,7 @@ err.qr_not_configured: QR-код менен төлөө азырынча жетк
 err.qty_too_large: бир товардан {max} даанадан ашпашы керек
 err.qty_too_large.order: буйрутмада бир товардан {max} даанадан ашпашы керек
 err.range_too_long: мезгил бир жылдан узун болбошу керек
+err.rate_limited: суроо-талаптар өтө көп — кийинчерээк аракет кылыңыз
 err.refresh_invalid: сеанстын мөөнөтү бүттү — кайра кириңиз
 err.refresh_rate_limited: суроо-талаптар өтө көп — кийинчерээк аракет кылыңыз
 err.sms_provider_error: SMS-провайдердин катасы (status {status})

@@ -185,6 +185,7 @@ err.qr_not_configured: оплата по QR-коду пока недоступн
 err.qty_too_large.order: не больше {max} шт. одного товара в заказе
 err.qty_too_large: не больше {max} шт. одного товара
 err.range_too_long: период не может быть длиннее года
+err.rate_limited: слишком много запросов, попробуйте позже
 err.refresh_invalid: сессия истекла, войдите снова
 err.refresh_rate_limited: слишком много запросов, попробуйте позже
 err.sms_provider_error: ошибка SMS-провайдера (status {status})

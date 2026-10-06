@@ -310,3 +310,54 @@ func TestLoad_SecurityOverrides(t *testing.T) {
 		t.Setenv(key, "")
 	}
 }
+
+func TestLoad_RateLimitDefaults(t *testing.T) {
+	setDevEnv(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rl := cfg.Security.RateLimit
+	if rl.RPS != DefaultRateLimitRPS || rl.Burst != DefaultRateLimitBurst {
+		t.Errorf("rate limit = %+v, want %v rps / burst %d", rl, DefaultRateLimitRPS, DefaultRateLimitBurst)
+	}
+	if DefaultRateLimitRPS != 20 || DefaultRateLimitBurst != 60 {
+		t.Errorf("defaults changed: %v / %d", DefaultRateLimitRPS, DefaultRateLimitBurst)
+	}
+}
+
+func TestLoad_RateLimitOverrides(t *testing.T) {
+	setDevEnv(t)
+	t.Setenv("RATE_LIMIT_RPS", "2.5")
+	t.Setenv("RATE_LIMIT_BURST", "10")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rl := cfg.Security.RateLimit; rl.RPS != 2.5 || rl.Burst != 10 {
+		t.Errorf("rate limit = %+v", rl)
+	}
+
+	// RATE_LIMIT_RPS=0 switches the limiter off; burst is then irrelevant.
+	t.Setenv("RATE_LIMIT_RPS", "0")
+	t.Setenv("RATE_LIMIT_BURST", "0")
+	if cfg, err = Load(); err != nil || cfg.Security.RateLimit.RPS != 0 {
+		t.Errorf("disabled: %+v %v", cfg.Security.RateLimit, err)
+	}
+
+	for _, bad := range []struct{ rps, burst string }{
+		{"-1", "10"},
+		{"fast", "10"},
+		{"NaN", "10"},
+		{"+Inf", "10"},
+		{"5", "0"},
+		{"5", "-3"},
+	} {
+		setDevEnv(t)
+		t.Setenv("RATE_LIMIT_RPS", bad.rps)
+		t.Setenv("RATE_LIMIT_BURST", bad.burst)
+		if _, err := Load(); err == nil {
+			t.Errorf("RATE_LIMIT_RPS=%q RATE_LIMIT_BURST=%q: want error", bad.rps, bad.burst)
+		}
+	}
+}
