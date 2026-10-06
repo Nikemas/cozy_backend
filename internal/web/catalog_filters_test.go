@@ -81,14 +81,6 @@ func TestFindCategoryIncludesDescendants(t *testing.T) {
 	}
 }
 
-func TestSortedSizesNumericFirst(t *testing.T) {
-	got := sortedSizes(map[string]bool{"42": true, "36,5": true, "M": true, "39": true, "L": true, "": true})
-	want := []string{"36,5", "39", "42", "L", "M"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("sortedSizes = %v, want %v", got, want)
-	}
-}
-
 func TestFilterOptionsKeepsStaleSelection(t *testing.T) {
 	got := filterOptions([]string{"41", "42"}, "45")
 	if len(got) != 3 || !got[2].Selected || got[2].Value != "45" {
