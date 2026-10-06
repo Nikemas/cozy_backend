@@ -102,7 +102,7 @@ paths:
               properties:
                 phone:
                   type: string
-                  description: Kyrgyz mobile number, any of `+996XXXXXXXXX`, `996XXXXXXXXX`, or local `0XXXXXXXXX`.
+                  description: Kyrgyz mobile number, any of `+996XXXXXXXXX`, `996XXXXXXXXX`, local `0XXXXXXXXX` or bare `XXXXXXXXX` (spaces, dashes and parentheses are ignored).
                   example: "+996700123456"
       responses:
         "200":

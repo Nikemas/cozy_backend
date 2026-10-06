@@ -36,7 +36,7 @@
     <form class="form-stack" hx-post="/login/otp/request" hx-target="#auth-card" hx-swap="outerHTML"
           method="post" action="/login/otp/request">
       <label class="field-label" for="auth-phone">{{t "auth.phone_label"}}</label>
-      <input type="tel" id="auth-phone" name="phone" autocomplete="tel" placeholder="{{t "auth.phone_placeholder"}}" required>
+      <input type="tel" id="auth-phone" name="phone" value="{{.Data.Phone}}" autocomplete="tel" inputmode="tel" placeholder="{{t "auth.phone_placeholder"}}" required>
       <button type="submit" class="btn btn--primary">{{t "auth.get_code"}}</button>
     </form>
   {{end}}
