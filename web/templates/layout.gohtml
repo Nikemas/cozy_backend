@@ -20,12 +20,22 @@
   {{if .SEO.OGImage}}<meta property="og:image" content="{{.SEO.OGImage}}">{{end}}
   <meta property="og:locale" content="{{.SEO.OGLocale}}">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" type="image/png" sizes="64x64" href="/static/img/logo-64.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="{{asset "img/logo-64.png"}}">
   <meta name="theme-color" content="#FF7A1A">
   {{if .SEO.JSONLD}}<script type="application/ld+json">{{.SEO.JSONLD}}</script>{{end}}
+  {{if .SEO.BreadcrumbJSONLD}}<script type="application/ld+json">{{.SEO.BreadcrumbJSONLD}}</script>{{end}}
+  {{/* Open the third-party connections the render-blocking stylesheets
+       (and the fonts they pull in, which are CORS requests — hence the
+       second, crossorigin preconnect) need while the HTML is still
+       parsing, instead of only after each stylesheet is discovered. */}}
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  {{with mediaOrigin}}<link rel="preconnect" href="{{.}}">{{end}}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="/static/css/site.css">
+  <link rel="stylesheet" href="{{asset "css/site.css"}}">
   {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
   {{/* htmx pinned to an exact file with Subresource Integrity: if the CDN
        ever serves different bytes the browser refuses to run them. */}}

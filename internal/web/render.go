@@ -108,7 +108,17 @@ type Renderer struct {
 	// contacts back the "seller" template func (footer legal line); set
 	// once at startup via SetContacts, before serving.
 	contacts config.Contacts
+	// assets backs the "asset" template func (content-hashed /static/
+	// URLs) and the long-cache decision in staticHandler.
+	assets assetVersions
+	// mediaOrigin is the product-photo host ("https://media.cozy.kg"),
+	// preconnected from <head>; "" omits the hint. Set via SetMediaOrigin.
+	mediaOrigin string
 }
+
+// SetMediaOrigin configures the photo host layout.gohtml preconnects to.
+// Call once at startup.
+func (rr *Renderer) SetMediaOrigin(origin string) { rr.mediaOrigin = origin }
 
 // SetContacts configures the shop's legal/contact details the shared
 // chrome renders (footer legal line). Call once at startup.
@@ -121,7 +131,11 @@ func (rr *Renderer) seller() config.Contacts { return rr.contacts }
 // NewRenderer parses every screen's templates for every supported
 // language.
 func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
-	rr := &Renderer{bundle: bundle, tmpl: map[string]map[string]*template.Template{}}
+	assets, err := loadAssetVersions(staticDir)
+	if err != nil {
+		return nil, err
+	}
+	rr := &Renderer{bundle: bundle, tmpl: map[string]map[string]*template.Template{}, assets: assets}
 
 	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
 		rr.tmpl[lang] = map[string]*template.Template{}
@@ -141,7 +155,7 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 			}
 			files = append(files, filepath.Join(templatesDir, page))
 
-			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).Funcs(template.FuncMap{"seller": rr.seller}).ParseFiles(files...)
+			t, err := template.New("layout.gohtml").Funcs(bundle.FuncMap(lang)).Funcs(viewFuncs(bundle, lang)).Funcs(template.FuncMap{"seller": rr.seller, "asset": rr.assets.url, "mediaOrigin": func() string { return rr.mediaOrigin }}).ParseFiles(files...)
 			if err != nil {
 				return nil, fmt.Errorf("web: parsing templates for screen %q (%s): %w", screen, lang, err)
 			}
@@ -152,12 +166,19 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 	return rr, nil
 }
 
+// eagerCardCount is how many shop-grid photos load eagerly — about one
+// desktop row, which also covers the first two rows on phones. Later
+// cards get loading="lazy" (shop.gohtml).
+const eagerCardCount = 4
+
 // viewFuncs are the storefront's own template helpers, on top of
 // i18n's "t".
 func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
 	return template.FuncMap{
 		// inc turns a 0-based range index into a 1-based label.
 		"inc": func(i int) int { return i + 1 },
+		// eagerCards is eagerCardCount for templates.
+		"eagerCards": func() int { return eagerCardCount },
 		// money formats a som amount: {{money .Total}} → "7 900 сом".
 		"money": func(v float64) string { return formatAmount(v, bundle.T(lang, "common.currency")) },
 		// plural picks key.one / key.few / key.many for n (Russian rules;

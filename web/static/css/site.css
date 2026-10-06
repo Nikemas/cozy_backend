@@ -1012,8 +1012,9 @@ button, input { font-family: inherit; }
 .shop-pager__link,
 .branch-card__route,
 .icon-btn--active { color: var(--cozy-accent-ink); }
-/* Large price text needs 3:1 — accent-strong gives 3.25:1. */
-.product-meta__price { color: var(--cozy-accent-strong); }
+/* Large price text needs 3:1. It sits on the #F5F5F3 canvas, where
+   accent-strong is only 2.98:1 (Lighthouse); accent-aa gives ~4.2:1. */
+.product-meta__price { color: var(--cozy-accent-aa); }
 
 /* Secondary text: #999 (2.8:1) → #666 (5.7:1). */
 .muted,

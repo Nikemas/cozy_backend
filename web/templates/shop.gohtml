@@ -9,15 +9,55 @@
   {{template "_shop_results" .}}
 </div>
 <script>
-  // Escape closes the quick-buy modal. Lives here (rendered once with the
-  // full page) rather than inside _quickbuy_modal, which is re-rendered
-  // on every size/color pick — an inline listener there would stack a
-  // new one on each swap instead of just running once.
-  document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
+  // Quick-buy modal keyboard/focus handling. Lives here (rendered once
+  // with the full page) rather than inside _quickbuy_modal, which is
+  // re-rendered on every size/color pick — listeners there would stack.
+  // Opening moves focus into the dialog, a size/color pick keeps focus on
+  // the picked option, Tab stays inside the dialog, and Escape / X /
+  // overlay / a completed order close it and return focus to the card's
+  // "Купить" button.
+  (function () {
     var slot = document.getElementById("quickbuy-slot");
-    if (slot) slot.innerHTML = "";
-  });
+    var opener = null, refocusHref = null;
+    function modal() { return slot && slot.querySelector(".quickbuy-modal"); }
+    window.cozyCloseQuickbuy = function () {
+      if (!slot) return;
+      slot.innerHTML = "";
+      if (opener && document.body.contains(opener)) opener.focus();
+      opener = null;
+    };
+    document.addEventListener("htmx:beforeRequest", function (e) {
+      if (e.detail.target !== slot) return;
+      if (modal()) {
+        var a = document.activeElement;
+        refocusHref = a && a.getAttribute ? a.getAttribute("href") : null;
+      } else {
+        opener = e.detail.elt;
+        refocusHref = null;
+      }
+    });
+    document.addEventListener("htmx:afterSwap", function (e) {
+      if (e.detail.target !== slot) return;
+      var m = modal();
+      if (!m) return;
+      var picked = null;
+      m.querySelectorAll("a[href]").forEach(function (el) {
+        if (el.getAttribute("href") === refocusHref) picked = el;
+      });
+      (picked || m).focus();
+    });
+    document.addEventListener("keydown", function (e) {
+      var m = modal();
+      if (!m) return;
+      if (e.key === "Escape") { window.cozyCloseQuickbuy(); return; }
+      if (e.key !== "Tab") return;
+      var f = m.querySelectorAll("a[href], button:not([disabled])");
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1], cur = document.activeElement;
+      if (e.shiftKey && (cur === first || cur === m)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+    });
+  })();
 </script>
 {{end}}
 
@@ -78,7 +118,7 @@
   </div>
   {{else}}
   <div class="shop-grid">
-    {{range $d.Products}}
+    {{range $i, $p := $d.Products}}
     <div class="product-card">
       <button class="product-card__fav" type="button" aria-label="{{t "product.add_to_favorites"}}: {{.Name}}"
               hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
@@ -87,7 +127,9 @@
       <a class="product-card__link" href="{{.DetailURL}}">
         <div class="product-card__thumb">
           {{if .HasPhoto}}
-          <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400" loading="lazy" decoding="async">
+          {{/* The first row is above the fold (and holds the LCP image when
+               there's no banner photo): load it eagerly, lazy-load the rest. */}}
+          <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400"{{if lt $i eagerCards}}{{if eq $i 0}} fetchpriority="high"{{end}}{{else}} loading="lazy"{{end}} decoding="async">
           {{else}}
           <svg width="110" height="66" viewBox="0 0 100 60" aria-hidden="true">
             <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
@@ -139,10 +181,10 @@
      no server round trip needed to just empty the mount point. */}}
 {{define "_quickbuy_modal"}}
 {{$d := .Data}}
-<div class="modal-overlay" onclick="document.getElementById('quickbuy-slot').innerHTML=''"></div>
-<div class="quickbuy-modal" role="dialog" aria-modal="true" aria-label="{{$d.Name}}">
+<div class="modal-overlay" onclick="cozyCloseQuickbuy()"></div>
+<div class="quickbuy-modal" role="dialog" aria-modal="true" aria-label="{{$d.Name}}" tabindex="-1">
   <button type="button" class="quickbuy-modal__close" aria-label="{{t "common.close"}}"
-          onclick="document.getElementById('quickbuy-slot').innerHTML=''">
+          onclick="cozyCloseQuickbuy()">
     <i class="ti ti-x" aria-hidden="true"></i>
   </button>
   <div class="quickbuy-modal__head">
@@ -191,12 +233,12 @@
     <input type="hidden" name="color" value="{{$d.SelectedColor}}">
     <button type="button" class="btn btn--primary quickbuy-modal__order" {{if not $d.InStock}}disabled{{end}}
             hx-post="{{$d.BuyActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
-            hx-on::after-request="document.getElementById('quickbuy-slot').innerHTML=''">
+            hx-on::after-request="cozyCloseQuickbuy()">
       {{t "product.buy_now"}} <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i>
     </button>
     <button type="button" class="btn btn--ghost quickbuy-modal__cart" {{if not $d.InStock}}disabled{{end}}
             hx-post="{{$d.CartActionURL}}" hx-include="closest form" hx-target="#toast-slot" hx-swap="innerHTML"
-            hx-on::after-request="document.getElementById('quickbuy-slot').innerHTML=''">
+            hx-on::after-request="cozyCloseQuickbuy()">
       {{t "product.add_to_cart"}} <i class="ti ti-shopping-bag" aria-hidden="true"></i>
     </button>
   </form>

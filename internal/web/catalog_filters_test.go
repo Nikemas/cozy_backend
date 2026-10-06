@@ -117,7 +117,7 @@ func TestRenderShopWithFilters(t *testing.T) {
 		`name="in_stock" value="1" checked`,
 		`<option value="price_asc" selected>`,
 		"от 4 500 сом",
-		`loading="lazy"`,
+		`fetchpriority="high"`,
 		`href="/catalog/krossovki">Сбросить фильтры`,
 	} {
 		if !strings.Contains(body, want) {

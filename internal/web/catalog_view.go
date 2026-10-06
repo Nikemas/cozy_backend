@@ -47,6 +47,9 @@ type ShopData struct {
 	BasePath string
 	// CategoryName is the active category's name ("" on the home page).
 	CategoryName string
+	// Trail is the root→active category chain (nil on the home page),
+	// for the BreadcrumbList structured data.
+	Trail []Crumb
 
 	Query    string
 	Size     string
@@ -150,6 +153,9 @@ func (h *handlers) shopSEO(r *http.Request, data *PageData, sd *ShopData) {
 		canonical += "?page=" + strconv.Itoa(sd.Page)
 	}
 	h.setCanonical(r, data, canonical)
+	if len(sd.Trail) > 0 {
+		data.SEO.BreadcrumbJSONLD = h.breadcrumbJSONLD(r, lang, sd.Trail)
+	}
 	if sd.Query != "" {
 		data.NoIndex = true
 	}
@@ -168,6 +174,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	basePath := "/"
 	var categoryIDs []string
 	categoryName := ""
+	var trail []Crumb
 	if categorySlug != "" {
 		cat, ids := findCategory(tree, categorySlug)
 		if cat == nil {
@@ -176,6 +183,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		basePath = "/catalog/" + cat.Slug
 		categoryIDs = ids
 		categoryName = pickName(cat.NameRu, cat.NameKy, lang)
+		trail = categoryTrail(tree, cat.ID, lang)
 	}
 
 	filter := params.listFilter(categoryIDs, shopPageSize)
@@ -251,6 +259,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	sd := &ShopData{
 		BasePath:     basePath,
 		CategoryName: categoryName,
+		Trail:        trail,
 		Query:        params.Query,
 		Size:         params.Size,
 		Color:        params.Color,
@@ -326,6 +335,11 @@ type ProductData struct {
 	SelectedSize      string
 	SelectedColor     string
 	SelectedVariantID string // "" if the size/color combo doesn't exist
+
+	// CategoryID is the product's category; product() turns it into
+	// Trail (root→category) for the BreadcrumbList structured data.
+	CategoryID string
+	Trail      []Crumb
 
 	ProductPath       string
 	CartActionURL     string
@@ -424,6 +438,11 @@ func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
 	if err := h.applyProductDelivery(r.Context(), pd); err != nil {
 		return err
 	}
+	tree, err := h.categories.Tree(r.Context())
+	if err != nil {
+		return err
+	}
+	pd.Trail = categoryTrail(tree, pd.CategoryID, data.Lang)
 	data.Data = pd
 	h.productSEO(r, &data, pd)
 	return h.render.Render(w, "product", data)
@@ -462,6 +481,7 @@ func (h *handlers) productSEO(r *http.Request, data *PageData, pd *ProductData) 
 		data.SEO.OGImage = pd.PhotoURL
 	}
 	data.SEO.JSONLD = productJSONLD(pd, data.SEO.Canonical, pd.Price)
+	data.SEO.BreadcrumbJSONLD = h.breadcrumbJSONLD(r, lang, append(append([]Crumb{}, pd.Trail...), Crumb{Name: pd.Name, Path: pd.ProductPath}))
 }
 
 func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, productID string) (*ProductData, error) {
@@ -550,6 +570,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 
 	return &ProductData{
 		Name:              name,
+		CategoryID:        product.CategoryID,
 		Brand:             stringOr(product.Brand, ""),
 		Price:             price,
 		PriceText:         formatAmount(price, h.t(lang, "common.currency")),
