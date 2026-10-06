@@ -17,17 +17,17 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/banner"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
-	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
 
-// staticMaxAge is how long browsers may reuse /static/* without
-// revalidating. Asset URLs aren't content-hashed, so this bounds how long
-// a deploy's CSS/logo change can take to show; after it, revalidation is
-// a cheap 304 via the ETag httpmw.Static sets.
+// staticMaxAge is how long browsers may reuse a /static/* URL that isn't
+// content-hashed (no or stale ?v=, e.g. og.png or an HTML page cached
+// from before a deploy); after it, revalidation is a cheap 304 via the
+// ETag httpmw.Static sets. Templates link assets through the "asset"
+// func, whose ?v=<hash> URLs get versionedMaxAge instead (assets.go).
 const staticMaxAge = 10 * time.Minute
 
 // RegisterRoutes mounts the storefront on mux. authSvc must be the same
@@ -47,6 +47,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	}
 	if cfg != nil {
 		renderer.SetContacts(cfg.Contacts)
+		renderer.SetMediaOrigin(originOf(cfg.PublicObjectURL("_")))
 	}
 
 	h := &handlers{
@@ -153,7 +154,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	// SEO + static assets.
 	mux.Handle("GET /sitemap.xml", apperr.Wrap(h.sitemap))
 	mux.HandleFunc("GET /robots.txt", h.robots)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", httpmw.Static("web/static", staticMaxAge)))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler(staticDir, renderer.assets)))
 
 	// Catch-all: every URL nothing else matched gets the branded HTML 404
 	// (or the JSON error body under /api/ — apperr.WriteError decides by
