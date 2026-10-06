@@ -14,12 +14,26 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"time"
 
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
 const templatesDir = "admin/templates"
+
+// staticDir holds the admin's CSS/JS/images, served under staticURLPrefix.
+const staticDir = "admin/static"
+
+// staticURLPrefix is where staticDir is mounted (routes.go).
+const staticURLPrefix = "/admin/static/"
+
+// staticMaxAge is the browser cache lifetime of an /admin/static/ URL
+// without the file's current ?v= hash (same as the storefront's): short
+// max-age + ETag. Templates link through the "asset" func, whose hashed
+// URLs get httpmw.VersionedMaxAge instead.
+const staticMaxAge = 10 * time.Minute
 
 // screenPages maps each admin screen to its content template file. "login"
 // and "no_access" render without the sidebar/header chrome (PageData.
@@ -105,6 +119,10 @@ type PageData struct {
 // there instead of mid-request. tmpl[lang][screen].
 type Renderer struct {
 	tmpl map[string]map[string]*template.Template
+	// assets backs the "asset" template func (content-hashed
+	// /admin/static/ URLs) and the long-cache decision in the
+	// /admin/static/ handler (routes.go).
+	assets httpmw.AssetVersions
 }
 
 // NewRenderer parses every screen's templates. Template paths are relative
@@ -116,7 +134,12 @@ type Renderer struct {
 // language's {{t}}/{{tf}}/{{lang}} funcs (lang.go's templateFuncs) — no
 // per-request parsing or Funcs calls.
 func NewRenderer() (*Renderer, error) {
-	rr := &Renderer{tmpl: map[string]map[string]*template.Template{}}
+	assets, err := httpmw.LoadAssetVersions(staticDir)
+	if err != nil {
+		return nil, fmt.Errorf("admin: %w", err)
+	}
+	rr := &Renderer{tmpl: map[string]map[string]*template.Template{}, assets: assets}
+	assetFunc := template.FuncMap{"asset": rr.assetURL}
 	langs := []string{i18n.LangRU, i18n.LangKY}
 	for _, lang := range langs {
 		rr.tmpl[lang] = map[string]*template.Template{}
@@ -129,7 +152,7 @@ func NewRenderer() (*Renderer, error) {
 		}
 		files = append(files, filepath.Join(templatesDir, page))
 
-		t, err := template.New("layout.gohtml").Funcs(templateFuncs(i18n.DefaultLang)).ParseFiles(files...)
+		t, err := template.New("layout.gohtml").Funcs(templateFuncs(i18n.DefaultLang)).Funcs(assetFunc).ParseFiles(files...)
 		if err != nil {
 			return nil, fmt.Errorf("admin: parsing templates for screen %q: %w", screen, err)
 		}
@@ -143,6 +166,12 @@ func NewRenderer() (*Renderer, error) {
 	}
 
 	return rr, nil
+}
+
+// assetURL is the "asset" template func: /admin/static/<rel>?v=<hash>, or
+// the plain path for a file it doesn't know (never a broken link).
+func (rr *Renderer) assetURL(rel string) string {
+	return rr.assets.URL(staticURLPrefix, rel)
 }
 
 // Render executes the "layout" template for screen using data, in

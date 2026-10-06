@@ -55,7 +55,7 @@ function ordersRangeChanged(sel) {
 </script>
 
 {{range .Data.Notes}}<div class="admin-form-error" role="status">{{.}}</div>{{end}}
-<script src="/admin/static/js/bulk.js" defer></script>
+<script src="{{asset "js/bulk.js"}}" defer></script>
 
 <div class="admin-orders-filters">
   <div class="admin-orders-chips" role="group" aria-label="{{t "admin.orders.status_filter"}}">

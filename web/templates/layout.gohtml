@@ -24,16 +24,19 @@
   <meta name="theme-color" content="#FF7A1A">
   {{if .SEO.JSONLD}}<script type="application/ld+json">{{.SEO.JSONLD}}</script>{{end}}
   {{if .SEO.BreadcrumbJSONLD}}<script type="application/ld+json">{{.SEO.BreadcrumbJSONLD}}</script>{{end}}
-  {{/* Open the third-party connections the render-blocking stylesheets
-       (and the fonts they pull in, which are CORS requests — hence the
-       second, crossorigin preconnect) need while the HTML is still
-       parsing, instead of only after each stylesheet is discovered. */}}
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  {{/* Open the third-party connections the render-blocking Google Fonts
+       stylesheet (and the font files it pulls in, which are CORS
+       requests — hence the crossorigin preconnect) needs while the HTML
+       is still parsing, instead of only after the stylesheet is found. */}}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   {{with mediaOrigin}}<link rel="preconnect" href="{{.}}">{{end}}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+  {{/* Self-hosted Tabler Icons subset (scripts/tabler-icons-subset.py):
+       only the glyphs the templates use. The font is preloaded so icons
+       don't wait for icons.css to be parsed; the href must equal the
+       url() inside icons.css (same ?v= hash) or it downloads twice. */}}
+  <link rel="preload" href="{{asset "fonts/tabler-icons.woff2"}}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{asset "css/icons.css"}}">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="{{asset "css/site.css"}}">
   {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}

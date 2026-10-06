@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
 // sitemapPageSize is a generous upper bound on how many products a
@@ -15,14 +16,24 @@ import (
 const sitemapPageSize = 5000
 
 type sitemapURLSet struct {
-	XMLName xml.Name     `xml:"urlset"`
-	Xmlns   string       `xml:"xmlns,attr"`
-	URLs    []sitemapURL `xml:"url"`
+	XMLName    xml.Name     `xml:"urlset"`
+	Xmlns      string       `xml:"xmlns,attr"`
+	XmlnsXHTML string       `xml:"xmlns:xhtml,attr"`
+	URLs       []sitemapURL `xml:"url"`
 }
 
 type sitemapURL struct {
-	Loc     string `xml:"loc"`
-	LastMod string `xml:"lastmod,omitempty"`
+	Loc        string       `xml:"loc"`
+	LastMod    string       `xml:"lastmod,omitempty"`
+	Alternates []sitemapAlt `xml:"xhtml:link"`
+}
+
+// sitemapAlt is an <xhtml:link rel="alternate" hreflang=".." href=".."/>
+// language alternate (Google's sitemap hreflang format).
+type sitemapAlt struct {
+	Rel      string `xml:"rel,attr"`
+	Hreflang string `xml:"hreflang,attr"`
+	Href     string `xml:"href,attr"`
 }
 
 // sitemapStaticPaths are the indexable non-catalog pages.
@@ -60,8 +71,20 @@ func (h *handlers) sitemap(w http.ResponseWriter, r *http.Request) error {
 
 // buildSitemap is the pure part of sitemap: home (lastmod = newest
 // product change), categories, products (own lastmod), info pages.
+//
+// Every page is listed once per language — the Russian URL and its
+// ?lang=ky twin, each canonical to itself (setCanonical) — and, as Google
+// asks for sitemap hreflang, each <url> carries the full set of
+// xhtml:link alternates (ru, ky, x-default = ru), itself included,
+// matching the <link rel="alternate"> tags in the page head.
 func buildSitemap(base string, tree []*catalog.Category, products []catalog.Product) sitemapURLSet {
-	set := sitemapURLSet{Xmlns: "http://www.sitemaps.org/schemas/sitemap/0.9"}
+	set := sitemapURLSet{
+		Xmlns:      "http://www.sitemaps.org/schemas/sitemap/0.9",
+		XmlnsXHTML: "http://www.w3.org/1999/xhtml",
+	}
+	add := func(path, lastMod string) {
+		set.URLs = append(set.URLs, sitemapLangURLs(base+path, lastMod)...)
+	}
 
 	var newest time.Time
 	for _, p := range products {
@@ -69,18 +92,33 @@ func buildSitemap(base string, tree []*catalog.Category, products []catalog.Prod
 			newest = p.UpdatedAt
 		}
 	}
-	set.URLs = append(set.URLs, sitemapURL{Loc: base + "/", LastMod: sitemapDate(newest)})
+	add("/", sitemapDate(newest))
 
 	walkCategories(tree, func(c *catalog.Category) {
-		set.URLs = append(set.URLs, sitemapURL{Loc: base + "/catalog/" + c.Slug})
+		add("/catalog/"+c.Slug, "")
 	})
 	for _, p := range products {
-		set.URLs = append(set.URLs, sitemapURL{Loc: base + ProductPath(p.ID, p.NameRu), LastMod: sitemapDate(p.UpdatedAt)})
+		add(ProductPath(p.ID, p.NameRu), sitemapDate(p.UpdatedAt))
 	}
 	for _, path := range sitemapStaticPaths {
-		set.URLs = append(set.URLs, sitemapURL{Loc: base + path})
+		add(path, "")
 	}
 	return set
+}
+
+// sitemapLangURLs is the Russian and Kyrgyz <url> entries for the page at
+// the absolute ruURL, both listing all language alternates.
+func sitemapLangURLs(ruURL, lastMod string) []sitemapURL {
+	kyURL := withLangParam(ruURL, i18n.LangKY)
+	alts := []sitemapAlt{
+		{Rel: "alternate", Hreflang: i18n.LangRU, Href: ruURL},
+		{Rel: "alternate", Hreflang: i18n.LangKY, Href: kyURL},
+		{Rel: "alternate", Hreflang: "x-default", Href: ruURL},
+	}
+	return []sitemapURL{
+		{Loc: ruURL, LastMod: lastMod, Alternates: alts},
+		{Loc: kyURL, LastMod: lastMod, Alternates: alts},
+	}
 }
 
 func sitemapDate(t time.Time) string {

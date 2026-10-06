@@ -63,10 +63,15 @@ PostgreSQL License) разрешают коммерческое использо
 | Компонент | Версия | Лицензия | Где |
 |---|---|---|---|
 | htmx (`unpkg.com/htmx.org`) | 1.9.12 | 0BSD | `web/templates/layout.gohtml`, `admin/templates/layout.gohtml` |
-| Tabler Icons webfont (`@tabler/icons-webfont`, jsDelivr) | 3.31.0 | MIT | `web/templates/layout.gohtml` |
 | Шрифт Manrope (Google Fonts) | — | SIL Open Font License 1.1 | `web/templates/layout.gohtml`, `admin/templates/layout.gohtml` |
 
-Собственные CSS/JS (`web/static`, `admin/static`) — код проекта.
+Собственные CSS/JS (`web/static`, `admin/static`) — код проекта, кроме перечисленного ниже.
+
+Размещены у нас (self-hosted, в репозитории):
+
+| Компонент | Версия | Лицензия | Где |
+|---|---|---|---|
+| Tabler Icons webfont (`@tabler/icons-webfont`, © Paweł Kuna) — подмножество используемых иконок | 3.31.0 | MIT | `web/static/fonts/tabler-icons.woff2`, `web/static/css/icons.css`; текст лицензии — `web/static/fonts/LICENSE-tabler-icons.txt`; пересборка — `scripts/tabler-icons-subset.py` |
 
 ## 4. Серверное ПО (отдельные процессы в Docker, не линкуется в код)
 

@@ -27,7 +27,7 @@ import (
 // content-hashed (no or stale ?v=, e.g. og.png or an HTML page cached
 // from before a deploy); after it, revalidation is a cheap 304 via the
 // ETag httpmw.Static sets. Templates link assets through the "asset"
-// func, whose ?v=<hash> URLs get versionedMaxAge instead (assets.go).
+// func, whose ?v=<hash> URLs get httpmw.VersionedMaxAge instead (assets.go).
 const staticMaxAge = 10 * time.Minute
 
 // RegisterRoutes mounts the storefront on mux. authSvc must be the same
