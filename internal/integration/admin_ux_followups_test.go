@@ -76,3 +76,29 @@ func TestAdminOrdersBadgeSkipsUnpaidOnline(t *testing.T) {
 		t.Error("guest got a count")
 	}
 }
+
+// Products row menu: activate/deactivate and delete return to the list
+// page/filters they were used on; a foreign "back" falls back to the list.
+func TestAdminProductRowActionsKeepListPosition(t *testing.T) {
+	t.Parallel()
+	a := app(t)
+	f := newFixture(t, 1, 1)
+	owner, _ := a.newStaffSession(t, staff.RoleOwner, nil)
+	c := []*http.Cookie{owner}
+	back := "/admin/products?cat=men&page=2"
+
+	w := a.do(t, req{method: http.MethodPost, path: "/admin/products/" + f.ProductID + "/toggle-active", cookies: c, form: url.Values{"back": {back}}})
+	wantStatus(t, w, http.StatusSeeOther)
+	if loc := w.Header().Get("Location"); !strings.HasPrefix(loc, back+"&toast=product_deactivated") {
+		t.Errorf("toggle Location = %q", loc)
+	}
+	w = a.do(t, req{method: http.MethodPost, path: "/admin/products/" + f.ProductID + "/toggle-active", cookies: c, form: url.Values{"back": {"https://evil.test/admin/products"}}})
+	if loc := w.Header().Get("Location"); !strings.HasPrefix(loc, "/admin/products?toast=product_activated") {
+		t.Errorf("foreign back: Location = %q", loc)
+	}
+
+	w = a.do(t, req{method: http.MethodPost, path: "/admin/products/" + f.ProductID + "/delete?back=" + url.QueryEscape(back), cookies: c, htmx: true})
+	if loc := w.Header().Get("HX-Redirect"); !strings.HasPrefix(loc, back+"&toast=product_deleted") {
+		t.Errorf("delete HX-Redirect = %q (code %d)", loc, w.Code)
+	}
+}

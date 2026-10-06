@@ -314,3 +314,19 @@ func listReturnURL(referer, host, listPath string) string {
 	}
 	return safeReturnURL(u.RequestURI(), listPath)
 }
+
+// withRowReturn returns a copy of rows whose delete link carries back
+// (the list page with its filters) so the row menu's «Удалить» — an
+// hx-post from the confirm dialog, no form to put it in — returns there.
+// Activate/deactivate send it as a hidden form field instead.
+func withRowReturn(rows []ProductRowVM, back string) []ProductRowVM {
+	out := make([]ProductRowVM, len(rows))
+	copy(out, rows)
+	if back == productsListPath || back == "" {
+		return out
+	}
+	for i := range out {
+		out[i].DeleteURL += "?back=" + url.QueryEscape(back)
+	}
+	return out
+}

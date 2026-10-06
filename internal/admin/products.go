@@ -167,7 +167,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		CategoryChips: withPointParams(buildCategoryChips(h.tr(r), tree, activeTop, q), pointSel),
 		ShowSubs:      activeTop != nil && len(activeTop.Children) > 0,
 		SubChips:      withPointParams(buildSubChips(h.tr(r), activeTop, activeSub, q), pointSel),
-		Products:      rows,
+		Products:      withRowReturn(rows, returnURL(r)),
 		Empty:         len(rows) == 0,
 		CountLabel:    countLabel(h.tr(r), total),
 		Query:         q,
@@ -558,10 +558,11 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
+	back := safeReturnURL(r.FormValue("back"), productsListPath)
 
 	product, err := h.products.GetByIDAny(ctx, id)
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", toastForErr(err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 
@@ -576,7 +577,7 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 		IsActive:      !product.IsActive,
 	})
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", toastForErr(err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 	h.auditProductActive(ctx, id, product.NameRu, !product.IsActive)
@@ -585,7 +586,7 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 	if !product.IsActive {
 		toast = toastKey("product_activated")
 	}
-	redirectWithToast(w, r, "/admin/products", toast)
+	redirectWithToast(w, r, back, toast)
 }
 
 // productDelete handles POST /admin/products/{id}/delete — the row menu's
@@ -604,12 +605,13 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 // deleting a product return that any harder than deactivating.
 func (h *handlers) productDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	back := safeReturnURL(r.FormValue("back"), productsListPath)
 	if err := h.products.Delete(r.Context(), id); err != nil {
-		redirectWithToast(w, r, "/admin/products", toastForErr(err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 	h.auditProductDeleted(r.Context(), id)
-	redirectWithToast(w, r, "/admin/products", toastKey("product_deleted"))
+	redirectWithToast(w, r, back, toastKey("product_deleted"))
 }
 
 // --- import screen ---
