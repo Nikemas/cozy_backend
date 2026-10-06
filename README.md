@@ -259,6 +259,8 @@ MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
 
 `cozy.kg` **не** добавляется ещё одним хостом в staging-`Caddyfile`: это обслуживало бы реальных покупателей из staging-базы с mock-оплатой. Прод — отдельный стек: лучше отдельный VPS (или минимум отдельный каталог, отдельное имя compose-проекта `-p cozy-prod`, свои volumes, свой `.env` и свой `Caddyfile` с блоками `cozy.kg, www.cozy.kg` и `media.cozy.kg` без `noindex`), отдельный deploy-workflow/environment `production` с ручным подтверждением, свои бэкапы с другим `BACKUP_RCLONE_REMOTE` и отдельным чеком healthchecks.
 
+Всё это уже в репозитории: `DEPLOY_ENV=production` (`scripts/env.sh`) включает compose-проект `cozy-prod`, `docker/Caddyfile.prod` (хосты из `SITE_HOST`/`MEDIA_HOST`, редирект с `www`) и образ `cozy-backend-prod`; выкладка — только вручную через `.github/workflows/deploy-prod.yml` (тег/SHA, Environment `production`, секреты `PROD_*`). Первый владелец — `server create-owner`. Пошагово — `docs/deployment.md`, разделы 2, 5 и 7.3.
+
 Чеклист `.env` прода (полный список переменных — `.env.example`):
 
 - [ ] `APP_ENV=prod`
@@ -267,6 +269,7 @@ MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
 - [ ] `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` — случайные, без `/ @ :` (`openssl rand -hex 20`); `MINIO_BUCKET`
 - [ ] `MINIO_PUBLIC_ENDPOINT=media.cozy.kg`, `MINIO_PUBLIC_USE_SSL=true`
 - [ ] `PUBLIC_BASE_URL=https://cozy.kg`
+- [ ] `SITE_HOST=cozy.kg`, `MEDIA_HOST=media.cozy.kg` (для `docker/Caddyfile.prod`)
 - [ ] `PAYMENTS_PROVIDER=bakai` (никогда `mock`) и боевые реквизиты Bakai; `BAKAI_WEBHOOK_TOKEN` — случайный (`openssl rand -hex 32`)
 - [ ] `NIKITA_API_KEY` — боевой, `SMS_MOCK_OTP=false`
 - [ ] `FCM_CREDENTIALS_FILE=/secrets/firebase-service-account.json` (файл `chmod 644` в `./secrets`), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — группа персонала прода, не тестовая

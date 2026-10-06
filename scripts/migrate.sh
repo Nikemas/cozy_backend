@@ -9,6 +9,7 @@
 #   bash scripts/migrate.sh up           # apply pending migrations
 #   bash scripts/migrate.sh force 21     # record version 21 as applied and clean, run nothing
 #   bash scripts/migrate.sh down 1       # revert the newest migration (can drop data!)
+#   DEPLOY_ENV=production bash scripts/migrate.sh version   # on the production server
 #
 # migrate runs in a throwaway container (same image/version as CI) sharing
 # the postgres container's network namespace, so it reaches it on
@@ -18,7 +19,9 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE=(docker compose -f "$REPO_DIR/docker/docker-compose.prod.yml" --env-file "$REPO_DIR/.env")
+# DEPLOY_ENV=production selects the production compose project (scripts/env.sh).
+# shellcheck source=scripts/env.sh
+. "$REPO_DIR/scripts/env.sh"
 MIGRATE_IMAGE="${MIGRATE_IMAGE:-migrate/migrate:v4.18.3}"
 
 if [ $# -eq 0 ]; then

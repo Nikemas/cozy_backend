@@ -46,8 +46,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://cozy.erpsystemsales.com/health
 | Симптом | Что смотреть (VPS) | Что делать |
 |---|---|---|
 | `502`/таймаут на всё, `/healthz` тоже не 200 | `$C ps backend`, `$C logs --tail=100 backend` | `$C up -d backend`; падает при старте — проблема в `.env` (backend не стартует при невалидном конфиге, текст ошибки в логе) или в образе → откат (чек-лист п. 2.2) |
-| `"db":"fail"` | `$C ps postgres`, `$C exec -T postgres pg_isready -U cozy -d cozy`, `$C logs --tail=100 postgres`, `df -h /` | `$C up -d postgres`; переполнен диск — освободить (`docker image prune -f`, старые дампы), не трогая свежий дамп |
-| `"minio":"fail"` | `$C ps minio`, `$C logs --tail=100 minio`, `df -h /` | `$C restart minio`; пропали фото — восстановление медиа (чек-лист п. 2.4) |
+| `"db":"error"` | `$C ps postgres`, `$C exec -T postgres pg_isready -U cozy -d cozy`, `$C logs --tail=100 postgres`, `df -h /` | `$C up -d postgres`; переполнен диск — освободить (`docker image prune -f`, старые дампы), не трогая свежий дамп |
+| `"minio":"error"` | `$C ps minio`, `$C logs --tail=100 minio`, `df -h /` | `$C restart minio`; пропали фото — восстановление медиа (чек-лист п. 2.4) |
 | `/readyz` 200, но сайт с ошибками | `X-Request-ID` из ответа → `$C logs backend \| grep <id>` | точечно; если ломается оформление заказа — п. 2.6 чек-листа |
 | TLS/сертификат | `$C logs --tail=100 caddy` | чек-лист п. 2.5 |
 

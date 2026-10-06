@@ -163,6 +163,7 @@ err.payment_not_retryable: бул буйрутманы кайра төлөөгө
 err.payment_not_retryable.too_many: төлөө аракеттери өтө көп — буйрутманы кайра тариздеңиз же алганда төлөөнү тандаңыз
 err.payment_provider_not_found: төлөм провайдери табылган жок
 err.payments_not_configured: онлайн-төлөм азырынча жеткиликсиз, алганда төлөөнү тандаңыз
+err.not_owner: "бул номер ээ ролу жок кызматкерге таандык: админкада ролун өзгөртүңүз же башка номер көрсөтүңүз"
 err.phone_taken: бул телефон номери колдонулуп жатат
 err.pickup_point_not_found: өзү алып кетүү пункту табылган жок
 err.point_id_forbidden: owner/manager ролу үчүн point_id бош болушу керек

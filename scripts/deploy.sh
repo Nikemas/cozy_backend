@@ -1,47 +1,74 @@
 #!/usr/bin/env bash
-# Deploy a commit of main to this server.
+# Deploy a commit to this server.
 #
-# Runs ON THE VPS (invoked over SSH by .github/workflows/deploy.yml, or by
-# hand: `bash /opt/cozy/scripts/deploy.sh`). The image is built here from
+# Runs ON THE VPS (invoked over SSH by .github/workflows/deploy.yml for
+# staging and .github/workflows/deploy-prod.yml for production, or by hand:
+# `bash /opt/cozy/scripts/deploy.sh`). The image is built here from
 # source — there is no registry in the loop, so the server needs nothing
 # but git, docker (with the compose plugin), curl and the .env file that
 # already lives next to this repo.
 #
 # Steps (the old backend keeps serving until step 6):
-#   0. preflight: .env, git, docker, curl present; one deploy at a time
-#   1. check out DEPLOY_REF (default origin/main; CI passes the exact SHA it
-#      tested). Hard reset: the server is a deploy target, never a place to
-#      edit code; .env is untracked and survives
-#   2. if docker/Caddyfile changed, validate it with the pinned caddy image
-#   3. build the backend image as cozy-backend:<sha>; remember the image the
-#      running backend uses as cozy-backend:previous (the rollback target)
+#   0. preflight: env file, git, docker, curl present; one deploy at a time
+#   1. check out DEPLOY_REF (staging default origin/main; CI passes the exact
+#      SHA it tested; production requires it explicitly). Hard reset: the
+#      server is a deploy target, never a place to edit code; .env is
+#      untracked and survives
+#   2. if the environment's Caddyfile changed (production: or caddy is not
+#      running yet, i.e. the first deploy), validate it with the pinned caddy
+#      image
+#   3. build the backend image as <image>:<sha>; remember the image the
+#      running backend uses as <image>:previous (the rollback target)
 #   4. start postgres, wait until healthy, refuse to continue on a dirty or
 #      untracked migration state
 #   5. apply migrations (scripts/migrate.sh: migrate/migrate, same image CI uses)
 #   6. switch services to the new image (`up -d`), restart caddy if its
 #      bind-mounted config changed
 #   7. wait for /readyz through Caddy. Not ready -> print logs, put
-#      cozy-backend:previous back, exit 1
+#      <image>:previous back, exit 1
 #   8. on success: tag the image :latest, drop old images beyond KEEP_IMAGES
 #
 # Rollback never reverts migrations (down migrations can drop data), so a
 # migration must stay compatible with the previous release's code
 # (expand/contract: add columns/tables first, remove them a release later).
 #
-# Settings (env vars, all optional):
-#   DEPLOY_REF     commit/ref to deploy        (default origin/main)
-#   HEALTH_URL     readiness URL through Caddy (default https://cozy.erpsystemsales.com/readyz)
+# Environment (scripts/env.sh has the full per-environment table):
+#   DEPLOY_ENV=staging     (default) exactly the historical behaviour: compose
+#                          project "docker", .env, docker/Caddyfile, image
+#                          cozy-backend, origin/main
+#   DEPLOY_ENV=production  compose project cozy-prod (COMPOSE_PROJECT_NAME),
+#                          docker/Caddyfile.prod with SITE_HOST/MEDIA_HOST
+#                          from the env file, image cozy-backend-prod;
+#                          DEPLOY_REF is required (a tag or SHA)
+#
+# Settings (env vars, all optional unless noted):
+#   DEPLOY_REF     commit/ref to deploy        (staging default origin/main; required for production)
+#   ENV_FILE       env file, relative to the repo (default .env)
+#   HEALTH_URL     readiness URL through Caddy (staging default https://cozy.erpsystemsales.com/readyz,
+#                                               production default https://$SITE_HOST/readyz)
 #   HEALTH_TIMEOUT seconds to wait for it      (default 90)
-#   KEEP_IMAGES    cozy-backend:<sha> images to keep (default 5)
+#   KEEP_IMAGES    <image>:<sha> images to keep (default 5)
 #   MIGRATE_IMAGE  default migrate/migrate:v4.18.3
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE=docker/docker-compose.prod.yml
-COMPOSE=(docker compose -f "$COMPOSE_FILE" --env-file .env)
-IMAGE_REPO=cozy-backend
-DEPLOY_REF="${DEPLOY_REF:-origin/main}"
-HEALTH_URL="${HEALTH_URL:-https://cozy.erpsystemsales.com/readyz}"
+# scripts/env.sh is sourced BEFORE the checkout below, so take it from the
+# commit being deployed: CI passes DEPLOY_REF and has already fetched it,
+# while deploy.yml only refreshes scripts/deploy.sh itself (and on the first
+# deploy after env.sh was introduced the old checkout has no env.sh at all).
+if [ -n "${DEPLOY_REF:-}" ]; then
+  git -C "$REPO_DIR" checkout -q "$DEPLOY_REF" -- scripts/env.sh 2>/dev/null || true
+fi
+[ -f "$REPO_DIR/scripts/env.sh" ] \
+  || { echo "deploy: ERROR: scripts/env.sh is missing (set DEPLOY_REF or update the checkout)" >&2; exit 1; }
+# shellcheck source=scripts/env.sh
+. "$REPO_DIR/scripts/env.sh"
+IMAGE_REPO="$BACKEND_IMAGE"
+if [ "$DEPLOY_ENV" = staging ]; then
+  DEPLOY_REF="${DEPLOY_REF:-origin/main}"
+else
+  DEPLOY_REF="${DEPLOY_REF:-}"
+fi
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"
 KEEP_IMAGES="${KEEP_IMAGES:-5}"
 MIGRATE_IMAGE="${MIGRATE_IMAGE:-migrate/migrate:v4.18.3}"
@@ -55,7 +82,15 @@ die() {
 cd "$REPO_DIR"
 
 # --- 0. preflight ------------------------------------------------------------
-[ -f .env ] || die "$REPO_DIR/.env is missing — copy .env.example and fill it in first"
+[ -f "$ENV_PATH" ] || die "$ENV_PATH is missing — copy .env.example and fill it in first"
+if [ "$DEPLOY_ENV" = production ]; then
+  [ -n "$DEPLOY_REF" ] || die "DEPLOY_REF is required for production (a release tag or commit SHA)"
+  for key in SITE_HOST MEDIA_HOST; do
+    [ -n "$(envfile_val "$key")" ] || die "$key is not set in $ENV_PATH (docker/Caddyfile.prod needs it)"
+  done
+  [ "$(envfile_val APP_ENV)" = prod ] || die "APP_ENV in $ENV_PATH must be 'prod' for the production stack"
+fi
+[ -n "$HEALTH_URL" ] || die "HEALTH_URL is empty"
 for bin in git docker curl; do
   command -v "$bin" >/dev/null 2>&1 || die "'$bin' is not installed on this server (apt install $bin)"
 done
@@ -67,13 +102,19 @@ esac
 # Two deploys at once (CI + someone by hand) would race on the checkout and
 # the containers. flock ships with util-linux.
 if command -v flock >/dev/null 2>&1; then
-  exec 9>"${TMPDIR:-/tmp}/cozy-deploy.lock"
+  exec 9>"${TMPDIR:-/tmp}/$LOCK_NAME"
   flock -n 9 || die "another deploy is running"
 fi
 
 # --- 1. checkout ---------------------------------------------------------------
+log "environment: $DEPLOY_ENV"
 old="$(git rev-parse HEAD)"
-git fetch -q origin main
+if [ "$DEPLOY_ENV" = staging ]; then
+  git fetch -q origin main
+else
+  # Production deploys tags/SHAs that need not be on main's tip.
+  git fetch -q --tags origin '+refs/heads/*:refs/remotes/origin/*'
+fi
 git reset -q --hard "$DEPLOY_REF"
 new="$(git rev-parse HEAD)"
 tag="${new:0:12}"
@@ -83,15 +124,24 @@ git --no-pager log --oneline "$old..$new" 2>/dev/null || true
 changed() { [ "$old" != "$new" ] && git diff --name-only "$old" "$new" -- "$1" | grep -q .; }
 
 # --- 2. Caddyfile --------------------------------------------------------------
+# Production also validates on its first deploy (no caddy container yet):
+# a fresh checkout has old == new, so `changed` alone would skip it.
+first_prod_caddy() {
+  [ "$DEPLOY_ENV" = production ] && [ -z "$("${COMPOSE[@]}" ps -q caddy 2>/dev/null || true)" ]
+}
+
 caddy_changed=0
-if changed docker/Caddyfile; then
+if changed "docker/$CADDYFILE" || first_prod_caddy; then
   caddy_changed=1
   caddy_image="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(caddy:[^[:space:]]*\).*/\1/p' "$COMPOSE_FILE" | head -n1)"
   [ -n "$caddy_image" ] || die "could not find the caddy image in $COMPOSE_FILE"
-  log "Caddyfile changed, validating with $caddy_image"
-  docker run --rm -v "$REPO_DIR/docker/Caddyfile:/etc/caddy/Caddyfile:ro" "$caddy_image" \
+  log "$CADDYFILE changed, validating with $caddy_image"
+  caddy_env=()
+  # Caddyfile.prod takes its hostnames from the env file.
+  [ "$DEPLOY_ENV" = production ] && caddy_env=(--env-file "$ENV_PATH")
+  docker run --rm ${caddy_env[@]+"${caddy_env[@]}"} -v "$REPO_DIR/docker/$CADDYFILE:/etc/caddy/Caddyfile:ro" "$caddy_image" \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null \
-    || die "docker/Caddyfile is invalid — no container was touched"
+    || die "docker/$CADDYFILE is invalid — no container was touched"
 fi
 
 # --- 3. build ------------------------------------------------------------------
@@ -209,7 +259,7 @@ BACKEND_TAG="$tag" "${COMPOSE[@]}" up -d --no-build \
 if [ "$caddy_changed" = 1 ]; then
   # Bind-mounted single file: git replaced it with a new inode, which the
   # running container doesn't see until it restarts.
-  log "Caddyfile changed, restarting caddy"
+  log "$CADDYFILE changed, restarting caddy"
   "${COMPOSE[@]}" restart caddy
 fi
 

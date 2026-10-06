@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------
+# Deploy PRODUCTION — manual only. Never runs on push: someone opens
+# Actions -> "Deploy production" -> Run workflow, and types the git tag or
+# commit SHA to ship (e.g. v1.0.0). Staging keeps deploying itself from main
+# via deploy.yml; nothing here touches it.
+#
+# Flow:
+#   1. resolve: the input ref -> an exact commit SHA, which must already be
+#      on main (only reviewed, merged code reaches customers)
+#   2. ci: the full CI workflow (ci.yml) on exactly that SHA
+#   3. deploy: waits for the GitHub Environment `production` (configure
+#      "Required reviewers" there so every run needs a human approval), then
+#      SSHes into the PRODUCTION server and runs
+#      `DEPLOY_ENV=production scripts/deploy.sh` for that SHA (compose
+#      project cozy-prod, docker/Caddyfile.prod, health check
+#      https://$SITE_HOST/readyz, rollback to the previous image on failure).
+#
+# Secrets — set them on the `production` Environment (Settings ->
+# Environments -> production -> Environment secrets), NOT as repo secrets,
+# so only a job that passed the approval gate can read them. Same meaning
+# as the DEPLOY_* secrets in deploy.yml, but for the production server:
+#   PROD_DEPLOY_HOST             production server hostname or IP
+#   PROD_DEPLOY_USER             non-root deploy user in the docker group
+#   PROD_DEPLOY_SSH_KEY          private key of a production-only deploy keypair
+#   PROD_DEPLOY_SSH_FINGERPRINT  SHA256 fingerprint of the server's ECDSA host key
+#                                (ssh-keyscan -t ecdsa HOST | ssh-keygen -lf - | awk '{print $2}')
+#   PROD_DEPLOY_PATH             repo checkout on the server (e.g. /opt/cozy)
+#   PROD_DEPLOY_SSH_PORT         optional, defaults to 22
+#
+# Third-party actions are pinned to exact version tags — same reasoning as
+# in ci.yml.
+# ---------------------------------------------------------------------------
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git tag or commit SHA to deploy to production (must be on main)
+        required: true
+        type: string
+
+# One production deploy at a time; a second request waits instead of
+# cancelling one that may already be migrating the database.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve the ref to a commit on main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: Checkout the requested ref
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          # Full history, to check that the commit is on main.
+          fetch-depth: 0
+
+      - name: Require the commit to be on main
+        id: sha
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$REQUESTED_REF ($sha) is not on main — merge it first, production only ships main's history"
+            exit 1
+          fi
+          echo "Deploying $REQUESTED_REF = $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  ci:
+    name: CI on the exact commit
+    needs: resolve
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+
+  deploy:
+    name: Deploy to production over SSH
+    needs: [resolve, ci]
+    runs-on: ubuntu-latest
+    permissions: {}
+    # Approval gate + home of the PROD_* secrets.
+    environment:
+      name: production
+    steps:
+      - name: Require the host key fingerprint
+        env:
+          FINGERPRINT: ${{ secrets.PROD_DEPLOY_SSH_FINGERPRINT }}
+        run: |
+          if [ -z "$FINGERPRINT" ]; then
+            echo "::error::secret PROD_DEPLOY_SSH_FINGERPRINT is not set on the production environment — refusing to deploy over SSH without host key verification"
+            exit 1
+          fi
+
+      - name: Run scripts/deploy.sh on the production server
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH }}
+          DEPLOY_REF: ${{ needs.resolve.outputs.sha }}
+        with:
+          host: ${{ secrets.PROD_DEPLOY_HOST }}
+          username: ${{ secrets.PROD_DEPLOY_USER }}
+          key: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.PROD_DEPLOY_SSH_FINGERPRINT }}
+          port: ${{ secrets.PROD_DEPLOY_SSH_PORT || 22 }}
+          envs: DEPLOY_PATH,DEPLOY_REF
+          command_timeout: 20m
+          script: |
+            set -e
+            cd "$DEPLOY_PATH"
+            # Bring the deploy scripts of the commit being shipped first, so
+            # a release that changes them runs the NEW versions.
+            git fetch -q --tags origin '+refs/heads/*:refs/remotes/origin/*'
+            git checkout -q "$DEPLOY_REF" -- scripts/deploy.sh scripts/env.sh
+            DEPLOY_ENV=production DEPLOY_REF="$DEPLOY_REF" bash scripts/deploy.sh

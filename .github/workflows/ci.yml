@@ -12,7 +12,15 @@ on:
   pull_request:
   # deploy.yml calls this whole workflow as its gate, so a deploy runs
   # exactly the same checks (incl. migrations + integration tests).
+  # deploy-prod.yml passes `ref` (the exact commit it is about to ship);
+  # everywhere else it is empty and checkout uses its usual default.
   workflow_call:
+    inputs:
+      ref:
+        description: Commit to check out and test (empty = the triggering ref)
+        required: false
+        type: string
+        default: ""
 
 # Least-privilege default for the GITHUB_TOKEN: this workflow only reads
 # the repo to lint/test it, it never pushes, comments, or touches packages.
@@ -26,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v6.5.0
@@ -83,6 +93,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v6.5.0
