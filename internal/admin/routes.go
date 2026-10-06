@@ -3,7 +3,6 @@ package admin
 import (
 	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/banner"
@@ -163,9 +162,10 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// duplicate registration).
 	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.productImportPage))
 
-	// Same caching policy as the storefront's /static/ (internal/web's
-	// staticMaxAge): short max-age + ETag, since URLs aren't hashed.
-	mux.Handle("GET /admin/static/", http.StripPrefix("/admin/static/", httpmw.Static("admin/static", 10*time.Minute)))
+	// Same caching policy as the storefront's /static/: a year for URLs
+	// carrying the file's current ?v= hash (templates use {{asset}}),
+	// short max-age + ETag otherwise.
+	mux.Handle("GET "+staticURLPrefix, http.StripPrefix(staticURLPrefix, httpmw.VersionedStatic(staticDir, renderer.assets, staticMaxAge)))
 
 	return nil
 }

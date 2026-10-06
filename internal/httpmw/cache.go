@@ -60,10 +60,11 @@ func (c *cacheHeaderWriter) Unwrap() http.ResponseWriter { return c.ResponseWrit
 // mounted behind http.StripPrefix) with caching headers: a weak ETag
 // derived from the file's size and mtime — which http.FileServer then
 // honors for If-None-Match, answering 304 without a body — and
-// Cache-Control: public, max-age=maxAge. Asset URLs are not
-// content-hashed yet (templates link plain /static/css/site.css), so
-// maxAge must stay short enough that a deploy's CSS change shows up
-// promptly; the ETag makes every revalidation after that a cheap 304.
+// Cache-Control: public, max-age=maxAge. For URLs that aren't content-
+// hashed maxAge must stay short enough that a deploy's CSS change shows
+// up promptly; the ETag makes every revalidation after that a cheap 304.
+// VersionedStatic (assets.go) layers the year-long cache for ?v=<hash>
+// URLs on top of this.
 func Static(dir string, maxAge time.Duration) http.Handler {
 	root := http.Dir(dir)
 	files := http.FileServer(root)
