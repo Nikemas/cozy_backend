@@ -195,7 +195,7 @@ admin.reports.no_sales: Тандалган мезгилде сатуу болг�
 admin.reports.by_brand: Бренддер боюнча
 admin.reports.by_category: Категориялар боюнча
 admin.reports.by_point: Сатуу жайлары боюнча
-admin.reports.by_point_hint: Түшкөн акча — сатуу жайына катталган буйрутмалардын суммасы боюнча.
+admin.reports.by_point_hint: "Түшкөн акча — буйрутмалардын суммасы (жеткирүү менен): алып кетүү — берүү жайы боюнча, жеткирүү — буйрутма жөнөтүлгөн жай боюнча."
 admin.reports.no_point: Сатуу жайы жок
 admin.reports.col_share: Үлүшү
 admin.reports.col_orders: Буйрутмалар
