@@ -206,6 +206,14 @@ func parseListFilter(q url.Values) (filter catalog.ListFilter, categoryParam str
 		filter.PriceMax = &max
 	}
 
+	switch q.Get("in_stock") {
+	case "", "0", "false":
+	case "1", "true":
+		filter.InStock = true
+	default:
+		return filter, "", apperr.BadRequest("invalid_in_stock", "некорректный in_stock")
+	}
+
 	switch sort := q.Get("sort"); sort {
 	case "", catalog.SortNewest, catalog.SortPriceAsc, catalog.SortPriceDesc, catalog.SortPopular:
 		filter.Sort = sort

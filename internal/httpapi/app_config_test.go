@@ -18,6 +18,7 @@ func TestAppConfigEndpoint(t *testing.T) {
 	RegisterAppConfigRoutes(mux, &config.Config{
 		AppMinVersion: "1.2.0", AppLatestVersion: "1.3.1",
 		AppStoreURLIOS: "https://apps.apple.com/app/id1", AppStoreURLAndroid: "https://play.google.com/store/apps/details?id=kg.cozy",
+		Contacts: config.Contacts{Phone: "+996 555 123 456", WhatsApp: "+996 700 000 001", Email: "shop@cozy.kg"},
 	})
 
 	rec := httptest.NewRecorder()
@@ -44,6 +45,7 @@ func TestAppConfigEndpoint(t *testing.T) {
 	want := map[string]string{
 		"min_version": "1.2.0", "latest_version": "1.3.1",
 		"store_url_ios": "https://apps.apple.com/app/id1", "store_url_android": "https://play.google.com/store/apps/details?id=kg.cozy",
+		"shop_phone": "+996 555 123 456", "shop_whatsapp": "+996 700 000 001", "shop_email": "shop@cozy.kg",
 	}
 	if len(got) != len(want) {
 		t.Errorf("got keys %v, want exactly %v", got, want)

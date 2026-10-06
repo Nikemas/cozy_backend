@@ -263,6 +263,10 @@ paths:
         - name: price_max
           in: query
           schema: { type: number, format: double }
+        - name: in_stock
+          in: query
+          description: "`1`/`true` keeps only products with a variant in stock (matching `size`/`color` when set)."
+          schema: { type: string, enum: ["0", "1", "false", "true"] }
         - name: q
           in: query
           description: Free-text search against `name_ru`/`name_ky` (`ILIKE`).
@@ -615,13 +619,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [min_version, latest_version, store_url_ios, store_url_android, delivery_fee]
+                required: [min_version, latest_version, store_url_ios, store_url_android, delivery_fee, shop_phone, shop_whatsapp, shop_email]
                 properties:
                   min_version: { type: string, example: "1.0.0" }
                   latest_version: { type: string, example: "1.0.0" }
                   store_url_ios: { type: string, example: "" }
                   store_url_android: { type: string, example: "" }
                   delivery_fee: { type: number, format: double, example: 200, description: "Som added to a delivery order's total (DELIVERY_FEE_SOM)." }
+                  shop_phone: { type: string, example: "+996 555 123 456", description: "Support phone (SHOP_PHONE); empty = hide." }
+                  shop_whatsapp: { type: string, example: "+996 555 123 456", description: "WhatsApp number (SHOP_WHATSAPP); empty = hide." }
+                  shop_email: { type: string, example: "info@cozy.kg", description: "Support e-mail (SHOP_EMAIL); empty = hide." }
 
   /api/v1/delivery-zones:
     get:
