@@ -187,3 +187,33 @@ func localeKeys(t *testing.T, path string) map[string]bool {
 	}
 	return keys
 }
+
+// A 4xx with no "error.code.<code>" site key still gets its translated,
+// parameter-filled message from the shared error bundle on the KY site,
+// instead of the generic text; RU keeps the detailed domain message.
+func TestErrorTextFallsBackToErrorBundleTranslation(t *testing.T) {
+	h := newTestHandlers(t)
+	appErr := apperr.BadRequest("qty_too_large", "не больше 10 шт. одного товара").
+		WithParams(map[string]string{"max": "10"})
+
+	ky := h.errorText("ky", appErr)
+	ru := h.errorText("ru", appErr)
+
+	if want := "бир товардан 10 даанадан ашпашы керек"; ky != want {
+		t.Errorf("ky = %q, want %q", ky, want)
+	}
+	if ru != "не больше 10 шт. одного товара" {
+		t.Errorf("ru = %q, want the domain message", ru)
+	}
+}
+
+// Without a translation anywhere the KY site still shows the generic text,
+// never a Russian sentence.
+func TestErrorTextKyWithoutAnyTranslationIsGeneric(t *testing.T) {
+	h := newTestHandlers(t)
+	appErr := apperr.BadRequest("no_such_code_anywhere", "русский текст")
+
+	if got := h.errorText("ky", appErr); got != h.t("ky", "error.generic.text") {
+		t.Errorf("ky = %q, want generic text", got)
+	}
+}
