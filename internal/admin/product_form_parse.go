@@ -5,10 +5,13 @@
 //
 // Form contract (product_form.gohtml):
 //
-//	variant_key[] / variant_id[] / variant_size[] / variant_color[]
+//	variant_key[] / variant_id[] / variant_size[] / variant_color[] /
+//	variant_price[]
 //	    parallel arrays, one entry per Вариации row. variant_key is the
 //	    variant id for an existing row, "n<N>" for a row added in the
-//	    browser.
+//	    browser. variant_price is the row's price_override in сом ("" =
+//	    no override, the product's base price applies); when the array is
+//	    absent or misaligned, stored overrides are left untouched.
 //	qty_<key>_<pointID>   the quantity typed into that row × point cell
 //	orig_<key>_<pointID>  the quantity the cell was rendered with ("" when
 //	                      no stock row existed); only present for cells
@@ -94,6 +97,30 @@ func parsePrice(s string) (float64, error) {
 		return 0, localizedError{"admin.price.err_negative"}
 	}
 	return v, nil
+}
+
+// maxPrice is the largest value a NUMERIC(10,2) price column can hold.
+const maxPrice = 99999999.99
+
+// parseVariantPrice parses a variant's price_override field. Blank means
+// "no override" (nil → NULL); otherwise the same formats as the base price
+// are accepted, and the amount must be positive — a zero override would
+// make the variant free rather than "inherit the base price".
+func parseVariantPrice(s string) (*float64, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	v, err := parsePrice(s)
+	if err != nil {
+		return nil, err
+	}
+	if v <= 0 {
+		return nil, localizedError{"admin.price.err_not_positive"}
+	}
+	if v > maxPrice {
+		return nil, localizedError{"admin.price.err_too_big"}
+	}
+	return &v, nil
 }
 
 // errStaleForm marks a hidden orig_ value that isn't a valid quantity —
@@ -186,6 +213,8 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 	ids := form["variant_id"]
 	sizes := form["variant_size"]
 	colors := form["variant_color"]
+	prices, pricesSubmitted := form["variant_price"]
+	pricesSubmitted = pricesSubmitted && len(prices) == len(sizes)
 	seenKeys := map[string]bool{}
 	for i := range sizes {
 		size := strings.TrimSpace(formAt(sizes, i))
@@ -209,6 +238,16 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 		}
 
 		row := VariantRowVM{Key: key, ID: id, Size: size, Color: color}
+		variant := variantRowInput{Key: key, ID: id, Size: size, Color: color}
+		if pricesSubmitted {
+			row.Price = strings.TrimSpace(prices[i])
+			override, err := parseVariantPrice(row.Price)
+			if err != nil {
+				addErr(t.F("admin.product.err_variant_price", orEmpty(size), orEmpty(color), errText(t, err)))
+				row.PriceInvalid = true
+			}
+			variant.PriceSet, variant.PriceOverride = true, override
+		}
 		total := 0
 		for _, p := range points {
 			cell := StockCellVM{
@@ -244,7 +283,7 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(t, total)
 
 		out.Rows = append(out.Rows, row)
-		out.Input.Variants = append(out.Input.Variants, variantRowInput{Key: key, ID: id, Size: size, Color: color})
+		out.Input.Variants = append(out.Input.Variants, variant)
 	}
 
 	imageKeys := form["image_object_key"]
@@ -329,6 +368,9 @@ func buildVariantRows(t tr, variants []catalog.Variant, entries []catalog.StockE
 	rows := make([]VariantRowVM, 0, len(variants))
 	for _, v := range variants {
 		row := VariantRowVM{Key: v.ID, ID: v.ID, Size: v.Size, Color: v.Color}
+		if v.PriceOverride != nil {
+			row.Price = strconv.FormatFloat(*v.PriceOverride, 'f', -1, 64)
+		}
 		for _, p := range points {
 			cell := StockCellVM{
 				PointID:   p.ID,

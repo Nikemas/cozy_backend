@@ -56,6 +56,11 @@ type variantRowInput struct {
 	ID    string // existing variant id, "" for a new row
 	Size  string
 	Color string
+	// PriceSet: the form submitted this row's price field, so
+	// PriceOverride (nil = no override → NULL) is written. When false an
+	// existing variant's stored price_override is left untouched.
+	PriceSet      bool
+	PriceOverride *float64
 }
 
 // stockCellChange is one edited (variant row × point) stock cell. Orig is
@@ -140,6 +145,9 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 	for _, v := range in.Variants {
 		if strings.TrimSpace(v.Size) == "" || strings.TrimSpace(v.Color) == "" {
 			return "", apperr.BadRequest("invalid_variant", "у каждой вариации должны быть размер и цвет")
+		}
+		if v.PriceSet && v.PriceOverride != nil && *v.PriceOverride <= 0 {
+			return "", apperr.BadRequest("invalid_variant_price", "цена вариации должна быть больше нуля")
 		}
 	}
 	for _, img := range in.Images {
@@ -240,8 +248,8 @@ func translateProductErr(err error) error {
 }
 
 // syncVariantsTx diffs rows against productID's current variants: rows
-// whose ID is one of them are updated (size/color only — sku and
-// price_override, set by the xlsx import, are left intact), other rows are
+// whose ID is one of them are updated (size/color, plus price_override when
+// the row carries one — sku, set by the xlsx import, is left intact), other rows are
 // created, and variants missing from rows are deleted. Deletes run first so
 // removing "42/Белый" and re-adding the same combo in one save doesn't trip
 // the (product_id, size, color) unique constraint. Returns row key ->
@@ -278,25 +286,41 @@ func syncVariantsTx(ctx context.Context, tx *sql.Tx, productID string, rows []va
 	idByKey := make(map[string]string, len(rows))
 	for _, row := range rows {
 		if row.ID != "" && existing[row.ID] {
-			const q = `UPDATE product_variants SET size = $2, color = $3 WHERE id = $1`
-			if _, err := tx.ExecContext(ctx, q, row.ID, row.Size, row.Color); err != nil {
-				return nil, translateVariantErr(err)
+			if err := updateVariantTx(ctx, tx, row); err != nil {
+				return nil, err
 			}
 			idByKey[row.Key] = row.ID
 			continue
 		}
 
 		const q = `
-			INSERT INTO product_variants (product_id, size, color)
-			VALUES ($1, $2, $3)
+			INSERT INTO product_variants (product_id, size, color, price_override)
+			VALUES ($1, $2, $3, $4)
 			RETURNING id`
 		var id string
-		if err := tx.QueryRowContext(ctx, q, productID, row.Size, row.Color).Scan(&id); err != nil {
+		if err := tx.QueryRowContext(ctx, q, productID, row.Size, row.Color, row.PriceOverride).Scan(&id); err != nil {
 			return nil, translateVariantErr(err)
 		}
 		idByKey[row.Key] = id
 	}
 	return idByKey, nil
+}
+
+// updateVariantTx updates an existing variant's size/color and, when the
+// form submitted it, its price_override.
+func updateVariantTx(ctx context.Context, tx *sql.Tx, row variantRowInput) error {
+	var err error
+	if row.PriceSet {
+		const q = `UPDATE product_variants SET size = $2, color = $3, price_override = $4 WHERE id = $1`
+		_, err = tx.ExecContext(ctx, q, row.ID, row.Size, row.Color, row.PriceOverride)
+	} else {
+		const q = `UPDATE product_variants SET size = $2, color = $3 WHERE id = $1`
+		_, err = tx.ExecContext(ctx, q, row.ID, row.Size, row.Color)
+	}
+	if err != nil {
+		return translateVariantErr(err)
+	}
+	return nil
 }
 
 func variantIDsTx(ctx context.Context, tx *sql.Tx, productID string) ([]string, error) {

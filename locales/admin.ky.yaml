@@ -180,6 +180,8 @@ admin.qty.err_too_big: саны өтө чоң
 admin.price.err_empty: баасын көрсөтүңүз
 admin.price.err_not_number: баасы сан болушу керек
 admin.price.err_negative: баасы терс болбошу керек
+admin.price.err_not_positive: баасы нөлдөн чоң болушу керек
+admin.price.err_too_big: баасы өтө чоң
 admin.range.this_month: Учурдагы ай
 admin.range.prev_month: Өткөн ай
 admin.reports.from: башталышы
@@ -248,6 +250,9 @@ admin.product.photos_hint: Биринчи сүрөт — негизги. JPEG, P
 admin.product.add_photo: Сүрөт кошуу
 admin.product.variants: Вариациялар
 admin.product.variants_hint: "Өлчөм × түс жана ар бир сатуу жайындагы калдык. Өзгөртүлгөн уячалар гана сакталат: эгер калдык ошол убакта өзгөрүп калса (сатуу, башка кызматкер), форма аны кайра жазбай, учурдагы маанини көрсөтөт."
+admin.product.variant_price: Баасы, сом
+admin.product.variant_price_hint: "Вариациянын баасы: бош калтырсаңыз, товардын негизги баасы колдонулат."
+admin.product.variant_price_placeholder: негизги
 admin.product.no_points_hint: Азырынча сатуу жайлары жок — калдыктарды «Кампа жана сатуу жайлары» бөлүмүндө сатуу жайын түзгөндөн кийин көрсөтсөңүз болот.
 admin.product.color_photos: Түстүн сүрөттөрү
 admin.product.color_photos_of: "«%s» түсүнүн сүрөттөрү"
@@ -279,6 +284,7 @@ admin.product.price_label: Баасы
 admin.product.err_duplicate_row: Форма бузулган (вариациянын сабы кайталанган) — баракты жаңылаңыз
 admin.product.err_size_color: Ар бир вариациянын өлчөмү жана түсү болушу керек
 admin.product.err_stock_cell: "Калдык %s / %s, «%s»: %s"
+admin.product.err_variant_price: "%s / %s вариациясынын баасы: %s"
 admin.product.err_stale_form: форма бузулган — баракты жаңылаңыз
 admin.product.err_stale_form_banner: Форма бузулган — баракты жаңылаңыз
 admin.import.title: Товарларды импорттоо

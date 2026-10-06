@@ -93,6 +93,7 @@
     <div class="admin-card__pad-sm">
       <div class="admin-card__title">{{t "admin.product.variants"}}</div>
       <div class="admin-card__hint">{{t "admin.product.variants_hint"}}</div>
+      <div class="admin-card__hint">{{t "admin.product.variant_price_hint"}}</div>
       {{if not .StockPoints}}<div class="admin-card__hint">{{t "admin.product.no_points_hint"}}</div>{{end}}
     </div>
     <div class="admin-table-wrap">
@@ -102,6 +103,7 @@
             <th scope="col">{{t "admin.common.size"}}</th>
             <th scope="col">{{t "admin.common.color"}}</th>
             <th scope="col">{{t "admin.product.color_photos"}}</th>
+            <th scope="col">{{t "admin.product.variant_price"}}</th>
             {{range .StockPoints}}
             <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Inactive}} <span class="admin-variants-table__inactive">{{t "admin.common.inactive_suffix"}}</span>{{end}}</th>
             {{end}}
@@ -118,6 +120,7 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
               <span class="admin-variant-photo-count">0</span>
             </button></td>
+            <td><input type="text" inputmode="decimal" name="variant_price" value="{{.Price}}" class="admin-variant-input admin-variant-input--price{{if .PriceInvalid}} is-invalid{{end}}" placeholder="{{t "admin.product.variant_price_placeholder"}}" aria-label="{{t "admin.product.variant_price"}}"{{if .PriceInvalid}} aria-invalid="true"{{end}}></td>
             {{range .Cells}}
             <td><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
             {{end}}
@@ -234,6 +237,8 @@
     size: {{t "admin.common.size"}},
     color: {{t "admin.common.color"}},
     colorPlaceholder: {{t "admin.product.color_placeholder"}},
+    variantPrice: {{t "admin.product.variant_price"}},
+    variantPricePlaceholder: {{t "admin.product.variant_price_placeholder"}},
     thisColorPhotos: {{t "admin.product.this_color_photos"}},
     stock: {{t "admin.common.stock"}},
     removeVariant: {{t "admin.product.remove_variant"}},
@@ -461,6 +466,12 @@
     tdPhoto.innerHTML = '<button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button>';
     tdPhoto.firstChild.setAttribute('aria-label', L.thisColorPhotos);
     tr.appendChild(tdPhoto);
+
+    // variant_price is a parallel array with variant_size/variant_color —
+    // every row must carry one, or the server ignores all of them.
+    var tdPrice = el('td');
+    tdPrice.appendChild(el('input', { type: 'text', inputmode: 'decimal', name: 'variant_price', value: '', 'class': 'admin-variant-input admin-variant-input--price', placeholder: L.variantPricePlaceholder, 'aria-label': L.variantPrice }));
+    tr.appendChild(tdPrice);
 
     stockPoints.forEach(function (p) {
       var td = el('td');

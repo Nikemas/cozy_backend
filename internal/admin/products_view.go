@@ -183,15 +183,18 @@ type CategoryOptionVM struct {
 // itself plus one stock cell per point of sale (Cells, in StockPoints
 // order). Qty/Badge* reflect the row's total across every point.
 type VariantRowVM struct {
-	Key      string // form row key: the variant id, or "n<N>" for a row added in the browser
-	ID       string
-	Size     string
-	Color    string
-	Cells    []StockCellVM
-	Qty      int
-	BadgeLbl string
-	BadgeFG  string
-	BadgeBG  string
+	Key   string // form row key: the variant id, or "n<N>" for a row added in the browser
+	ID    string
+	Size  string
+	Color string
+	Price string // price_override as typed/stored; "" = base price applies
+	// PriceInvalid marks Price as rejected by validation (re-render).
+	PriceInvalid bool
+	Cells        []StockCellVM
+	Qty          int
+	BadgeLbl     string
+	BadgeFG      string
+	BadgeBG      string
 }
 
 // ImageRowVM is one photo slot. Color is "" for a general product photo, or

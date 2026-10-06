@@ -793,6 +793,7 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-variants-table th { border-top: 1px solid var(--admin-border); }
 .admin-variant-input { width: 100%; max-width: 140px; height: 40px; border: 1px solid var(--admin-border); border-radius: var(--admin-radius-field); padding: 0 12px; font-size: 14px; color: var(--admin-text); outline: none; font-variant-numeric: tabular-nums; background: var(--admin-surface); }
 .admin-variant-input--qty { max-width: 96px; }
+.admin-variant-input--price { max-width: 112px; }
 .admin-variant-remove { width: 28px; height: 28px; border: none; background: transparent; color: var(--admin-muted); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .admin-variant-remove:hover { background: var(--admin-danger-tint); color: var(--admin-danger); }
 

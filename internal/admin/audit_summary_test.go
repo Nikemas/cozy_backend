@@ -107,7 +107,7 @@ func TestAuditEntryBuildersCarryMessages(t *testing.T) {
 			{Key: "n1", Size: "44", Color: "Белый"},
 		},
 	}
-	oldVariants := map[string]variantSnapshot{"v2": {"43", "Чёрный"}, "v3": {"45", "Белый"}}
+	oldVariants := map[string]variantSnapshot{"v2": {Size: "43", Color: "Чёрный"}, "v3": {Size: "45", Color: "Белый"}}
 	create := productSaveInput{Product: catalog.ProductInput{CategoryID: "c1", NameRu: "Кеды", NameKy: "Кеды", BasePrice: 100}}
 
 	var entries []audit.Entry
