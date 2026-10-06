@@ -288,6 +288,39 @@ paths:
           description: Malformed `price_min`/`price_max`/`sort`/`page`, or unknown `category`.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
+  /api/v1/products/facets:
+    get:
+      tags: [Catalog]
+      summary: Filter options (sizes, colors, price range) for a product scope
+      description: |
+        The sizes, colors and effective price range (variant `price_override`,
+        else `base_price`) of the active products matching `category`/`q`
+        like `GET /api/v1/products`, except that a parent `category` also
+        covers its subcategories (as the website's category page does), so
+        one call serves a screen that lists several subcategories. Filter params (`size`,
+        `color`, `price_*`, `in_stock`) are ignored — facets list every option
+        in the scope. Same short public `Cache-Control` as the product list.
+        Takes precedence over `/api/v1/products/{id}` (ServeMux picks the
+        more specific pattern).
+      parameters:
+        - name: category
+          in: query
+          description: Category `id` (UUID) or `slug`; includes all of its subcategories.
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Same free-text search as the product list.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Facets for the scope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductFacets" }
+        "404":
+          description: "`category_not_found` — unknown category slug."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
   /api/v1/products/{id}:
     get:
       tags: [Catalog]
@@ -1975,6 +2008,31 @@ components:
         page: { type: integer }
         page_size: { type: integer }
         total: { type: integer }
+
+    ProductFacets:
+      type: object
+      required: [sizes, colors, price_min, price_max]
+      properties:
+        sizes:
+          type: array
+          items: { type: string }
+          description: Distinct variant sizes, numeric ones ascending ("36,5" < "40") then non-numeric alphabetically.
+          example: ["38", "39,5", "40", "41"]
+        colors:
+          type: array
+          items: { type: string }
+          description: Distinct variant colors exactly as stored (no case/ё normalisation).
+          example: ["Черный", "белый"]
+        price_min:
+          type: number
+          format: double
+          nullable: true
+          description: Cheapest effective price in scope; null when the scope has no products.
+        price_max:
+          type: number
+          format: double
+          nullable: true
+          description: Dearest effective price in scope; null when the scope has no products.
 
     ProductDetailResponse:
       allOf:

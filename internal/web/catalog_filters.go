@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -186,76 +185,9 @@ func (h *handlers) effectivePrices(ctx context.Context, productIDs []string) (ma
 	return out, rows.Err()
 }
 
-// shopFacets are the filter options offered for the current category:
-// every size/color of an active product's variant.
-type shopFacets struct {
-	Sizes  []string
-	Colors []string
-}
-
-func (h *handlers) loadFacets(ctx context.Context, categoryIDs []string) (shopFacets, error) {
-	const q = `
-		SELECT DISTINCT pv.size, pv.color
-		FROM product_variants pv
-		JOIN products p ON p.id = pv.product_id AND p.is_active
-		WHERE cardinality($1::uuid[]) = 0 OR p.category_id = ANY($1::uuid[])`
-	if categoryIDs == nil {
-		categoryIDs = []string{}
-	}
-	rows, err := h.db.QueryContext(ctx, q, categoryIDs)
-	if err != nil {
-		return shopFacets{}, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	sizes, colors := map[string]bool{}, map[string]bool{}
-	for rows.Next() {
-		var size, color string
-		if err := rows.Scan(&size, &color); err != nil {
-			return shopFacets{}, err
-		}
-		sizes[size] = true
-		colors[color] = true
-	}
-	if err := rows.Err(); err != nil {
-		return shopFacets{}, err
-	}
-	return shopFacets{Sizes: sortedSizes(sizes), Colors: sortedStrings(colors)}, nil
-}
-
-// sortedSizes orders sizes numerically where possible ("36" < "36.5" <
-// "42"), with non-numeric sizes ("M", "XL") after, alphabetically.
-func sortedSizes(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for s := range set {
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool {
-		a, aerr := strconv.ParseFloat(strings.ReplaceAll(out[i], ",", "."), 64)
-		b, berr := strconv.ParseFloat(strings.ReplaceAll(out[j], ",", "."), 64)
-		switch {
-		case aerr == nil && berr == nil:
-			return a < b
-		case aerr == nil:
-			return true
-		case berr == nil:
-			return false
-		default:
-			return out[i] < out[j]
-		}
-	})
-	return out
-}
-
-func sortedStrings(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for s := range set {
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	sort.Strings(out)
-	return out
+// loadFacets returns the filter options offered for the current category:
+// every size/color of an active product's variant (catalog.ProductRepo.Facets,
+// shared with GET /api/v1/products/facets).
+func (h *handlers) loadFacets(ctx context.Context, categoryIDs []string) (catalog.Facets, error) {
+	return h.products.Facets(ctx, catalog.FacetFilter{CategoryIDs: categoryIDs})
 }

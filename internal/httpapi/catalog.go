@@ -100,6 +100,29 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		})
 	})))
 
+	// More specific than GET /api/v1/products/{id}, so ServeMux (Go 1.22+)
+	// routes /products/facets here rather than treating "facets" as an id.
+	mux.Handle("GET /api/v1/products/facets", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
+		filter := parseFacetFilter(r.URL.Query())
+		if filter.CategoryID != "" {
+			id, err := categories.ResolveID(r.Context(), filter.CategoryID)
+			if err != nil {
+				return err
+			}
+			tree, err := categories.Tree(r.Context())
+			if err != nil {
+				return err
+			}
+			// A parent category's facets include its subcategories'.
+			filter.CategoryID, filter.CategoryIDs = "", catalog.SubtreeIDs(tree, id)
+		}
+		facets, err := products.Facets(r.Context(), filter)
+		if err != nil {
+			return err
+		}
+		return writeJSON(w, http.StatusOK, facets)
+	})))
+
 	mux.Handle("GET /api/v1/products/{id}", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
 		id := r.PathValue("id")
 
@@ -233,4 +256,13 @@ func parseListFilter(q url.Values) (filter catalog.ListFilter, categoryParam str
 	filter.PageSize = catalog.DefaultPageSize
 
 	return filter, categoryParam, nil
+}
+
+// parseFacetFilter reads the scoping params of GET /api/v1/products/facets
+// — the same `category` (id or slug; CategoryID holds the raw value until
+// the handler resolves it) and `q` the product list accepts. Filter params
+// (size, color, price, in_stock) are ignored on purpose: facets describe
+// every option within the scope, not just the currently selected ones.
+func parseFacetFilter(q url.Values) catalog.FacetFilter {
+	return catalog.FacetFilter{CategoryID: q.Get("category"), Query: q.Get("q")}
 }
