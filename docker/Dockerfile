@@ -13,7 +13,7 @@
 
 # ---- Stage 1: builder -------------------------------------------------
 # Version must track the `go` directive in go.mod (currently 1.26.6).
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26.6-alpine AS builder
 
 WORKDIR /src
 
