@@ -1032,3 +1032,9 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   .admin-list-toolbar { flex-wrap: wrap; }
   .admin-list-toolbar > .admin-btn { flex: 1 1 100%; }
 }
+
+/* fix/admin-ux-followups: the new-orders badges stay in the DOM at 0
+   (they refresh themselves), hidden. */
+.admin-nav__badge[hidden], .admin-header__hamburger-badge[hidden] { display: none; }
+.admin-chip--awaiting-pay { color: #8A5A00; background: #FFF3D6; }
+.admin-order-detail__chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }

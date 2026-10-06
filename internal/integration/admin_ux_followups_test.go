@@ -41,3 +41,38 @@ func TestAdminToastIgnoresCraftedText(t *testing.T) {
 	w = a.get(t, "/admin/orders/"+o.ID+"?toast=order_status&toast_st=confirmed", owner)
 	wantBody(t, w, "Статус заказа: Подтверждён")
 }
+
+// The «Заказы» badge endpoint counts only actionable orders of the
+// viewer's point: an online-card order still waiting for payment is left
+// out (and marked «Ожидает оплаты» on the list), a paid one counts.
+func TestAdminOrdersBadgeSkipsUnpaidOnline(t *testing.T) {
+	t.Parallel()
+	a := app(t)
+	f := newFixture(t, 5, 5)
+	cash := placePickupOrder(t, f)
+	online := placePickupOrder(t, f)
+	if _, err := testDB.ExecContext(ctxT(t),
+		`UPDATE orders SET payment_method = 'online_card', payment_status = 'pending' WHERE id = $1`, online.ID); err != nil {
+		t.Fatal(err)
+	}
+	seller, _ := a.newStaffSession(t, staff.RolePointStaff, strptr(f.PointA))
+
+	w := a.get(t, "/admin/orders/badge", seller)
+	wantStatus(t, w, http.StatusOK)
+	wantBody(t, w, `id="admin-orders-badge"`, `data-count="1"`, `hx-swap-oob="outerHTML"`)
+	if strings.Contains(w.Body.String(), "<html") {
+		t.Error("badge endpoint returned a full page")
+	}
+
+	w = a.get(t, "/admin/orders?status=placed", seller)
+	wantBody(t, w, cash.OrderNumber, online.OrderNumber, "Ожидает оплаты")
+
+	if _, err := testDB.ExecContext(ctxT(t), `UPDATE orders SET payment_status = 'paid' WHERE id = $1`, online.ID); err != nil {
+		t.Fatal(err)
+	}
+	wantBody(t, a.get(t, "/admin/orders/badge", seller), `data-count="2"`)
+
+	if w := a.get(t, "/admin/orders/badge"); w.Code == http.StatusOK && strings.Contains(w.Body.String(), "data-count") {
+		t.Error("guest got a count")
+	}
+}

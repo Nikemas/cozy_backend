@@ -108,8 +108,8 @@ func TestNavBadgeShowsNewOrdersCount(t *testing.T) {
 func TestNavBadgeHiddenWhenNoNewOrders(t *testing.T) {
 	owner := &staff.Staff{ID: "s1", Name: "Owner", Role: staff.RoleOwner, IsActive: true}
 	body := runWithBadges(t, &fakeNewOrders{n: 0}, owner, http.MethodGet).Body.String()
-	if strings.Contains(body, `class="admin-nav__badge"`) || strings.Contains(body, "admin-header__hamburger-badge") {
-		t.Error("badge rendered for zero new orders")
+	if !strings.Contains(body, `data-count="0" hidden`) || !strings.Contains(body, `class="admin-header__hamburger-badge" aria-hidden="true" hidden`) {
+		t.Error("badge shown for zero new orders")
 	}
 }
 
@@ -125,7 +125,7 @@ func TestNavBadgeScopedToPointStaffPoint(t *testing.T) {
 	noPoint := &staff.Staff{ID: "s3", Name: "Seller", Role: staff.RolePointStaff, IsActive: true}
 	counter2 := &fakeNewOrders{n: 9}
 	body := runWithBadges(t, counter2, noPoint, http.MethodGet).Body.String()
-	if counter2.calls != 0 || strings.Contains(body, `class="admin-nav__badge"`) {
+	if counter2.calls != 0 || !strings.Contains(body, `data-count="0" hidden`) {
 		t.Error("point_staff without a point must not see a count")
 	}
 }
@@ -140,7 +140,7 @@ func TestNavBadgeSkippedForPostAndOnError(t *testing.T) {
 
 	failing := &fakeNewOrders{n: 5, err: errors.New("db down")}
 	rec := runWithBadges(t, failing, owner, http.MethodGet)
-	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `class="admin-nav__badge"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-count="0" hidden`) {
 		t.Errorf("count failure must degrade to no badge, got %d", rec.Code)
 	}
 }
@@ -166,7 +166,7 @@ func TestCountNewOrdersQuery(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	repo := orderBadgeRepo{db: db}
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders WHERE status = 'placed'$`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders WHERE status = 'placed' AND \(payment_method <> 'online_card' OR payment_status = 'paid'\)$`).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(4))
 	n, err := repo.CountNewOrders(context.Background(), nil)
 	if err != nil || n != 4 {
@@ -174,7 +174,7 @@ func TestCountNewOrdersQuery(t *testing.T) {
 	}
 
 	pt := "pt-1"
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders WHERE status = 'placed' AND point_id = \$1`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM orders WHERE status = 'placed' AND .* AND point_id = \$1`).
 		WithArgs(pt).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 	n, err = repo.CountNewOrders(context.Background(), &pt)
 	if err != nil || n != 2 {

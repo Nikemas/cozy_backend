@@ -11,7 +11,10 @@
       <div class="admin-order-detail__title">{{tf "admin.order.title" .Data.Number}}</div>
       <div class="admin-order-detail__date">{{.Data.DateLabel}}</div>
     </div>
-    <span class="admin-chip {{.Data.StatusClass}}">{{.Data.StatusLabel}}</span>
+    <div class="admin-order-detail__chips">
+      <span class="admin-chip {{.Data.StatusClass}}">{{.Data.StatusLabel}}</span>
+      {{if .Data.AwaitingPayment}}<span class="admin-chip admin-chip--awaiting-pay" title="{{t "admin.order.awaiting_payment_hint"}}">{{t "admin.order.awaiting_payment"}}</span>{{end}}
+    </div>
   </div>
 
   <div class="admin-order-detail__grid">

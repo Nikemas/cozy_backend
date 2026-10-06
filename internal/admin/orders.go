@@ -71,6 +71,9 @@ type OrderRowView struct {
 	PaymentLabel string
 	StatusLabel  string
 	StatusClass  string
+	// AwaitingPayment (fix/admin-ux-followups): a placed online-card order
+	// not paid yet — marked «Ожидает оплаты», not counted in the badge.
+	AwaitingPayment bool
 }
 
 // OrdersListData backs orders.gohtml's content template.
@@ -124,21 +127,23 @@ type StatusButtonView struct {
 
 // OrderDetailData backs order_detail.gohtml's content template.
 type OrderDetailData struct {
-	ID            string
-	Number        string
-	DateLabel     string
-	StatusLabel   string
-	StatusClass   string
-	Phone         string
-	CustomerName  string       // fix/admin-owner-ux: "" when the customer gave none
-	Contact       PhoneContact // fix/admin-owner-ux: call / WhatsApp / copy
-	PaymentLabel  string
-	AddressText   string
-	ZoneName      string // delivery zone, in the admin's language ("" = none)
-	Comment       string
-	Items         []OrderDetailItemView
-	TotalLabel    string
-	StatusButtons []StatusButtonView
+	ID           string
+	Number       string
+	DateLabel    string
+	StatusLabel  string
+	StatusClass  string
+	Phone        string
+	CustomerName string       // fix/admin-owner-ux: "" when the customer gave none
+	Contact      PhoneContact // fix/admin-owner-ux: call / WhatsApp / copy
+	PaymentLabel string
+	// AwaitingPayment: see OrderRowView.AwaitingPayment.
+	AwaitingPayment bool
+	AddressText     string
+	ZoneName        string // delivery zone, in the admin's language ("" = none)
+	Comment         string
+	Items           []OrderDetailItemView
+	TotalLabel      string
+	StatusButtons   []StatusButtonView
 	// Order history / money flags (fix/orders-integrity, order_history.go).
 	OrderHistoryData
 }
@@ -200,6 +205,16 @@ func paymentLabel(t tr, pm orders.PaymentMethod, ps *orders.PaymentStatus) strin
 	default:
 		return t.T("admin.payment.online") + ", " + string(*ps)
 	}
+}
+
+// awaitingPayment reports a placed online-card order that isn't paid
+// (pending, failed or cancelled payment): nothing for the shop to do yet —
+// the badge (orderBadgeRepo) leaves these out, the list marks them.
+func awaitingPayment(o *orders.Order) bool {
+	if o == nil || o.Status != orders.StatusPlaced || o.PaymentMethod != orders.PaymentOnlineCard {
+		return false
+	}
+	return o.PaymentStatus == nil || *o.PaymentStatus != orders.PaymentPaid
 }
 
 // formatSom renders amount as "7 900 сом" — duplicated from internal/web/
@@ -461,6 +476,8 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 			PaymentLabel: paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 			StatusLabel:  meta.Label,
 			StatusClass:  meta.Class,
+
+			AwaitingPayment: awaitingPayment(&o),
 		})
 	}
 
@@ -636,6 +653,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		CustomerName:     customerName,
 		Contact:          phoneContact(phone),
 		PaymentLabel:     paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
+		AwaitingPayment:  awaitingPayment(o),
 		AddressText:      addressText,
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
 		Comment:          comment,

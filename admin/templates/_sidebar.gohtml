@@ -14,7 +14,7 @@
     <a href="{{.URL}}" title="{{t .Label}}" class="admin-nav__item{{if .Active}} active{{end}}">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{.IconPath}}"></path></svg>
       <span class="admin-nav__label">{{t .Label}}</span>
-      {{if .Badge}}<span class="admin-nav__badge" title="{{tf "admin.nav.new_orders" .Badge}}" aria-label="{{tf "admin.nav.new_orders" .Badge}}">{{.Badge}}</span>{{end}}
+      {{if eq .Key "orders"}}{{template "_orders_badge" .Badge}}{{end}}
     </a>
     {{end}}
   </nav>

@@ -79,6 +79,19 @@ function adminToast(text) {
   } catch (e) { /* old browser: keep the URL */ }
 })();
 
+// New-orders count in the tab title, "(3) Cozy Admin — …", kept in step
+// with the self-refreshing #admin-orders-badge (_orders_badge.gohtml).
+(function () {
+  var baseTitle = document.title;
+  function syncTitle() {
+    var badge = document.getElementById('admin-orders-badge');
+    var n = badge ? parseInt(badge.getAttribute('data-count'), 10) || 0 : 0;
+    document.title = (n > 0 ? '(' + n + ') ' : '') + baseTitle;
+  }
+  syncTitle();
+  document.addEventListener('htmx:afterSettle', syncTitle);
+})();
+
 // [data-copy] buttons copy their value (a phone, an order number).
 document.addEventListener('click', function (evt) {
   var btn = evt.target.closest ? evt.target.closest('[data-copy]') : null;

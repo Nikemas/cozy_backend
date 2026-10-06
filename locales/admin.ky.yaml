@@ -652,3 +652,7 @@ admin.staff.notice_created: Кызматкер кошулду. Ага кирүү
 admin.staff.notice_activated: Кызматкер активдештирилди
 admin.staff.notice_deactivated: Кызматкер активсиздештирилди — админкага кирүү жабылды.
 admin.import.working: Файл иштетилүүдө…
+
+# fix/admin-ux-followups
+admin.order.awaiting_payment: Төлөм күтүлүүдө
+admin.order.awaiting_payment_hint: Онлайн төлөм али өтө элек — төлөнгөндөн кийин заказ жаңылардын санагычына кошулат
