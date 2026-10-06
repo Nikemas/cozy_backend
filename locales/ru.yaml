@@ -145,6 +145,7 @@ checkout.pickup_free: Самовывоз — бесплатно
 
 done.total: Итого
 done.delivery_window: Курьер свяжется для уточнения времени доставки
+done.pickup_window: Мы сообщим, когда заказ будет готов к выдаче
 
 # Error pages / messages (internal/web/errors.go).
 error.not_found.title: Страница не найдена

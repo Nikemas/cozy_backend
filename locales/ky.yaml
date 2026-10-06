@@ -145,6 +145,7 @@ checkout.pickup_free: Өзү алып кетүү — акысыз
 
 done.total: Жыйынтык
 done.delivery_window: Курьер жеткирүү убактысын тактоо үчүн байланышат
+done.pickup_window: Буйрутма алып кетүүгө даяр болгондо билдиребиз
 
 # Error pages / messages (internal/web/errors.go).
 error.not_found.title: Барак табылган жок
