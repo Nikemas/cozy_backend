@@ -28,7 +28,7 @@
   {{if .NoPoint}}
   <div class="admin-card"><div class="admin-empty"><div class="admin-empty__title">{{.NoPoint}}</div></div></div>
   {{else}}
-  <form method="post" action="/admin/stock" class="admin-card" id="stock-form">
+  <form method="post" action="/admin/stock" class="admin-card" id="stock-form" data-dirty-guard>
     <input type="hidden" name="point" value="{{.PointID}}">
     <input type="hidden" name="q" value="{{.Query}}">
     <input type="hidden" name="page" value="{{.Page}}">

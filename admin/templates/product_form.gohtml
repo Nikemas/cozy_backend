@@ -4,7 +4,7 @@
      rerenderFormOnError (products.go). */}}
 {{define "content"}}
 {{with .Data}}
-<form method="post" action="{{if .IsEdit}}/admin/products/{{.ProductID}}{{else}}/admin/products{{end}}" class="admin-product-form" id="product-form">
+<form method="post" action="{{if .IsEdit}}/admin/products/{{.ProductID}}{{else}}/admin/products{{end}}" class="admin-product-form" id="product-form" data-dirty-guard>
   <input type="hidden" name="category_id" id="pf-category-id" value="{{.CategoryID}}">
 
   {{if .Err}}

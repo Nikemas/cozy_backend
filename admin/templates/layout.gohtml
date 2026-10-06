@@ -123,6 +123,28 @@ document.addEventListener('DOMContentLoaded', function () {
   modal.style.display = 'flex';
 });
 
+// form[data-dirty-guard] (Остатки, product form): leaving the page with
+// unsaved edits (Дальше, another point, Back, a menu link) asks first —
+// the browser's own "leave site?" prompt. Submitting the form itself
+// doesn't.
+(function () {
+  var dirty = false;
+  document.addEventListener('input', function (e) {
+    if (e.target.form && e.target.form.hasAttribute('data-dirty-guard')) dirty = true;
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.form && e.target.form.hasAttribute('data-dirty-guard')) dirty = true;
+  });
+  document.addEventListener('submit', function (e) {
+    if (!e.defaultPrevented && e.target.hasAttribute && e.target.hasAttribute('data-dirty-guard')) dirty = false;
+  });
+  window.addEventListener('beforeunload', function (e) {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+})();
+
 function toggleAdminDrawer(open) {
   if (typeof open === 'boolean') {
     document.body.classList.toggle('admin-drawer-open', open);
