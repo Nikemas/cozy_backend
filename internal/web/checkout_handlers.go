@@ -317,6 +317,12 @@ func (h *handlers) cancelOrder(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// isPickupOrder reports whether order is collected at a point of sale:
+// it has a pickup point and no delivery address.
+func isPickupOrder(order *orders.Order) bool {
+	return order.PointID != nil && order.AddressID == nil
+}
+
 // done renders the order-confirmation screen. Requires auth (like cart/
 // checkout) since GetOrder is scoped to the session's customer_id.
 func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
@@ -331,8 +337,8 @@ func (h *handlers) done(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	done := DoneData{OrderNumber: order.OrderNumber, Total: order.TotalAmount, Pickup: order.AddressID == nil}
-	if done.Pickup && order.PointID != nil {
+	done := DoneData{OrderNumber: order.OrderNumber, Total: order.TotalAmount, Pickup: isPickupOrder(order)}
+	if done.Pickup {
 		name, err := pointName(r.Context(), h.db, *order.PointID)
 		if err != nil {
 			return err
