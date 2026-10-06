@@ -344,10 +344,14 @@ func (p *planner) assemble(m *plannedModel, rs []*rawRow) {
 		} else {
 			sizes[k] = r.row.line
 		}
+		// A 0 variant price means "no override", like an empty cell: a
+		// stored price_override of 0 would sell the variant for free.
 		switch {
 		case r.priceOverride != nil:
-			pr.variant.PriceOverride = r.priceOverride
-		case r.price != nil && base != nil && *r.price != *base:
+			if *r.priceOverride > 0 {
+				pr.variant.PriceOverride = r.priceOverride
+			}
+		case r.price != nil && base != nil && *r.price != *base && *r.price > 0:
 			pr.variant.PriceOverride = r.price
 		}
 	}
