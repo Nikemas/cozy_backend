@@ -655,3 +655,8 @@ admin.staff.notice_created: Сотрудник добавлен. Передай�
 admin.staff.notice_activated: Сотрудник активирован
 admin.staff.notice_deactivated: Сотрудник деактивирован — доступ к админке закрыт.
 admin.import.working: Обрабатываем файл…
+
+# fix/admin-ux-followups
+admin.order.awaiting_payment: Ожидает оплаты
+admin.order.awaiting_payment_hint: Онлайн-оплата ещё не прошла — заказ появится в счётчике новых после оплаты
+admin.order.on_map: На карте

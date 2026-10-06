@@ -125,6 +125,7 @@
                 <div class="admin-rowmenu__panel">
                   <a href="{{.EditURL}}" class="admin-rowmenu__item">{{t "admin.common.edit"}}</a>
                   <form method="post" action="{{.ToggleActiveURL}}" class="admin-rowmenu__form">
+                    <input type="hidden" name="back" value="{{$.Data.ReturnURL}}">
                     <button type="submit" class="admin-rowmenu__item">{{.DeactivateLabel}}</button>
                   </form>
                   {{if $.Data.CanDelete}}
@@ -212,15 +213,20 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') clos
 
 // The shared header (_header.gohtml) renders a bare <input name="q">, no
 // <form> — this screen wires Enter-to-search itself rather than the
-// header partial gaining a <form> every screen would inherit.
+// header partial gaining a <form> every screen would inherit. The search
+// keeps the current category/point/stock filters and page size; it only
+// resets to page 1 and drops one-shot messages.
 (function () {
   var input = document.querySelector('.admin-header__search input');
   if (!input) return;
   input.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter') return;
-    var url = new URL('/admin/products', window.location.origin);
+    var url = new URL(window.location.href);
+    var drop = ['q', 'page', 'bulk_fail', 'bulk_more'];
+    url.searchParams.forEach(function (_, k) { if (k.indexOf('toast') === 0) drop.push(k); });
+    drop.forEach(function (k) { url.searchParams.delete(k); });
     if (input.value.trim()) url.searchParams.set('q', input.value.trim());
-    window.location.href = url.toString();
+    window.location.href = url.pathname + url.search;
   });
 })();
 </script>

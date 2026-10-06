@@ -69,6 +69,7 @@ var layoutPartials = []string{
 	"_toast.gohtml",
 	"_confirm_modal.gohtml",
 	"_langswitch.gohtml",
+	"_orders_badge.gohtml",
 }
 
 // NavItem is one already-RBAC-filtered, already-ordered sidebar entry for
@@ -208,4 +209,20 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return t.ExecuteTemplate(w, "layout", data)
+}
+
+// fragmentScreen is the template set RenderFragment executes partials
+// from — every screen's set carries the same layout partials.
+const fragmentScreen = "orders"
+
+// RenderFragment executes one named partial (no layout) in the language
+// the auth-gate attached to w — for small HTMX responses such as the
+// new-orders badge.
+func (rr *Renderer) RenderFragment(w http.ResponseWriter, name string, data any) error {
+	t, ok := rr.tmpl[supportedLang(langFromWriter(w))][fragmentScreen]
+	if !ok {
+		return fmt.Errorf("admin: no template set for fragments")
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return t.ExecuteTemplate(w, name, data)
 }

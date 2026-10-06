@@ -1,0 +1,16 @@
+{{/* _orders_badge (fix/admin-ux-followups): the «Заказы» new-orders
+     badge refreshes itself every 60s while the tab is visible (and right
+     when it becomes visible again) from GET /admin/orders/badge, which
+     returns "_orders_badge_poll": this same element plus the mobile menu
+     button's badge as an out-of-band swap. It stays in the DOM at 0
+     (hidden) so polling continues. hx-select keeps an expired session's
+     login page out of the sidebar. The argument is the count. */}}
+{{define "_orders_badge"}}<span id="admin-orders-badge" class="admin-nav__badge" data-count="{{.}}"{{if not .}} hidden{{end}}
+  title="{{tf "admin.nav.new_orders" .}}" aria-label="{{tf "admin.nav.new_orders" .}}"
+  hx-get="/admin/orders/badge" hx-select="#admin-orders-badge" hx-swap="outerHTML"
+  hx-trigger="every 60s [document.visibilityState === 'visible'], visibilitychange[document.visibilityState === 'visible'] from:document">{{.}}</span>{{end}}
+
+{{define "_hamburger_badge"}}<span id="admin-hamburger-badge" class="admin-header__hamburger-badge" aria-hidden="true"{{if not .}} hidden{{end}}>{{.}}</span>{{end}}
+
+{{define "_orders_badge_poll"}}{{template "_orders_badge" .}}
+<span id="admin-hamburger-badge" class="admin-header__hamburger-badge" aria-hidden="true" hx-swap-oob="outerHTML"{{if not .}} hidden{{end}}>{{.}}</span>{{end}}

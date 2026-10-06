@@ -89,7 +89,7 @@ func (h *handlers) renderPointsPage(w http.ResponseWriter, r *http.Request, errM
 	data := h.shellPageData("points", "admin.nav.points", st)
 	data.Data = pointsPageData{Rows: rows, Error: errMsg}
 	data.FormRetry = withRetryError(pointsFormRetry(r, h.tr(r)), errMsg)
-	data.Toast = r.URL.Query().Get("toast")
+	data.Toast = h.pageToast(r)
 	if err := h.render.Render(w, "points", data); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
@@ -120,7 +120,7 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditPoint(r.Context(), audit.ActionPointCreate, created.ID, nil, in)
 
-	redirectWithToast(w, r, "/admin/points", h.tr(r).T("admin.points.toast_saved"))
+	redirectWithToast(w, r, "/admin/points", toastKey("point_saved"))
 }
 
 // pointsUpdate handles POST /admin/points/{id} — the edit modal (name, city,
@@ -150,7 +150,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditPoint(r.Context(), audit.ActionPointUpdate, id, current, in)
 
-	redirectWithToast(w, r, "/admin/points", h.tr(r).T("admin.points.toast_saved"))
+	redirectWithToast(w, r, "/admin/points", toastKey("point_saved"))
 }
 
 // pointsToggle handles POST /admin/points/{id}/toggle — the row's "toggle
@@ -180,9 +180,9 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditPoint(r.Context(), toggleAction, id, target, in)
 
-	toast := h.tr(r).T("admin.points.toast_deactivated")
+	toast := toastKey("point_deactivated")
 	if in.IsActive {
-		toast = h.tr(r).T("admin.points.toast_activated")
+		toast = toastKey("point_activated")
 	}
 	redirectWithToast(w, r, "/admin/points", toast)
 }

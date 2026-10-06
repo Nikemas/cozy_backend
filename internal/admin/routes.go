@@ -92,6 +92,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// Orders are open to point_staff too, scoped to their own point inside
 	// the handlers (same rule as the JSON API in httpapi/admin_orders.go).
 	mux.HandleFunc("GET /admin/orders", anyRole(h.ordersListPage))
+	// fix/admin-ux-followups: the sidebar badge polls this every 60s.
+	mux.HandleFunc("GET /admin/orders/badge", anyRole(h.ordersBadge))
 	mux.HandleFunc("GET /admin/orders/{id}", anyRole(h.orderDetailPage))
 	mux.HandleFunc("POST /admin/orders/{id}/status", anyRole(h.orderStatusUpdate))
 	// fix/admin-ops: bulk status change from the list (same RBAC per order).

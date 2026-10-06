@@ -14,8 +14,8 @@ import (
 
 // bulkIDs reads the checked rows' ids (form field "id", repeated): valid
 // uuids only, deduplicated, at most maxBulkItems. ok is false when nothing
-// usable was selected or too much was.
-func bulkIDs(t tr, values []string) (ids []string, errMsg string) {
+// usable was selected or too much was (errToast says which).
+func bulkIDs(values []string) (ids []string, errToast flash) {
 	seen := map[string]bool{}
 	for _, v := range values {
 		id, err := uuid.Parse(strings.TrimSpace(v))
@@ -30,11 +30,11 @@ func bulkIDs(t tr, values []string) (ids []string, errMsg string) {
 	}
 	switch {
 	case len(ids) == 0:
-		return nil, t.T("admin.bulk.none_selected")
+		return nil, toastKey("bulk_none")
 	case len(ids) > maxBulkItems:
-		return nil, t.F("admin.bulk.too_many", maxBulkItems)
+		return nil, toastKey("bulk_too_many")
 	}
-	return ids, ""
+	return ids, flash{}
 }
 
 // safeReturnURL returns back if it is a same-site link to listPath (the
@@ -45,9 +45,7 @@ func safeReturnURL(back, listPath string) string {
 	if err != nil || u.Scheme != "" || u.Host != "" || u.Path != listPath {
 		return listPath
 	}
-	q := u.Query()
-	q.Del("toast")
-	q.Del("bulk_fail")
+	q := stripOneShotParams(u.Query())
 	if len(q) == 0 {
 		return listPath
 	}
@@ -59,16 +57,15 @@ func safeReturnURL(back, listPath string) string {
 // |category (+ category_id) for every checked row.
 func (h *handlers) productsBulk(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	t := h.tr(r)
 	if err := r.ParseForm(); err != nil {
-		redirectWithToast(w, r, "/admin/products", t.T("admin.err.form"))
+		redirectWithToast(w, r, "/admin/products", toastKey("form_error"))
 		return
 	}
 	back := safeReturnURL(r.FormValue("back"), "/admin/products")
 
-	ids, errMsg := bulkIDs(t, r.Form["id"])
-	if errMsg != "" {
-		redirectWithToast(w, r, back, errMsg)
+	ids, errToast := bulkIDs(r.Form["id"])
+	if errToast.Key != "" {
+		redirectWithToast(w, r, back, errToast)
 		return
 	}
 
@@ -82,12 +79,12 @@ func (h *handlers) productsBulk(w http.ResponseWriter, r *http.Request) {
 	case "category":
 		categoryID := strings.TrimSpace(r.FormValue("category_id"))
 		if _, perr := uuid.Parse(categoryID); perr != nil {
-			redirectWithToast(w, r, back, t.T("admin.apperr.invalid_category_id"))
+			redirectWithToast(w, r, back, toastKey("invalid_category"))
 			return
 		}
 		changed, err = h.productOps.BulkSetCategory(ctx, ids, categoryID)
 	default:
-		redirectWithToast(w, r, back, t.T("admin.bulk.unknown_action"))
+		redirectWithToast(w, r, back, toastKey("bulk_unknown_action"))
 		return
 	}
 	if err != nil {
@@ -95,8 +92,8 @@ func (h *handlers) productsBulk(w http.ResponseWriter, r *http.Request) {
 		if !errors.As(err, &ae) {
 			slog.ErrorContext(ctx, "admin: products bulk action failed", "action", r.FormValue("action"), "err", err)
 		}
-		redirectWithToast(w, r, back, appErrMessage(t, err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
-	redirectWithToast(w, r, back, t.F("admin.bulk.products_done", changed, len(ids), t.Plural(len(ids), "admin.plural.product_gen")))
+	redirectWithToast(w, r, back, toastNOf("products_bulk", changed, len(ids)))
 }

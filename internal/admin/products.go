@@ -23,7 +23,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -70,29 +69,6 @@ func (h *handlers) thumbURL(objectKey string) string {
 // convention just for this task.
 func (h *handlers) renderInternalErr(w http.ResponseWriter, err error) {
 	http.Error(w, trFromWriter(w).T("admin.err.internal"), http.StatusInternalServerError)
-}
-
-// redirectWithToast redirects to path with ?toast=<message> appended
-// (picked up by productsListPage/productEditPage via PageData.Toast), or —
-// for a request HTMX issued (the delete confirm modal's hx-post) — sets
-// HX-Redirect instead so htmx performs a full client-side navigation
-// rather than trying to swap the redirect's HTML into whatever element
-// triggered it, mirroring internal/web's redirectToLogin.
-func redirectWithToast(w http.ResponseWriter, r *http.Request, path, toast string) {
-	target := path
-	if toast != "" {
-		sep := "?"
-		if strings.Contains(path, "?") {
-			sep = "&"
-		}
-		target = path + sep + "toast=" + url.QueryEscape(toast)
-	}
-	if r.Header.Get("HX-Request") != "" {
-		w.Header().Set("HX-Redirect", target)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
 // --- list screen ---
@@ -191,7 +167,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		CategoryChips: withPointParams(buildCategoryChips(h.tr(r), tree, activeTop, q), pointSel),
 		ShowSubs:      activeTop != nil && len(activeTop.Children) > 0,
 		SubChips:      withPointParams(buildSubChips(h.tr(r), activeTop, activeSub, q), pointSel),
-		Products:      rows,
+		Products:      withRowReturn(rows, returnURL(r)),
 		Empty:         len(rows) == 0,
 		CountLabel:    countLabel(h.tr(r), total),
 		Query:         q,
@@ -209,7 +185,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		PointName:      pointSel.Name,
 		OutOfStockOnly: pointSel.OOS,
 		BulkURL:        "/admin/products/bulk",
-		ReturnURL:      r.URL.RequestURI(),
+		ReturnURL:      returnURL(r),
 		BulkCategories: flatCategoryOptions(tree),
 	}
 
@@ -223,7 +199,7 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 	pageData := h.productsShellData("products", "admin.nav.products", st)
 	pageData.ShowSearch = true
 	pageData.SearchQuery = q
-	pageData.Toast = query.Get("toast")
+	pageData.Toast = h.pageToast(r)
 	pageData.Data = data
 
 	if err := h.render.Render(w, "products", pageData); err != nil {
@@ -338,7 +314,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.products.GetByIDAny(ctx, id)
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
+		redirectWithToast(w, r, "/admin/products", toastForErr(err))
 		return
 	}
 
@@ -467,7 +443,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 	if productID != "" {
 		current, err := h.products.GetByIDAny(ctx, productID)
 		if err != nil {
-			redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
+			redirectWithToast(w, r, "/admin/products", toastForErr(err))
 			return
 		}
 		isActive = current.IsActive
@@ -500,7 +476,7 @@ func (h *handlers) saveProduct(w http.ResponseWriter, r *http.Request, productID
 		return
 	}
 
-	redirectWithToast(w, r, safeReturnURL(r.FormValue("back"), productsListPath), h.tr(r).T("admin.product.toast_saved"))
+	redirectWithToast(w, r, safeReturnURL(r.FormValue("back"), productsListPath), toastKey("product_saved"))
 }
 
 // rerenderFormOnError redisplays the form with whatever the staff member
@@ -582,10 +558,11 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
+	back := safeReturnURL(r.FormValue("back"), productsListPath)
 
 	product, err := h.products.GetByIDAny(ctx, id)
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 
@@ -600,16 +577,16 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 		IsActive:      !product.IsActive,
 	})
 	if err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 	h.auditProductActive(ctx, id, product.NameRu, !product.IsActive)
 
-	toast := h.tr(r).T("admin.product.toast_deactivated")
+	toast := toastKey("product_deactivated")
 	if !product.IsActive {
-		toast = h.tr(r).T("admin.product.toast_activated")
+		toast = toastKey("product_activated")
 	}
-	redirectWithToast(w, r, "/admin/products", toast)
+	redirectWithToast(w, r, back, toast)
 }
 
 // productDelete handles POST /admin/products/{id}/delete — the row menu's
@@ -628,12 +605,13 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 // deleting a product return that any harder than deactivating.
 func (h *handlers) productDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	back := safeReturnURL(r.FormValue("back"), productsListPath)
 	if err := h.products.Delete(r.Context(), id); err != nil {
-		redirectWithToast(w, r, "/admin/products", appErrMessage(h.tr(r), err))
+		redirectWithToast(w, r, back, toastForErr(err))
 		return
 	}
 	h.auditProductDeleted(r.Context(), id)
-	redirectWithToast(w, r, "/admin/products", h.tr(r).T("admin.product.toast_deleted"))
+	redirectWithToast(w, r, back, toastKey("product_deleted"))
 }
 
 // --- import screen ---

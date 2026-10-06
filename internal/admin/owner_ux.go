@@ -19,21 +19,11 @@ import (
 // productsListPath is the Товары list screen.
 const productsListPath = "/admin/products"
 
-// productsStaleParams are one-shot query params (a toast, a bulk
-// result) that must not follow the user onto another page of the list.
-var productsStaleParams = []string{"toast", "bulk_fail"}
-
 // productsPageURL is the products list URL for page, keeping every filter
 // in q (category, subcategory, search, point, out-of-stock, page size).
 // q is not modified.
 func productsPageURL(q url.Values, page int) string {
-	next := url.Values{}
-	for k, v := range q {
-		next[k] = append([]string(nil), v...)
-	}
-	for _, k := range productsStaleParams {
-		next.Del(k)
-	}
+	next := stripOneShotParams(q)
 	if page > 1 {
 		next.Set("page", strconv.Itoa(page))
 	} else {
@@ -48,19 +38,23 @@ func productsPageURL(q url.Values, page int) string {
 // ---------- unprocessed-orders badge ----------
 
 // newOrdersCounter counts orders still waiting for the shop (status
-// "Оформлен"), optionally at one point of sale only.
+// "Оформлен"), optionally at one point of sale only. Online-card orders
+// count only once paid: until then there is nothing to do with them (the
+// state machine won't confirm an unpaid one), they are only marked
+// «Ожидает оплаты» in the list. The «Оформлен» filter itself still lists
+// every placed order.
 type newOrdersCounter interface {
 	CountNewOrders(ctx context.Context, pointID *string) (int, error)
 }
 
-// orderBadgeRepo is the SQL newOrdersCounter (idx_orders_status keeps it
-// an index-only count).
+// orderBadgeRepo is the SQL newOrdersCounter (idx_orders_status narrows
+// it to placed orders).
 type orderBadgeRepo struct {
 	db *sql.DB
 }
 
 func (r orderBadgeRepo) CountNewOrders(ctx context.Context, pointID *string) (int, error) {
-	const base = `SELECT COUNT(*) FROM orders WHERE status = 'placed'`
+	const base = `SELECT COUNT(*) FROM orders WHERE status = 'placed' AND (payment_method <> 'online_card' OR payment_status = 'paid')`
 	var n int
 	var err error
 	if pointID == nil {
@@ -133,6 +127,17 @@ func countNewOrdersFor(ctx context.Context, counter newOrdersCounter) (int, erro
 		return 0, err
 	}
 	return n, nil
+}
+
+// ordersBadge handles GET /admin/orders/badge (behind withNavBadges): the
+// «Заказы» badge fragment its own hx-trigger polls, plus the mobile menu
+// button's badge out of band. Scoped like the sidebar count.
+func (h *handlers) ordersBadge(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if err := h.render.RenderFragment(w, "_orders_badge_poll", newOrdersFromWriter(w)); err != nil {
+		slog.ErrorContext(r.Context(), "admin nav: orders badge render failed", "err", err)
+		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
+	}
 }
 
 // withOrdersBadge returns a copy of items with the «Заказы» entry
@@ -308,4 +313,20 @@ func listReturnURL(referer, host, listPath string) string {
 		return ""
 	}
 	return safeReturnURL(u.RequestURI(), listPath)
+}
+
+// withRowReturn returns a copy of rows whose delete link carries back
+// (the list page with its filters) so the row menu's «Удалить» — an
+// hx-post from the confirm dialog, no form to put it in — returns there.
+// Activate/deactivate send it as a hidden form field instead.
+func withRowReturn(rows []ProductRowVM, back string) []ProductRowVM {
+	out := make([]ProductRowVM, len(rows))
+	copy(out, rows)
+	if back == productsListPath || back == "" {
+		return out
+	}
+	for i := range out {
+		out[i].DeleteURL += "?back=" + url.QueryEscape(back)
+	}
+	return out
 }

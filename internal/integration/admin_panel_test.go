@@ -283,7 +283,7 @@ func TestAdminPanelOrdersStockAndCategories(t *testing.T) {
 	w := a.get(t, "/admin/orders/"+o.ID, c...)
 	wantStatus(t, w, http.StatusOK)
 	wantBody(t, w, o.OrderNumber)
-	wantStatus(t, a.get(t, "/admin/orders/"+o.ID+"?status_error=oops", c...), http.StatusOK)
+	wantStatus(t, a.get(t, "/admin/orders/"+o.ID+"?toast=error&toast_code=invalid_status_transition", c...), http.StatusOK)
 	if w := a.get(t, "/admin/orders/"+uuid.NewString(), c...); w.Code != http.StatusNotFound {
 		t.Fatalf("unknown order: %d, want 404", w.Code)
 	}
@@ -291,8 +291,8 @@ func TestAdminPanelOrdersStockAndCategories(t *testing.T) {
 	// Status change: invalid transition reports the error, valid one applies.
 	w = a.do(t, req{method: http.MethodPost, path: "/admin/orders/" + o.ID + "/status", cookies: c, form: url.Values{"status": {"delivered"}}})
 	wantStatus(t, w, http.StatusSeeOther)
-	if loc, err := url.Parse(w.Header().Get("Location")); err != nil || loc.Path != "/admin/orders/"+o.ID || loc.Query().Get("status_error") == "" {
-		t.Fatalf("illegal placed→delivered should redirect with status_error, got %q", w.Header().Get("Location"))
+	if loc, err := url.Parse(w.Header().Get("Location")); err != nil || loc.Path != "/admin/orders/"+o.ID || loc.Query().Get("toast") != "error" {
+		t.Fatalf("illegal placed→delivered should redirect with an error toast, got %q", w.Header().Get("Location"))
 	}
 	wantRedirectPath(t, a.do(t, req{method: http.MethodPost, path: "/admin/orders/" + o.ID + "/status", cookies: c, form: url.Values{"status": {"confirmed"}}}), "/admin/orders/"+o.ID)
 	var status string

@@ -74,10 +74,10 @@ func TestOrderBulkStatusReportsPerOrderFailures(t *testing.T) {
 		t.Fatalf("Location = %q", w.Header().Get("Location"))
 	}
 	q := loc.Query()
-	if q.Get("status") != "placed" || !strings.Contains(q.Get("toast"), "1 из 2") {
+	if q.Get("status") != "placed" || !strings.Contains(toastFromQuery(ruTr, q), "1 из 2") {
 		t.Errorf("query = %v", q)
 	}
-	if fails := q["bulk_fail"]; len(fails) != 1 || !strings.Contains(fails[0], "COZY-2") || !strings.Contains(fails[0], "недопустимый") {
+	if fails := bulkFailureNotes(ruTr, q); len(fails) != 1 || !strings.Contains(fails[0], "COZY-2") || !strings.Contains(fails[0], "нельзя перевести") {
 		t.Errorf("bulk_fail = %v", fails)
 	}
 }
@@ -89,7 +89,7 @@ func TestOrderBulkStatusManagerCannotCancel(t *testing.T) {
 	if len(svc.updated) != 0 {
 		t.Fatal("manager cancelled orders in bulk")
 	}
-	if !strings.Contains(w.Header().Get("Location"), url.QueryEscape("только владелец")) {
+	if loc, _ := url.Parse(w.Header().Get("Location")); !strings.Contains(toastFromQuery(ruTr, loc.Query()), "только владелец") {
 		t.Errorf("Location = %q", w.Header().Get("Location"))
 	}
 }
@@ -106,7 +106,7 @@ func TestOrderBulkStatusPointStaffScoped(t *testing.T) {
 		t.Fatalf("updated = %v", svc.updated)
 	}
 	loc, _ := url.Parse(w.Header().Get("Location"))
-	if fails := loc.Query()["bulk_fail"]; len(fails) != 1 || !strings.Contains(fails[0], "не найден") || strings.Contains(fails[0], "COZY-2") {
+	if fails := bulkFailureNotes(ruTr, loc.Query()); len(fails) != 1 || !strings.Contains(fails[0], "не найден") || strings.Contains(fails[0], "COZY-2") {
 		t.Errorf("bulk_fail = %v (must not leak the other point's order number)", fails)
 	}
 }

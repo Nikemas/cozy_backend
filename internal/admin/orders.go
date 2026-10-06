@@ -72,6 +72,9 @@ type OrderRowView struct {
 	PaymentLabel string
 	StatusLabel  string
 	StatusClass  string
+	// AwaitingPayment (fix/admin-ux-followups): a placed online-card order
+	// not paid yet — marked «Ожидает оплаты», not counted in the badge.
+	AwaitingPayment bool
 }
 
 // OrdersListData backs orders.gohtml's content template.
@@ -125,21 +128,24 @@ type StatusButtonView struct {
 
 // OrderDetailData backs order_detail.gohtml's content template.
 type OrderDetailData struct {
-	ID            string
-	Number        string
-	DateLabel     string
-	StatusLabel   string
-	StatusClass   string
-	Phone         string
-	CustomerName  string       // fix/admin-owner-ux: "" when the customer gave none
-	Contact       PhoneContact // fix/admin-owner-ux: call / WhatsApp / copy
-	PaymentLabel  string
-	AddressText   string
-	ZoneName      string // delivery zone, in the admin's language ("" = none)
-	Comment       string
-	Items         []OrderDetailItemView
-	TotalLabel    string
-	StatusButtons []StatusButtonView
+	ID           string
+	Number       string
+	DateLabel    string
+	StatusLabel  string
+	StatusClass  string
+	Phone        string
+	CustomerName string       // fix/admin-owner-ux: "" when the customer gave none
+	Contact      PhoneContact // fix/admin-owner-ux: call / WhatsApp / copy
+	PaymentLabel string
+	// AwaitingPayment: see OrderRowView.AwaitingPayment.
+	AwaitingPayment bool
+	AddressText     string
+	MapURL          string // 2GIS search for a delivery address ("" for pickup)
+	ZoneName        string // delivery zone, in the admin's language ("" = none)
+	Comment         string
+	Items           []OrderDetailItemView
+	TotalLabel      string
+	StatusButtons   []StatusButtonView
 	// Order history / money flags (fix/orders-integrity, order_history.go).
 	OrderHistoryData
 }
@@ -201,6 +207,16 @@ func paymentLabel(t tr, pm orders.PaymentMethod, ps *orders.PaymentStatus) strin
 	default:
 		return t.T("admin.payment.online") + ", " + string(*ps)
 	}
+}
+
+// awaitingPayment reports a placed online-card order that isn't paid
+// (pending, failed or cancelled payment): nothing for the shop to do yet —
+// the badge (orderBadgeRepo) leaves these out, the list marks them.
+func awaitingPayment(o *orders.Order) bool {
+	if o == nil || o.Status != orders.StatusPlaced || o.PaymentMethod != orders.PaymentOnlineCard {
+		return false
+	}
+	return o.PaymentStatus == nil || *o.PaymentStatus != orders.PaymentPaid
 }
 
 // formatSom renders amount as "7 900 сом" — duplicated from internal/web/
@@ -395,13 +411,13 @@ func (h *handlers) ordersListPage(w http.ResponseWriter, r *http.Request) {
 	if params.Point == "" {
 		data.StatusChips = withPlacedCount(data.StatusChips, newOrdersFromWriter(w))
 	}
-	data.Notes = append(notes, r.URL.Query()["bulk_fail"]...)
+	data.Notes = append(notes, bulkFailureNotes(h.tr(r), r.URL.Query())...)
 	data.BulkStatuses = bulkStatusOptions(h.tr(r), st.Role)
 	data.BulkURL = "/admin/orders/bulk-status"
-	data.ReturnURL = r.URL.RequestURI()
+	data.ReturnURL = returnURL(r)
 
 	pageData := h.shellPageData("orders", "admin.nav.orders", st)
-	pageData.Toast = r.URL.Query().Get("toast")
+	pageData.Toast = h.pageToast(r)
 	pageData.Data = data
 	if err := h.render.Render(w, "orders", pageData); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
@@ -462,6 +478,8 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 			PaymentLabel: paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 			StatusLabel:  meta.Label,
 			StatusClass:  meta.Class,
+
+			AwaitingPayment: awaitingPayment(&o),
 		})
 	}
 
@@ -576,10 +594,7 @@ func (h *handlers) orderDetailPage(w http.ResponseWriter, r *http.Request) {
 	pageData.Screen = "order_detail"
 	pageData.ShowBack = true
 	pageData.BackURL = "/admin/orders"
-	pageData.Toast = r.URL.Query().Get("toast")
-	if msg := r.URL.Query().Get("status_error"); msg != "" {
-		pageData.Toast = msg
-	}
+	pageData.Toast = h.pageToast(r)
 	pageData.Data = data
 
 	if err := h.render.Render(w, "order_detail", pageData); err != nil {
@@ -600,7 +615,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		}
 	}
 
-	addressText, comment := h.orderDeliveryInfo(ctx, o)
+	addressText, mapAddress, comment := h.orderDeliveryInfo(ctx, o)
 
 	variantIDs := make([]string, 0, len(o.Items))
 	for _, it := range o.Items {
@@ -640,7 +655,9 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		CustomerName:     customerName,
 		Contact:          phoneContact(phone),
 		PaymentLabel:     paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
+		AwaitingPayment:  awaitingPayment(o),
 		AddressText:      addressText,
+		MapURL:           mapSearchURL(mapAddress),
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
 		Comment:          comment,
 		Items:            items,
@@ -659,7 +676,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 // delivery order PointID instead names whichever warehouse happened to
 // fulfill it, which isn't meaningful to show here, so it's only consulted
 // in the nil-AddressID branch).
-func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (address, comment string) {
+func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (address, mapAddress, comment string) {
 	comment = "—"
 	if o.Comment != nil && *o.Comment != "" {
 		comment = *o.Comment
@@ -671,7 +688,7 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 			if a.Label != nil && *a.Label != "" {
 				address = *a.Label + ": " + address
 			}
-			return address, comment
+			return address, a.AddressText, comment
 		}
 	}
 
@@ -679,27 +696,41 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 		if pts, err := h.pointsRepo.List(ctx); err == nil {
 			for _, p := range pts {
 				if p.ID == *o.PointID {
-					return trFromContext(ctx).F("admin.order.pickup_at", p.Name, p.Address), comment
+					return trFromContext(ctx).F("admin.order.pickup_at", p.Name, p.Address), "", comment
 				}
 			}
 		}
 	}
 
-	return "—", comment
+	return "—", "", comment
+}
+
+// mapSearchBaseURL is 2GIS's search in Bishkek; the address is appended
+// as one escaped path segment.
+const mapSearchBaseURL = "https://2gis.kg/bishkek/search/"
+
+// mapSearchURL is the «На карте» link for a delivery address (staff and
+// couriers open it on a phone), or "" when there is no address.
+func mapSearchURL(address string) string {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return ""
+	}
+	return mapSearchBaseURL + url.PathEscape(address)
 }
 
 // orderStatusUpdate handles POST /admin/orders/{id}/status: the "Сменить
 // статус" buttons on the detail page. Success redirects back to the (now
-// updated) detail page; a rejected transition or an unauthorized cancel
-// redirects back with ?status_error=... so orderDetailPage surfaces it as
-// a toast instead of a raw error page.
+// updated) detail page with a toast; a rejected transition or an
+// unauthorized cancel redirects back with an error toast (keys only, see
+// toast.go) instead of a raw error page.
 func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 	id := r.PathValue("id")
 	detailURL := "/admin/orders/" + id
 
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.err.form")), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, toastKey("form_error"))
 		return
 	}
 	newStatus := orders.OrderStatus(r.FormValue("status"))
@@ -709,7 +740,7 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	// comment): hiding the button isn't enough on its own, since nothing
 	// stops a manager from POSTing status=cancelled directly.
 	if newStatus == orders.StatusCancelled && st.Role != staff.RoleOwner {
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(h.tr(r).T("admin.apperr.cancel_forbidden")), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, toastKey("cancel_forbidden"))
 		return
 	}
 
@@ -723,12 +754,13 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.ordersSvc.AdminUpdateStatus(r.Context(), id, newStatus)
 	if err != nil {
-		msg := h.tr(r).T("admin.order.status_change_failed")
+		f := toastForErr(err)
 		var appErr *apperr.AppError
-		if errors.As(err, &appErr) {
-			msg = appErrMessage(h.tr(r), err)
+		if !errors.As(err, &appErr) {
+			slog.ErrorContext(r.Context(), "admin: order status change failed", "order_id", id, "err", err)
+			f = toastKey("status_change_failed")
 		}
-		http.Redirect(w, r, detailURL+"?status_error="+url.QueryEscape(msg), http.StatusSeeOther)
+		redirectWithToast(w, r, detailURL, f)
 		return
 	}
 
@@ -737,8 +769,7 @@ func (h *handlers) orderStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	if updated != nil {
 		shown = updated.Status
 	}
-	t := h.tr(r)
-	redirectWithToast(w, r, detailURL, t.F("admin.order.status_changed", orderStatusMetaFor(t, shown).Label))
+	redirectWithToast(w, r, detailURL, toastOrderStatus(shown))
 }
 
 // staffCanSeeOrder is the point-based RBAC rule for one order: owner and
