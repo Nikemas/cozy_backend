@@ -62,11 +62,8 @@ func TestListOrderBy(t *testing.T) {
 	if got := listOrderBy(SortPriceDesc); !strings.HasPrefix(got, minPriceExpr+" DESC") {
 		t.Errorf("price_desc = %q", got)
 	}
-	if got := listOrderBy(SortPopular); !strings.HasPrefix(got, popularityExpr+" DESC, created_at DESC") {
-		t.Errorf("popular = %q, want units sold desc, then newest", got)
-	}
-	if !strings.Contains(popularityExpr, "<> 'cancelled'") {
-		t.Errorf("popularityExpr must exclude cancelled orders: %s", popularityExpr)
+	if got := listOrderBy(SortPopular); got != "COALESCE(popularity.units_sold, 0) DESC, products.created_at DESC, products.id" {
+		t.Errorf("popular = %q, want units sold desc, then newest, then id", got)
 	}
 	if got := listOrderBy("bogus"); !strings.HasPrefix(got, "created_at DESC") {
 		t.Errorf("unknown sort = %q, want newest first", got)
@@ -80,5 +77,28 @@ func TestBuildListConditionsCategoryIDsTakePrecedence(t *testing.T) {
 	}
 	if ids, ok := args[0].([]string); !ok || len(ids) != 2 {
 		t.Fatalf("args = %v, want the id list", args)
+	}
+}
+
+// sort=popular aggregates units sold once (a LEFT JOIN to a GROUP BY
+// subquery) instead of a correlated subquery per product row; every other
+// sort reads products alone.
+func TestListFrom(t *testing.T) {
+	for _, sort := range []string{"", SortNewest, SortPriceAsc, SortPriceDesc, "bogus"} {
+		if got := listFrom(sort); got != "products" {
+			t.Errorf("listFrom(%q) = %q, want bare products", sort, got)
+		}
+	}
+	got := listFrom(SortPopular)
+	for _, want := range []string{
+		"LEFT JOIN (", "SUM(oi.quantity) AS units_sold", "GROUP BY pv.product_id",
+		"o.status <> 'cancelled'", ") popularity ON popularity.product_id = products.id",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("listFrom(popular) missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "products.id") != 1 {
+		t.Errorf("the aggregate must not be correlated with products:\n%s", got)
 	}
 }
