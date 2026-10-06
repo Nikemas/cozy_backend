@@ -1,6 +1,6 @@
 module github.com/Nikemas/cozy_backend
 
-go 1.26.4
+go 1.26.6
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -10,7 +10,7 @@ require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/crypto v0.57.0
-	golang.org/x/image v0.38.0
+	golang.org/x/image v0.45.0
 )
 
 require (
