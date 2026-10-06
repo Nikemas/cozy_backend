@@ -24,8 +24,19 @@ func newFakeStaffGetter(staffers ...*Staff) *fakeStaffGetter {
 	return f
 }
 
+// GetByPhone mirrors Repo.GetByPhone's tolerant matching: both sides are
+// compared in canonical form, exact spelling first.
 func (f *fakeStaffGetter) GetByPhone(_ context.Context, phone string) (*Staff, error) {
-	return f.byPhone[phone], nil
+	key := canonicalPhoneKey(phone)
+	if s, ok := f.byPhone[key]; ok {
+		return s, nil
+	}
+	for stored, s := range f.byPhone {
+		if canonicalPhoneKey(stored) == key {
+			return s, nil
+		}
+	}
+	return nil, nil
 }
 
 func (f *fakeStaffGetter) GetByID(_ context.Context, id string) (*Staff, error) {

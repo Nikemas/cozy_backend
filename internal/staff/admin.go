@@ -63,14 +63,26 @@ func (r *Repo) List(ctx context.Context) ([]Staff, error) {
 // Translates a duplicate phone (SQLSTATE 23505) into apperr.Conflict and an
 // unknown point_id (23503) into apperr.BadRequest instead of a raw 500 — see
 // translateStaffWriteErr.
+//
+// The UNIQUE constraint only catches the exact same spelling, so a legacy
+// row holding the same number in another format (e.g. "0700123456" vs
+// "+996700123456") is looked up first and reported as phone_taken too.
 func (r *Repo) Create(ctx context.Context, in StaffCreateInput) (*Staff, error) {
+	existing, err := r.GetByPhone(ctx, in.Phone)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, apperr.Conflict("phone_taken", "этот номер телефона уже используется")
+	}
+
 	const q = `
 		INSERT INTO staff (phone, password_hash, name, role, point_id, is_active)
 		VALUES ($1, $2, $3, $4, $5, true)
 		RETURNING id, phone, password_hash, name, role, point_id, is_active, created_at`
 
 	var s Staff
-	err := r.db.QueryRowContext(ctx, q, in.Phone, in.PasswordHash, in.Name, in.Role, in.PointID).
+	err = r.db.QueryRowContext(ctx, q, in.Phone, in.PasswordHash, in.Name, in.Role, in.PointID).
 		Scan(&s.ID, &s.Phone, &s.PasswordHash, &s.Name, &s.Role, &s.PointID, &s.IsActive, &s.CreatedAt)
 	if err != nil {
 		return nil, translateStaffWriteErr(err)

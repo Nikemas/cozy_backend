@@ -107,10 +107,17 @@ func (s *Service) SetLoginIPLimit(n int) {
 // Login rejects with apperr.TooManyRequests without touching the database
 // or running bcrypt, so brute-forcing one account's password can't be
 // sped up by parallelizing requests.
-func (s *Service) Login(ctx context.Context, phone, password string) (sessionToken string, err error) {
+//
+// The phone may be typed in any spelling of a Kyrgyz number ("0700 123
+// 456", "996700123456", "+996700123456"): it is normalized first
+// (canonicalPhoneKey), and that normalized form is both the per-phone
+// rate-limit key — so retyping one number differently can't reset its
+// budget — and what the stored phone is compared against.
+func (s *Service) Login(ctx context.Context, rawPhone, password string) (sessionToken string, err error) {
 	if ip := httpmw.ClientIPFromContext(ctx); s.ipLimiter != nil && ip != "" && !s.ipLimiter.allow(ip) {
 		return "", apperr.TooManyRequests("too_many_attempts", "слишком много попыток входа, попробуйте позже")
 	}
+	phone := canonicalPhoneKey(rawPhone)
 	if !s.loginLimiter.allow(phone) {
 		return "", apperr.TooManyRequests("too_many_attempts", "слишком много попыток входа, попробуйте позже")
 	}
@@ -233,9 +240,16 @@ func (s *Service) ListStaff(ctx context.Context) ([]Staff, error) {
 // owner/manager. Duplicate phone and unknown point_id are caught by the
 // repo's Postgres constraint translation (see translateStaffWriteErr) and
 // surface here as ordinary *apperr.AppError values.
+//
+// The phone is stored normalized to +996XXXXXXXXX (normalizeStaffPhone, the
+// customers' rule), so staff can later log in with any spelling of it.
 func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff, error) {
 	if strings.TrimSpace(in.Phone) == "" {
 		return nil, apperr.BadRequest("invalid_phone", "телефон обязателен").WithVariant("required")
+	}
+	phone, err := normalizeStaffPhone(in.Phone)
+	if err != nil {
+		return nil, err
 	}
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, apperr.BadRequest("invalid_name", "имя обязательно").WithVariant("required")
@@ -247,14 +261,14 @@ func (s *Service) CreateStaff(ctx context.Context, in CreateStaffInput) (*Staff,
 		return nil, err
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	hash, err := hashPassword(in.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.admin.Create(ctx, StaffCreateInput{
-		Phone:        in.Phone,
-		PasswordHash: string(hash),
+		Phone:        phone,
+		PasswordHash: hash,
 		Name:         in.Name,
 		Role:         in.Role,
 		PointID:      in.PointID,
@@ -284,12 +298,11 @@ func (s *Service) UpdateStaff(ctx context.Context, id string, in UpdateStaffInpu
 		if err := validatePassword(*in.Password); err != nil {
 			return nil, err
 		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(*in.Password), bcrypt.DefaultCost)
+		hash, err := hashPassword(*in.Password)
 		if err != nil {
 			return nil, err
 		}
-		h := string(hash)
-		upd.PasswordHash = &h
+		upd.PasswordHash = &hash
 	}
 
 	updated, err := s.admin.Update(ctx, id, upd)
@@ -313,11 +326,11 @@ func (s *Service) ResetPassword(ctx context.Context, id, newPassword string) err
 	if err := validatePassword(newPassword); err != nil {
 		return err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	hash, err := hashPassword(newPassword)
 	if err != nil {
 		return err
 	}
-	if err := s.admin.SetPassword(ctx, id, string(hash)); err != nil {
+	if err := s.admin.SetPassword(ctx, id, hash); err != nil {
 		return err
 	}
 	return s.sessions.revokeAllForStaff(ctx, id)
@@ -329,6 +342,17 @@ const MinPasswordLength = 8
 // maxPasswordBytes is bcrypt's input limit: longer passwords are rejected
 // by bcrypt.GenerateFromPassword rather than silently truncated.
 const maxPasswordBytes = 72
+
+// hashPassword is the one place staff passwords are hashed: bcrypt at
+// bcrypt.DefaultCost, which is what Login's CompareHashAndPassword checks.
+// Callers validate the password (validatePassword) first.
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
 
 func validatePassword(p string) error {
 	if utf8.RuneCountInString(p) < MinPasswordLength {
