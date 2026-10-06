@@ -24,6 +24,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -129,7 +130,7 @@ func validateProductInput(in catalog.ProductInput) error {
 	if strings.TrimSpace(in.NameKy) == "" {
 		return apperr.BadRequest("invalid_name_ky", "укажите название на кыргызском")
 	}
-	if in.BasePrice < 0 {
+	if math.IsNaN(in.BasePrice) || math.IsInf(in.BasePrice, 0) || in.BasePrice < 0 {
 		return apperr.BadRequest("invalid_base_price", "цена не может быть отрицательной")
 	}
 	return nil
@@ -146,7 +147,8 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 		if strings.TrimSpace(v.Size) == "" || strings.TrimSpace(v.Color) == "" {
 			return "", apperr.BadRequest("invalid_variant", "у каждой вариации должны быть размер и цвет")
 		}
-		if v.PriceSet && v.PriceOverride != nil && *v.PriceOverride <= 0 {
+		// !(x > 0) rather than x <= 0: NaN fails every comparison.
+		if p := v.PriceOverride; p != nil && (!(*p > 0) || math.IsInf(*p, 0)) {
 			return "", apperr.BadRequest("invalid_variant_price", "цена вариации должна быть больше нуля")
 		}
 	}

@@ -12,6 +12,9 @@
 //	    browser. variant_price is the row's price_override in сом ("" =
 //	    no override, the product's base price applies); when the array is
 //	    absent or misaligned, stored overrides are left untouched.
+//	orig_variant_price_<key>  the price_override an existing row was
+//	                      rendered with; the override is written only when
+//	                      variant_price differs from it
 //	qty_<key>_<pointID>   the quantity typed into that row × point cell
 //	orig_<key>_<pointID>  the quantity the cell was rendered with ("" when
 //	                      no stock row existed); only present for cells
@@ -25,6 +28,7 @@ package admin
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -81,31 +85,50 @@ func parseStockQty(s string) (int, error) {
 	return n, nil
 }
 
-// parsePrice parses the base-price field ("4 500" and "4500,50" accepted).
-// A blank or unparsable value is an error rather than a silent 0.
-func parsePrice(s string) (float64, error) {
-	s = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), " ", ""))
+// maxPrice is the largest value a NUMERIC(10,2) price column can hold.
+const maxPrice = 99999999.99
+
+// parseAmount normalizes a typed money amount ("4 500" and "4500,50"
+// accepted) and rounds it to whole тыйын, the precision NUMERIC(10,2)
+// stores. NaN/Inf (which strconv.ParseFloat accepts and which pass every
+// comparison) are rejected. The sign is not checked here.
+func parseAmount(s string) (float64, error) {
+	s = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), "\u00a0", ""))
 	s = strings.ReplaceAll(s, ",", ".")
 	if s == "" {
 		return 0, localizedError{"admin.price.err_empty"}
 	}
 	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
 		return 0, localizedError{"admin.price.err_not_number"}
+	}
+	return math.Round(v*100) / 100, nil
+}
+
+// parsePrice parses a price field (the base price, or a variant's
+// override). A blank or unparsable value is an error rather than a silent
+// 0, and the amount — as stored, i.e. rounded to 2 decimals — must be
+// positive and fit NUMERIC(10,2).
+func parsePrice(s string) (float64, error) {
+	v, err := parseAmount(s)
+	if err != nil {
+		return 0, err
 	}
 	if v < 0 {
 		return 0, localizedError{"admin.price.err_negative"}
 	}
+	if v <= 0 {
+		return 0, localizedError{"admin.price.err_not_positive"}
+	}
+	if v > maxPrice {
+		return 0, localizedError{"admin.price.err_too_big"}
+	}
 	return v, nil
 }
 
-// maxPrice is the largest value a NUMERIC(10,2) price column can hold.
-const maxPrice = 99999999.99
-
 // parseVariantPrice parses a variant's price_override field. Blank means
-// "no override" (nil → NULL); otherwise the same formats as the base price
-// are accepted, and the amount must be positive — a zero override would
-// make the variant free rather than "inherit the base price".
+// "no override" (nil → NULL); otherwise it's parsePrice — a zero override
+// would make the variant free rather than "inherit the base price".
 func parseVariantPrice(s string) (*float64, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, nil
@@ -114,13 +137,29 @@ func parseVariantPrice(s string) (*float64, error) {
 	if err != nil {
 		return nil, err
 	}
-	if v <= 0 {
-		return nil, localizedError{"admin.price.err_not_positive"}
-	}
-	if v > maxPrice {
-		return nil, localizedError{"admin.price.err_too_big"}
-	}
 	return &v, nil
+}
+
+// variantPriceOrigFieldName is the hidden input carrying the price_override
+// an existing row was rendered with (orig_variant_price_<key>). Keyed by
+// row rather than a parallel array, so rows added in the browser (which
+// have no stored price) simply don't carry one.
+func variantPriceOrigFieldName(key string) string { return "orig_variant_price_" + key }
+
+// variantPriceChanged reports whether the submitted override differs from
+// the rendered one (origRaw, as buildVariantRows wrote it). The orig is
+// parsed leniently — any finite amount, so a stored 0 rendered as blank
+// counts as changed and gets cleared. An unparsable orig (tampered form)
+// counts as changed: the submitted value was validated on its own.
+func variantPriceChanged(submitted *float64, origRaw string) bool {
+	if strings.TrimSpace(origRaw) == "" {
+		return submitted != nil
+	}
+	orig, err := parseAmount(origRaw)
+	if err != nil {
+		return true
+	}
+	return !sameMoneyPtr(submitted, &orig)
 }
 
 // errStaleForm marks a hidden orig_ value that isn't a valid quantity —
@@ -241,12 +280,18 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 		variant := variantRowInput{Key: key, ID: id, Size: size, Color: color}
 		if pricesSubmitted {
 			row.Price = strings.TrimSpace(prices[i])
+			origRaw, hasOrig := formValue(form, variantPriceOrigFieldName(key))
+			row.PriceOrig, row.HasPriceOrig = strings.TrimSpace(origRaw), hasOrig
 			override, err := parseVariantPrice(row.Price)
 			if err != nil {
 				addErr(t.F("admin.product.err_variant_price", orEmpty(size), orEmpty(color), errText(t, err)))
 				row.PriceInvalid = true
 			}
-			variant.PriceSet, variant.PriceOverride = true, override
+			// An existing row's override is only written when it was edited
+			// (or the form predates orig_variant_price): an untouched field
+			// must not overwrite a price changed since the form was opened.
+			changed := id == "" || !hasOrig || variantPriceChanged(override, origRaw)
+			variant.PriceSet, variant.PriceOverride = changed, override
 		}
 		total := 0
 		for _, p := range points {
@@ -368,8 +413,16 @@ func buildVariantRows(t tr, variants []catalog.Variant, entries []catalog.StockE
 	rows := make([]VariantRowVM, 0, len(variants))
 	for _, v := range variants {
 		row := VariantRowVM{Key: v.ID, ID: v.ID, Size: v.Size, Color: v.Color}
+		row.HasPriceOrig = true
 		if v.PriceOverride != nil {
-			row.Price = strconv.FormatFloat(*v.PriceOverride, 'f', -1, 64)
+			// orig is the stored value verbatim; a non-positive override
+			// (legacy/import data — it would sell the variant for 0) is
+			// shown as blank, so an untouched save clears it to NULL
+			// instead of failing validation on every save.
+			row.PriceOrig = strconv.FormatFloat(*v.PriceOverride, 'f', -1, 64)
+			if *v.PriceOverride > 0 {
+				row.Price = row.PriceOrig
+			}
 		}
 		for _, p := range points {
 			cell := StockCellVM{

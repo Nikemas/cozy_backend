@@ -188,6 +188,11 @@ type VariantRowVM struct {
 	Size  string
 	Color string
 	Price string // price_override as typed/stored; "" = base price applies
+	// PriceOrig is the stored price_override the row was rendered with
+	// (orig_variant_price_<key>); HasPriceOrig renders that hidden input at
+	// all — false for rows added in the browser.
+	PriceOrig    string
+	HasPriceOrig bool
 	// PriceInvalid marks Price as rejected by validation (re-render).
 	PriceInvalid bool
 	Cells        []StockCellVM
