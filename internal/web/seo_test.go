@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,6 +58,50 @@ func TestBuildSitemapIncludesHomeLastmodAndStaticPages(t *testing.T) {
 	}
 	if got := locs["https://cozy.kg/product/11111111-1111-1111-1111-111111111111-krossovki-air"]; got != "2026-09-01" {
 		t.Errorf("product lastmod = %q, want 2026-09-01", got)
+	}
+}
+
+func TestBuildSitemapListsKyrgyzURLsWithHreflangAlternates(t *testing.T) {
+	products := []catalog.Product{{ID: "11111111-1111-1111-1111-111111111111", NameRu: "Кроссовки Air", UpdatedAt: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}}
+	set := buildSitemap("https://cozy.kg", nil, products)
+
+	byLoc := map[string]sitemapURL{}
+	for _, u := range set.URLs {
+		byLoc[u.Loc] = u
+	}
+	if len(byLoc) != len(set.URLs) {
+		t.Errorf("duplicate <loc> entries: %d urls, %d unique", len(set.URLs), len(byLoc))
+	}
+	ru := "https://cozy.kg/product/11111111-1111-1111-1111-111111111111-krossovki-air"
+	ky := ru + "?lang=ky"
+	for _, loc := range []string{ru, ky, "https://cozy.kg/", "https://cozy.kg/?lang=ky", "https://cozy.kg/delivery?lang=ky"} {
+		u, ok := byLoc[loc]
+		if !ok {
+			t.Errorf("sitemap missing %s", loc)
+			continue
+		}
+		if len(u.Alternates) != 3 {
+			t.Errorf("%s: %d alternates, want ru+ky+x-default", loc, len(u.Alternates))
+		}
+	}
+	if got := byLoc[ky].LastMod; got != "2026-09-01" {
+		t.Errorf("ky product lastmod = %q, want 2026-09-01", got)
+	}
+
+	out, err := xml.Marshal(set)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(out)
+	for _, want := range []string{
+		`xmlns:xhtml="http://www.w3.org/1999/xhtml"`,
+		`<xhtml:link rel="alternate" hreflang="ru" href="` + ru + `"></xhtml:link>`,
+		`<xhtml:link rel="alternate" hreflang="ky" href="` + ky + `"></xhtml:link>`,
+		`<xhtml:link rel="alternate" hreflang="x-default" href="` + ru + `"></xhtml:link>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sitemap XML missing %s", want)
+		}
 	}
 }
 
