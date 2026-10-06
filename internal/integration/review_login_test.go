@@ -20,7 +20,7 @@ func TestReviewLoginAgainstRealDB(t *testing.T) {
 	review := config.ReviewLogin{Phone: phone, Code: "7391"}
 	svc := auth.NewService(testDB, notify.NewMockClient(), []byte("0123456789abcdef0123456789abcdef"), config.AuthLimits{
 		OTPPerIPPerHour: 100, OTPPerDay: 1000, OTPVerifyMaxAttempts: 5, OTPVerifyFailsPerIPPerHour: 100, RefreshPerIPPerMinute: 100,
-	}, review)
+	}, review, nil)
 
 	if err := svc.RequestOTP(ctx, phone); err != nil {
 		t.Fatal(err)

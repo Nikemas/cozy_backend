@@ -47,3 +47,59 @@ func TestAdminConditionsSearchBrandAndSKU(t *testing.T) {
 		t.Fatalf("conds = %v", conds)
 	}
 }
+
+func TestSearchTokensDropsTokensBeyondMax(t *testing.T) {
+	got := searchTokens("a b c d e f g")
+	want := []string{"a", "b", "c", "d", "e"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("tokens = %v, want %v", got, want)
+	}
+}
+
+func TestSearchTokensCapsQueryRunes(t *testing.T) {
+	long := strings.Repeat("ж", maxSearchQueryRunes+50)
+	got := searchTokens(long)
+	if len(got) != 1 || len([]rune(got[0])) != maxSearchQueryRunes {
+		t.Fatalf("got %d tokens, first has %d runes", len(got), len([]rune(got[0])))
+	}
+}
+
+func TestSearchTokensRuneCapAppliesBeforeSplitting(t *testing.T) {
+	// The 101st rune starts a token that must not appear at all.
+	q := strings.Repeat("x", maxSearchQueryRunes) + " tail"
+	got := searchTokens(q)
+	if len(got) != 1 {
+		t.Fatalf("tokens = %v", got)
+	}
+}
+
+func TestSearchConditionBindsAtMostMaxTokens(t *testing.T) {
+	cond, args := searchCondition(strings.Repeat("nike ", 50), nil)
+	if len(args) != maxSearchTokens {
+		t.Fatalf("args = %d, want %d", len(args), maxSearchTokens)
+	}
+	if strings.Count(cond, "product_variants pv") != maxSearchTokens {
+		t.Fatalf("cond has %d token clauses", strings.Count(cond, "product_variants pv"))
+	}
+}
+
+func TestBuildListConditionsCapsSearchTokens(t *testing.T) {
+	_, args := buildListConditions(ListFilter{Query: "a b c d e f g h"})
+	if len(args) != maxSearchTokens {
+		t.Fatalf("args = %v", args)
+	}
+}
+
+func TestFacetConditionsCapSearchTokens(t *testing.T) {
+	_, args := buildFacetConditions(FacetFilter{Query: "a b c d e f g h"})
+	if len(args) != maxSearchTokens {
+		t.Fatalf("args = %v", args)
+	}
+}
+
+func TestAdminConditionsCapSearchTokens(t *testing.T) {
+	_, args := buildAdminListConditions(AdminListFilter{Query: "a b c d e f g h"})
+	if len(args) != maxSearchTokens {
+		t.Fatalf("args = %v", args)
+	}
+}
