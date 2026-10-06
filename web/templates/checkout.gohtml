@@ -24,6 +24,7 @@
         data-pickup-fee="{{money 0}}" data-pickup-total="{{money $d.ItemsTotal}}"
         data-flat-fee="{{money $d.DeliveryFee}}" data-flat-total="{{money $d.FlatTotal}}">
     <input type="hidden" name="idempotency_key" value="{{.Data.IdempotencyKey}}">
+    <div class="checkout-main">
     <div class="checkout-options">
       <label class="checkout-option{{if .Data.Addresses}} checkout-option--active{{end}}">
         <input type="radio" name="fulfillment" value="delivery"{{if .Data.Addresses}} checked{{end}}{{if not .Data.Addresses}} disabled{{end}}>
@@ -87,10 +88,11 @@
     </div>
     {{end}}
 
-    <label class="checkout-comment">
-      <span>{{t "checkout.comment"}}</span>
-      <textarea name="comment" rows="3" maxlength="{{.Data.CommentMaxLen}}" placeholder="{{t "checkout.comment_placeholder"}}"></textarea>
-    </label>
+    <div class="checkout-comment">
+      <label class="field-label" for="checkout-comment">{{t "checkout.comment"}}</label>
+      <textarea id="checkout-comment" name="comment" rows="3" maxlength="{{.Data.CommentMaxLen}}" placeholder="{{t "checkout.comment_placeholder"}}"></textarea>
+    </div>
+    </div>
 
     <aside class="checkout-summary">
       <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{money .Data.ItemsTotal}}</span></div>

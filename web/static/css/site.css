@@ -446,7 +446,10 @@ button, input { font-family: inherit; }
    web-plan Task 3 / Open Questions; styled to match .lang-option) ---- */
 .checkout-page h1 { font-size: var(--cozy-fs-22); font-weight: 700; margin: 0 0 20px; }
 .checkout-form { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
-.checkout-options { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 8px; }
+/* Left column: delivery, payment and the order comment, stacked; the
+   summary card sits beside it (below it on narrow screens). */
+.checkout-main { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
+.checkout-options { display: flex; flex-direction: column; gap: 8px; }
 .checkout-option {
   display: flex;
   align-items: center;
@@ -464,6 +467,26 @@ button, input { font-family: inherit; }
 .checkout-suboption { display: flex; align-items: center; gap: 9px; font-size: var(--cozy-fs-13); color: var(--cozy-ink); padding: 6px 2px; cursor: pointer; }
 .checkout-suboption input { accent-color: var(--cozy-accent); }
 .checkout-hint { margin: 0 0 4px 30px; }
+/* Order comment: label above a full-width textarea, same field look as
+   .address-form textarea. */
+.checkout-comment { display: flex; flex-direction: column; gap: 8px; }
+.checkout-comment .field-label { margin-bottom: 0; }
+.checkout-comment textarea {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  box-sizing: border-box;
+  border: 0.5px solid var(--cozy-border);
+  background: var(--cozy-surface);
+  border-radius: var(--cozy-r-12);
+  padding: 13px 16px;
+  font-family: inherit;
+  font-size: var(--cozy-fs-15);
+  line-height: 1.4;
+  color: var(--cozy-ink);
+  outline: none;
+  resize: vertical;
+}
 
 .checkout-summary {
   width: 280px;
@@ -964,6 +987,7 @@ button, input { font-family: inherit; }
 .search input:focus-visible { outline: none; }
 .form-stack input:focus-visible,
 .address-form textarea:focus-visible,
+.checkout-comment textarea:focus-visible,
 .aside__price-field input:focus-visible,
 .shop-sort select:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 1px; border-color: var(--cozy-ink-2); }
 
