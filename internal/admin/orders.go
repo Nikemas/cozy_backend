@@ -13,6 +13,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -139,6 +140,7 @@ type OrderDetailData struct {
 	// AwaitingPayment: see OrderRowView.AwaitingPayment.
 	AwaitingPayment bool
 	AddressText     string
+	MapURL          string // 2GIS search for a delivery address ("" for pickup)
 	ZoneName        string // delivery zone, in the admin's language ("" = none)
 	Comment         string
 	Items           []OrderDetailItemView
@@ -613,7 +615,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		}
 	}
 
-	addressText, comment := h.orderDeliveryInfo(ctx, o)
+	addressText, mapAddress, comment := h.orderDeliveryInfo(ctx, o)
 
 	variantIDs := make([]string, 0, len(o.Items))
 	for _, it := range o.Items {
@@ -655,6 +657,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		PaymentLabel:     paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 		AwaitingPayment:  awaitingPayment(o),
 		AddressText:      addressText,
+		MapURL:           mapSearchURL(mapAddress),
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
 		Comment:          comment,
 		Items:            items,
@@ -673,7 +676,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 // delivery order PointID instead names whichever warehouse happened to
 // fulfill it, which isn't meaningful to show here, so it's only consulted
 // in the nil-AddressID branch).
-func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (address, comment string) {
+func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (address, mapAddress, comment string) {
 	comment = "—"
 	if o.Comment != nil && *o.Comment != "" {
 		comment = *o.Comment
@@ -685,7 +688,7 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 			if a.Label != nil && *a.Label != "" {
 				address = *a.Label + ": " + address
 			}
-			return address, comment
+			return address, a.AddressText, comment
 		}
 	}
 
@@ -693,13 +696,27 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 		if pts, err := h.pointsRepo.List(ctx); err == nil {
 			for _, p := range pts {
 				if p.ID == *o.PointID {
-					return trFromContext(ctx).F("admin.order.pickup_at", p.Name, p.Address), comment
+					return trFromContext(ctx).F("admin.order.pickup_at", p.Name, p.Address), "", comment
 				}
 			}
 		}
 	}
 
-	return "—", comment
+	return "—", "", comment
+}
+
+// mapSearchBaseURL is 2GIS's search in Bishkek; the address is appended
+// as one escaped path segment.
+const mapSearchBaseURL = "https://2gis.kg/bishkek/search/"
+
+// mapSearchURL is the «На карте» link for a delivery address (staff and
+// couriers open it on a phone), or "" when there is no address.
+func mapSearchURL(address string) string {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return ""
+	}
+	return mapSearchBaseURL + url.PathEscape(address)
 }
 
 // orderStatusUpdate handles POST /admin/orders/{id}/status: the "Сменить

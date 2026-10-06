@@ -659,3 +659,4 @@ admin.import.working: Обрабатываем файл…
 # fix/admin-ux-followups
 admin.order.awaiting_payment: Ожидает оплаты
 admin.order.awaiting_payment_hint: Онлайн-оплата ещё не прошла — заказ появится в счётчике новых после оплаты
+admin.order.on_map: На карте

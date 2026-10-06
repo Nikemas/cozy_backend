@@ -656,3 +656,4 @@ admin.import.working: Файл иштетилүүдө…
 # fix/admin-ux-followups
 admin.order.awaiting_payment: Төлөм күтүлүүдө
 admin.order.awaiting_payment_hint: Онлайн төлөм али өтө элек — төлөнгөндөн кийин заказ жаңылардын санагычына кошулат
+admin.order.on_map: Картада
