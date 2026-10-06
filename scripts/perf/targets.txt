@@ -1,0 +1,28 @@
+# name  path   — ids are deterministic (md5('product-<n>')) in scripts/perf/seed.sql.
+# product-17 is active and has variants at both seed scales.
+api_products_default        /api/v1/products
+api_products_popular        /api/v1/products?sort=popular
+api_products_price_asc      /api/v1/products?sort=price_asc
+api_products_size_color     /api/v1/products?size=40&color=Черный
+api_products_in_stock       /api/v1/products?in_stock=1&size=40
+api_products_category       /api/v1/products?category=women-sneakers
+api_products_search         /api/v1/products?q=nike
+api_products_search2        /api/v1/products?q=air%20classic
+api_products_deep_page      /api/v1/products?page=80
+api_facets                  /api/v1/products/facets
+api_facets_category         /api/v1/products/facets?category=women
+api_product_detail          /api/v1/products/4ac4f6f9-97e9-cdbf-0cd4-424a240557a3
+api_categories              /api/v1/categories
+site_home                   /
+site_catalog                /catalog/women
+site_catalog_leaf_filtered  /catalog/men-sneakers?size=42&sort=popular
+site_product                /product/4ac4f6f9-97e9-cdbf-0cd4-424a240557a3-sandalii-clarks-city-17
+sitemap                     /sitemap.xml
+admin_orders                /admin/orders
+admin_orders_search         /admin/orders?q=COZY-2026
+admin_orders_deep           /admin/orders?page=200
+admin_reports_month         /admin/reports?period=prev_month
+admin_reports_year          /admin/reports?period=custom&from=2025-10-01&to=2026-09-30
+admin_products              /admin/products
+admin_products_search       /admin/products?q=nike
+admin_products_oos          /admin/products?point=820ef443-7d89-166c-6e8f-96a866059eb5&oos=1
