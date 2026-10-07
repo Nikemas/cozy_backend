@@ -229,24 +229,9 @@ MAILTO=ops@example.com
 
 На healthchecks.io для чека: период 1 день, grace 2 часа.
 
-**Восстановление Postgres** (перезаписывает текущие данные — сначала сделайте свежий дамп):
+**Восстановление Postgres** — скриптом `scripts/restore.sh` (обязательный `--target`, защита от случайной перезаписи боевой базы, восстановление одной транзакцией, проверка дампа до начала). Пошагово, вместе с остановкой backend, `migrate up` и проверкой `/readyz` — в [docs/deployment.md §8.4](docs/deployment.md); справка: `bash scripts/restore.sh --help`.
 
-```bash
-cd /opt/cozy
-C="docker compose -f docker/docker-compose.prod.yml --env-file .env"
-# дамп с другой машины, если VPS потерян:  rclone copy b2:cozy-backups/staging/postgres/cozy_YYYYMMDD_HHMMSS.dump /var/backups/cozy/postgres/
-$C stop backend                                   # никто не пишет в базу
-$C exec -T postgres dropdb -U cozy cozy
-$C exec -T postgres createdb -U cozy cozy
-$C exec -T postgres pg_restore -U cozy -d cozy --no-owner --no-acl --exit-on-error \
-  < /var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump
-bash scripts/migrate.sh version                   # версия из дампа, не dirty
-bash scripts/migrate.sh up                        # докатить миграции новее дампа
-$C start backend
-curl -fsS https://cozy.erpsystemsales.com/readyz
-```
-
-Дамп включает таблицу `schema_migrations`, так что `migrate up` докатит только миграции новее дампа. Проверить дамп без восстановления: `pg_restore --list <файл>`; восстановить в отдельную базу для проверки — `createdb cozy_check` и тот же `pg_restore -d cozy_check`. Хотя бы раз в месяц делайте такую пробную проверку.
+Дамп включает таблицу `schema_migrations`, так что `migrate up` докатит только миграции новее дампа. Хотя бы раз в месяц делайте пробное восстановление во временную базу (§8.7 там же).
 
 **Восстановление медиа** (из зеркала обратно в бакет; при потере VPS сначала `rclone copy b2:cozy-backups/staging/minio /var/backups/cozy/minio`):
 
