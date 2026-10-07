@@ -94,3 +94,15 @@ func auditSummaryArg(v any) string {
 		return auditValue(ruTr, x)
 	}
 }
+
+// russianAuditSummary renders a message into the Russian Summary stored
+// next to it (old rows, search) from the same locale template the journal
+// translates — so the stored text never drifts from admin.ru.yaml and no
+// Russian literal lives in the code.
+func russianAuditSummary(key string, args audit.Args, via string) string {
+	text, _ := fillAuditSummary(ruTr, ruTr.T(key), map[string]any(args))
+	if via != "" {
+		text += " " + ruTr.T(audit.ViaKeyPrefix+via)
+	}
+	return text
+}

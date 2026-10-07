@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/audit"
@@ -79,16 +78,17 @@ func (s *productOpsStore) BulkSetActive(ctx context.Context, ids []string, activ
 			return err
 		}
 
-		action, verb, msg := audit.ActionProductDeactivate, "деактивирован", audit.MsgProductDeactivated
+		action, msg := audit.ActionProductDeactivate, audit.MsgProductDeactivated
 		if active {
-			action, verb, msg = audit.ActionProductActivate, "активирован", audit.MsgProductActivated
+			action, msg = audit.ActionProductActivate, audit.MsgProductActivated
 		}
 		entries := make([]audit.Entry, len(changed))
 		for i, p := range changed {
+			args := audit.Args{"name": p.Name}
 			entries[i] = audit.Entry{
 				Action: action, EntityType: audit.EntityProduct, EntityID: p.ID,
-				Summary: fmt.Sprintf("Товар «%s» %s (массово)", p.Name, verb),
-				MsgKey:  msg, MsgArgs: audit.Args{"name": p.Name}, MsgVia: audit.ViaBulk,
+				Summary: russianAuditSummary(msg, args, audit.ViaBulk),
+				MsgKey:  msg, MsgArgs: args, MsgVia: audit.ViaBulk,
 				Details: map[string]any{"is_active": audit.Change{From: !active, To: active}, "bulk": true},
 			}
 		}
@@ -147,11 +147,12 @@ func (s *productOpsStore) BulkSetCategory(ctx context.Context, ids []string, cat
 				}
 				entries := make([]audit.Entry, len(changed))
 				for i, p := range changed {
+					args := audit.Args{"name": p.Name, "from": names[p.CategoryID], "to": categoryName}
 					entries[i] = audit.Entry{
 						Action: audit.ActionProductCategory, EntityType: audit.EntityProduct, EntityID: p.ID,
-						Summary: fmt.Sprintf("Товар «%s»: категория «%s» → «%s» (массово)", p.Name, names[p.CategoryID], categoryName),
+						Summary: russianAuditSummary(audit.MsgProductCategory, args, audit.ViaBulk),
 						MsgKey:  audit.MsgProductCategory, MsgVia: audit.ViaBulk,
-						MsgArgs: audit.Args{"name": p.Name, "from": names[p.CategoryID], "to": categoryName},
+						MsgArgs: args,
 						Details: map[string]any{"category_id": audit.Change{From: p.CategoryID, To: categoryID}, "bulk": true},
 					}
 				}
