@@ -506,7 +506,7 @@ admin.import.st_will_update: жаңыланат
 admin.import.st_skipped: өткөрүлдү
 admin.import.st_will_skip: өткөрүлөт
 admin.import.st_error: ката
-admin.import.dry_errors: "Текшерүү: каталар бар. Эч нерсе жазылган жок — файлды оңдоңуз же туура моделдерди гана импорттоңуз."
+admin.import.dry_errors: "Текшерүү: каталар бар. Эч нерсе жазылган жок — файлды оңдоп, кайра текшериңиз."
 admin.import.dry_ok: Текшерүү ийгиликтүү, эч нерсе жазылган жок. Импорттосоңуз болот.
 admin.import.rows: Саптар
 admin.import.with_errors: ката менен

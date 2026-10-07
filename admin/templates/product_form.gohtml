@@ -114,18 +114,18 @@
         <tbody id="pf-variant-rows">
           {{range .Variants}}
           <tr class="admin-variant-row" data-key="{{.Key}}">
-            <td><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="{{t "admin.common.size"}}"></td>
-            <td><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="{{t "admin.product.color_placeholder"}}" aria-label="{{t "admin.common.color"}}"></td>
-            <td><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="{{t "admin.product.this_color_photos"}}">
+            <td data-label="{{t "admin.common.size"}}"><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="{{t "admin.common.size"}}"></td>
+            <td data-label="{{t "admin.common.color"}}"><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="{{t "admin.product.color_placeholder"}}" aria-label="{{t "admin.common.color"}}"></td>
+            <td data-label="{{t "admin.product.color_photos"}}"><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="{{t "admin.product.this_color_photos"}}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
               <span class="admin-variant-photo-count">0</span>
             </button></td>
-            <td><input type="text" inputmode="decimal" name="variant_price" value="{{.Price}}" class="admin-variant-input admin-variant-input--price{{if .PriceInvalid}} is-invalid{{end}}" placeholder="{{t "admin.product.variant_price_placeholder"}}" aria-label="{{t "admin.product.variant_price"}}"{{if .PriceInvalid}} aria-invalid="true"{{end}}>{{if .HasPriceOrig}}<input type="hidden" name="orig_variant_price_{{.Key}}" value="{{.PriceOrig}}">{{end}}</td>
+            <td data-label="{{t "admin.product.variant_price"}}"><input type="text" inputmode="decimal" name="variant_price" value="{{.Price}}" class="admin-variant-input admin-variant-input--price{{if .PriceInvalid}} is-invalid{{end}}" placeholder="{{t "admin.product.variant_price_placeholder"}}" aria-label="{{t "admin.product.variant_price"}}"{{if .PriceInvalid}} aria-invalid="true"{{end}}>{{if .HasPriceOrig}}<input type="hidden" name="orig_variant_price_{{.Key}}" value="{{.PriceOrig}}">{{end}}</td>
             {{range .Cells}}
-            <td><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
+            <td class="admin-variant-cell--qty" data-label="{{.PointName}}"><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
             {{end}}
-            <td><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
-            <td><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="{{t "admin.product.remove_variant"}}">
+            <td class="admin-variant-cell--total" data-label="{{t "admin.product.total"}}"><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
+            <td class="admin-variant-cell--remove"><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="{{t "admin.product.remove_variant"}}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
             </button></td>
           </tr>
@@ -241,6 +241,8 @@
     variantPrice: {{t "admin.product.variant_price"}},
     variantPricePlaceholder: {{t "admin.product.variant_price_placeholder"}},
     thisColorPhotos: {{t "admin.product.this_color_photos"}},
+    colorPhotos: {{t "admin.product.color_photos"}},
+    total: {{t "admin.product.total"}},
     stock: {{t "admin.common.stock"}},
     removeVariant: {{t "admin.product.remove_variant"}},
     mainPhoto: {{t "admin.product.main_photo"}},
@@ -453,17 +455,17 @@
     var tbody = document.getElementById('pf-variant-rows');
     var tr = el('tr', { 'class': 'admin-variant-row', 'data-key': key });
 
-    var tdSize = el('td');
+    var tdSize = el('td', { 'data-label': L.size });
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_key', value: key }));
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_id', value: '' }));
     tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': L.size }));
     tr.appendChild(tdSize);
 
-    var tdColor = el('td');
+    var tdColor = el('td', { 'data-label': L.color });
     tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', 'class': 'admin-variant-input', placeholder: L.colorPlaceholder, 'aria-label': L.color }));
     tr.appendChild(tdColor);
 
-    var tdPhoto = el('td');
+    var tdPhoto = el('td', { 'data-label': L.colorPhotos });
     tdPhoto.innerHTML = '<button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg><span class="admin-variant-photo-count">0</span></button>';
     tdPhoto.firstChild.setAttribute('aria-label', L.thisColorPhotos);
     tr.appendChild(tdPhoto);
@@ -472,12 +474,12 @@
     // every row must carry one, or the server ignores all of them. A new
     // row gets no orig_variant_price_<key>: it has no stored price, so the
     // server always takes what was typed (see product_form_parse.go).
-    var tdPrice = el('td');
+    var tdPrice = el('td', { 'data-label': L.variantPrice });
     tdPrice.appendChild(el('input', { type: 'text', inputmode: 'decimal', name: 'variant_price', value: '', 'class': 'admin-variant-input admin-variant-input--price', placeholder: L.variantPricePlaceholder, 'aria-label': L.variantPrice }));
     tr.appendChild(tdPrice);
 
     stockPoints.forEach(function (p) {
-      var td = el('td');
+      var td = el('td', { 'class': 'admin-variant-cell--qty', 'data-label': p.Name });
       var input = el('input', {
         type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric',
         name: 'qty_' + key + '_' + p.ID, value: '0',
@@ -489,12 +491,12 @@
       tr.appendChild(td);
     });
 
-    var tdBadge = el('td');
+    var tdBadge = el('td', { 'class': 'admin-variant-cell--total', 'data-label': L.total });
     tdBadge.innerHTML = '<span class="admin-chip admin-variant-badge" style="color:#C62828;background:#FFEBEE"></span>';
     tdBadge.firstChild.textContent = L.outOfStock;
     tr.appendChild(tdBadge);
 
-    var tdRemove = el('td');
+    var tdRemove = el('td', { 'class': 'admin-variant-cell--remove' });
     tdRemove.innerHTML = '<button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
     tdRemove.firstChild.setAttribute('aria-label', L.removeVariant);
     tr.appendChild(tdRemove);

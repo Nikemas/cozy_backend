@@ -153,7 +153,30 @@ func TestRenderProductFormExecutes(t *testing.T) {
 			if w.Code != 200 {
 				t.Fatalf("status = %d, want 200", w.Code)
 			}
+			if c.name == "edit" {
+				assertVariantCardLabels(t, w.Body.String())
+			}
 		})
+	}
+}
+
+// assertVariantCardLabels: every variant cell carries the caption the
+// phone layout (stacked cards, admin.css <640px) shows above its input,
+// and the inputs keep their submission names.
+func assertVariantCardLabels(t *testing.T, body string) {
+	t.Helper()
+	for _, want := range []string{
+		`<td data-label="Размер"><input type="hidden" name="variant_key"`,
+		`<td data-label="Цвет"><input type="text" name="variant_color"`,
+		`<td data-label="Цена, сом"><input type="text" inputmode="decimal" name="variant_price"`,
+		`<td class="admin-variant-cell--qty" data-label="Главный склад"><input type="number"`,
+		`<td class="admin-variant-cell--qty" data-label="Дордой"><input type="number"`,
+		`<td class="admin-variant-cell--remove"><button type="button" class="admin-variant-remove"`,
+		`'data-label': L.size`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("product form lacks %q", want)
+		}
 	}
 }
 

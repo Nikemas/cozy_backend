@@ -509,7 +509,7 @@ admin.import.st_will_update: будет обновлено
 admin.import.st_skipped: пропущено
 admin.import.st_will_skip: будет пропущено
 admin.import.st_error: ошибка
-admin.import.dry_errors: "Проверка: есть ошибки. Ничего не записано — исправьте файл или импортируйте только корректные модели."
+admin.import.dry_errors: "Проверка: есть ошибки. Ничего не записано — исправьте файл и проверьте его ещё раз."
 admin.import.dry_ok: Проверка пройдена, ничего не записано. Можно импортировать.
 admin.import.rows: Строк
 admin.import.with_errors: с ошибками
