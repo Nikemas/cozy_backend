@@ -4,6 +4,7 @@ package integration
 
 import (
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -105,5 +106,40 @@ func TestSalesSQLMatchesAggregateSales(t *testing.T) {
 	}
 	if len(cats) != 1 || cats[0].OrderCount != 3 || cats[0].ItemCount != 7 || math.Abs(cats[0].Revenue-8200.4) > 1e-6 {
 		t.Errorf("CategorySales = %+v, want one row 3 orders / 7 items / 8200.40", cats)
+	}
+
+	// Brands (moved from the admin package): same sale lines, so the rows
+	// add up to the category total.
+	brands, err := repo.BrandSales(ctx, from, to)
+	if err != nil {
+		t.Fatalf("BrandSales: %v", err)
+	}
+	var brandRevenue float64
+	for _, b := range brands {
+		brandRevenue += b.Revenue
+	}
+	if len(brands) == 0 || math.Abs(brandRevenue-8200.4) > 1e-6 {
+		t.Errorf("BrandSales = %+v, want revenue summing to 8200.40", brands)
+	}
+
+	// The cached layer serves exactly the repo's rows, first load and hit.
+	cached := reports.NewCachedRepo(repo, reports.CacheConfig{})
+	for pass := range 2 {
+		got, err := cached.Sales(ctx, from, to, reports.GroupByPoint, names)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := repo.Sales(ctx, from, to, reports.GroupByPoint, names)
+		if !slices.Equal(got, want) {
+			t.Errorf("pass %d: cached Sales = %+v, want %+v", pass, got, want)
+		}
+		gotBrands, err := cached.BrandSales(ctx, from, to)
+		if err != nil || !slices.Equal(gotBrands, brands) {
+			t.Errorf("pass %d: cached BrandSales = %+v (%v), want %+v", pass, gotBrands, err, brands)
+		}
+		gotCats, err := cached.CategorySales(ctx, from, to)
+		if err != nil || !slices.Equal(gotCats, cats) {
+			t.Errorf("pass %d: cached CategorySales = %+v (%v), want %+v", pass, gotCats, err, cats)
+		}
 	}
 }
