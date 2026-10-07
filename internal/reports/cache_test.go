@@ -17,10 +17,26 @@ type fakeSource struct {
 	// gate, when set, blocks every load until closed (singleflight test).
 	gate    chan struct{}
 	started chan struct{}
+	// panicMsg, when set, makes every load panic.
+	panicMsg atomic.Value
+	// inFlight / maxInFlight track concurrent loads (semaphore test).
+	inFlight    atomic.Int64
+	maxInFlight atomic.Int64
 }
 
 func (f *fakeSource) rows(label string, from, to time.Time) ([]Row, error) {
 	f.calls.Add(1)
+	n := f.inFlight.Add(1)
+	defer f.inFlight.Add(-1)
+	for {
+		m := f.maxInFlight.Load()
+		if n <= m || f.maxInFlight.CompareAndSwap(m, n) {
+			break
+		}
+	}
+	if msg, ok := f.panicMsg.Load().(string); ok && msg != "" {
+		panic(msg)
+	}
 	if f.started != nil {
 		select {
 		case f.started <- struct{}{}:
@@ -333,10 +349,210 @@ func TestCachedRepo_PointNamesPassesThrough(t *testing.T) {
 
 func TestNewCachedRepo_Defaults(t *testing.T) {
 	c := NewCachedRepo(&fakeSource{}, CacheConfig{})
-	if c.cfg.TTL != DefaultCacheTTL || c.cfg.OpenTTL != DefaultOpenCacheTTL || c.cfg.MaxEntries != DefaultCacheMaxEntries || c.cfg.Now == nil {
+	if c.cfg.TTL != DefaultCacheTTL || c.cfg.OpenTTL != DefaultOpenCacheTTL || c.cfg.MaxEntries != DefaultCacheMaxEntries ||
+		c.cfg.MaxConcurrentLoads != DefaultCacheMaxConcurrentLoads || c.cfg.Now == nil {
 		t.Fatalf("defaults not applied: %+v", c.cfg)
 	}
 	if DefaultCacheTTL > 5*time.Minute || DefaultOpenCacheTTL > DefaultCacheTTL {
 		t.Fatalf("TTLs too long: closed %v, open %v", DefaultCacheTTL, DefaultOpenCacheTTL)
+	}
+}
+
+// waitFor polls cond until it holds or the test times out.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestCachedRepo_PanicInQueryBecomesErrorAndIsNotCached(t *testing.T) {
+	src := &fakeSource{}
+	src.panicMsg.Store("boom")
+	c, _ := newTestCache(src, 0)
+	ctx := context.Background()
+
+	_, err := c.CategorySales(ctx, closedFrom, closedTo)
+	if !errors.Is(err, ErrQueryPanicked) {
+		t.Fatalf("err = %v, want ErrQueryPanicked", err)
+	}
+
+	src.panicMsg.Store("")
+	rows, err := c.CategorySales(ctx, closedFrom, closedTo)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("after panic: rows=%v err=%v, want a fresh load", rows, err)
+	}
+}
+
+func TestCachedRepo_CancelledContextStartsNoQuery(t *testing.T) {
+	src := &fakeSource{}
+	c, _ := newTestCache(src, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := c.BrandSales(ctx, closedFrom, closedTo); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if got := src.calls.Load(); got != 0 {
+		t.Fatalf("source calls = %d, want 0", got)
+	}
+}
+
+func TestCachedRepo_CapsConcurrentDistinctLoads(t *testing.T) {
+	const limit, keys = 2, 6
+	src := &fakeSource{gate: make(chan struct{})}
+	c := NewCachedRepo(src, CacheConfig{MaxConcurrentLoads: limit, Now: func() time.Time { return cacheNow }})
+	ctx := context.Background()
+
+	var wg sync.WaitGroup
+	errs := make([]error, keys)
+	for i := range keys {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = c.CategorySales(ctx, closedFrom.AddDate(0, 0, i), closedTo)
+		}()
+	}
+	waitFor(t, "loads to start", func() bool { return src.inFlight.Load() == limit })
+	time.Sleep(50 * time.Millisecond) // the others are queued, not running
+	if got := src.maxInFlight.Load(); got != limit {
+		t.Fatalf("concurrent loads = %d, want %d", got, limit)
+	}
+	close(src.gate)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("key %d: %v", i, err)
+		}
+	}
+	if got := src.maxInFlight.Load(); got > limit {
+		t.Fatalf("concurrent loads peaked at %d, want <= %d", got, limit)
+	}
+}
+
+func TestCachedRepo_WaitForLoadSlotHonoursCallerContext(t *testing.T) {
+	src := &fakeSource{gate: make(chan struct{})}
+	c := NewCachedRepo(src, CacheConfig{MaxConcurrentLoads: 1, Now: func() time.Time { return cacheNow }})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.BrandSales(context.Background(), closedFrom, closedTo)
+		done <- err
+	}()
+	waitFor(t, "slot holder to start", func() bool { return src.inFlight.Load() == 1 })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := c.CategorySales(ctx, closedFrom, closedTo); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("queued caller err = %v, want context.DeadlineExceeded", err)
+	}
+	if got := src.calls.Load(); got != 1 {
+		t.Fatalf("source calls = %d, want 1 (queued query never ran)", got)
+	}
+
+	close(src.gate)
+	if err := <-done; err != nil {
+		t.Fatalf("slot holder err = %v", err)
+	}
+}
+
+func TestCachedRepo_CancelledLeaderDoesNotFailOtherWaiters(t *testing.T) {
+	src := &fakeSource{gate: make(chan struct{}), started: make(chan struct{}, 1)}
+	c, _ := newTestCache(src, 0)
+
+	leaderCtx, cancelLeader := context.WithCancel(context.Background())
+	leaderDone := make(chan error, 1)
+	go func() {
+		_, err := c.Sales(leaderCtx, closedFrom, closedTo, GroupByDay, nil)
+		leaderDone <- err
+	}()
+	<-src.started
+
+	waiterDone := make(chan error, 1)
+	go func() {
+		rows, err := c.Sales(context.Background(), closedFrom, closedTo, GroupByDay, nil)
+		if err == nil && len(rows) != 1 {
+			err = errors.New("no rows")
+		}
+		waiterDone <- err
+	}()
+	time.Sleep(50 * time.Millisecond) // waiter joins the flight
+
+	cancelLeader()
+	if err := <-leaderDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("leader err = %v, want context.Canceled", err)
+	}
+	close(src.gate)
+	if err := <-waiterDone; err != nil {
+		t.Fatalf("waiter failed because the leader went away: %v", err)
+	}
+	if got := src.calls.Load(); got != 1 {
+		t.Fatalf("source calls = %d, want 1", got)
+	}
+}
+
+func TestCachedRepo_LeaderCancelledWhileQueuedDoesNotFailWaiters(t *testing.T) {
+	src := &fakeSource{gate: make(chan struct{})}
+	c := NewCachedRepo(src, CacheConfig{MaxConcurrentLoads: 1, Now: func() time.Time { return cacheNow }})
+
+	// Occupy the only load slot.
+	holderDone := make(chan error, 1)
+	go func() {
+		_, err := c.BrandSales(context.Background(), closedFrom, closedTo)
+		holderDone <- err
+	}()
+	waitFor(t, "slot holder to start", func() bool { return src.inFlight.Load() == 1 })
+
+	// A leader queues for the slot; a waiter joins its flight.
+	leaderCtx, cancelLeader := context.WithCancel(context.Background())
+	leaderDone := make(chan error, 1)
+	go func() {
+		_, err := c.CategorySales(leaderCtx, closedFrom, closedTo)
+		leaderDone <- err
+	}()
+	time.Sleep(20 * time.Millisecond)
+	waiterDone := make(chan error, 1)
+	go func() {
+		rows, err := c.CategorySales(context.Background(), closedFrom, closedTo)
+		if err == nil && len(rows) != 1 {
+			err = errors.New("no rows")
+		}
+		waiterDone <- err
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	cancelLeader()
+	if err := <-leaderDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("leader err = %v, want context.Canceled", err)
+	}
+	close(src.gate)
+	if err := <-waiterDone; err != nil {
+		t.Fatalf("waiter failed because the queued leader went away: %v", err)
+	}
+	if err := <-holderDone; err != nil {
+		t.Fatalf("slot holder err = %v", err)
+	}
+}
+
+func TestCachedRepo_KeyHandlesYearsOutsideUnixNanoRange(t *testing.T) {
+	src := &fakeSource{}
+	c, _ := newTestCache(src, 0)
+	ctx := context.Background()
+	to := time.Date(3000, 1, 1, 0, 0, 0, 0, Location)
+
+	// UnixNano is undefined outside ~1678..2262; distinct far years must
+	// still be distinct keys.
+	for _, year := range []int{1000, 1001, 1600} {
+		if _, err := c.CategorySales(ctx, time.Date(year, 1, 1, 0, 0, 0, 0, Location), to); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := src.calls.Load(); got != 3 {
+		t.Fatalf("source calls = %d, want 3 (one per distinct range)", got)
 	}
 }

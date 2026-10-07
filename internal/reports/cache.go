@@ -3,6 +3,10 @@ package reports
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"slices"
 	"sync"
 	"time"
@@ -25,6 +29,11 @@ const (
 	DefaultCacheTTL        = 5 * time.Minute
 	DefaultOpenCacheTTL    = time.Minute
 	DefaultCacheMaxEntries = 256
+	// DefaultCacheMaxConcurrentLoads caps distinct report queries running
+	// at once (identical ones already share a flight): loads are detached
+	// from their requests, so without a cap many distinct ranges could pile
+	// up queries no request is waiting for any more.
+	DefaultCacheMaxConcurrentLoads = 4
 
 	// cacheLoadTimeout bounds a shared load: it runs detached from the
 	// request that started it (see CachedRepo.load), so a client hanging up
@@ -34,10 +43,12 @@ const (
 
 // CacheConfig tunes CachedRepo; zero fields take the defaults above.
 type CacheConfig struct {
-	TTL        time.Duration    // ranges that end before now
-	OpenTTL    time.Duration    // ranges that include now (today)
-	MaxEntries int              // bound on cached results
-	Now        func() time.Time // clock, injectable for tests
+	TTL        time.Duration // ranges that end before now
+	OpenTTL    time.Duration // ranges that include now (today)
+	MaxEntries int           // bound on cached results
+	// MaxConcurrentLoads caps distinct queries running at once.
+	MaxConcurrentLoads int
+	Now                func() time.Time // clock, injectable for tests
 }
 
 func (c CacheConfig) withDefaults() CacheConfig {
@@ -50,6 +61,9 @@ func (c CacheConfig) withDefaults() CacheConfig {
 	if c.MaxEntries <= 0 {
 		c.MaxEntries = DefaultCacheMaxEntries
 	}
+	if c.MaxConcurrentLoads <= 0 {
+		c.MaxConcurrentLoads = DefaultCacheMaxConcurrentLoads
+	}
 	if c.Now == nil {
 		c.Now = time.Now
 	}
@@ -60,8 +74,9 @@ func (c CacheConfig) withDefaults() CacheConfig {
 // aggregate queries (Sales, BrandSales, CategorySales): a year-long report
 // costs Postgres a scan of every order row in the year, and 20 concurrent
 // identical requests used to run it 20 times. Concurrent requests for the
-// same key share one query (singleflight); results are kept briefly
-// (CacheConfig) and only when the query succeeded.
+// same key share one query (singleflight); distinct queries run at most
+// MaxConcurrentLoads at a time; results are kept briefly (CacheConfig) and
+// only when the query succeeded.
 //
 // The cache key is the query name plus every argument that reaches SQL
 // or shapes the rows: from, to, groupBy and the pointNames map. That is
@@ -77,6 +92,8 @@ type CachedRepo struct {
 	src   Source
 	cfg   CacheConfig
 	group singleflight.Group
+	// loadSlots is a semaphore of MaxConcurrentLoads slots.
+	loadSlots chan struct{}
 
 	mu      sync.Mutex
 	entries map[string]cacheEntry
@@ -89,15 +106,32 @@ type cacheEntry struct {
 
 // NewCachedRepo wraps src with a result cache configured by cfg.
 func NewCachedRepo(src Source, cfg CacheConfig) *CachedRepo {
-	return &CachedRepo{src: src, cfg: cfg.withDefaults(), entries: make(map[string]cacheEntry)}
+	cfg = cfg.withDefaults()
+	return &CachedRepo{
+		src:       src,
+		cfg:       cfg,
+		loadSlots: make(chan struct{}, cfg.MaxConcurrentLoads),
+		entries:   make(map[string]cacheEntry),
+	}
 }
 
-// cacheKey identifies one query result. Times are stored as UnixNano so the
-// same instant in another *time.Location shares the entry.
+// ErrQueryPanicked is returned (wrapped) when a report query panics: the
+// panic is recovered inside the shared load — singleflight would re-panic
+// it on a fresh goroutine, killing the process — and becomes an error.
+var ErrQueryPanicked = errors.New("reports: report query panicked")
+
+// errLoadAbandoned is a flight's result when its leader's context ended
+// while it was still queued for a load slot: no query ran, so the waiters
+// that joined the flight retry instead of failing.
+var errLoadAbandoned = errors.New("reports: load abandoned before it started")
+
+// cacheKey identifies one query result. Times are stored as UTC RFC 3339
+// text: the same instant in another *time.Location shares the entry, and
+// unlike UnixNano it is exact for any year the handlers accept (0000-9999).
 type cacheKey struct {
 	Query      string            `json:"q"`
-	From       int64             `json:"f"`
-	To         int64             `json:"t"`
+	From       string            `json:"f"`
+	To         string            `json:"t"`
 	GroupBy    GroupBy           `json:"g,omitempty"`
 	PointNames map[string]string `json:"p,omitempty"`
 }
@@ -109,22 +143,24 @@ func (k cacheKey) String() (string, error) {
 	return string(b), err
 }
 
+func keyTime(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+
 func (c *CachedRepo) Sales(ctx context.Context, from, to time.Time, groupBy GroupBy, pointNames map[string]string) ([]Row, error) {
-	key := cacheKey{Query: "sales", From: from.UnixNano(), To: to.UnixNano(), GroupBy: groupBy, PointNames: pointNames}
+	key := cacheKey{Query: "sales", From: keyTime(from), To: keyTime(to), GroupBy: groupBy, PointNames: pointNames}
 	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.Sales(ctx, from, to, groupBy, pointNames)
 	})
 }
 
 func (c *CachedRepo) BrandSales(ctx context.Context, from, to time.Time) ([]Row, error) {
-	key := cacheKey{Query: "brand", From: from.UnixNano(), To: to.UnixNano()}
+	key := cacheKey{Query: "brand", From: keyTime(from), To: keyTime(to)}
 	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.BrandSales(ctx, from, to)
 	})
 }
 
 func (c *CachedRepo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, error) {
-	key := cacheKey{Query: "category", From: from.UnixNano(), To: to.UnixNano()}
+	key := cacheKey{Query: "category", From: keyTime(from), To: keyTime(to)}
 	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.CategorySales(ctx, from, to)
 	})
@@ -151,36 +187,67 @@ func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query
 	if err != nil {
 		return nil, err
 	}
-	if rows, ok := c.lookup(k); ok {
-		return slices.Clone(rows), nil
-	}
-
-	ch := c.group.DoChan(k, func() (any, error) {
-		if rows, ok := c.lookup(k); ok { // a flight finished since the miss
-			return rows, nil
-		}
-		// Detached from ctx: the result is shared with other waiters, who
-		// must not fail because the first requester went away.
-		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheLoadTimeout)
-		defer cancel()
-		rows, err := query(loadCtx)
-		if err != nil {
+	// Loops only when the flight this caller joined was abandoned by its
+	// leader before any query ran; each pass either finds the result,
+	// joins another flight or leads one itself, and ends with ctx.
+	for {
+		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		c.store(k, rows, to)
-		return rows, nil
-	})
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case res := <-ch:
-		if res.Err != nil {
-			return nil, res.Err
+		if rows, ok := c.lookup(k); ok {
+			return slices.Clone(rows), nil
 		}
-		rows, _ := res.Val.([]Row)
-		return slices.Clone(rows), nil
+
+		ch := c.group.DoChan(k, func() (any, error) {
+			return c.flight(ctx, k, to, query)
+		})
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case res := <-ch:
+			if errors.Is(res.Err, errLoadAbandoned) {
+				continue
+			}
+			if res.Err != nil {
+				return nil, res.Err
+			}
+			rows, _ := res.Val.([]Row)
+			return slices.Clone(rows), nil
+		}
 	}
+}
+
+// flight is the body of one shared load. It waits for a load slot while
+// its leader (ctx) is still interested, then runs query detached from ctx
+// — the result is shared with other waiters, who must not fail because
+// the first requester went away — bounded by cacheLoadTimeout. A panic in
+// query is recovered and returned as ErrQueryPanicked.
+func (c *CachedRepo) flight(ctx context.Context, k string, to time.Time, query func(context.Context) ([]Row, error)) (val any, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			slog.Error("reports: report query panicked", "key", k, "panic", p, "stack", string(debug.Stack()))
+			val, err = nil, fmt.Errorf("%w: %v", ErrQueryPanicked, p)
+		}
+	}()
+
+	if rows, ok := c.lookup(k); ok { // a flight finished since the miss
+		return rows, nil
+	}
+	select {
+	case c.loadSlots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, errLoadAbandoned
+	}
+	defer func() { <-c.loadSlots }()
+
+	loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheLoadTimeout)
+	defer cancel()
+	rows, err := query(loadCtx)
+	if err != nil {
+		return nil, err
+	}
+	c.store(k, rows, to)
+	return rows, nil
 }
 
 func (c *CachedRepo) lookup(k string) ([]Row, bool) {
