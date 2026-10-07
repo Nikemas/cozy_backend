@@ -16,6 +16,11 @@
 # reflects it, so both languages are fetched with ?lang= and that attribute
 # is asserted.
 #
+# Stage 5 checks: the home page loads nothing from public CDNs (unpkg,
+# Google Fonts), the hashed htmx and a font come back with a long
+# Cache-Control, and the API's Kyrgyz color labels (facets color_options +
+# Vary: Accept-Language, color_label on product variants) are in place.
+#
 # Settings (env vars, optional):
 #   SMOKE_TIMEOUT  seconds per request (default 15)
 set -u
@@ -27,6 +32,9 @@ TIMEOUT="${SMOKE_TIMEOUT:-15}"
 STATIC_PAGES="about contacts delivery privacy terms"
 LANGS="ru ky"
 MAX_EXIT=125
+# Long-lived cache for ?v=<hash> static URLs: at least 30 days.
+MIN_ASSET_MAX_AGE=2592000
+CDN_PATTERN='unpkg\.com|googleapis\.com|gstatic\.com'
 
 if [ -z "$BASE" ]; then
   sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
@@ -73,9 +81,19 @@ fail() {
 
 # fetch PATH: GET $BASE$PATH without following redirects. Sets CODE
 # ("000" on a network error) and CTYPE; body in $BODY, headers in $HEADERS.
+# REQ_LANG, if set, is sent as Accept-Language.
+REQ_LANG=""
 fetch() {
-  CODE="$(curl -sS -m "$TIMEOUT" -o "$BODY" -D "$HEADERS" -w '%{http_code}' "$BASE$1" 2>"$WORK/err")" || CODE="000"
-  CTYPE="$(grep -i '^content-type:' "$HEADERS" 2>/dev/null | tail -n1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//')"
+  # An empty header ("X-Smoke:") makes curl send nothing extra.
+  local lang_header="X-Smoke:"
+  [ -z "$REQ_LANG" ] || lang_header="Accept-Language: $REQ_LANG"
+  CODE="$(curl -sS -m "$TIMEOUT" -H "$lang_header" -o "$BODY" -D "$HEADERS" -w '%{http_code}' "$BASE$1" 2>"$WORK/err")" || CODE="000"
+  CTYPE="$(header_value content-type)"
+}
+
+# header_value NAME: last value of response header NAME (case-insensitive).
+header_value() {
+  grep -i "^$1:" "$HEADERS" 2>/dev/null | tail -n1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//'
 }
 
 # body_problems [NEEDLE...]: prints why the body is bad, nothing if it's
@@ -131,6 +149,28 @@ check() {
     return 1
   fi
   pass "$name ($path $CODE)"
+}
+
+# check_asset NAME PATH: PATH must be 200 with Cache-Control max-age of at
+# least MIN_ASSET_MAX_AGE (hashed ?v= URLs are cached for a year).
+check_asset() {
+  local name="$1" path="$2" cc age
+  if [ -z "$path" ]; then
+    fail "$name" "no such asset URL on the home page"
+    return 1
+  fi
+  fetch "$path"
+  if [ "$CODE" != "200" ]; then
+    fail "$name" "GET $path: HTTP $CODE, want 200"
+    return 1
+  fi
+  cc="$(header_value cache-control)"
+  age="$(printf '%s' "$cc" | sed -n 's/.*max-age=\([0-9][0-9]*\).*/\1/p')"
+  if [ -z "$age" ] || [ "$age" -lt "$MIN_ASSET_MAX_AGE" ]; then
+    fail "$name" "GET $path: Cache-Control \"$cc\", want max-age>=$MIN_ASSET_MAX_AGE"
+    return 1
+  fi
+  pass "$name ($path max-age=$age)"
 }
 
 # first_link PREFIX: first href="PREFIX<slug>" in $BODY, slug only.
@@ -190,6 +230,41 @@ check "robots" /robots.txt 200 text 'User-agent:' 'Sitemap:'
 # --- public API ---------------------------------------------------------
 check "api points" /api/v1/points 200 json '"items"'
 check "api app config" /api/v1/app/config 200 json '"min_version"' '"delivery_fee"'
+
+# --- stage 5: self-hosted assets, no CDNs --------------------------------
+HTMX_URL=""
+FONT_URL=""
+if check "home ky" "/?lang=ky" 200 html '<html lang="ky"'; then
+  if grep -qE "$CDN_PATTERN" "$BODY"; then
+    fail "no CDN" "home page references $(grep -oE "$CDN_PATTERN" "$BODY" | sort -u | tr '\n' ' ')"
+  else
+    pass "no CDN (home has no unpkg/googleapis/gstatic)"
+  fi
+  HTMX_URL="$(grep -oE '/static/js/htmx\.min\.js\?v=[0-9a-f]+' "$BODY" | head -n1)"
+  FONT_URL="$(grep -oE '/static/fonts/manrope-[a-z-]+\.woff2\?v=[0-9a-f]+' "$BODY" | head -n1)"
+fi
+check_asset "htmx hashed" "$HTMX_URL"
+check_asset "font hashed" "$FONT_URL"
+
+# --- stage 5: Kyrgyz color labels in the API -----------------------------
+REQ_LANG="ky"
+if check "api facets ky" /api/v1/products/facets 200 json '"color_options"' '"label"'; then
+  vary="$(grep -i '^vary:' "$HEADERS" | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//' | paste -sd, -)"
+  case "$(printf '%s' "$vary" | tr '[:upper:]' '[:lower:]')" in
+    *accept-language*) pass "api facets Vary ($vary)" ;;
+    *) fail "api facets Vary" "Vary \"$vary\", want Accept-Language" ;;
+  esac
+fi
+API_PRODUCT=""
+if check "api products in stock" "/api/v1/products?in_stock=1&page_size=1" 200 json '"items"'; then
+  API_PRODUCT="$(grep -oE '"items":\[\{"id":"[^"]+"' "$BODY" | head -n1 | sed 's/.*"id":"//; s/"$//')"
+fi
+if [ -n "$API_PRODUCT" ]; then
+  check "api product color_label" "/api/v1/products/$API_PRODUCT" 200 json '"variants":[{' '"color_label"'
+else
+  fail "api product color_label" "no in-stock product id in /api/v1/products"
+fi
+REQ_LANG=""
 
 # --- 404 ----------------------------------------------------------------
 check "404 html" "/smoke-no-such-page-$$" 404 html '<html'
