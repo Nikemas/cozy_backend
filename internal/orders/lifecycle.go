@@ -331,6 +331,16 @@ func (s *Service) CancelByCustomer(ctx context.Context, customerID, idOrNumber s
 	return &list[0], nil
 }
 
+// Notes of the automatic (system) cancellations of unpaid online orders.
+// They are stable codes, not text: order_status_history.note keeps the
+// code and the admin panel shows it in the viewer's language
+// (admin.history.note.<code>). Staff-written notes stay free text.
+const (
+	NotePaymentExpired    = "payment_expired"     // not paid in time
+	NotePaymentOpenFailed = "payment_open_failed" // the payment could not be opened
+	NotePaymentCancelled  = "payment_cancelled"   // the customer cancelled the payment
+)
+
 // CancelUnpaidOrderTx cancels orderID and returns its reserved stock,
 // inside the caller's transaction — the compensating action for a failed,
 // cancelled or expired online payment (the caller has already written the

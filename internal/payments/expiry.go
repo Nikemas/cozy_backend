@@ -102,7 +102,7 @@ func (s *Service) expireOne(ctx context.Context, orderID string, ttl time.Durati
 		if !still {
 			return nil // paid, retried or cancelled in the meantime
 		}
-		ok, err := orders.CancelUnpaidOrderTx(ctx, tx, orderID, "не оплачен вовремя")
+		ok, err := orders.CancelUnpaidOrderTx(ctx, tx, orderID, orders.NotePaymentExpired)
 		if err != nil {
 			return err
 		}

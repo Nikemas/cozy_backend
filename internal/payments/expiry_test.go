@@ -25,7 +25,7 @@ func TestExpirePendingCancelsOrderAndReturnsStock(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM orders o WHERE")).
 		WithArgs((30 * time.Minute).Seconds(), "order-1").
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	expectCancelUnpaid(mock, StatusPending, "не оплачен вовремя")
+	expectCancelUnpaid(mock, StatusPending, orders.NotePaymentExpired)
 	mock.ExpectCommit()
 
 	// order-2: paid/retried between the scan and the lock → untouched.

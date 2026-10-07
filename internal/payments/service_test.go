@@ -394,7 +394,7 @@ func TestHandleCallbackCancelledCancelsOrderAndReturnsStock(t *testing.T) {
 		WithArgs(StatusCancelled, sqlmock.AnyArg(), "pay-1").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("UPDATE orders SET payment_status")).
 		WithArgs(StatusCancelled, "order-1").WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("placed"))
-	expectCancelUnpaid(mock, StatusCancelled, "оплата отменена покупателем")
+	expectCancelUnpaid(mock, StatusCancelled, orders.NotePaymentCancelled)
 	mock.ExpectCommit()
 
 	res, err := svc.HandleCallback(context.Background(), MockProviderName, h, body)
@@ -545,7 +545,7 @@ func TestPlaceOnlineOrderProviderFailureCancelsOrder(t *testing.T) {
 	// fresh order rather than replaying this cancelled one.
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE orders SET payment_status = 'failed', idempotency_key = NULL")).
 		WithArgs("order-1").WillReturnResult(sqlmock.NewResult(0, 1))
-	expectCancelUnpaid(mock, StatusFailed, "не удалось открыть платёж")
+	expectCancelUnpaid(mock, StatusFailed, orders.NotePaymentOpenFailed)
 	mock.ExpectCommit()
 
 	_, _, _, err := svc.PlaceOnlineOrder(context.Background(), orders.PlaceOrderInput{CustomerID: "cust-1"})

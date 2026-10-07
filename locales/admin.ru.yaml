@@ -718,3 +718,8 @@ admin.import.tpl.hint.sku: Уникальный код вариации (штр�
 admin.import.tpl.hint.quantity: Целое число ≥ 0 — остаток на точке продаж, выбранной при импорте (заменяет текущий остаток).
 admin.import.tpl.hint.description_ru: Описание на русском. Пустая ячейка не стирает уже заполненное описание.
 admin.import.tpl.hint.description_ky: Описание на кыргызском.
+
+# fix/admin-polish: system notes of automatic cancellations (orders.Note*)
+admin.history.note.payment_expired: Не оплачен вовремя
+admin.history.note.payment_open_failed: Не удалось открыть платёж
+admin.history.note.payment_cancelled: Оплата отменена покупателем

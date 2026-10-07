@@ -10,7 +10,7 @@ import (
 func TestBuildOrderHistoryData(t *testing.T) {
 	placed := orders.StatusPlaced
 	name := "Айгуль"
-	note := "не оплачен вовремя"
+	note := "позвонить перед доставкой"
 	at := time.Date(2026, 9, 24, 10, 5, 0, 0, time.UTC)
 	d := buildOrderHistoryData(ruTr, &orders.Order{
 		DeliveryFee:    200,
@@ -35,5 +35,33 @@ func TestBuildOrderHistoryData(t *testing.T) {
 	}
 	if (buildOrderHistoryData(ruTr, &orders.Order{})).DeliveryFeeLabel != "" {
 		t.Error("pickup order must not show a delivery line")
+	}
+}
+
+func TestOrderHistorySystemNotesAreTranslated(t *testing.T) {
+	// Arrange: the automatic cancellations store a stable code.
+	codes := []string{orders.NotePaymentExpired, orders.NotePaymentOpenFailed, orders.NotePaymentCancelled}
+	staffNote := "клиент передумал"
+	for _, code := range codes {
+		code := code
+		o := &orders.Order{History: []orders.StatusChange{
+			{ToStatus: orders.StatusCancelled, ActorType: orders.ActorSystem, Note: &code},
+			{ToStatus: orders.StatusCancelled, ActorType: orders.ActorStaff, Note: &staffNote},
+		}}
+
+		// Act
+		ru, ky := buildOrderHistoryData(ruTr, o), buildOrderHistoryData(kyTr, o)
+
+		// Assert
+		key := "admin.history.note." + code
+		if ru.History[0].Note != ruTr.T(key) || ru.History[0].Note == key {
+			t.Errorf("ru note for %s = %q", code, ru.History[0].Note)
+		}
+		if ky.History[0].Note != kyTr.T(key) || ky.History[0].Note == ru.History[0].Note {
+			t.Errorf("ky note for %s = %q", code, ky.History[0].Note)
+		}
+		if ky.History[1].Note != staffNote {
+			t.Errorf("free-text staff note changed: %q", ky.History[1].Note)
+		}
 	}
 }

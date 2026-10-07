@@ -717,3 +717,8 @@ admin.import.tpl.hint.sku: Вариациянын уникалдуу коду (�
 admin.import.tpl.hint.quantity: Бүтүн сан ≥ 0 — импорттоодо тандалган сатуу жайындагы калдык (учурдагы калдыктын ордуна жазылат).
 admin.import.tpl.hint.description_ru: Орусча сүрөттөмө. Бош уяча мурда толтурулган сүрөттөмөнү өчүрбөйт.
 admin.import.tpl.hint.description_ky: Кыргызча сүрөттөмө.
+
+# fix/admin-polish: system notes of automatic cancellations (orders.Note*)
+admin.history.note.payment_expired: Убагында төлөнгөн жок
+admin.history.note.payment_open_failed: Төлөмдү ачуу мүмкүн болбоду
+admin.history.note.payment_cancelled: Сатып алуучу төлөмдү жокко чыгарды
