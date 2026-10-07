@@ -194,7 +194,7 @@ func TestCategoriesCreateRemovesUploadWhenSaveFails(t *testing.T) {
 
 	w := postCategory(t, newCategoryHandlers(t, repo, images).categoriesCreate, "/admin/categories", "", validCategoryFields(), map[string][]byte{"image": []byte("jpg")})
 
-	if !strings.Contains(w.Body.String(), "категория с таким slug уже существует") {
+	if !strings.Contains(w.Body.String(), "Категория с таким slug уже существует") {
 		t.Errorf("error not shown: %d", w.Code)
 	}
 	if len(images.removed) != 1 || images.removed[0] != "categories/new.jpg" {

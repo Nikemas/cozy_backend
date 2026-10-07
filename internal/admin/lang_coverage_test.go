@@ -118,3 +118,22 @@ func TestTemplatesHaveNoHardcodedRussian(t *testing.T) {
 		}
 	}
 }
+
+// standaloneErrorKey matches admin locale keys whose text is shown on its
+// own as an error/flash line (not composed mid-sentence).
+var standaloneErrorKey = regexp.MustCompile(`^admin\.(apperr|err)\.|_failed$|^admin\.(delivery|audit)\.err_|^admin\.staff\.passwords_mismatch$|^admin\.product\.err_stale_form$|^admin\.bulk\.already_in_status$`)
+
+// TestStandaloneAdminErrorsAreCapitalized: an error line starts with a
+// capital letter in both languages (fix/admin-polish).
+func TestStandaloneAdminErrorsAreCapitalized(t *testing.T) {
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		for _, key := range adminBundle.Keys(lang) {
+			if !standaloneErrorKey.MatchString(key) || key == "admin.broadcasts.stat_failed" {
+				continue
+			}
+			if v := adminBundle.T(lang, key); i18n.UpperFirst(v) != v {
+				t.Errorf("admin.%s.yaml %s starts lowercase: %q", lang, key, v)
+			}
+		}
+	}
+}

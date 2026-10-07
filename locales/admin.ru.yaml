@@ -111,7 +111,7 @@ admin.order.change_status: Сменить статус
 admin.order.cancel_confirm_text: Заказ %s будет отменён — это действие необратимо.
 admin.order.cancel_confirm_title: Отменить заказ?
 admin.order.cancel_confirm_label: Отменить заказ
-admin.order.status_change_failed: не удалось изменить статус
+admin.order.status_change_failed: Не удалось изменить статус
 admin.history.actor_customer: покупатель
 admin.history.actor_system: система
 admin.history.actor_staff: сотрудник
@@ -128,7 +128,7 @@ admin.categories.edit_title: Редактировать категорию
 admin.categories.sort_order: Порядок
 admin.categories.parent: Родительская категория
 admin.categories.no_parent: — нет (корневая) —
-admin.categories.load_failed: не удалось загрузить категории
+admin.categories.load_failed: Не удалось загрузить категории
 admin.categories.image: Фото категории
 admin.categories.image_hint: JPEG, PNG или WEBP до 10 МБ, меньшая сторона не меньше 200 px. Показывается на плитке категории в приложении
 admin.categories.current_image: Текущее фото
@@ -143,7 +143,7 @@ admin.points.new_title: Новая точка продаж
 admin.points.edit_title: Редактировать точку
 admin.points.active: Активна
 admin.points.inactive: Неактивна
-admin.points.load_failed: не удалось загрузить точки продаж
+admin.points.load_failed: Не удалось загрузить точки продаж
 
 # Staff
 admin.staff.add: Добавить сотрудника
@@ -161,8 +161,8 @@ admin.staff.password_note: Сотрудник выйдет из всех сеа�
 admin.staff.save_password: Сохранить пароль
 admin.staff.point_not_found: точка не найдена
 admin.staff.notice_password: Пароль изменён. Сотрудник выйдет из всех сеансов и войдёт с новым паролем.
-admin.staff.load_failed: не удалось загрузить сотрудников
-admin.staff.passwords_mismatch: пароли не совпадают
+admin.staff.load_failed: Не удалось загрузить сотрудников
+admin.staff.passwords_mismatch: Пароли не совпадают
 
 # Stock, quantities, reports
 admin.stock.search_placeholder: Название, бренд или артикул
@@ -215,7 +215,7 @@ admin.reports.for_period: за период
 admin.reports.per_order: на заказ
 admin.reports.pcs: "%d шт."
 admin.reports.no_brand: Без бренда
-admin.reports.build_failed: не удалось построить отчёт
+admin.reports.build_failed: Не удалось построить отчёт
 
 # Products: list, form, import
 admin.points.address_placeholder: ул. Дордой, 1
@@ -292,7 +292,7 @@ admin.product.err_duplicate_row: Форма повреждена (повтор �
 admin.product.err_size_color: У каждой вариации должны быть размер и цвет
 admin.product.err_stock_cell: "Остаток %s / %s, «%s»: %s"
 admin.product.err_variant_price: "Цена вариации %s / %s: %s"
-admin.product.err_stale_form: форма повреждена — обновите страницу
+admin.product.err_stale_form: Форма повреждена — обновите страницу
 admin.product.err_stale_form_banner: Форма повреждена — обновите страницу
 admin.import.title: Импорт товаров
 admin.import.drop: Перетащите Excel или CSV файл сюда
@@ -316,8 +316,8 @@ admin.broadcasts.status_sending: Отправляется
 admin.broadcasts.status_done: Отправлена
 admin.broadcasts.status_failed: Ошибка
 admin.broadcasts.queued_toast: Рассылка поставлена в очередь — статистика обновится ниже
-admin.broadcasts.load_failed: не удалось загрузить рассылки
-admin.broadcasts.search_failed: ошибка поиска
+admin.broadcasts.load_failed: Не удалось загрузить рассылки
+admin.broadcasts.search_failed: Ошибка поиска
 admin.broadcasts.note_who: Push получат покупатели, у которых включено «Акции и скидки» и установлено приложение.
 admin.broadcasts.note_now: "Сейчас:"
 admin.broadcasts.devices_short: устр.
@@ -349,10 +349,10 @@ admin.broadcasts.opens_category: Откроет категорию
 admin.broadcasts.no_category: Категория не выбрана
 admin.broadcasts.opens_app: Откроет приложение
 admin.broadcasts.pick_product: Выберите товар из списка
-admin.delivery.load_failed: не удалось загрузить зоны доставки
-admin.delivery.err_amount: сумма должна быть числом
-admin.delivery.err_fee_required: укажите стоимость доставки
-admin.delivery.err_sort_order: порядок — целое число
+admin.delivery.load_failed: Не удалось загрузить зоны доставки
+admin.delivery.err_amount: Сумма должна быть числом
+admin.delivery.err_fee_required: Укажите стоимость доставки
+admin.delivery.err_sort_order: Порядок — целое число
 admin.delivery.note: "Покупатель выбирает зону при оформлении доставки; стоимость считает сервер: цена зоны, или 0, если сумма товаров не меньше «бесплатно от»."
 admin.delivery.pickup_free: Самовывоз всегда бесплатный.
 admin.delivery.no_zones_flat: Сейчас нет активных зон — доставка стоит %s сом (DELIVERY_FEE_SOM) для всех адресов.
@@ -412,9 +412,9 @@ admin.audit.field.parent: родитель
 admin.audit.field.city: город
 admin.audit.field.working_hours: время работы
 admin.audit.field.coordinates: координаты
-admin.audit.err_from: дата «с» должна быть в формате ГГГГ-ММ-ДД
-admin.audit.err_to: дата «по» должна быть в формате ГГГГ-ММ-ДД
-admin.audit.err_range: дата начала позже даты окончания
+admin.audit.err_from: Дата «с» должна быть в формате ГГГГ-ММ-ДД
+admin.audit.err_to: Дата «по» должна быть в формате ГГГГ-ММ-ДД
+admin.audit.err_range: Дата начала позже даты окончания
 admin.audit.all_staff: Все сотрудники
 admin.audit.staff_inactive: (отключён)
 admin.audit.all_entities: Все объекты
@@ -486,7 +486,7 @@ admin.bulk.category_button: Сменить категорию
 admin.bulk.choose_status: Выберите статус
 admin.bulk.status_done: "Статус «%s» установлен: %d из %d"
 admin.bulk.and_more: … и ещё %d
-admin.bulk.already_in_status: уже в этом статусе
+admin.bulk.already_in_status: Уже в этом статусе
 admin.bulk.none_selected: Не выбрано ни одной строки
 admin.bulk.too_many: За один раз можно изменить не больше %d строк
 admin.bulk.unknown_action: Неизвестное действие
@@ -519,61 +519,61 @@ admin.import.with_errors: с ошибками
 admin.import.will_not: Не будет импортировано
 admin.import.not_imported: Не импортировано
 admin.import.confirm_run: Файл ещё не проверен без ошибок. Импортировать сейчас? Корректные модели будут записаны, модели с ошибками — пропущены.
-admin.apperr.invalid_broadcast: заполните заголовок и текст на русском
-admin.apperr.invalid_broadcast_link: выберите товар или категорию для ссылки
-admin.apperr.invalid_submit_token: форма устарела — обновите страницу
-admin.apperr.broadcast_not_found: рассылка не найдена
-admin.apperr.invalid_delivery_zone_input: проверьте поля зоны доставки
-admin.apperr.delivery_zone_not_found: зона доставки не найдена
-admin.apperr.delivery_zone_in_use: по этой зоне уже есть заказы — её можно только деактивировать
+admin.apperr.invalid_broadcast: Заполните заголовок и текст на русском
+admin.apperr.invalid_broadcast_link: Выберите товар или категорию для ссылки
+admin.apperr.invalid_submit_token: Форма устарела — обновите страницу
+admin.apperr.broadcast_not_found: Рассылка не найдена
+admin.apperr.invalid_delivery_zone_input: Проверьте поля зоны доставки
+admin.apperr.delivery_zone_not_found: Зона доставки не найдена
+admin.apperr.delivery_zone_in_use: По этой зоне уже есть заказы — её можно только деактивировать
 
 # Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
-admin.err.generic: произошла ошибка, попробуйте ещё раз
-admin.err.form: не удалось прочитать форму
-admin.err.render: ошибка рендеринга страницы
-admin.err.internal: внутренняя ошибка
-admin.apperr.invalid_credentials: неверный телефон или пароль
-admin.apperr.too_many_attempts: слишком много попыток входа, попробуйте позже
-admin.apperr.invalid_phone: укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
-admin.apperr.invalid_name: имя обязательно
-admin.apperr.invalid_address: адрес обязателен
-admin.apperr.invalid_city: город обязателен
-admin.apperr.invalid_coordinates: укажите и широту, и долготу в допустимом диапазоне
-admin.apperr.phone_taken: этот номер телефона уже используется
-admin.apperr.last_owner: нельзя понизить или деактивировать последнего владельца
-admin.apperr.staff_not_found: сотрудник не найден
-admin.apperr.invalid_role: неизвестная роль
-admin.apperr.invalid_password: пароль должен быть не короче 8 символов
+admin.err.generic: Произошла ошибка, попробуйте ещё раз
+admin.err.form: Не удалось прочитать форму
+admin.err.render: Ошибка рендеринга страницы
+admin.err.internal: Внутренняя ошибка
+admin.apperr.invalid_credentials: Неверный телефон или пароль
+admin.apperr.too_many_attempts: Слишком много попыток входа, попробуйте позже
+admin.apperr.invalid_phone: Укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
+admin.apperr.invalid_name: Имя обязательно
+admin.apperr.invalid_address: Адрес обязателен
+admin.apperr.invalid_city: Город обязателен
+admin.apperr.invalid_coordinates: Укажите и широту, и долготу в допустимом диапазоне
+admin.apperr.phone_taken: Этот номер телефона уже используется
+admin.apperr.last_owner: Нельзя понизить или деактивировать последнего владельца
+admin.apperr.staff_not_found: Сотрудник не найден
+admin.apperr.invalid_role: Неизвестная роль
+admin.apperr.invalid_password: Пароль должен быть не короче 8 символов
 admin.apperr.point_id_required: point_id обязателен для роли point_staff
 admin.apperr.point_id_forbidden: point_id должен быть пустым для роли owner/manager
-admin.apperr.point_not_found: точка продаж не найдена
-admin.apperr.invalid_point_id: точка продаж не найдена
-admin.apperr.point_in_use: "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"
-admin.apperr.category_not_found: категория не найдена
-admin.apperr.category_in_use: "нельзя удалить категорию: на неё ссылаются товары или подкатегории"
-admin.apperr.category_slug_taken: категория с таким slug уже существует
-admin.apperr.invalid_parent_id: родительская категория не найдена
+admin.apperr.point_not_found: Точка продаж не найдена
+admin.apperr.invalid_point_id: Точка продаж не найдена
+admin.apperr.point_in_use: "Нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"
+admin.apperr.category_not_found: Категория не найдена
+admin.apperr.category_in_use: "Нельзя удалить категорию: на неё ссылаются товары или подкатегории"
+admin.apperr.category_slug_taken: Категория с таким slug уже существует
+admin.apperr.invalid_parent_id: Родительская категория не найдена
 admin.apperr.invalid_slug: slug обязателен
-admin.apperr.invalid_name_ru: укажите название на русском
-admin.apperr.invalid_name_ky: укажите название на кыргызском
-admin.apperr.invalid_category_id: выберите категорию
-admin.apperr.invalid_base_price: цена не может быть отрицательной
-admin.apperr.invalid_variant: у каждой вариации должны быть размер и цвет
+admin.apperr.invalid_name_ru: Укажите название на русском
+admin.apperr.invalid_name_ky: Укажите название на кыргызском
+admin.apperr.invalid_category_id: Выберите категорию
+admin.apperr.invalid_base_price: Цена не может быть отрицательной
+admin.apperr.invalid_variant: У каждой вариации должны быть размер и цвет
 admin.apperr.invalid_object_key: object_key обязателен
-admin.apperr.product_not_found: товар не найден
-admin.apperr.variant_not_found: вариация не найдена
-admin.apperr.variant_in_use: "нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0"
-admin.apperr.variant_exists: "вариации повторяются: такой размер и цвет уже есть в таблице"
-admin.apperr.invalid_quantity: количество не может быть отрицательным
-admin.apperr.invalid_variant_or_point: вариация или точка продаж не найдена — обновите страницу
-admin.apperr.order_not_found: заказ не найден
-admin.apperr.cancel_forbidden: только владелец может отменить заказ
-admin.apperr.forbidden: недостаточно прав для этого действия
-admin.apperr.invalid_status_transition: нельзя перевести заказ в этот статус
-admin.apperr.payment_not_completed: заказ с онлайн-оплатой можно подтвердить только после оплаты
-admin.apperr.invalid_date: дата должна быть в формате YYYY-MM-DD
-admin.apperr.invalid_range: дата начала не может быть позже даты окончания
-admin.apperr.range_too_long: период не может быть длиннее года
+admin.apperr.product_not_found: Товар не найден
+admin.apperr.variant_not_found: Вариация не найдена
+admin.apperr.variant_in_use: "Нельзя удалить вариацию: по ней есть заказы — поставьте ей остаток 0"
+admin.apperr.variant_exists: "Вариации повторяются: такой размер и цвет уже есть в таблице"
+admin.apperr.invalid_quantity: Количество не может быть отрицательным
+admin.apperr.invalid_variant_or_point: Вариация или точка продаж не найдена — обновите страницу
+admin.apperr.order_not_found: Заказ не найден
+admin.apperr.cancel_forbidden: Только владелец может отменить заказ
+admin.apperr.forbidden: Недостаточно прав для этого действия
+admin.apperr.invalid_status_transition: Нельзя перевести заказ в этот статус
+admin.apperr.payment_not_completed: Заказ с онлайн-оплатой можно подтвердить только после оплаты
+admin.apperr.invalid_date: Дата должна быть в формате YYYY-MM-DD
+admin.apperr.invalid_range: Дата начала не может быть позже даты окончания
+admin.apperr.range_too_long: Период не может быть длиннее года
 admin.plural.product.one: товар
 admin.plural.product.few: товара
 admin.plural.product.many: товаров

@@ -108,7 +108,7 @@ admin.order.change_status: Абалын өзгөртүү
 admin.order.cancel_confirm_text: "%s буйрутмасы жокко чыгарылат — бул аракетти кайтарууга болбойт."
 admin.order.cancel_confirm_title: Буйрутманы жокко чыгарасызбы?
 admin.order.cancel_confirm_label: Буйрутманы жокко чыгаруу
-admin.order.status_change_failed: абалын өзгөртүү мүмкүн болбоду
+admin.order.status_change_failed: Абалын өзгөртүү мүмкүн болбоду
 admin.history.actor_customer: сатып алуучу
 admin.history.actor_system: система
 admin.history.actor_staff: кызматкер
@@ -125,7 +125,7 @@ admin.categories.edit_title: Категорияны түзөтүү
 admin.categories.sort_order: Тартиби
 admin.categories.parent: Негизги категория
 admin.categories.no_parent: — жок (башкы) —
-admin.categories.load_failed: категорияларды жүктөө мүмкүн болбоду
+admin.categories.load_failed: Категорияларды жүктөө мүмкүн болбоду
 admin.categories.image: Категориянын сүрөтү
 admin.categories.image_hint: JPEG, PNG же WEBP, 10 МБга чейин, кыска жагы 200 pxтен кем эмес. Тиркемедеги категориянын плиткасында көрсөтүлөт
 admin.categories.current_image: Азыркы сүрөт
@@ -140,7 +140,7 @@ admin.points.new_title: Жаңы сатуу жайы
 admin.points.edit_title: Сатуу жайын түзөтүү
 admin.points.active: Активдүү
 admin.points.inactive: Активдүү эмес
-admin.points.load_failed: сатуу жайларын жүктөө мүмкүн болбоду
+admin.points.load_failed: Сатуу жайларын жүктөө мүмкүн болбоду
 
 # Staff
 admin.staff.add: Кызматкер кошуу
@@ -158,8 +158,8 @@ admin.staff.password_note: Кызматкер бардык сеанстарда�
 admin.staff.save_password: Сырсөздү сактоо
 admin.staff.point_not_found: сатуу жайы табылган жок
 admin.staff.notice_password: Сырсөз алмаштырылды. Кызматкер бардык сеанстардан чыгарылат жана жаңы сырсөз менен кирет.
-admin.staff.load_failed: кызматкерлерди жүктөө мүмкүн болбоду
-admin.staff.passwords_mismatch: сырсөздөр дал келбейт
+admin.staff.load_failed: Кызматкерлерди жүктөө мүмкүн болбоду
+admin.staff.passwords_mismatch: Сырсөздөр дал келбейт
 
 # Stock, quantities, reports
 admin.stock.search_placeholder: Аталышы, бренд же артикул
@@ -212,7 +212,7 @@ admin.reports.for_period: мезгил ичинде
 admin.reports.per_order: бир буйрутмага
 admin.reports.pcs: "%d даана"
 admin.reports.no_brand: Бренди жок
-admin.reports.build_failed: отчетту түзүү мүмкүн болбоду
+admin.reports.build_failed: Отчетту түзүү мүмкүн болбоду
 
 # Products: list, form, import
 admin.points.address_placeholder: Дордой көч., 1
@@ -289,7 +289,7 @@ admin.product.err_duplicate_row: Форма бузулган (вариациян
 admin.product.err_size_color: Ар бир вариациянын өлчөмү жана түсү болушу керек
 admin.product.err_stock_cell: "Калдык %s / %s, «%s»: %s"
 admin.product.err_variant_price: "%s / %s вариациясынын баасы: %s"
-admin.product.err_stale_form: форма бузулган — баракты жаңылаңыз
+admin.product.err_stale_form: Форма бузулган — баракты жаңылаңыз
 admin.product.err_stale_form_banner: Форма бузулган — баракты жаңылаңыз
 admin.import.title: Товарларды импорттоо
 admin.import.drop: Excel же CSV файлды ушул жерге сүйрөп келиңиз
@@ -313,8 +313,8 @@ admin.broadcasts.status_sending: Жөнөтүлүүдө
 admin.broadcasts.status_done: Жөнөтүлдү
 admin.broadcasts.status_failed: Ката
 admin.broadcasts.queued_toast: Жөнөтмө кезекке коюлду — статистика төмөндө жаңыланат
-admin.broadcasts.load_failed: жөнөтмөлөрдү жүктөө мүмкүн болбоду
-admin.broadcasts.search_failed: издөөдө ката кетти
+admin.broadcasts.load_failed: Жөнөтмөлөрдү жүктөө мүмкүн болбоду
+admin.broadcasts.search_failed: Издөөдө ката кетти
 admin.broadcasts.note_who: Push-билдирүүнү «Акциялар жана арзандатуулар» күйгүзүлгөн жана тиркеме орнотулган сатып алуучулар алат.
 admin.broadcasts.note_now: "Азыр:"
 admin.broadcasts.devices_short: түзмөк
@@ -346,10 +346,10 @@ admin.broadcasts.opens_category: Категорияны ачат
 admin.broadcasts.no_category: Категория тандалган жок
 admin.broadcasts.opens_app: Тиркемени ачат
 admin.broadcasts.pick_product: Тизмеден товар тандаңыз
-admin.delivery.load_failed: жеткирүү зоналарын жүктөө мүмкүн болбоду
-admin.delivery.err_amount: сумма сан болушу керек
-admin.delivery.err_fee_required: жеткирүүнүн баасын көрсөтүңүз
-admin.delivery.err_sort_order: тартиби бүтүн сан болушу керек
+admin.delivery.load_failed: Жеткирүү зоналарын жүктөө мүмкүн болбоду
+admin.delivery.err_amount: Сумма сан болушу керек
+admin.delivery.err_fee_required: Жеткирүүнүн баасын көрсөтүңүз
+admin.delivery.err_sort_order: Тартиби бүтүн сан болушу керек
 admin.delivery.note: "Сатып алуучу жеткирүүнү тариздөөдө зонаны тандайт; баасын сервер эсептейт: зонанын баасы, же товарлардын суммасы «акысыз жеткирүүнүн чегинен» кем эмес болсо — 0."
 admin.delivery.pickup_free: Өзү алып кетүү ар дайым акысыз.
 admin.delivery.no_zones_flat: Азыр активдүү зоналар жок — бардык даректерге жеткирүү %s сом (DELIVERY_FEE_SOM).
@@ -409,9 +409,9 @@ admin.audit.field.parent: негизги категория
 admin.audit.field.city: шаар
 admin.audit.field.working_hours: иш убактысы
 admin.audit.field.coordinates: координаттар
-admin.audit.err_from: башталыш күнү ЖЖЖЖ-АА-КК форматында болушу керек
-admin.audit.err_to: аяктоо күнү ЖЖЖЖ-АА-КК форматында болушу керек
-admin.audit.err_range: башталыш күнү аяктоо күнүнөн кеч
+admin.audit.err_from: Башталыш күнү ЖЖЖЖ-АА-КК форматында болушу керек
+admin.audit.err_to: Аяктоо күнү ЖЖЖЖ-АА-КК форматында болушу керек
+admin.audit.err_range: Башталыш күнү аяктоо күнүнөн кеч
 admin.audit.all_staff: Бардык кызматкерлер
 admin.audit.staff_inactive: (өчүрүлгөн)
 admin.audit.all_entities: Бардык объекттер
@@ -483,7 +483,7 @@ admin.bulk.category_button: Категорияны алмаштыруу
 admin.bulk.choose_status: Абалды тандаңыз
 admin.bulk.status_done: "«%s» абалы коюлду: %d / %d"
 admin.bulk.and_more: … жана дагы %d
-admin.bulk.already_in_status: буга чейин эле ушул абалда
+admin.bulk.already_in_status: Буга чейин эле ушул абалда
 admin.bulk.none_selected: Бир да сап тандалган жок
 admin.bulk.too_many: Бир жолу %d саптан ашык өзгөртүүгө болбойт
 admin.bulk.unknown_action: Белгисиз аракет
@@ -516,61 +516,61 @@ admin.import.with_errors: ката менен
 admin.import.will_not: Импорттолбойт
 admin.import.not_imported: Импорттолгон жок
 admin.import.confirm_run: Файл азырынча катасыз текшерилген жок. Азыр импорттойсузбу? Туура моделдер жазылат, катасы барлары өткөрүлөт.
-admin.apperr.invalid_broadcast: орусча аталышын жана текстин толтуруңуз (аталышы 65, тексти 240 белгиден ашпасын)
-admin.apperr.invalid_broadcast_link: шилтеме үчүн товарды же категорияны тандаңыз
-admin.apperr.invalid_submit_token: форма эскирди — баракты жаңылаңыз
-admin.apperr.broadcast_not_found: жөнөтмө табылган жок
-admin.apperr.invalid_delivery_zone_input: "жеткирүү зонасынын талааларын текшериңиз: эки тилдеги аталышы милдеттүү, баасы — 0дон кем эмес сан"
-admin.apperr.delivery_zone_not_found: жеткирүү зонасы табылган жок
-admin.apperr.delivery_zone_in_use: бул зона боюнча буйрутмалар бар — аны активсиздештирсеңиз гана болот
+admin.apperr.invalid_broadcast: Орусча аталышын жана текстин толтуруңуз (аталышы 65, тексти 240 белгиден ашпасын)
+admin.apperr.invalid_broadcast_link: Шилтеме үчүн товарды же категорияны тандаңыз
+admin.apperr.invalid_submit_token: Форма эскирди — баракты жаңылаңыз
+admin.apperr.broadcast_not_found: Жөнөтмө табылган жок
+admin.apperr.invalid_delivery_zone_input: "Жеткирүү зонасынын талааларын текшериңиз: эки тилдеги аталышы милдеттүү, баасы — 0дон кем эмес сан"
+admin.apperr.delivery_zone_not_found: Жеткирүү зонасы табылган жок
+admin.apperr.delivery_zone_in_use: Бул зона боюнча буйрутмалар бар — аны активсиздештирсеңиз гана болот
 
 # Errors and plurals. admin.apperr.<code> translates a service error by its apperr code (Kyrgyz only — Russian shows the service message as is)
-admin.err.generic: ката кетти, кайра аракет кылыңыз
-admin.err.form: форманы окуу мүмкүн болбоду
-admin.err.render: баракты көрсөтүүдө ката кетти
-admin.err.internal: ички ката
-admin.apperr.invalid_credentials: телефон же сырсөз туура эмес
-admin.apperr.too_many_attempts: кирүү аракеттери өтө көп, кийинчерээк аракет кылыңыз
+admin.err.generic: Ката кетти, кайра аракет кылыңыз
+admin.err.form: Форманы окуу мүмкүн болбоду
+admin.err.render: Баракты көрсөтүүдө ката кетти
+admin.err.internal: Ички ката
+admin.apperr.invalid_credentials: Телефон же сырсөз туура эмес
+admin.apperr.too_many_attempts: Кирүү аракеттери өтө көп, кийинчерээк аракет кылыңыз
 admin.apperr.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
-admin.apperr.invalid_name: аты (аталышы) көрсөтүлүшү керек
-admin.apperr.invalid_address: дареги көрсөтүлүшү керек
-admin.apperr.invalid_city: шаар көрсөтүлүшү керек
-admin.apperr.invalid_coordinates: туурасын да, узундугун да жол берилген чекте көрсөтүңүз
-admin.apperr.phone_taken: бул телефон номери колдонулуп жатат
-admin.apperr.last_owner: акыркы ээсинин ролун төмөндөтүүгө же аны активсиздештирүүгө болбойт
-admin.apperr.staff_not_found: кызматкер табылган жок
-admin.apperr.invalid_role: белгисиз роль
-admin.apperr.invalid_password: сырсөз кеминде 8 белгиден турушу керек жана 72 байттан ашпашы керек
-admin.apperr.point_id_required: кампачы үчүн сатуу жайын тандаңыз
-admin.apperr.point_id_forbidden: ээси жана менеджер үчүн сатуу жайы көрсөтүлбөйт
-admin.apperr.point_not_found: сатуу жайы табылган жок
-admin.apperr.invalid_point_id: сатуу жайы табылган жок
-admin.apperr.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"
-admin.apperr.category_not_found: категория табылган жок
-admin.apperr.category_in_use: "категорияны өчүрүүгө болбойт: ага товарлар же ички категориялар шилтеме кылат"
-admin.apperr.category_slug_taken: мындай slug менен категория бар
-admin.apperr.invalid_parent_id: негизги категория туура эмес же табылган жок
+admin.apperr.invalid_name: Аты (аталышы) көрсөтүлүшү керек
+admin.apperr.invalid_address: Дареги көрсөтүлүшү керек
+admin.apperr.invalid_city: Шаар көрсөтүлүшү керек
+admin.apperr.invalid_coordinates: Туурасын да, узундугун да жол берилген чекте көрсөтүңүз
+admin.apperr.phone_taken: Бул телефон номери колдонулуп жатат
+admin.apperr.last_owner: Акыркы ээсинин ролун төмөндөтүүгө же аны активсиздештирүүгө болбойт
+admin.apperr.staff_not_found: Кызматкер табылган жок
+admin.apperr.invalid_role: Белгисиз роль
+admin.apperr.invalid_password: Сырсөз кеминде 8 белгиден турушу керек жана 72 байттан ашпашы керек
+admin.apperr.point_id_required: Кампачы үчүн сатуу жайын тандаңыз
+admin.apperr.point_id_forbidden: Ээси жана менеджер үчүн сатуу жайы көрсөтүлбөйт
+admin.apperr.point_not_found: Сатуу жайы табылган жок
+admin.apperr.invalid_point_id: Сатуу жайы табылган жок
+admin.apperr.point_in_use: "Сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"
+admin.apperr.category_not_found: Категория табылган жок
+admin.apperr.category_in_use: "Категорияны өчүрүүгө болбойт: ага товарлар же ички категориялар шилтеме кылат"
+admin.apperr.category_slug_taken: Мындай slug менен категория бар
+admin.apperr.invalid_parent_id: Негизги категория туура эмес же табылган жок
 admin.apperr.invalid_slug: slug көрсөтүлүшү керек
-admin.apperr.invalid_name_ru: орусча аталышын жазыңыз
-admin.apperr.invalid_name_ky: кыргызча аталышын жазыңыз
-admin.apperr.invalid_category_id: категорияны тандаңыз
-admin.apperr.invalid_base_price: баасы терс болбошу керек
-admin.apperr.invalid_variant: ар бир вариациянын өлчөмү жана түсү болушу керек
-admin.apperr.invalid_object_key: сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
-admin.apperr.product_not_found: товар табылган жок
-admin.apperr.variant_not_found: вариация табылган жок
-admin.apperr.variant_in_use: "вариацияны өчүрүүгө болбойт: ал боюнча буйрутмалар бар — калдыгын 0 кылыңыз"
-admin.apperr.variant_exists: "вариациялар кайталанат: мындай өлчөм жана түс таблицада бар"
-admin.apperr.invalid_quantity: саны терс болбошу керек
-admin.apperr.invalid_variant_or_point: вариация же сатуу жайы табылган жок — баракты жаңылаңыз
-admin.apperr.order_not_found: буйрутма табылган жок
-admin.apperr.cancel_forbidden: буйрутманы ээси гана жокко чыгара алат
-admin.apperr.forbidden: бул аракет үчүн укук жетишсиз
-admin.apperr.invalid_status_transition: буйрутманы бул абалга өткөрүүгө болбойт
-admin.apperr.payment_not_completed: онлайн-төлөмдүү буйрутманы төлөнгөндөн кийин гана ырастоого болот
-admin.apperr.invalid_date: күнү YYYY-MM-DD форматында болушу керек
-admin.apperr.invalid_range: башталыш күнү аяктоо күнүнөн кеч болбошу керек
-admin.apperr.range_too_long: мезгил бир жылдан узун болбошу керек
+admin.apperr.invalid_name_ru: Орусча аталышын жазыңыз
+admin.apperr.invalid_name_ky: Кыргызча аталышын жазыңыз
+admin.apperr.invalid_category_id: Категорияны тандаңыз
+admin.apperr.invalid_base_price: Баасы терс болбошу керек
+admin.apperr.invalid_variant: Ар бир вариациянын өлчөмү жана түсү болушу керек
+admin.apperr.invalid_object_key: Сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
+admin.apperr.product_not_found: Товар табылган жок
+admin.apperr.variant_not_found: Вариация табылган жок
+admin.apperr.variant_in_use: "Вариацияны өчүрүүгө болбойт: ал боюнча буйрутмалар бар — калдыгын 0 кылыңыз"
+admin.apperr.variant_exists: "Вариациялар кайталанат: мындай өлчөм жана түс таблицада бар"
+admin.apperr.invalid_quantity: Саны терс болбошу керек
+admin.apperr.invalid_variant_or_point: Вариация же сатуу жайы табылган жок — баракты жаңылаңыз
+admin.apperr.order_not_found: Буйрутма табылган жок
+admin.apperr.cancel_forbidden: Буйрутманы ээси гана жокко чыгара алат
+admin.apperr.forbidden: Бул аракет үчүн укук жетишсиз
+admin.apperr.invalid_status_transition: Буйрутманы бул абалга өткөрүүгө болбойт
+admin.apperr.payment_not_completed: Онлайн-төлөмдүү буйрутманы төлөнгөндөн кийин гана ырастоого болот
+admin.apperr.invalid_date: Күнү YYYY-MM-DD форматында болушу керек
+admin.apperr.invalid_range: Башталыш күнү аяктоо күнүнөн кеч болбошу керек
+admin.apperr.range_too_long: Мезгил бир жылдан узун болбошу керек
 admin.plural.product.one: товар
 admin.plural.product.few: товар
 admin.plural.product.many: товар

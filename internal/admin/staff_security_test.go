@@ -34,7 +34,7 @@ func TestLoginSubmitHidesInternalErrors(t *testing.T) {
 	if strings.Contains(body, "SECRET-DETAIL") || strings.Contains(body, "relation") {
 		t.Fatalf("login page leaks the internal error: %s", body)
 	}
-	if !strings.Contains(body, "произошла ошибка") {
+	if !strings.Contains(body, "Произошла ошибка") {
 		t.Errorf("expected the generic error message on the page")
 	}
 }

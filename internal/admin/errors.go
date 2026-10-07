@@ -16,19 +16,21 @@ import (
 // (falling back to the Russian message for a code with no translation).
 // A localizedError (admin-side validation) is shown in t's language.
 // Any other error (a raw database/driver failure) gets a generic message
-// instead of leaking internals to the page.
+// instead of leaking internals to the page. The message is shown on its
+// own, so it starts with a capital letter (services write theirs in
+// lowercase — they are also composed mid-sentence).
 func appErrMessage(t tr, err error) string {
 	var le localizedError
 	if errors.As(err, &le) {
-		return t.T(le.key)
+		return i18n.UpperFirst(t.T(le.key))
 	}
 	var ae *apperr.AppError
 	if errors.As(err, &ae) {
 		key := "admin.apperr." + ae.Code
 		if t.Lang() != i18n.LangRU && adminBundle.Has(t.Lang(), key) {
-			return t.T(key)
+			return i18n.UpperFirst(t.T(key))
 		}
-		return ae.Message
+		return i18n.UpperFirst(ae.Message)
 	}
 	return t.T("admin.err.generic")
 }
