@@ -9,6 +9,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
 )
@@ -119,7 +120,7 @@ type createOrderRequest struct {
 // createOrderResponse is the order plus, for online_card, the URL the app
 // must open (WebView/browser) for the customer to pay.
 type createOrderResponse struct {
-	*orders.Order
+	orderOut
 	PaymentURL string `json:"payment_url,omitempty"`
 }
 
@@ -163,7 +164,7 @@ func createOrderHandler(svc orderService, checkout onlineCheckout) apperr.Handle
 			if err != nil {
 				return err
 			}
-			return writeJSON(w, createdStatus(created), createOrderResponse{Order: order})
+			return writeLocalizedJSON(w, createdStatus(created), createOrderResponse{orderOut: localizeOrder(order, apiLang(r))})
 		case orders.PaymentOnlineCard:
 			if checkout == nil {
 				return payments.ErrNotConfigured
@@ -172,7 +173,7 @@ func createOrderHandler(svc orderService, checkout onlineCheckout) apperr.Handle
 			if err != nil {
 				return err
 			}
-			return writeJSON(w, createdStatus(created), createOrderResponse{Order: order, PaymentURL: paymentURL})
+			return writeLocalizedJSON(w, createdStatus(created), createOrderResponse{orderOut: localizeOrder(order, apiLang(r)), PaymentURL: paymentURL})
 		default:
 			return apperr.BadRequest("invalid_payment_method", "неизвестный способ оплаты")
 		}
@@ -254,7 +255,7 @@ func cancelOrderHandler(svc orderService) apperr.HandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, order)
+		return writeLocalizedJSON(w, http.StatusOK, localizeOrder(order, apiLang(r)))
 	}
 }
 
@@ -269,7 +270,7 @@ func listOrdersHandler(svc orderService) apperr.HandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, list)
+		return writeLocalizedJSON(w, http.StatusOK, localizeOrders(list, apiLang(r)))
 	}
 }
 
@@ -288,7 +289,7 @@ func getOrderHandler(svc orderService) apperr.HandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, order)
+		return writeLocalizedJSON(w, http.StatusOK, localizeOrder(order, apiLang(r)))
 	}
 }
 
@@ -322,6 +323,7 @@ type cartLineResponse struct {
 	ProductNameKy string  `json:"product_name_ky"`
 	Size          string  `json:"size"`
 	Color         string  `json:"color"`
+	ColorLabel    string  `json:"color_label"`
 	Price         float64 `json:"price"`
 	PhotoURL      *string `json:"photo_url"`
 	ThumbURL      *string `json:"thumb_url"`
@@ -357,6 +359,7 @@ func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Confi
 			}
 		}
 
+		lang := apiLang(r)
 		resp := make([]cartLineResponse, 0, len(lines))
 		for _, l := range lines {
 			var photoURLPtr, thumbURLPtr *string
@@ -372,6 +375,7 @@ func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Confi
 				ProductNameKy: l.ProductNameKy,
 				Size:          l.Size,
 				Color:         l.Color,
+				ColorLabel:    i18n.ColorLabel(lang, l.Color),
 				Price:         l.Price,
 				PhotoURL:      photoURLPtr,
 				ThumbURL:      thumbURLPtr,
@@ -381,7 +385,7 @@ func listCartHandler(repo cartService, images cartImageGetter, cfg *config.Confi
 			})
 		}
 
-		return writeJSON(w, http.StatusOK, resp)
+		return writeLocalizedJSON(w, http.StatusOK, resp)
 	}
 }
 

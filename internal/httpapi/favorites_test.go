@@ -154,7 +154,7 @@ func TestListFavoritesHandlerReturnsFullProducts(t *testing.T) {
 
 func TestBuildProductDetailsSingleProductMatchesDetailShape(t *testing.T) {
 	src := &fakeDetailSources{variants: map[string][]catalog.Variant{"p1": {{ID: "v1", ProductID: "p1"}}}}
-	got, err := buildProductDetails(context.Background(), src, testCfg, []catalog.Product{{ID: "p1"}})
+	got, err := buildProductDetails(context.Background(), src, testCfg, "ru", []catalog.Product{{ID: "p1"}})
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got %v, %v", got, err)
 	}

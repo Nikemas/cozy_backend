@@ -62,6 +62,7 @@ func TestProductFacetsEndpoint(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
 			}
+			checkRawColorOptions(t, body)
 		}
 		return rec.Code, body
 	}
@@ -111,4 +112,23 @@ func TestProductFacetsEndpoint(t *testing.T) {
 	if code, _ := get(url.Values{"category": {"no-such-" + tag}}); code != http.StatusNotFound {
 		t.Errorf("unknown category status = %d, want 404", code)
 	}
+}
+
+// checkRawColorOptions asserts a facets body's color_options mirror its
+// colors one-to-one, labelled with the raw value (no Accept-Language → ru),
+// then drops the key so the callers compare the remaining shape.
+func checkRawColorOptions(t *testing.T, body map[string]any) {
+	t.Helper()
+	colors, _ := body["colors"].([]any)
+	opts, ok := body["color_options"].([]any)
+	if !ok || len(opts) != len(colors) {
+		t.Fatalf("color_options = %v, want one entry per color in %v", body["color_options"], colors)
+	}
+	for i, o := range opts {
+		want := map[string]any{"value": colors[i], "label": colors[i]}
+		if !reflect.DeepEqual(o, want) {
+			t.Errorf("color_options[%d] = %v, want %v", i, o, want)
+		}
+	}
+	delete(body, "color_options")
 }

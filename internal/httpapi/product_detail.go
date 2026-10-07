@@ -5,6 +5,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
 // productDetailSources is what building a productDetailResponse reads —
@@ -40,8 +41,9 @@ func (s catalogDetailSources) ImagesByProductIDs(ctx context.Context, ids []stri
 // shape (images + variants with per-point stock) with a constant number
 // of queries — three, however many products — so the favorites list
 // returns exactly the objects the product screen does without N+1.
-// Output order follows products.
-func buildProductDetails(ctx context.Context, src productDetailSources, cfg *config.Config, products []catalog.Product) ([]productDetailResponse, error) {
+// Output order follows products. lang localizes each variant's
+// color_label (see i18n.ColorLabel).
+func buildProductDetails(ctx context.Context, src productDetailSources, cfg *config.Config, lang string, products []catalog.Product) ([]productDetailResponse, error) {
 	out := make([]productDetailResponse, 0, len(products))
 	if len(products) == 0 {
 		return out, nil
@@ -87,7 +89,7 @@ func buildProductDetails(ctx context.Context, src productDetailSources, cfg *con
 			if st == nil {
 				st = []stockPoint{}
 			}
-			resp.Variants = append(resp.Variants, variantDetail{Variant: v, Stock: st})
+			resp.Variants = append(resp.Variants, variantDetail{Variant: v, ColorLabel: i18n.ColorLabel(lang, v.Color), Stock: st})
 		}
 		out = append(out, resp)
 	}

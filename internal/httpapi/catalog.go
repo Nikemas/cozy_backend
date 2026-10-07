@@ -120,7 +120,7 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, facets)
+		return writeLocalizedJSON(w, http.StatusOK, newFacetsResponse(facets, apiLang(r)))
 	})))
 
 	mux.Handle("GET /api/v1/products/{id}", productCache(apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {
@@ -131,13 +131,11 @@ func RegisterCatalogRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config) {
 			return err
 		}
 
-		details, err := buildProductDetails(r.Context(), detailSources, cfg, []catalog.Product{*product})
+		details, err := buildProductDetails(r.Context(), detailSources, cfg, apiLang(r), []catalog.Product{*product})
 		if err != nil {
 			return err
 		}
-		resp := details[0]
-
-		return writeJSON(w, http.StatusOK, resp)
+		return writeLocalizedJSON(w, http.StatusOK, details[0])
 	})))
 }
 
@@ -192,9 +190,13 @@ type productDetailResponse struct {
 	Variants []variantDetail `json:"variants"`
 }
 
+// variantDetail's ColorLabel is Color in the request's language (Color
+// itself when there is no translation); Color stays the raw stored value
+// the ?color= filter matches.
 type variantDetail struct {
 	catalog.Variant
-	Stock []stockPoint `json:"stock"`
+	ColorLabel string       `json:"color_label"`
+	Stock      []stockPoint `json:"stock"`
 }
 
 type stockPoint struct {

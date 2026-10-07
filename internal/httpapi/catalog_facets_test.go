@@ -81,8 +81,12 @@ func TestProductFacetsRouteWinsOverProductID(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]any{
-		"sizes":     []any{"38,5", "42"},
-		"colors":    []any{"Черный", "белый"},
+		"sizes":  []any{"38,5", "42"},
+		"colors": []any{"Черный", "белый"},
+		"color_options": []any{
+			map[string]any{"value": "Черный", "label": "Черный"},
+			map[string]any{"value": "белый", "label": "белый"},
+		},
 		"price_min": 2500.0,
 		"price_max": 9000.0,
 	}
@@ -104,7 +108,7 @@ func TestProductFacetsEmptyScopeReturnsEmptyArraysAndNullPrices(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
 	}
-	if got, want := strings.TrimSpace(rec.Body.String()), `{"sizes":[],"colors":[],"price_min":null,"price_max":null}`; got != want {
+	if got, want := strings.TrimSpace(rec.Body.String()), `{"sizes":[],"colors":[],"price_min":null,"price_max":null,"color_options":[]}`; got != want {
 		t.Errorf("body = %s, want %s", got, want)
 	}
 }
