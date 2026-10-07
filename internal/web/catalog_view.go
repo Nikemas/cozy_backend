@@ -268,7 +268,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		PriceMin:     params.PriceMin,
 		PriceMax:     params.PriceMax,
 		SizeOptions:  filterOptions(facets.Sizes, params.Size),
-		ColorOptions: filterOptions(facets.Colors, params.Color),
+		ColorOptions: colorFilterOptions(facets.Colors, params.Color, lang),
 		SortOptions:  sortOptions(h.bundle, lang, params.Sort),
 		HasFilters:   params.hasFilters(),
 		Page:         page,
@@ -300,6 +300,34 @@ func filterOptions(values []string, selected string) []FilterOption {
 	}
 	if selected != "" && !found {
 		out = append(out, FilterOption{Value: selected, Label: selected, Selected: true})
+	}
+	return out
+}
+
+// colorFilterOptions is filterOptions for the color facet: Value stays the
+// raw stored color (the ?color= filter), Label is its display text in lang.
+func colorFilterOptions(values []string, selected, lang string) []FilterOption {
+	opts := filterOptions(values, selected)
+	out := make([]FilterOption, len(opts))
+	for i, o := range opts {
+		out[i] = FilterOption{Value: o.Value, Label: i18n.ColorLabel(lang, o.Value), Selected: o.Selected}
+	}
+	return out
+}
+
+// buildColorOptions backs the product page's and quick-buy modal's color
+// pickers: Label is the color in lang, Href keeps the raw color (and the
+// selected size) under basePath.
+func buildColorOptions(colors []string, variants []catalog.Variant, qtyByVariant map[string]int, selectedSize, selectedColor, basePath, lang string) []ColorOption {
+	out := make([]ColorOption, 0, len(colors))
+	for _, c := range colors {
+		v := findVariant(variants, selectedSize, c)
+		out = append(out, ColorOption{
+			Label:     i18n.ColorLabel(lang, c),
+			Selected:  c == selectedColor,
+			Available: v != nil && qtyByVariant[v.ID] > 0,
+			Href:      basePath + "?size=" + url.QueryEscape(selectedSize) + "&color=" + url.QueryEscape(c),
+		})
 	}
 	return out
 }
@@ -532,16 +560,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 			Href:      productPath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(selectedColor),
 		})
 	}
-	colorOpts := make([]ColorOption, 0, len(colors))
-	for _, c := range colors {
-		v := findVariant(variantList, selectedSize, c)
-		colorOpts = append(colorOpts, ColorOption{
-			Label:     c,
-			Selected:  c == selectedColor,
-			Available: v != nil && qtyByVariant[v.ID] > 0,
-			Href:      productPath + "?size=" + url.QueryEscape(selectedSize) + "&color=" + url.QueryEscape(c),
-		})
-	}
+	colorOpts := buildColorOptions(colors, variantList, qtyByVariant, selectedSize, selectedColor, productPath, lang)
 
 	price := product.BasePrice
 	selectedVariantID := ""
@@ -667,16 +686,7 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 			Href:      quickBuyPath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(selectedColor),
 		})
 	}
-	colorOpts := make([]ColorOption, 0, len(colors))
-	for _, c := range colors {
-		v := findVariant(variantList, selectedSize, c)
-		colorOpts = append(colorOpts, ColorOption{
-			Label:     c,
-			Selected:  c == selectedColor,
-			Available: v != nil && qtyByVariant[v.ID] > 0,
-			Href:      quickBuyPath + "?size=" + url.QueryEscape(selectedSize) + "&color=" + url.QueryEscape(c),
-		})
-	}
+	colorOpts := buildColorOptions(colors, variantList, qtyByVariant, selectedSize, selectedColor, quickBuyPath, lang)
 
 	price := product.BasePrice
 	selectedVariantID := ""

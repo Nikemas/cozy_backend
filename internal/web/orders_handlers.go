@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
@@ -78,9 +79,9 @@ func statusView(s orders.OrderStatus) orderStatusMeta {
 // buildOrderViews turns Service.ListOrders' result into orders.gohtml's
 // view model. t translates a single i18n key (bound to the request's
 // language) — used for the small bits of item-line copy ("размер ...")
-// that aren't whole static template strings.
+// that aren't whole static template strings; lang localizes item colors.
 // photos maps variant_id → thumbnail URL (see variantPhotos); nil is fine.
-func buildOrderViews(list []orders.Order, t func(string) string, photos map[string]string) []OrderView {
+func buildOrderViews(list []orders.Order, t func(string) string, lang string, photos map[string]string) []OrderView {
 	views := make([]OrderView, 0, len(list))
 	for _, o := range list {
 		meta := statusView(o.Status)
@@ -89,7 +90,7 @@ func buildOrderViews(list []orders.Order, t func(string) string, photos map[stri
 		for _, it := range o.Items {
 			title := it.ProductNameSnapshot
 			if it.SizeSnapshot != "" || it.ColorSnapshot != "" {
-				title = fmt.Sprintf("%s — %s %s, %s", it.ProductNameSnapshot, t("order.item.size_prefix"), it.SizeSnapshot, strings.ToLower(it.ColorSnapshot))
+				title = fmt.Sprintf("%s — %s %s, %s", it.ProductNameSnapshot, t("order.item.size_prefix"), it.SizeSnapshot, strings.ToLower(i18n.ColorLabel(lang, it.ColorSnapshot)))
 			}
 			items = append(items, OrderItemView{Title: title, Qty: it.Quantity, PhotoURL: photos[it.VariantID]})
 		}
@@ -138,7 +139,7 @@ func (h *handlers) orders(w http.ResponseWriter, r *http.Request) error {
 			if perr != nil {
 				return perr
 			}
-			view.Orders = buildOrderViews(list, t, photos)
+			view.Orders = buildOrderViews(list, t, data.Lang, photos)
 			view.Empty = len(view.Orders) == 0
 		case isNotImplemented(err):
 			// internal/orders (Task 3) isn't merged yet in this worktree —

@@ -82,11 +82,11 @@ func listFavoritesHandler(favorites favoriteLister, products favoriteProductGett
 			}
 		}
 
-		items, err := buildProductDetails(r.Context(), details, cfg, active)
+		items, err := buildProductDetails(r.Context(), details, cfg, apiLang(r), active)
 		if err != nil {
 			return err
 		}
-		return writeJSON(w, http.StatusOK, favoritesResponse{Items: items})
+		return writeLocalizedJSON(w, http.StatusOK, favoritesResponse{Items: items})
 	}
 }
 

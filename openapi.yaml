@@ -42,6 +42,22 @@ info:
 
     Translations live in `locales/errors.ru.yaml` / `errors.ky.yaml`; a test
     fails if any code raised in the code lacks either one.
+
+    ## Color labels (`color_label`)
+
+    Product colors are stored in Russian (`color`, e.g. `Чёрный`). Wherever
+    a customer endpoint returns a variant/cart/order color it also returns
+    `color_label`: the color in the request's language, picked from the
+    `Accept-Language` header only (`ky` or `ru`, default `ru` — no cookie or
+    `?lang=`). `color_label` is a string, always present next to `color`,
+    and equals `color` when there is no translation (and always for `ru`).
+    Display `color_label`; keep sending the raw `color` back (e.g. the
+    `?color=` filter of `GET /api/v1/products`). Facets give
+    `color_options: [{value, label}]` next to the raw `colors`. These
+    responses send `Vary: Accept-Language`: `GET /api/v1/products/facets`,
+    `GET /api/v1/products/{id}`, `GET /api/v1/favorites`, `GET /api/v1/cart`,
+    `POST/GET /api/v1/orders`, `GET /api/v1/orders/{id}`,
+    `POST /api/v1/orders/{id}/cancel`.
   version: "0.7.0"
 
 servers:
@@ -299,7 +315,9 @@ paths:
         covers its subcategories (as the website's category page does), so
         one call serves a screen that lists several subcategories. Filter params (`size`,
         `color`, `price_*`, `in_stock`) are ignored — facets list every option
-        in the scope. Same short public `Cache-Control` as the product list.
+        in the scope. Same short public `Cache-Control` as the product list,
+        plus `Vary: Accept-Language` (`color_options[].label` is localized —
+        see "Color labels").
         Takes precedence over `/api/v1/products/{id}` (ServeMux picks the
         more specific pattern).
       parameters:
@@ -2029,7 +2047,7 @@ components:
 
     ProductFacets:
       type: object
-      required: [sizes, colors, price_min, price_max]
+      required: [sizes, colors, color_options, price_min, price_max]
       properties:
         sizes:
           type: array
@@ -2041,6 +2059,16 @@ components:
           items: { type: string }
           description: Distinct variant colors exactly as stored (no case/ё normalisation).
           example: ["Черный", "белый"]
+        color_options:
+          type: array
+          description: "Same colors, same order, each with its display label in the `Accept-Language` language (see \"Color labels\"). Filter by `value`, show `label`."
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value: { type: string, description: "Raw stored color — what `?color=` takes." }
+              label: { type: string, description: "Localized label; equals `value` when there is no translation." }
+          example: [{ value: "Черный", label: "Кара" }, { value: "белый", label: "ак" }]
         price_min:
           type: number
           format: double
@@ -2079,7 +2107,9 @@ components:
       allOf:
         - $ref: "#/components/schemas/Variant"
         - type: object
+          required: [color_label]
           properties:
+            color_label: { type: string, example: "Кара", description: "`color` in the `Accept-Language` language; equals `color` when there is no translation (see \"Color labels\")." }
             stock:
               type: array
               items: { $ref: "#/components/schemas/StockPoint" }
@@ -2162,6 +2192,7 @@ components:
         product_name_snapshot: { type: string }
         size_snapshot: { type: string }
         color_snapshot: { type: string }
+        color_label: { type: string, example: "Кара", description: "Customer endpoints (`/api/v1/orders*`) only, always present there: `color_snapshot` in the `Accept-Language` language, equal to it when there is no translation (see \"Color labels\"). Admin endpoints omit it." }
         quantity: { type: integer }
         price: { type: number, format: double }
         product_id: { type: string, format: uuid, nullable: true, description: "Current product of the variant — for \"repeat order\" / opening the product." }
@@ -2233,6 +2264,7 @@ components:
         product_name_ky: { type: string }
         size: { type: string }
         color: { type: string }
+        color_label: { type: string, example: "Кара", description: "`color` in the `Accept-Language` language; equals `color` when there is no translation (see \"Color labels\")." }
         price: { type: number, format: double, description: "variant.price_override if set, else the product's base_price." }
         photo_url: { type: string, nullable: true, description: "Primary photo URL, or null if the product has none." }
         thumb_url: { type: string, nullable: true, description: "400×400 variant of the primary photo (same as photo_url for legacy photos), or null if the product has none." }

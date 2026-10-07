@@ -34,7 +34,7 @@ func TestBuildOrderViewsShowCancelOnlyForPlacedUnpaid(t *testing.T) {
 		{ID: "a", Status: orders.StatusPlaced, PaymentMethod: orders.PaymentCashOnDelivery},
 		{ID: "b", Status: orders.StatusConfirmed, PaymentMethod: orders.PaymentCashOnDelivery},
 		{ID: "c", Status: orders.StatusPlaced, PaymentMethod: orders.PaymentOnlineCard, PaymentStatus: &paid},
-	}, func(k string) string { return k }, nil)
+	}, func(k string) string { return k }, "ru", nil)
 	if !views[0].ShowCancel || views[1].ShowCancel || views[2].ShowCancel {
 		t.Errorf("ShowCancel = %v/%v/%v, want true/false/false", views[0].ShowCancel, views[1].ShowCancel, views[2].ShowCancel)
 	}

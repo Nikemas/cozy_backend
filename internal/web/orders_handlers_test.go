@@ -84,7 +84,7 @@ func TestBuildOrderViewsShowsTrackForInFlightAndRepeatForFinished(t *testing.T) 
 		},
 	}
 
-	views := buildOrderViews(list, noop, map[string]string{"v1": "https://m/v1/thumb.jpg"})
+	views := buildOrderViews(list, noop, "ru", map[string]string{"v1": "https://m/v1/thumb.jpg"})
 	if len(views) != 2 {
 		t.Fatalf("buildOrderViews returned %d views, want 2", len(views))
 	}
