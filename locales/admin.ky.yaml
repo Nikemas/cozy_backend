@@ -671,3 +671,49 @@ admin.delivery.name_ky_placeholder: Бишкек ш.
 admin.points.name_placeholder: Дордой-Центр
 admin.points.default_city: Бишкек
 admin.staff.name_placeholder: Айгерим Б.
+
+# fix/admin-polish: Excel export column headers (internal/httpapi/admin_reports.go)
+admin.export.col.day: Күнү
+admin.export.col.product: Товар
+admin.export.col.point: Сатуу жайы
+admin.export.col.category: Категория
+admin.export.col.key: Ачкыч
+admin.export.col.orders: Буйрутмалар
+admin.export.col.items: Товарлар
+admin.export.col.revenue: Киреше
+
+# fix/admin-polish: product import template (internal/catalog/import_template.go).
+# Each admin.import.tpl.col.* is also accepted as an import header.
+admin.import.tpl.sheet_products: Товарлар
+admin.import.tpl.sheet_help: Нускама
+admin.import.tpl.sheet_categories: Категориялар
+admin.import.tpl.cat_name_ru: Аталышы (RU)
+admin.import.tpl.cat_name_ky: Аталышы (KY)
+admin.import.tpl.help_column: Тилке
+admin.import.tpl.help_what: Эмне жазуу керек
+admin.import.tpl.help_rows: Бир сап = бир вариация (өлчөм × түс). Милдеттүү тилкелер * менен белгиленген. Тилкелердин тартиби маанилүү эмес, ашыкча тилкелер эске алынбайт.
+admin.import.tpl.help_check: Адегенде «Текшерүү» баскычын басыңыз — отчет эмне түзүлөрүн/жаңыланарын жана кайсы саптарда ката бар экенин көрсөтөт, базага эч нерсе жазылбайт.
+admin.import.tpl.col.model_code: Артикул
+admin.import.tpl.col.name_ru: Аталышы (RU)
+admin.import.tpl.col.name_ky: Аталышы (KY)
+admin.import.tpl.col.category: Категория
+admin.import.tpl.col.brand: Бренд
+admin.import.tpl.col.price: Баасы
+admin.import.tpl.col.size: Өлчөмү
+admin.import.tpl.col.color: Түсү
+admin.import.tpl.col.sku: SKU
+admin.import.tpl.col.quantity: Калдык
+admin.import.tpl.col.description_ru: Сүрөттөмө (RU)
+admin.import.tpl.col.description_ky: Сүрөттөмө (KY)
+admin.import.tpl.hint.model_code: Моделдин артикулу. Артикулу бирдей саптар — бир товар (ар кандай өлчөм/түс). Бош болсо — товар бренд + аталыш + категория боюнча аныкталат.
+admin.import.tpl.hint.name_ru: Товардын орусча аталышы.
+admin.import.tpl.hint.name_ky: Кыргызча аталышы. Бош болсо — орусчасы алынат (кийин товардын карточкасында которсо болот).
+admin.import.tpl.hint.category: Категориянын аталышы же slug'у («Категориялар» барагын караңыз). Моделдин биринчи сабында көрсөтүү жетиштүү.
+admin.import.tpl.hint.brand: Моделдин бренди (милдеттүү эмес).
+admin.import.tpl.hint.price: Баасы сом менен, сан ≥ 0 (мисалы 4990 же 4990,50). Моделдин биринчи сабында көрсөтүү жетиштүү; өлчөмдүн баасы башка болсо — ал ушул вариациянын баасы болот.
+admin.import.tpl.hint.size: Вариациянын өлчөмү (мисалы 38 же 42,5). Өлчөм менен түс чогуу көрсөтүлөт.
+admin.import.tpl.hint.color: Вариациянын түсү.
+admin.import.tpl.hint.sku: Вариациянын уникалдуу коду (штрихкод). Кайра импорттоодо вариация ушул код боюнча жаңыланат, жаңысы түзүлбөйт.
+admin.import.tpl.hint.quantity: Бүтүн сан ≥ 0 — импорттоодо тандалган сатуу жайындагы калдык (учурдагы калдыктын ордуна жазылат).
+admin.import.tpl.hint.description_ru: Орусча сүрөттөмө. Бош уяча мурда толтурулган сүрөттөмөнү өчүрбөйт.
+admin.import.tpl.hint.description_ky: Кыргызча сүрөттөмө.

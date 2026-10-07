@@ -672,3 +672,49 @@ admin.delivery.name_ky_placeholder: Бишкек ш.
 admin.points.name_placeholder: Дордой-Центр
 admin.points.default_city: Бишкек
 admin.staff.name_placeholder: Айгерим Б.
+
+# fix/admin-polish: Excel export column headers (internal/httpapi/admin_reports.go)
+admin.export.col.day: Дата
+admin.export.col.product: Товар
+admin.export.col.point: Точка
+admin.export.col.category: Категория
+admin.export.col.key: Ключ
+admin.export.col.orders: Заказы
+admin.export.col.items: Товары
+admin.export.col.revenue: Выручка
+
+# fix/admin-polish: product import template (internal/catalog/import_template.go).
+# Each admin.import.tpl.col.* is also accepted as an import header.
+admin.import.tpl.sheet_products: Товары
+admin.import.tpl.sheet_help: Инструкция
+admin.import.tpl.sheet_categories: Категории
+admin.import.tpl.cat_name_ru: Название
+admin.import.tpl.cat_name_ky: Название (KY)
+admin.import.tpl.help_column: Колонка
+admin.import.tpl.help_what: Что указывать
+admin.import.tpl.help_rows: Одна строка = одна вариация (размер × цвет). Обязательные колонки отмечены *. Порядок колонок не важен, лишние колонки игнорируются.
+admin.import.tpl.help_check: Сначала нажмите «Проверить» — отчёт покажет, что будет создано/обновлено и какие строки с ошибками, без записи в базу.
+admin.import.tpl.col.model_code: Артикул
+admin.import.tpl.col.name_ru: Название
+admin.import.tpl.col.name_ky: Название (KY)
+admin.import.tpl.col.category: Категория
+admin.import.tpl.col.brand: Бренд
+admin.import.tpl.col.price: Цена
+admin.import.tpl.col.size: Размер
+admin.import.tpl.col.color: Цвет
+admin.import.tpl.col.sku: SKU
+admin.import.tpl.col.quantity: Остаток
+admin.import.tpl.col.description_ru: Описание
+admin.import.tpl.col.description_ky: Описание (KY)
+admin.import.tpl.hint.model_code: Артикул модели. Строки с одним артикулом — один товар (разные размеры/цвета). Если пусто — товар определяется по бренду + названию + категории.
+admin.import.tpl.hint.name_ru: Название товара на русском.
+admin.import.tpl.hint.name_ky: Название на кыргызском. Если пусто — берётся русское (можно перевести потом в карточке товара).
+admin.import.tpl.hint.category: Название категории или её slug (см. лист «Категории»). Достаточно указать в первой строке модели.
+admin.import.tpl.hint.brand: Бренд модели (необязательно).
+admin.import.tpl.hint.price: Цена в сомах, число ≥ 0 (например 4990 или 4990,50). Достаточно указать в первой строке модели; если у размера цена другая — она станет ценой этой вариации.
+admin.import.tpl.hint.size: Размер вариации (например 38 или 42,5). Размер и цвет указываются вместе.
+admin.import.tpl.hint.color: Цвет вариации.
+admin.import.tpl.hint.sku: Уникальный код вариации (штрихкод). По нему повторный импорт обновляет вариацию, а не создаёт новую.
+admin.import.tpl.hint.quantity: Целое число ≥ 0 — остаток на точке продаж, выбранной при импорте (заменяет текущий остаток).
+admin.import.tpl.hint.description_ru: Описание на русском. Пустая ячейка не стирает уже заполненное описание.
+admin.import.tpl.hint.description_ky: Описание на кыргызском.

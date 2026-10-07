@@ -82,7 +82,7 @@ func salesReportXLSXHandler(repo salesRepo) apperr.HandlerFunc {
 			return err
 		}
 
-		return writeSalesXLSX(w, groupBy, rows)
+		return writeSalesXLSX(w, adminRequestLang(r), groupBy, rows)
 	}
 }
 
@@ -173,32 +173,33 @@ func toRowResponses(rows []reports.Row) []salesRowJSON {
 // --- Excel representation ---
 
 // keyColumnHeader returns groupBy's column header for the first column of
-// the Excel export. ParseGroupBy already rejects anything else before this
-// is ever called, so the default case is unreachable in practice.
-func keyColumnHeader(groupBy reports.GroupBy) string {
+// the Excel export, in lang. ParseGroupBy already rejects anything else
+// before this is ever called, so the default case is unreachable in
+// practice.
+func keyColumnHeader(lang string, groupBy reports.GroupBy) string {
 	switch groupBy {
-	case reports.GroupByDay:
-		return "Дата"
-	case reports.GroupByProduct:
-		return "Товар"
-	case reports.GroupByPoint:
-		return "Точка"
-	case groupByCategory:
-		return "Категория"
+	case reports.GroupByDay, reports.GroupByProduct, reports.GroupByPoint, groupByCategory:
+		return adminText(lang, "admin.export.col."+string(groupBy))
 	default:
-		return "Ключ"
+		return adminText(lang, "admin.export.col.key")
 	}
 }
 
 // writeSalesXLSX renders rows as a single-sheet .xlsx workbook straight
 // into the response body, with the headers an admin's browser needs to
-// download it as a file rather than render it inline.
-func writeSalesXLSX(w http.ResponseWriter, groupBy reports.GroupBy, rows []reports.Row) error {
+// download it as a file rather than render it inline. Headers are in lang
+// (the requesting admin's language, adminRequestLang).
+func writeSalesXLSX(w http.ResponseWriter, lang string, groupBy reports.GroupBy, rows []reports.Row) error {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
 	sheet := f.GetSheetName(0)
-	header := []interface{}{keyColumnHeader(groupBy), "Заказы", "Товары", "Выручка"}
+	header := []interface{}{
+		keyColumnHeader(lang, groupBy),
+		adminText(lang, "admin.export.col.orders"),
+		adminText(lang, "admin.export.col.items"),
+		adminText(lang, "admin.export.col.revenue"),
+	}
 	if err := f.SetSheetRow(sheet, "A1", &header); err != nil {
 		return err
 	}

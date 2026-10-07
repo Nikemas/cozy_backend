@@ -10,6 +10,8 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/locales"
 )
 
 // buildXLSX writes rows (row 0 = header) into a one-sheet workbook. A cell
@@ -530,26 +532,55 @@ func TestLegacyEnglishFileStillImports(t *testing.T) {
 }
 
 func TestTemplateImportsCleanly(t *testing.T) {
-	data, err := BuildImportTemplate([]TemplateCategory{{Slug: "sneakers", NameRu: "Кроссовки", NameKy: "Кроссовкалар"}, {Slug: "boots", NameRu: "Ботинки"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := excelize.OpenReader(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := f.GetSheetList(); len(got) != 3 || got[0] != "Товары" {
-		t.Errorf("sheets = %v", got)
-	}
-	_ = f.Close()
+	cats := []TemplateCategory{{Slug: "sneakers", NameRu: "Кроссовки", NameKy: "Кроссовкалар"}, {Slug: "boots", NameRu: "Ботинки"}}
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		t.Run(lang, func(t *testing.T) {
+			data, err := BuildImportTemplate(lang, cats)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f, err := excelize.OpenReader(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantMain := locales.AdminBundle().T(lang, "admin.import.tpl.sheet_products")
+			if got := f.GetSheetList(); len(got) != 3 || got[0] != wantMain {
+				t.Errorf("sheets = %v, want %q first", got, wantMain)
+			}
+			_ = f.Close()
 
-	s := newMemStore()
-	res := runXLSX(t, s, data, ImportOptions{DryRun: true})
-	wantSummary(t, res.Summary, ImportSummary{Rows: 4, Created: 4, ProductsCreated: 2, VariantsCreated: 4})
+			// The localized headers round-trip through the importer.
+			s := newMemStore()
+			res := runXLSX(t, s, data, ImportOptions{DryRun: true})
+			wantSummary(t, res.Summary, ImportSummary{Rows: 4, Created: 4, ProductsCreated: 2, VariantsCreated: 4})
+		})
+	}
 
 	// Without categories (empty DB) the template still builds.
-	if _, err := BuildImportTemplate(nil); err != nil {
+	if _, err := BuildImportTemplate(i18n.LangRU, nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTemplateHeadersAreLocalizedAndParse(t *testing.T) {
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		headers := templateHeaders(lang)
+		cols, err := canonicalHeaders(headers)
+		if err != nil {
+			t.Fatalf("%s: template headers rejected: %v", lang, err)
+		}
+		for i, c := range templateColumns {
+			if cols[i] != c.col {
+				t.Errorf("%s: header %q parsed as %q, want %q", lang, headers[i], cols[i], c.col)
+			}
+		}
+	}
+	// The Russian captions stay what older templates already carry.
+	if got := templateHeaders(i18n.LangRU); got[1] != "Название*" || got[5] != "Цена*" {
+		t.Errorf("ru headers changed: %q", got)
+	}
+	if ru, ky := templateHeaders(i18n.LangRU), templateHeaders(i18n.LangKY); ru[6] == ky[6] {
+		t.Errorf("ky size header not translated: %q", ky[6])
 	}
 }
 

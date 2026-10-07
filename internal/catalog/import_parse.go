@@ -79,6 +79,29 @@ var columnAliases = map[string]string{
 	"остаток": colQuantity, "количество": colQuantity, "кол-во": colQuantity,
 }
 
+// headerAliases is columnAliases plus every language's template header
+// (BuildImportTemplate), so a Kyrgyz template imports as well as a
+// Russian one. A template header that collides with another column's
+// alias is a programming mistake and panics at startup.
+var headerAliases = withTemplateHeaders(columnAliases)
+
+func withTemplateHeaders(base map[string]string) map[string]string {
+	out := make(map[string]string, len(base)+len(templateColumns)*len(templateLangs))
+	for k, v := range base {
+		out[k] = v
+	}
+	for _, lang := range templateLangs {
+		for i, h := range templateHeaders(lang) {
+			n, col := normalizeHeader(h), templateColumns[i].col
+			if prev, ok := out[n]; ok && prev != col {
+				panic(fmt.Sprintf("catalog: template header %q (%s) is already an alias of %q", h, lang, prev))
+			}
+			out[n] = col
+		}
+	}
+	return out
+}
+
 // requiredColumns must be present in the header row; without them no row
 // could ever be imported, so the file is rejected up front.
 var requiredColumns = []struct{ key, caption string }{
@@ -133,7 +156,7 @@ func canonicalHeaders(raw []string) ([]string, error) {
 		var col string
 		if strings.HasPrefix(n, stockPointColumnPrefix) {
 			col = stockPointColumnPrefix + strings.TrimSpace(strings.TrimPrefix(n, stockPointColumnPrefix))
-		} else if c, ok := columnAliases[n]; ok {
+		} else if c, ok := headerAliases[n]; ok {
 			col = c
 		} else {
 			continue

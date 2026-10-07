@@ -7,11 +7,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/xuri/excelize/v2"
 
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 )
@@ -295,10 +297,77 @@ func TestKeyColumnHeaderPerGroupBy(t *testing.T) {
 		reports.GroupByDay:     "Дата",
 		reports.GroupByProduct: "Товар",
 		reports.GroupByPoint:   "Точка",
+		groupByCategory:        "Категория",
 	}
 	for gb, want := range cases {
-		if got := keyColumnHeader(gb); got != want {
-			t.Errorf("keyColumnHeader(%q) = %q, want %q", gb, got, want)
+		if got := keyColumnHeader(i18n.LangRU, gb); got != want {
+			t.Errorf("keyColumnHeader(ru, %q) = %q, want %q", gb, got, want)
 		}
+		if got := keyColumnHeader(i18n.LangKY, gb); got == "" || got == "admin.export.col."+string(gb) {
+			t.Errorf("keyColumnHeader(ky, %q) = %q, want a translation", gb, got)
+		}
+	}
+}
+
+func TestSalesXLSXHeadersFollowAdminLanguage(t *testing.T) {
+	// Arrange: the admin chose Kyrgyz; the browser itself still says ru.
+	handler := salesReportXLSXHandler(&fakeSalesRepo{})
+	req := salesReportRequest("from=2026-01-01&to=2026-01-31&group_by=day")
+	req.Header.Set("Accept-Language", "ru-RU,ru;q=0.9")
+	req.AddCookie(&http.Cookie{Name: "admin_lang", Value: "ky"})
+	rec := httptest.NewRecorder()
+
+	// Act
+	if err := handler(rec, req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Assert
+	f, err := excelize.OpenReader(bytes.NewReader(rec.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("open workbook: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+	rows, err := f.GetRows(f.GetSheetName(0))
+	if err != nil || len(rows) == 0 {
+		t.Fatalf("GetRows: %v (%d rows)", err, len(rows))
+	}
+	want := []string{
+		adminText(i18n.LangKY, "admin.export.col.day"),
+		adminText(i18n.LangKY, "admin.export.col.orders"),
+		adminText(i18n.LangKY, "admin.export.col.items"),
+		adminText(i18n.LangKY, "admin.export.col.revenue"),
+	}
+	if strings.Join(rows[0], "|") != strings.Join(want, "|") {
+		t.Errorf("header = %q, want %q", rows[0], want)
+	}
+	if rows[0][1] == "Заказы" {
+		t.Errorf("header still Russian: %q", rows[0])
+	}
+}
+
+func TestAdminRequestLang(t *testing.T) {
+	cases := []struct {
+		name, query, cookie, accept, want string
+	}{
+		{"default", "", "", "", i18n.LangRU},
+		{"query wins", "lang=ky", "ru", "ru", i18n.LangKY},
+		{"cookie beats accept-language", "", "ky", "ru-RU", i18n.LangKY},
+		{"accept-language without cookie", "", "", "ky", i18n.LangKY},
+		{"bad cookie falls through", "", "xx", "ky", i18n.LangKY},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/admin/api/reports/sales.xlsx?"+c.query, nil)
+			if c.cookie != "" {
+				r.AddCookie(&http.Cookie{Name: "admin_lang", Value: c.cookie})
+			}
+			if c.accept != "" {
+				r.Header.Set("Accept-Language", c.accept)
+			}
+			if got := adminRequestLang(r); got != c.want {
+				t.Errorf("adminRequestLang = %q, want %q", got, c.want)
+			}
+		})
 	}
 }

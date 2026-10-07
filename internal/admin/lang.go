@@ -40,17 +40,9 @@ const (
 	langCookieMaxAge = 365 * 24 * 60 * 60
 )
 
-// adminBundle is the admin panel's translation set. A broken/missing
-// embedded file is a build-time mistake, so it fails loudly at startup.
-var adminBundle = mustLoadAdminBundle()
-
-func mustLoadAdminBundle() *i18n.Bundle {
-	b, err := i18n.LoadFS(locales.Admin, "admin.%s.yaml")
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
+// adminBundle is the admin panel's translation set (locales.AdminBundle,
+// shared with the Excel exports and the import template).
+var adminBundle = locales.AdminBundle()
 
 // supportedLang normalizes lang to a supported language code.
 func supportedLang(lang string) string {

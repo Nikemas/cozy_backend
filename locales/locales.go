@@ -5,7 +5,12 @@
 // are still read from disk by internal/web via i18n.Load("locales").
 package locales
 
-import "embed"
+import (
+	"embed"
+	"sync"
+
+	"github.com/Nikemas/cozy_backend/internal/i18n"
+)
 
 // Admin holds admin.ru.yaml and admin.ky.yaml — load with
 // i18n.LoadFS(locales.Admin, "admin.%s.yaml").
@@ -20,3 +25,15 @@ var Admin embed.FS
 //
 //go:embed errors.ru.yaml errors.ky.yaml
 var Errors embed.FS
+
+// AdminBundle returns the admin panel's translation set, loaded once —
+// for every package that renders admin-facing text (internal/admin's
+// pages, the Excel exports and the import template). A broken embedded
+// file is a build-time mistake, so it panics.
+var AdminBundle = sync.OnceValue(func() *i18n.Bundle {
+	b, err := i18n.LoadFS(Admin, "admin.%s.yaml")
+	if err != nil {
+		panic(err)
+	}
+	return b
+})
