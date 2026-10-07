@@ -615,29 +615,3 @@ func (h *handlers) productDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- import screen ---
-
-// productImportPage handles GET /admin/products/import: renders the
-// upload form. The form's own JS does the actual work — POSTing the
-// chosen file as multipart/form-data straight to the existing
-// POST /admin/products/import JSON endpoint (httpapi.
-// RegisterAdminImportRoutes, already wired in cmd/server/main.go ahead of
-// this task) and rendering the returned {imported, errors[]} inline. See
-// this file's package doc comment for why that endpoint isn't called via
-// an internal Go function call instead: it already owns this exact
-// method+path, so a second net/http.ServeMux registration for it here
-// would panic at startup. This is arguably no worse than the "preferred"
-// direct-call option the task brief describes — catalog.ImportProducts'
-// own request/response shape is JSON-in/JSON-out either way, and this
-// keeps the browser's real multipart upload as one hop instead of two.
-func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
-	st, _ := staff.FromContext(r.Context())
-	data := ImportPageData{ImportURL: "/admin/products/import"}
-
-	pageData := h.productsShellData("product_import", "admin.import.title", st)
-	pageData.ShowBack = true
-	pageData.BackURL = productsListPath
-	pageData.Data = data
-	if err := h.render.Render(w, "product_import", pageData); err != nil {
-		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
-	}
-}

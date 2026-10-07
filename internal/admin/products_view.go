@@ -260,7 +260,44 @@ type ImportRowError struct {
 }
 
 type ImportPageData struct {
-	ImportURL string
+	ImportURL string // base path; <ImportURL>/template is the .xlsx template
+	CheckURL  string // POST: dry run
+	ApplyURL  string // POST: real import (needs Run.Token)
+	ResetURL  string // GET: another file chosen
+
+	Points       []catalog.ImportPoint // stock point choices, default first
+	PointsFailed bool                  // points could not be loaded
+	PointID      string                // the chosen point ("" = default)
+
+	Result *ImportResultVM // nil before the first check
+	Run    ImportRunVM
+}
+
+// ImportRunVM is the «Импортировать» button's server-side state: enabled
+// only right after a clean check, carrying that check's token.
+type ImportRunVM struct {
+	Enabled bool
+	Token   string
+}
+
+// ImportResultVM is the report under the import form.
+type ImportResultVM struct {
+	Error       string // a file-level problem; nothing else is shown
+	DryRun      bool
+	HasProblems bool
+	Head        string
+	Summary     string
+	BadTitle    string
+	BadRows     []string
+	Rows        []ImportRowVM
+}
+
+// ImportRowVM is one report table row.
+type ImportRowVM struct {
+	Row                      int
+	StatusLabel, StatusClass string
+	Model, Size, Color, SKU  string
+	Message                  string
 }
 
 // --- pure helpers ---

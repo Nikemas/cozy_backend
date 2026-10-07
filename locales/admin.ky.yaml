@@ -295,11 +295,9 @@ admin.import.title: Товарларды импорттоо
 admin.import.drop: Excel же CSV файлды ушул жерге сүйрөп келиңиз
 admin.import.or: же
 admin.import.choose: Файл тандаңыз
-admin.import.failed: Импорттоодо ката кетти
 admin.import.imported: Импорттолду
 admin.import.skipped: Ката менен өткөрүлүп жиберилди
 admin.import.row: Сап
-admin.import.run_failed: Импорттоо мүмкүн болбоду
 
 # Wave 2 screens: broadcasts, delivery zones, audit journal, bulk actions, import v2
 admin.common.yes: ооба
@@ -494,7 +492,6 @@ admin.products.oos_only: Ушул сатуу жайында жоктор ган�
 admin.products.at_point: Сатуу жайында
 admin.import.template: Үлгүнү жүктөп алуу
 admin.import.point_label: "«Калдык» тилкеси үчүн сатуу жайы"
-admin.import.loading: Жүктөлүүдө…
 admin.import.check: Текшерүү
 admin.import.run: Импорттоо
 admin.import.model: Модель
@@ -515,7 +512,6 @@ admin.import.rows: Саптар
 admin.import.with_errors: ката менен
 admin.import.will_not: Импорттолбойт
 admin.import.not_imported: Импорттолгон жок
-admin.import.confirm_run: Файл азырынча катасыз текшерилген жок. Азыр импорттойсузбу? Туура моделдер жазылат, катасы барлары өткөрүлөт.
 admin.apperr.invalid_broadcast: Орусча аталышын жана текстин толтуруңуз (аталышы 65, тексти 240 белгиден ашпасын)
 admin.apperr.invalid_broadcast_link: Шилтеме үчүн товарды же категорияны тандаңыз
 admin.apperr.invalid_submit_token: Форма эскирди — баракты жаңылаңыз
@@ -722,3 +718,11 @@ admin.import.tpl.hint.description_ky: Кыргызча сүрөттөмө.
 admin.history.note.payment_expired: Убагында төлөнгөн жок
 admin.history.note.payment_open_failed: Төлөмдү ачуу мүмкүн болбоду
 admin.history.note.payment_cancelled: Сатып алуучу төлөмдү жокко чыгарды
+
+# fix/admin-polish: server-rendered import flow (internal/admin/product_import.go)
+admin.import.run_hint: Файл катасыз текшерилгенден кийин импорттоо жеткиликтүү болот.
+admin.import.err_recheck: Текшерүүдөн кийин файл же сатуу жайы өзгөрдү — «Текшерүү» баскычын кайра басыңыз.
+admin.import.err_no_file: .csv же .xlsx файлын тандаңыз.
+admin.import.err_upload: Файлды окуу мүмкүн болбоду — балким, ал 20 МБдан чоң.
+admin.import.err_format: .csv жана .xlsx файлдары гана колдоого алынат.
+admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"

@@ -298,11 +298,9 @@ admin.import.title: Импорт товаров
 admin.import.drop: Перетащите Excel или CSV файл сюда
 admin.import.or: или
 admin.import.choose: Выберите файл
-admin.import.failed: Ошибка импорта
 admin.import.imported: Импортировано
 admin.import.skipped: Пропущено с ошибками
 admin.import.row: Строка
-admin.import.run_failed: Не удалось выполнить импорт
 
 # Wave 2 screens: broadcasts, delivery zones, audit journal, bulk actions, import v2
 admin.common.yes: да
@@ -497,7 +495,6 @@ admin.products.oos_only: Только нет в наличии в этой то�
 admin.products.at_point: В точке
 admin.import.template: Скачать шаблон
 admin.import.point_label: Точка продаж для колонки «Остаток»
-admin.import.loading: Загрузка…
 admin.import.check: Проверить
 admin.import.run: Импортировать
 admin.import.model: Модель
@@ -518,7 +515,6 @@ admin.import.rows: Строк
 admin.import.with_errors: с ошибками
 admin.import.will_not: Не будет импортировано
 admin.import.not_imported: Не импортировано
-admin.import.confirm_run: Файл ещё не проверен без ошибок. Импортировать сейчас? Корректные модели будут записаны, модели с ошибками — пропущены.
 admin.apperr.invalid_broadcast: Заполните заголовок и текст на русском
 admin.apperr.invalid_broadcast_link: Выберите товар или категорию для ссылки
 admin.apperr.invalid_submit_token: Форма устарела — обновите страницу
@@ -723,3 +719,11 @@ admin.import.tpl.hint.description_ky: Описание на кыргызском
 admin.history.note.payment_expired: Не оплачен вовремя
 admin.history.note.payment_open_failed: Не удалось открыть платёж
 admin.history.note.payment_cancelled: Оплата отменена покупателем
+
+# fix/admin-polish: server-rendered import flow (internal/admin/product_import.go)
+admin.import.run_hint: Импорт станет доступен после проверки файла без ошибок.
+admin.import.err_recheck: Файл или точка продаж изменились после проверки — нажмите «Проверить» ещё раз.
+admin.import.err_no_file: Выберите файл .csv или .xlsx.
+admin.import.err_upload: Не удалось прочитать файл — возможно, он больше 20 МБ.
+admin.import.err_format: Поддерживаются только файлы .csv и .xlsx.
+admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"
