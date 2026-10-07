@@ -15,7 +15,8 @@ const quote = "'"
 
 // needsQuote reports whether s, ignoring any leading apostrophes, starts
 // with a formula trigger. Looking past existing apostrophes keeps Text
-// reversible: "'=x" becomes "''=x" and Unescape gives back "'=x".
+// reversible: an already-quoted "'=x" gets a second apostrophe, and
+// Unescape removes exactly that one, giving back "'=x".
 func needsQuote(s string) bool {
 	rest := strings.TrimLeft(s, quote)
 	if rest == "" {
