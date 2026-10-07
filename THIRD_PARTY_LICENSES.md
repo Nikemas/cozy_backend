@@ -23,7 +23,7 @@ PostgreSQL License) разрешают коммерческое использо
 | github.com/golang-jwt/jwt/v5 | v5.3.1 | MIT | JWT-токены мобильного приложения |
 | github.com/google/uuid | v1.6.0 | BSD-3-Clause | UUID |
 | golang.org/x/crypto | v0.57.0 | BSD-3-Clause | bcrypt (пароли сотрудников) |
-| golang.org/x/image | v0.38.0 | BSD-3-Clause | нормализация фото товаров и баннера (`internal/media`) |
+| golang.org/x/image | v0.46.0 | BSD-3-Clause | нормализация фото товаров и баннера (`internal/media`) |
 | github.com/DATA-DOG/go-sqlmock | v1.5.2 | BSD-3-Clause | только тесты, в сборку не входит |
 
 ## 2. Транзитивные зависимости, входящие в серверный бинарник
