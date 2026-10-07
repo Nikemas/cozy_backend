@@ -311,4 +311,8 @@ func TestRussianAuditSummaryFromLocale(t *testing.T) {
 	if got := russianAuditSummary(audit.MsgProductActivated, args, ""); got != "Товар «Кеды» активирован" {
 		t.Errorf("without via = %q", got)
 	}
+	stock := russianAuditSummary(audit.MsgStockChanged, audit.StockArgs("Nike", "42", "Белый", "Дордой", 2, 4), "")
+	if want := "Остаток «Nike» 42 / Белый, Дордой: 2 → 4"; stock != want {
+		t.Errorf("stock = %q, want %q", stock, want)
+	}
 }
