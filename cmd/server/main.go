@@ -26,6 +26,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/points"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/reqid"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
@@ -269,9 +270,11 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	httpapi.RegisterAdminCatalogRoutes(mux, db, staffSvc, cfg.PublicObjectURL)
 	points.RegisterRoutes(mux, db, staffSvc)
 	httpapi.RegisterAdminOrdersRoutes(mux, db, staffSvc)
-	httpapi.RegisterAdminReportsRoutes(mux, db, staffSvc)
+	// One reports cache for the HTML reports page and the JSON/xlsx export.
+	reportsRepo := reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
+	httpapi.RegisterAdminReportsRoutes(mux, reportsRepo, staffSvc)
 	httpapi.RegisterAdminImportRoutes(mux, db, staffSvc)
-	return admin.RegisterRoutes(mux, db, staffSvc, mediaClient, cfg)
+	return admin.RegisterRoutes(mux, db, staffSvc, mediaClient, cfg, reportsRepo)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.

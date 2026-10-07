@@ -13,6 +13,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
 )
@@ -29,8 +30,10 @@ import (
 // does); the photo upload itself is media.RegisterRoutes' POST
 // /admin/api/media/upload, called from the product form's JS. mediaClient
 // is the single *media.Client cmd/server/main.go already constructs for
-// media.RegisterRoutes, not a second instance.
-func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config) error {
+// media.RegisterRoutes, not a second instance. reportsRepo is likewise the
+// single reports.CachedRepo also given to httpapi.RegisterAdminReportsRoutes,
+// so the reports page and the export share one cache.
+func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config, reportsRepo *reports.CachedRepo) error {
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
@@ -41,7 +44,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		staffSvc: staffSvc,
 		render:   renderer,
 
-		reports:    newReportsBackend(db),
+		reports:    reportsRepo,
 		pointsRepo: points.NewPointsRepo(db),
 
 		ordersSvc: orders.NewService(db),

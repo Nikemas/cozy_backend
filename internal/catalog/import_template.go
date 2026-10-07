@@ -6,6 +6,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/xlsxsafe"
 	"github.com/Nikemas/cozy_backend/locales"
 )
 
@@ -110,6 +111,7 @@ func BuildImportTemplate(lang string, categories []TemplateCategory) ([]byte, er
 		if len(categories) > 0 && row[3] != "" {
 			row[3] = categories[min(i/3, len(categories)-1)].NameRu // an existing category, so the example validates
 		}
+		row = xlsxsafe.Row(row) // category names come from the DB
 		cell, _ := excelize.CoordinatesToCellName(1, i+2)
 		if err := f.SetSheetRow(main, cell, &row); err != nil {
 			return nil, err
@@ -167,7 +169,8 @@ func BuildImportTemplate(lang string, categories []TemplateCategory) ([]byte, er
 		}
 		for i, c := range categories {
 			cell, _ := excelize.CoordinatesToCellName(1, i+2)
-			if err := f.SetSheetRow(cats, cell, &[]any{c.Slug, c.NameRu, c.NameKy}); err != nil {
+			row := xlsxsafe.Row([]any{c.Slug, c.NameRu, c.NameKy})
+			if err := f.SetSheetRow(cats, cell, &row); err != nil {
 				return nil, err
 			}
 		}

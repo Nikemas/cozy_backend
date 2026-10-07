@@ -15,6 +15,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/xlsxsafe"
 )
 
 // Canonical import column names. Every accepted header (English key or
@@ -184,7 +185,9 @@ func canonicalHeaders(raw []string) ([]string, error) {
 }
 
 // buildRow zips headers with record into an importRow, tolerating a record
-// shorter than headers (missing trailing columns count as empty).
+// shorter than headers (missing trailing columns count as empty). A cell
+// carrying xlsxsafe's anti-formula apostrophe (an exported file or the
+// template re-uploaded as-is) gets its original value back.
 func buildRow(headers []string, record []string, line int) importRow {
 	fields := make(map[string]string, len(headers))
 	for i, h := range headers {
@@ -194,6 +197,7 @@ func buildRow(headers []string, record []string, line int) importRow {
 		v := ""
 		if i < len(record) {
 			v = strings.TrimSpace(strings.ReplaceAll(record[i], "\u00a0", " "))
+			v = strings.TrimSpace(xlsxsafe.Unescape(v))
 		}
 		fields[h] = v
 	}

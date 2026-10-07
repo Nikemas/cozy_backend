@@ -620,3 +620,81 @@ func TestDetectImportFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateEscapesFormulaLikeCategoryNames(t *testing.T) {
+	evil := `=HYPERLINK("http://x","y")`
+	cats := []TemplateCategory{{Slug: "@SUM(A1)", NameRu: evil, NameKy: "+1"}}
+	data, err := BuildImportTemplate(i18n.LangRU, cats)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+
+	catSheet := f.GetSheetList()[2]
+	row, err := f.GetRows(catSheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := row[1]; got[0] != "'@SUM(A1)" || got[1] != "'"+evil || got[2] != "'+1" {
+		t.Errorf("categories row not escaped: %q", got)
+	}
+	main, err := f.GetRows(f.GetSheetList()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if main[1][3] != "'"+evil {
+		t.Errorf("example category cell = %q, want escaped", main[1][3])
+	}
+	if typ, _ := f.GetCellType(f.GetSheetList()[0], "F2"); typ == excelize.CellTypeSharedString || typ == excelize.CellTypeInlineString {
+		t.Errorf("example price written as text")
+	}
+}
+
+func TestImportStripsExportEscapeApostrophe(t *testing.T) {
+	s := newMemStore()
+	data := buildXLSX(t, [][]string{
+		{"model_code", "name_ru", "category", "price", "size", "color", "sku", "quantity"},
+		{"'=M1", `'=HYPERLINK("http://x","y")`, "Кроссовки", "100", "40", "'-2+3", "'@SUM(A1)", "1"},
+		{"M2", "'Plain quoted", "Кроссовки", "100", "41", "''+1", "SKU-2", "1"},
+	})
+	res := runXLSX(t, s, data, ImportOptions{})
+	if res.Summary.Errors != 0 {
+		t.Fatalf("unexpected errors: %+v", res.Rows)
+	}
+
+	csvRes := runCSV(t, newMemStore(), "model_code,name_ru,category,price\n'+1,'-5 name,Кроссовки,100\n", ImportOptions{})
+	if csvRes.Summary.Errors != 0 {
+		t.Fatalf("csv errors: %+v", csvRes.Rows)
+	}
+
+	rows, err := parseXLSXRows(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []map[string]string{
+		{colModelCode: "=M1", colNameRu: `=HYPERLINK("http://x","y")`, colColor: "-2+3", colSKU: "@SUM(A1)"},
+		{colModelCode: "M2", colNameRu: "'Plain quoted", colColor: "'+1", colSKU: "SKU-2"},
+	}
+	for i, w := range want {
+		for col, v := range w {
+			if got := rows[i].get(col); got != v {
+				t.Errorf("row %d %s = %q, want %q", i, col, got, v)
+			}
+		}
+	}
+
+	csvRows, err := parseCSVRows(strings.NewReader("name_ru,category,price,sku\n'-5 name,Кроссовки,100,'@x\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := csvRows[0].get(colNameRu); got != "-5 name" {
+		t.Errorf("csv name = %q", got)
+	}
+	if got := csvRows[0].get(colSKU); got != "@x" {
+		t.Errorf("csv sku = %q", got)
+	}
+}

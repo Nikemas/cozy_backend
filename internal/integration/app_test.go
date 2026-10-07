@@ -22,6 +22,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/points"
+	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/web"
 )
@@ -43,6 +44,7 @@ type testApp struct {
 	cfg     *config.Config
 	auth    *auth.Service
 	staff   *staff.Service
+	reports *reports.CachedRepo
 }
 
 var (
@@ -107,9 +109,10 @@ func buildApp() (*testApp, error) {
 	httpapi.RegisterAdminCatalogRoutes(mux, testDB, staffSvc, cfg.PublicObjectURL)
 	points.RegisterRoutes(mux, testDB, staffSvc)
 	httpapi.RegisterAdminOrdersRoutes(mux, testDB, staffSvc)
-	httpapi.RegisterAdminReportsRoutes(mux, testDB, staffSvc)
+	reportsRepo := reports.NewCachedRepo(reports.NewRepo(testDB), reports.CacheConfig{})
+	httpapi.RegisterAdminReportsRoutes(mux, reportsRepo, staffSvc)
 	httpapi.RegisterAdminImportRoutes(mux, testDB, staffSvc)
-	if err := admin.RegisterRoutes(mux, testDB, staffSvc, nil, cfg); err != nil {
+	if err := admin.RegisterRoutes(mux, testDB, staffSvc, nil, cfg, reportsRepo); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +120,7 @@ func buildApp() (*testApp, error) {
 	if err := web.RegisterRoutes(mux, testDB, cfg, authSvc, payProvider); err != nil {
 		return nil, err
 	}
-	return &testApp{handler: mux, cfg: cfg, auth: authSvc, staff: staffSvc}, nil
+	return &testApp{handler: mux, cfg: cfg, auth: authSvc, staff: staffSvc, reports: reportsRepo}, nil
 }
 
 // req describes one request to the app.

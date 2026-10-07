@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/xlsxsafe"
 )
 
 // salesRepo is the subset of *reports.CachedRepo the report handlers depend on, so
@@ -35,11 +35,11 @@ const groupByCategory reports.GroupBy = "category"
 // sales report, so they get 403 (via staffSvc.RequireRole, same as every
 // other admin-only route in this package).
 //
-// The aggregates go through reports.CachedRepo: a short-TTL in-process
-// cache with concurrent identical requests sharing one query (a year-long
-// export aggregates every order row of the year).
-func RegisterAdminReportsRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
-	repo := reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
+// The aggregates go through repo, the process-wide reports.CachedRepo
+// cmd/server builds and also hands to the admin HTML reports page: a
+// short-TTL in-process cache with concurrent identical requests sharing
+// one query (a year-long export aggregates every order row of the year).
+func RegisterAdminReportsRoutes(mux *http.ServeMux, repo *reports.CachedRepo, staffSvc *staff.Service) {
 	ownerOrManager := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
 
 	mux.Handle("GET /admin/api/reports/sales", ownerOrManager(apperr.Wrap(salesReportJSONHandler(repo))))
@@ -210,7 +210,9 @@ func writeSalesXLSX(w http.ResponseWriter, lang string, groupBy reports.GroupBy,
 
 	for i, row := range rows {
 		cell := fmt.Sprintf("A%d", i+2)
-		values := []interface{}{row.Key, row.OrderCount, row.ItemCount, row.Revenue}
+		// row.Key is a product/point/category name — data, so it goes
+		// through xlsxsafe; the counts and revenue stay numeric cells.
+		values := xlsxsafe.Row([]any{row.Key, row.OrderCount, row.ItemCount, row.Revenue})
 		if err := f.SetSheetRow(sheet, cell, &values); err != nil {
 			return err
 		}

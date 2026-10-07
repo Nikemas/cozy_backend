@@ -9,7 +9,6 @@ package admin
 
 import (
 	"context"
-	"database/sql"
 	"math"
 	"net/http"
 	"net/url"
@@ -26,20 +25,13 @@ import (
 // reportsBackend is the subset of behavior reportsPage depends on — an
 // interface (mirroring salesRepo in internal/httpapi/admin_reports.go) so
 // the handler can be tested with a fake instead of a live database.
-// *reports.CachedRepo satisfies it in production (see newReportsBackend).
+// In production it is the process-wide *reports.CachedRepo cmd/server
+// builds and passes to RegisterRoutes (shared with the JSON/xlsx export).
 type reportsBackend interface {
 	Sales(ctx context.Context, from, to time.Time, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error)
 	BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 	CategorySales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
 	PointNames(ctx context.Context) (map[string]string, error)
-}
-
-// newReportsBackend is the reports screen's query layer: reports.Repo's
-// aggregates behind an in-process TTL cache (reports.CachedRepo) with
-// concurrent identical requests sharing one query — a year-long report
-// aggregates every order row of the year.
-func newReportsBackend(db *sql.DB) reportsBackend {
-	return reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
 }
 
 // --- Period selection ---
