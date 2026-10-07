@@ -53,6 +53,10 @@ PG_USER=cozy                       # role used by docker-compose.prod.yml / back
 DB_NAME_RE='^[a-z_][a-z0-9_]{0,39}$' # 40 max: room for _restore_/_old_ + timestamp (63 limit)
 BUCKET_RE='^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
 SWAP_WAIT_SECONDS=10
+# libpq URL parameters allowed in --database-url; anything else (dbname=,
+# options=, service=, password=, percent-encoded keys...) is refused.
+URL_QUERY_KEYS="sslmode connect_timeout sslrootcert sslcert sslkey application_name target_session_attrs"
+FREE_SPACE_FACTOR=3 # temp DB + old DB + dump on one disk
 
 log() { echo "restore: $*"; }
 die() {
@@ -114,13 +118,17 @@ check_database_url() {
   case "$authority" in
     *:*@*) die "пароль в --database-url не принимается (виден в ps и истории) — используйте PGPASSFILE (~/.pgpass) или PGPASSWORD" ;;
   esac
-  local query=""
+  local query="" pair key
   case "$database_url" in *\?*) query="${database_url#*\?}" ;; esac
-  query="$(printf '%s' "$query" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
-  case "&$query" in
-    *"&dbname="*|*"&options="*|*"&service="*)
-      die "параметры dbname=/options=/service= в --database-url не допускаются — целевая база задаётся только --target" ;;
-  esac
+  local IFS='&'
+  for pair in $query; do
+    key="${pair%%=*}"
+    case " $URL_QUERY_KEYS " in
+      *" $key "*) ;;
+      *) die "параметр '$key' в --database-url не разрешён (допустимы: $URL_QUERY_KEYS); \
+база задаётся только --target, пароль — через PGPASSFILE/PGPASSWORD" ;;
+    esac
+  done
 }
 
 if [ -n "$database_url" ]; then
@@ -273,6 +281,23 @@ check_target_state() {
   log "база '$target' существует ($tables табл.) — после восстановления станет '$old_db'"
 }
 
+# check_free_space: compose mode only — warn (not refuse) when the postgres
+# volume has less than FREE_SPACE_FACTOR x dump size free.
+check_free_space() {
+  [ "$mode" = compose ] || return 0
+  local dump_kb free_kb
+  dump_kb=$(( ($(wc -c <"$dump") + 1023) / 1024 ))
+  free_kb="$("${COMPOSE[@]}" exec -T postgres df -Pk /var/lib/postgresql/data 2>/dev/null | awk 'NR==2 {print $4}' || true)"
+  case "$free_kb" in
+    ''|*[!0-9]*) log "свободное место на томе postgres измерить не удалось — проверьте вручную (df -h)"; return 0 ;;
+  esac
+  log "свободно на томе postgres: $((free_kb / 1024)) МБ, дамп: $((dump_kb / 1024)) МБ"
+  if [ "$free_kb" -lt $((dump_kb * FREE_SPACE_FACTOR)) ]; then
+    log "ВНИМАНИЕ: свободного места меньше ${FREE_SPACE_FACTOR}× размера дампа — на время восстановления на диске будут"
+    log "  старая база, временная база и дамп; при нехватке места восстановление упадёт (целевая база не пострадает)"
+  fi
+}
+
 # --- restore into a temporary database ----------------------------------------
 restore_to_temp() {
   local started=$SECONDS
@@ -309,6 +334,37 @@ wait_for_no_sessions() {
   done
 }
 
+# While the target refuses connections (swap in progress), any exit —
+# error, Ctrl-C, SIGTERM, lost SSH — must re-open it, or the shop stays
+# down with a perfectly good database. swap_state: "" | blocked | done.
+swap_state=""
+reopen_connections() {
+  local db
+  for db in "$target" "$old_db"; do
+    [ "$(psql_on postgres "SELECT 1 FROM pg_database WHERE datname = '$db' AND NOT datallowconn" 2>/dev/null)" = 1 ] \
+      || continue
+    if psql_on postgres "ALTER DATABASE \"$db\" WITH ALLOW_CONNECTIONS true" 2>/dev/null; then
+      echo "restore: подключения к '$db' снова разрешены" >&2
+    else
+      echo "restore: ВНИМАНИЕ: не удалось разрешить подключения к '$db' — выполните вручную:" >&2
+      echo "restore:   ALTER DATABASE \"$db\" WITH ALLOW_CONNECTIONS true;  (см. docs/deployment.md, 8.4)" >&2
+    fi
+  done
+}
+on_exit() {
+  local rc=$?
+  if [ "$swap_state" = blocked ]; then
+    echo "restore: прервано во время переключения — возвращаю подключения" >&2
+    reopen_connections
+    echo "restore: '$target' не изменена; восстановленная копия осталась как '$tmp_db' (удалить: DROP DATABASE \"$tmp_db\")" >&2
+  fi
+  exit "$rc"
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
 swap_into_place() {
   if [ "$target_exists" != 1 ]; then
     psql_on postgres "ALTER DATABASE \"$tmp_db\" RENAME TO \"$target\""
@@ -316,13 +372,16 @@ swap_into_place() {
     return 0
   fi
   log "переключение: '$target' -> '$old_db', '$tmp_db' -> '$target'"
+  swap_state=blocked # set first: a signal right after the ALTER is still covered
   psql_on postgres "ALTER DATABASE \"$target\" WITH ALLOW_CONNECTIONS false"
   if ! wait_for_no_sessions \
     || ! psql_on postgres "ALTER DATABASE \"$target\" RENAME TO \"$old_db\"; ALTER DATABASE \"$tmp_db\" RENAME TO \"$target\""; then
-    psql_on postgres "ALTER DATABASE \"$target\" WITH ALLOW_CONNECTIONS true" || true
     die "не удалось переключить базы (остались подключения?). '$target' не изменена, восстановленная копия — '$tmp_db'"
   fi
-  psql_on postgres "ALTER DATABASE \"$old_db\" WITH ALLOW_CONNECTIONS true"
+  swap_state=done
+  psql_on postgres "ALTER DATABASE \"$old_db\" WITH ALLOW_CONNECTIONS true" \
+    || echo "restore: ВНИМАНИЕ: подключения к '$old_db' остались запрещены (на работу магазина не влияет); \
+вернуть: ALTER DATABASE \"$old_db\" WITH ALLOW_CONNECTIONS true" >&2
   log "старая база сохранена как '$old_db'. Когда убедитесь, что всё в порядке, удалите её:"
   if [ "$mode" = compose ]; then
     log "  docker compose ... exec -T postgres dropdb -U $PG_USER $old_db"
@@ -351,6 +410,7 @@ check_prod_target
 media_preflight
 check_dump
 check_target_state
+check_free_space
 restore_to_temp
 print_summary "$tmp_db"
 swap_into_place
