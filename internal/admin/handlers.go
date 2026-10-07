@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/audit"
@@ -55,6 +56,10 @@ type handlers struct {
 	// that signs its "checked without errors" tokens.
 	importer       productImporter
 	importTokenKey []byte
+	// fix/import-hardening: the tokens' clock (nil = time.Now) and the
+	// per-staff limit on check/apply (nil = unlimited).
+	importNow     func() time.Time
+	importLimiter importRateLimiter
 
 	// fix/admin-ops (W5): audit journal (nil-safe: a nil *audit.Log
 	// records nothing) and the products list's bulk/per-point queries.
