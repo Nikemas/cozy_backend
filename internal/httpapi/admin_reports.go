@@ -14,7 +14,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
-// salesRepo is the subset of *reports.Repo the report handlers depend on, so
+// salesRepo is the subset of *reports.CachedRepo the report handlers depend on, so
 // handler-level tests can inject a fake instead of a live database —
 // mirrors stockUpserter in admin_catalog.go.
 type salesRepo interface {
@@ -34,8 +34,12 @@ const groupByCategory reports.GroupBy = "category"
 // only — a point_staff member has no business use case for a cross-point
 // sales report, so they get 403 (via staffSvc.RequireRole, same as every
 // other admin-only route in this package).
+//
+// The aggregates go through reports.CachedRepo: a short-TTL in-process
+// cache with concurrent identical requests sharing one query (a year-long
+// export aggregates every order row of the year).
 func RegisterAdminReportsRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
-	repo := reports.NewRepo(db)
+	repo := reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
 	ownerOrManager := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
 
 	mux.Handle("GET /admin/api/reports/sales", ownerOrManager(apperr.Wrap(salesReportJSONHandler(repo))))

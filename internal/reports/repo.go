@@ -153,6 +153,39 @@ func (r *Repo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, er
 		) sales
 		ORDER BY revenue DESC, category COLLATE "default"`
 
+	return r.queryRows(ctx, q, from, to)
+}
+
+// BrandSales aggregates sold line items by product brand over [from, to)
+// — the admin report's "По брендам" list. orders.OrderItem snapshots only
+// a product name, size and color at checkout, not the brand, so this joins
+// order_items.variant_id -> product_variants -> products.brand. Revenue is
+// line price × quantity, like AggregateSales' GroupByProduct, so brand rows
+// sum to the same total as the product rows. Only orders that count as
+// sales (SaleConditionSQL) are included. Products with no brand (or an
+// all-whitespace one) roll up into one "" bucket; the admin page labels it
+// in the page language. Grouped under COLLATE "C" (same groups, byte
+// comparisons — see Sales); rows sorted by revenue, highest first.
+func (r *Repo) BrandSales(ctx context.Context, from, to time.Time) ([]Row, error) {
+	const q = `
+		SELECT COALESCE(TRIM(p.brand), '') COLLATE "C" AS brand,
+		       COUNT(DISTINCT oi.order_id) AS order_count,
+		       COALESCE(SUM(oi.quantity), 0) AS item_count,
+		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
+		FROM order_items oi
+		JOIN orders o ON o.id = oi.order_id
+		JOIN product_variants pv ON pv.id = oi.variant_id
+		JOIN products p ON p.id = pv.product_id
+		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
+		GROUP BY 1
+		ORDER BY revenue DESC`
+
+	return r.queryRows(ctx, q, from, to)
+}
+
+// queryRows scans (key, order_count, item_count, revenue) rows in the
+// order the query returns them.
+func (r *Repo) queryRows(ctx context.Context, q string, from, to time.Time) ([]Row, error) {
 	rows, err := r.db.QueryContext(ctx, q, from, to)
 	if err != nil {
 		return nil, err
