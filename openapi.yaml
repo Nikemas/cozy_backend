@@ -1610,6 +1610,13 @@ paths:
         lookups/constraints, in a rolled-back transaction) and writes
         nothing.
 
+        **Limits** (checked before the upload is read, shared with the
+        admin page's check/apply — one budget per staff member, one cap per
+        server process): at most 10 import requests per staff member per
+        minute (burst 10, refilled at 10/min), and at most 2 imports
+        parsed/run at once; a request waits up to 2 s for a free slot.
+        Either refusal is a 429 with `Retry-After`.
+
         Prices: non-negative decimals only (`4990`, `4 990`, `4990,50`);
         NaN/Inf/negative/exponent values are row errors. Quantities:
         non-negative integers. Required columns (else 400
@@ -1647,6 +1654,18 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429":
+          description: |
+            `import_rate_limited` — this staff member is out of import
+            requests (the budget is shared with the admin page's check and
+            apply); or `import_busy` — 2 imports are already running on
+            this server. Nothing was read or processed; retry after
+            `Retry-After` seconds.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying (at least 1).
+              schema: { type: integer, minimum: 1 }
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /admin/products/import/template:
     get:

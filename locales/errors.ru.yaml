@@ -51,6 +51,8 @@ err.fulfillment_required: выберите способ получения
 err.has_active_orders: есть незавершённые заказы — удалить аккаунт можно после их доставки или отмены
 err.image_too_large: "слишком большое разрешение: {width}×{height} px (максимум {max_mp} Мп)"
 err.image_too_small: "фото слишком маленькое: {width}×{height} px — меньшая сторона должна быть не меньше {min} px"
+err.import_busy: сейчас уже идут другие проверки или импорты — подождите несколько секунд и попробуйте снова
+err.import_rate_limited: слишком много проверок и импортов подряд — подождите минуту и попробуйте снова
 err.insufficient_stock.left: товара «{name}» осталось только {count} шт.
 err.insufficient_stock.sold_out: товар «{name}» закончился
 err.insufficient_stock.split: весь заказ целиком нет ни в одном магазине — оформите товары отдельными заказами или выберите самовывоз

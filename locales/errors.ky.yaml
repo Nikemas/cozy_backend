@@ -44,6 +44,8 @@ err.fulfillment_required: алуу ыкмасын тандаңыз
 err.has_active_orders: аякталбаган буйрутмалар бар — аккаунтту алар жеткирилгенден же жокко чыгарылгандан кийин өчүрсөңүз болот
 err.image_too_large: "өтө чоң чечилиш: {width}×{height} px (эң көп {max_mp} Мп)"
 err.image_too_small: "сүрөт өтө кичинекей: {width}×{height} px — кыска жагы кеминде {min} px болушу керек"
+err.import_busy: азыр башка текшерүүлөр же импорттор жүрүп жатат — бир нече секунд күтүп, кайра аракет кылыңыз
+err.import_rate_limited: текшерүү жана импорттоо өтө көп болуп кетти — бир мүнөт күтүп, кайра аракет кылыңыз
 err.insufficient_stock: товар кампада жетишсиз
 err.insufficient_stock.left: «{name}» товарынан {count} даана гана калды
 err.insufficient_stock.sold_out: «{name}» товары түгөндү

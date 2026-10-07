@@ -30,7 +30,7 @@ func TestImportFileErrorsFollowPageLanguage(t *testing.T) {
 			"ky": "файлда милдеттүү тилкелер жок: Категория (category), Цена (price) — импорттун үлгүсүн жүктөп алыңыз",
 		}},
 	}
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 	for _, c := range cases {
 		for _, lang := range []string{"ru", "ky"} {
 			req := newImportRequest(t, c.filename, "", c.body)
@@ -54,7 +54,7 @@ func TestImportFileErrorsFollowPageLanguage(t *testing.T) {
 }
 
 func TestImportRowMessagesFollowPageLanguage(t *testing.T) {
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 	req := newImportRequestWithFields(t, "products.csv", "", "name_ru,category,price\nКеды,sneakers,\n",
 		map[string]string{"dry_run": "1"})
 	req.AddCookie(&http.Cookie{Name: "admin_lang", Value: "ky"})

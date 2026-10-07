@@ -21,6 +21,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/health"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
 	"github.com/Nikemas/cozy_backend/internal/httpmw"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/orders"
@@ -273,8 +274,11 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB, mediaClient *media.Clie
 	// One reports cache for the HTML reports page and the JSON/xlsx export.
 	reportsRepo := reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
 	httpapi.RegisterAdminReportsRoutes(mux, reportsRepo, staffSvc)
-	httpapi.RegisterAdminImportRoutes(mux, db, staffSvc)
-	return admin.RegisterRoutes(mux, db, staffSvc, mediaClient, cfg, reportsRepo)
+	// One import guard for the HTML import page and the JSON import: a
+	// shared per-staff rate limit and a shared cap on concurrent imports.
+	importGuard := importguard.New()
+	httpapi.RegisterAdminImportRoutes(mux, db, staffSvc, importGuard)
+	return admin.RegisterRoutes(mux, db, staffSvc, mediaClient, cfg, reportsRepo, importGuard)
 }
 
 // registerWebRoutes mounts / — the public html/template storefront.

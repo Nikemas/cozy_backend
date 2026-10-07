@@ -14,6 +14,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
 // --- fake import backend: an empty catalog, every write succeeds ---
@@ -133,11 +134,15 @@ func newImportRequestWithFields(t *testing.T, filename, contentType, body string
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/products/import", &buf)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
-	return req
+	// Signed in as a manager, as RequireRole leaves it in production.
+	return req.WithContext(staff.NewContextWithStaff(req.Context(), testImportStaff))
 }
 
+// testImportStaff is the manager the import requests are made as.
+var testImportStaff = &staff.Staff{ID: "staff-import-1", Role: staff.RoleManager, IsActive: true}
+
 func TestImportProductsHandlerMissingFile(t *testing.T) {
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, newImportRequest(t, "", "", ""))
@@ -148,7 +153,7 @@ func TestImportProductsHandlerMissingFile(t *testing.T) {
 }
 
 func TestImportProductsHandlerUnsupportedFormat(t *testing.T) {
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, newImportRequest(t, "products.txt", "text/plain", "whatever"))
@@ -162,7 +167,7 @@ func TestImportProductsHandlerRejectsUnrecognizedFormatBeforeParsing(t *testing.
 	// A body that would fail CSV/XLSX parsing outright, on a file whose
 	// name/content-type isn't recognized at all — the handler must reject
 	// on format alone, before ever handing this to catalog.ImportProducts.
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, newImportRequest(t, "products.bin", "application/octet-stream", "\x00\x01garbage"))
@@ -173,7 +178,7 @@ func TestImportProductsHandlerRejectsUnrecognizedFormatBeforeParsing(t *testing.
 }
 
 func TestImportProductsHandlerCSVExtensionHappyPath(t *testing.T) {
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	csvBody := "name_ru,name_ky,category,price\n" +
 		"Кроссовки,Кроссовкалар,sneakers,4999\n"
@@ -198,7 +203,7 @@ func TestImportProductsHandlerCSVExtensionHappyPath(t *testing.T) {
 }
 
 func TestImportProductsHandlerContentTypeFallbackWhenNoExtension(t *testing.T) {
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	csvBody := "name_ru,name_ky,category,price\n" +
 		"Кроссовки,Кроссовкалар,sneakers,4999\n"
@@ -217,7 +222,7 @@ func TestImportProductsHandlerReportsPerRowErrorsWithHTTP200(t *testing.T) {
 	// The request as a whole succeeded (the file was read and processed);
 	// per-row failures are data in the response body, not an HTTP error —
 	// exactly the "one bad row doesn't kill the batch" contract.
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	csvBody := "name_ru,name_ky,category,price\n" +
 		"OK,ОК,sneakers,1000\n" +
@@ -246,7 +251,7 @@ func TestImportProductsHandlerWholeFileFailureIsHTTPError(t *testing.T) {
 	// Unlike a bad data row, a structurally malformed file can't be
 	// processed at all — the handler must surface that as an HTTP error,
 	// not a 200 with an empty result.
-	handler := apperr.Wrap(importProductsHandler(newImportDeps()))
+	handler := apperr.Wrap(importProductsHandler(newImportDeps(), nil))
 
 	badCSV := "name_ru,name_ky,category,price\n" +
 		"Foo\"Bar,ОК,sneakers,4999\n"
@@ -261,7 +266,7 @@ func TestImportProductsHandlerWholeFileFailureIsHTTPError(t *testing.T) {
 
 func TestImportProductsHandlerDryRunAndPoint(t *testing.T) {
 	backend := newImportDeps()
-	handler := apperr.Wrap(importProductsHandler(backend))
+	handler := apperr.Wrap(importProductsHandler(backend, nil))
 
 	csvBody := "Артикул,Название,Категория,Цена,Размер,Цвет,Остаток\n" +
 		"A1,Кеды,sneakers,1000,38,red,2\n" +
