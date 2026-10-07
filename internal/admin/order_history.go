@@ -37,7 +37,7 @@ func orderZoneName(t tr, z *orders.OrderDeliveryZone) string {
 func buildOrderHistoryData(t tr, o *orders.Order) OrderHistoryData {
 	d := OrderHistoryData{RefundRequired: o.RefundRequired}
 	if o.DeliveryFee > 0 {
-		d.DeliveryFeeLabel = formatSom(o.DeliveryFee)
+		d.DeliveryFeeLabel = t.Som(o.DeliveryFee)
 	}
 	for _, h := range o.History {
 		row := OrderHistoryRowView{

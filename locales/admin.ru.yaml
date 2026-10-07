@@ -660,3 +660,15 @@ admin.import.working: Обрабатываем файл…
 admin.order.awaiting_payment: Ожидает оплаты
 admin.order.awaiting_payment_hint: Онлайн-оплата ещё не прошла — заказ появится в счётчике новых после оплаты
 admin.order.on_map: На карте
+
+# fix/admin-polish: money, form placeholders (example values)
+admin.money.som: "%s сом"
+admin.broadcasts.title_ru_placeholder: Скидки до 30% на кроссовки
+admin.broadcasts.body_ru_placeholder: Только до воскресенья — успейте выбрать свою пару
+admin.categories.name_ru_placeholder: Кроссовки
+admin.categories.name_ky_placeholder: Кроссовкалар
+admin.delivery.name_ru_placeholder: Бишкек
+admin.delivery.name_ky_placeholder: Бишкек ш.
+admin.points.name_placeholder: Дордой-Центр
+admin.points.default_city: Бишкек
+admin.staff.name_placeholder: Айгерим Б.

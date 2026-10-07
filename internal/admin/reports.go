@@ -262,7 +262,7 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		PointExportURL:    strings.Replace(reportExportURL(from, to), "group_by=day", "group_by=point", 1),
 		Stats:             buildStatCards(t, dayRows),
 		ChartNote:         from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
-		Bars:              buildBars(dayRows, from, to),
+		Bars:              buildBars(t, dayRows, from, to),
 		TopProducts:       buildTopProducts(t, productRows),
 		TopBrands:         buildTopBrands(t, brandRows),
 		Categories:        buildCategoryBars(t, categoryRows),
@@ -388,9 +388,9 @@ func buildStatCards(t tr, dayRows []reports.Row) []StatCard {
 	}
 
 	return []StatCard{
-		{Label: t.T("admin.reports.revenue"), Value: formatMoney(totalRevenue), Note: t.T("admin.reports.for_period")},
+		{Label: t.T("admin.reports.revenue"), Value: t.Som(totalRevenue), Note: t.T("admin.reports.for_period")},
 		{Label: t.T("admin.reports.orders"), Value: strconv.Itoa(orderCount), Note: t.T("admin.reports.for_period")},
-		{Label: t.T("admin.reports.avg_check"), Value: formatMoney(avgOrder), Note: t.T("admin.reports.per_order")},
+		{Label: t.T("admin.reports.avg_check"), Value: t.Som(avgOrder), Note: t.T("admin.reports.per_order")},
 		{Label: t.T("admin.reports.items_sold"), Value: t.F("admin.reports.pcs", itemCount), Note: t.T("admin.reports.for_period")},
 	}
 }
@@ -400,7 +400,7 @@ func buildStatCards(t tr, dayRows []reports.Row) []StatCard {
 // gaps with zero-height bars rather than skipping them (a day with no
 // sales should still show up as an empty column, not disappear from the
 // chart).
-func buildBars(dayRows []reports.Row, from, to time.Time) []ReportBar {
+func buildBars(t tr, dayRows []reports.Row, from, to time.Time) []ReportBar {
 	byDay := make(map[string]reports.Row, len(dayRows))
 	maxRevenue := 0.0
 	for _, row := range dayRows {
@@ -425,7 +425,7 @@ func buildBars(dayRows []reports.Row, from, to time.Time) []ReportBar {
 		bars = append(bars, ReportBar{
 			Day:       d.Format("02.01"),
 			HeightPct: pct,
-			Revenue:   formatMoney(row.Revenue),
+			Revenue:   t.Som(row.Revenue),
 		})
 	}
 	return bars
@@ -476,14 +476,10 @@ func buildTopBrands(t tr, brandRows []reports.Row) []BrandBar {
 		if name == "" {
 			name = t.T("admin.reports.no_brand")
 		}
-		out[i] = BrandBar{Name: name, Sum: formatMoney(row.Revenue), WidthPct: pct}
+		out[i] = BrandBar{Name: name, Sum: t.Som(row.Revenue), WidthPct: pct}
 	}
 	return out
 }
-
-// formatMoney is defined once for the package in products_view.go (the
-// same KGS thousands-grouped, no-decimals formatting internal/web's own
-// formatMoney uses) — reused here rather than redefined.
 
 // buildCategoryBars shapes reports.Repo.CategorySales' rows (already
 // revenue-sorted) — every category, not capped like the top-5 lists, since
@@ -501,7 +497,7 @@ func buildCategoryBars(t tr, rows []reports.Row) []CategoryBar {
 		}
 		out[i] = CategoryBar{
 			Name:     row.Key,
-			Sum:      formatMoney(row.Revenue),
+			Sum:      t.Som(row.Revenue),
 			Qty:      t.F("admin.reports.pcs", row.ItemCount),
 			Orders:   t.N(row.OrderCount, "admin.plural.order"),
 			WidthPct: pct,

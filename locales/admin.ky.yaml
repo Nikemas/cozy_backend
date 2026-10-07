@@ -657,3 +657,17 @@ admin.import.working: Файл иштетилүүдө…
 admin.order.awaiting_payment: Төлөм күтүлүүдө
 admin.order.awaiting_payment_hint: Онлайн төлөм али өтө элек — төлөнгөндөн кийин заказ жаңылардын санагычына кошулат
 admin.order.on_map: Картада
+
+# fix/admin-polish: money, form placeholders (example values). The *_ru
+# placeholders are examples for a Russian-language field, so they stay
+# Russian here too.
+admin.money.som: "%s сом"
+admin.broadcasts.title_ru_placeholder: Скидки до 30% на кроссовки
+admin.broadcasts.body_ru_placeholder: Только до воскресенья — успейте выбрать свою пару
+admin.categories.name_ru_placeholder: Кроссовки
+admin.categories.name_ky_placeholder: Кроссовкалар
+admin.delivery.name_ru_placeholder: Бишкек
+admin.delivery.name_ky_placeholder: Бишкек ш.
+admin.points.name_placeholder: Дордой-Центр
+admin.points.default_city: Бишкек
+admin.staff.name_placeholder: Айгерим Б.

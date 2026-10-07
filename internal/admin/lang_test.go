@@ -321,7 +321,7 @@ func kyScreenFixtures() map[string]PageData {
 	reportsPage := shell("reports", "admin.nav.reports")
 	reportsPage.Data = ReportsData{
 		Periods: reportPeriodOptions(kyTr, "custom"), Stats: buildStatCards(kyTr, nil),
-		Bars:        buildBars(nil, now, now),
+		Bars:        buildBars(ruTr, nil, now, now),
 		TopProducts: buildTopProducts(kyTr, nil), Categories: buildCategoryBars(kyTr, nil),
 		TopBrands: buildTopBrands(kyTr, []reports.Row{{Key: "Nike", Revenue: 2}, {Key: "", Revenue: 1}}),
 		Custom:    true, Err: "x",

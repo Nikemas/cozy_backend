@@ -9,10 +9,8 @@ package admin
 import (
 	"encoding/json"
 	"html/template"
-	"math"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
@@ -289,34 +287,6 @@ func countLabel(t tr, total int) string {
 // variantsLabel renders the table's "Вариаций" cell / card subtitle.
 func variantsLabel(t tr, n int) string {
 	return t.N(n, "admin.plural.variant")
-}
-
-// formatMoney renders a KGS amount the same way internal/web's
-// handlers.formatMoney (catalog_view.go) does — thousands grouped with a
-// space, " сом" suffix, no decimals — kept as its own copy rather than an
-// import because internal/web doesn't export it and pulling in the whole
-// web package here for one formatting helper would be a much bigger
-// coupling than duplicating ~15 lines shared by design, not by code.
-func formatMoney(v float64) string {
-	n := int64(math.Round(v))
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	digits := strconv.FormatInt(n, 10)
-
-	var grouped []byte
-	for i := 0; i < len(digits); i++ {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			grouped = append(grouped, ' ')
-		}
-		grouped = append(grouped, digits[i])
-	}
-	out := string(grouped)
-	if neg {
-		out = "-" + out
-	}
-	return out + " сом"
 }
 
 // statusLabel mirrors the design's {{ p.status }} binding.

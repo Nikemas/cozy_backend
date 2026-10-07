@@ -113,7 +113,7 @@ func TestRenderShellScreensExecute(t *testing.T) {
 					data.Data = ReportsData{
 						Periods: reportPeriodOptions(ruTr, defaultReportPeriod()),
 						Stats:   buildStatCards(ruTr, nil),
-						Bars:    buildBars(nil, time.Now().UTC(), time.Now().UTC()),
+						Bars:    buildBars(ruTr, nil, time.Now().UTC(), time.Now().UTC()),
 					}
 				}
 				w := httptest.NewRecorder()

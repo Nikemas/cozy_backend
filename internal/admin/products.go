@@ -218,7 +218,7 @@ func (h *handlers) buildProductRow(t tr, p catalog.Product, tree []*catalog.Cate
 		Name:            p.NameRu,
 		Brand:           stringOrEmpty(p.Brand),
 		CategoryPath:    categoryPath(tree, p.CategoryID),
-		PriceText:       formatMoney(p.BasePrice),
+		PriceText:       t.Som(p.BasePrice),
 		VariantsLabel:   variantsLabel(t, variantCounts[p.ID]),
 		StockLabel:      stockLabel,
 		StockFG:         fg,

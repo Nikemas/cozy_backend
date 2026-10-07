@@ -24,7 +24,7 @@
       </div>
       <div class="admin-row__info">
         <div class="admin-row__title">{{.NameRu}} <span class="admin-row__subtitle">/ {{.NameKy}}</span></div>
-        <div class="admin-row__subtitle">{{.Fee}} сом{{if .FreeFrom}} · {{tf "admin.delivery.free_from_short" .FreeFrom}}{{end}} · {{t "admin.categories.sort_order"}} {{.SortOrder}}</div>
+        <div class="admin-row__subtitle">{{tf "admin.money.som" .Fee}}{{if .FreeFrom}} · {{tf "admin.delivery.free_from_short" .FreeFrom}}{{end}} · {{t "admin.categories.sort_order"}} {{.SortOrder}}</div>
       </div>
       <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
@@ -54,11 +54,11 @@
       <div class="admin-field-row">
         <div class="admin-field">
           <label for="zone-name-ru">{{t "admin.common.name_ru"}}</label>
-          <input id="zone-name-ru" name="name_ru" placeholder="Бишкек" required maxlength="100">
+          <input id="zone-name-ru" name="name_ru" placeholder="{{t "admin.delivery.name_ru_placeholder"}}" required maxlength="100">
         </div>
         <div class="admin-field">
           <label for="zone-name-ky">{{t "admin.common.name_ky"}}</label>
-          <input id="zone-name-ky" name="name_ky" placeholder="Бишкек ш." required maxlength="100">
+          <input id="zone-name-ky" name="name_ky" placeholder="{{t "admin.delivery.name_ky_placeholder"}}" required maxlength="100">
         </div>
       </div>
       <div class="admin-field-row">
