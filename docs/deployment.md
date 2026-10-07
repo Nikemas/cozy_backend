@@ -558,6 +558,22 @@ curl -fsS https://cozy.kg/readyz
 
 ## 8. Бэкапы и восстановление
 
+Коротко:
+
+| Что | Когда | Где | Сколько хранится |
+|---|---|---|---|
+| База Postgres `cozy` — `pg_dump -Fc --no-owner --no-acl` (схема, данные, `schema_migrations`) | каждую ночь в 03:30 (cron, 8.3) | `/var/backups/cozy/postgres/cozy_ГГГГММДД_ЧЧММСС.dump` на том же VPS | 14 дней (`KEEP_DAYS`) |
+| Фото товаров — зеркало бакета MinIO (`mc mirror`, инкрементально) | там же, тем же запуском | `/var/backups/cozy/minio/<bucket>/` | бессрочно: удалённые в MinIO файлы в зеркале остаются |
+| Off-site копия дампов и зеркала (`rclone copy`) | тем же запуском, **только если задан** `BACKUP_RCLONE_REMOTE` | бакет B2/S3 заказчика | дампы 60 дней (`BACKUP_RCLONE_KEEP_DAYS`), медиа бессрочно |
+
+**Не бэкапится** (хранить в менеджере паролей заказчика): `.env`, `secrets/`
+(ключ Firebase), `docker/Caddyfile*` берутся из git. Логи контейнеров не
+бэкапятся.
+
+> **Задача владельца сервера.** Скрипт есть, но ни cron, ни off-site копия
+> сами не включаются: пока не выполнены 8.2 и 8.3, бэкапов нет вообще (или
+> они лежат только на диске того же VPS и погибнут вместе с ним).
+
 ### 8.1. Что делает `scripts/backup.sh`
 
 1. `pg_dump -Fc` базы → `$BACKUP_DIR/postgres/cozy_ГГГГММДД_ЧЧММСС.dump`
@@ -601,6 +617,29 @@ curl -fsS https://cozy.kg/readyz
 3. Пробный запуск:
    `BACKUP_RCLONE_REMOTE=b2:cozy-backups/prod bash /opt/cozy/scripts/backup.sh`
    и `rclone ls b2:cozy-backups/prod/postgres | tail`.
+4. Добавить `BACKUP_RCLONE_REMOTE=...` в строку cron (8.3).
+
+Пример remote для Backblaze B2 (ключи вводятся в `rclone config` или через
+переменные окружения, в репозиторий и в строку cron не попадают):
+
+```bash
+rclone config create b2 b2 account "$B2_KEY_ID" key "$B2_APP_KEY"   # один раз, под пользователем cron
+rclone lsd b2:                                                     # проверка
+```
+
+Если облачного хранилища нет — минимум копировать дампы на другую машину
+(ноутбук администратора, второй сервер) по SSH-ключу, например cron на **той**
+машине (тянет сама, так что взлом VPS не даёт доступа к копиям):
+
+```bash
+# на машине-хранилище, ежедневно в 05:00:
+0 5 * * * rsync -a --ignore-existing deploy@<IP_VPS>:/var/backups/cozy/postgres/ /srv/cozy-backups/postgres/ && rsync -a deploy@<IP_VPS>:/var/backups/cozy/minio/ /srv/cozy-backups/minio/
+# разово вручную: scp deploy@<IP_VPS>:/var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump .
+```
+
+(Пользователю `deploy` нужен доступ на чтение к `/var/backups/cozy` —
+`backup.sh` ставит на каталог `chmod 700`, поэтому либо запускать бэкап под
+`deploy`, либо выдать права отдельно.)
 
 ### 8.3. Расписание (cron)
 
@@ -621,60 +660,122 @@ cron обязателен на prod (cron не читает `~/.profile`); на 
 Проверить, что расписание есть: `crontab -l | grep backup.sh`; что бэкапы
 идут: `ls -lt /var/backups/cozy/postgres | head` и `tail /var/backups/cozy/backup.log`.
 
-### 8.4. Восстановление Postgres
+### 8.4. Восстановление базы — `scripts/restore.sh`
 
-Перезаписывает текущие данные — сначала сделайте свежий дамп текущего
-состояния (`bash scripts/backup.sh`).
+`scripts/restore.sh` восстанавливает дамп `backup.sh` в **явно указанную**
+базу (`--target` обязателен, значения по умолчанию нет). Защиты:
+
+- база `cozy` или любая с `prod` в имени считается рабочей: без
+  `--i-know-this-is-prod` скрипт отказывается, а с ним ещё и просит **набрать
+  имя базы** на терминале (из cron/CI без терминала — отказ);
+- если база существует и в ней есть таблицы — отказ, пока не передан
+  `--replace` (тогда `DROP DATABASE ... WITH (FORCE)` и создание заново);
+- дамп сначала проверяется `pg_restore --list`; `.partial` не принимается;
+- восстановление идёт одной транзакцией с `--exit-on-error`: битый дамп
+  оставляет базу пустой, а не наполовину заполненной (созданная этим запуском
+  база при ошибке удаляется);
+- в конце печатает версию `schema_migrations` и число строк в основных
+  таблицах.
+
+Режимы: по умолчанию — через контейнер `postgres` того же compose-стека, что
+и `backup.sh` (`DEPLOY_ENV=production` выбирает prod-стек); с
+`--database-url postgres://user@host:port/postgres` — через локальные
+`psql`/`pg_restore` (учения на ноутбуке, отдельный сервер). Справка:
+`scripts/restore.sh --help`.
+
+**Аварийное восстановление рабочей базы** (перезаписывает текущие данные —
+если база ещё жива, сначала снимите её состояние: `bash scripts/backup.sh`):
 
 ```bash
 cd /opt/cozy
-C="docker compose -f docker/docker-compose.prod.yml --env-file .env"
-# если VPS потерян — сначала забрать дамп из off-site:
-#   rclone copy b2:cozy-backups/prod/postgres/cozy_YYYYMMDD_HHMMSS.dump /var/backups/cozy/postgres/
-$C stop backend                                   # никто не пишет в базу
-$C exec -T postgres dropdb -U cozy cozy
-$C exec -T postgres createdb -U cozy cozy
-$C exec -T postgres pg_restore -U cozy -d cozy --no-owner --no-acl --exit-on-error \
-  < /var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump
-bash scripts/migrate.sh version                   # версия из дампа, без "(dirty)"
-bash scripts/migrate.sh up                        # докатить миграции новее дампа
+export DEPLOY_ENV=production          # на staging не нужно
+C="docker compose -p cozy-prod -f docker/docker-compose.prod.yml --env-file .env"   # staging: без -p
+# 0. если VPS потерян — сначала забрать дамп из off-site:
+#    rclone copy b2:cozy-backups/prod/postgres/cozy_YYYYMMDD_HHMMSS.dump /var/backups/cozy/postgres/
+ls -lt /var/backups/cozy/postgres | head          # 1. выбрать дамп
+$C stop backend                                   # 2. никто не пишет в базу
+bash scripts/restore.sh --target cozy --replace --i-know-this-is-prod \
+  /var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump   # 3. набрать "cozy" для подтверждения
+bash scripts/migrate.sh version                   # 4. версия из дампа, без "(dirty)"
+bash scripts/migrate.sh up                        # 5. докатить миграции новее дампа
 $C start backend
-curl -fsS https://cozy.kg/readyz
+curl -fsS https://cozy.kg/readyz                  # 6. 200 + bash scripts/smoke.sh https://cozy.kg
 ```
 
-Проверка дампа без восстановления: `pg_restore --list <файл>`. Пробное
-восстановление в отдельную базу (делать хотя бы раз в месяц):
-
-```bash
-$C exec -T postgres createdb -U cozy cozy_check
-$C exec -T postgres pg_restore -U cozy -d cozy_check --no-owner --no-acl < /var/backups/cozy/postgres/<файл>.dump
-$C exec -T postgres psql -U cozy -d cozy_check -c 'SELECT count(*) FROM orders;'
-$C exec -T postgres dropdb -U cozy cozy_check
-```
+Всё, что было создано после момента дампа (заказы, оплаты, правки каталога),
+теряется — сверить оплаты за этот период с кабинетом Bakai.
 
 ### 8.5. Восстановление фото (MinIO)
 
+`backup.sh` зеркалирует бакет в `$BACKUP_DIR/minio/<bucket>/`; обратно его
+возвращает тот же `restore.sh` с `--media` (только compose-режим). Зеркалирование
+обратно только добавляет и перезаписывает файлы, ничего в бакете не удаляет;
+перед запуском скрипт просит набрать имя бакета.
+
 ```bash
-cd /opt/cozy
 # если VPS потерян: rclone copy b2:cozy-backups/prod/minio /var/backups/cozy/minio
-set -a; . ./.env; set +a       # MINIO_ACCESS_KEY / MINIO_SECRET_KEY / MINIO_BUCKET в окружение
-MINIO_ID=$($C ps -q minio)
-MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
-  docker run --rm --network container:$MINIO_ID -e MC_HOST_cozy -v /var/backups/cozy/minio:/backup \
-  quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z mirror --overwrite /backup/cozy-media cozy/cozy-media
+bash scripts/restore.sh --target cozy --replace --i-know-this-is-prod \
+  --media /var/backups/cozy/minio /var/backups/cozy/postgres/cozy_YYYYMMDD_HHMMSS.dump
 ```
 
-(Замените `cozy-media` на значение `MINIO_BUCKET`, если оно другое.
-`. ./.env` выполняет файл как shell-скрипт — убедитесь, что в нём нет
-значений с пробелами без кавычек.)
+Бакет берётся из `MINIO_BUCKET` (`.env`, иначе `cozy-media`), ключи — из `.env`.
+Отдельно, без базы, медиа можно вернуть командой `mc mirror` из README
+(«Восстановление медиа»).
 
 ### 8.6. Полная потеря сервера
 
 1. Новый VPS по разделам 5.1–5.4 (тот же `.env` и `secrets/` из менеджера
    паролей заказчика, DNS перевести на новый IP).
 2. `bash scripts/deploy.sh` с `HEALTH_URL` — поднимет пустую базу и MinIO.
-3. Восстановить базу (8.4) и фото (8.5) из off-site копии.
-4. Проверить вход, каталог с фото, тестовый заказ.
+3. `rclone copy` дампа и `minio/` из off-site в `/var/backups/cozy/`, затем
+   8.4 + 8.5 одной командой (`--media`).
+4. Проверить вход, каталог с фото, тестовый заказ; заново включить cron (8.3).
+
+### 8.7. Ежемесячные учения по восстановлению
+
+Бэкап, который ни разу не восстанавливали, — не бэкап. Раз в месяц (и после
+каждого изменения `backup.sh`/схемы хранения) на сервере:
+
+```bash
+cd /opt/cozy
+export DEPLOY_ENV=production; C="..."     # как в 8.4
+latest=$(ls -t /var/backups/cozy/postgres/cozy_*.dump | head -n1)
+bash scripts/restore.sh --target cozy_restore_drill "$latest"    # рабочую базу не трогает
+# сравнить с рабочей базой (счётчики дампа чуть меньше — после него были заказы):
+for db in cozy cozy_restore_drill; do
+  $C exec -T postgres psql -U cozy -d $db -Atc \
+    "SELECT '$db', (SELECT count(*) FROM products), (SELECT count(*) FROM orders),
+            (SELECT count(*) FROM customers), (SELECT max(version) FROM schema_migrations)"
+done
+$C exec -T postgres dropdb -U cozy cozy_restore_drill
+```
+
+Плюс раз в квартал — то же самое с дампом, **скачанным из off-site** на другую
+машину (`--database-url` и локальный Postgres 16), чтобы проверить, что
+off-site копия существует и читается. Записать дату, имя дампа, время
+восстановления и результат в журнал эксплуатации.
+
+Результат учений 07.10.2026 (локально, Postgres 16.15, копия демо-базы
+`cozy_e2e` → `cozy_restore_drill` через `restore.sh --database-url`): дамп
+115 КБ, восстановление < 1 с, все 25 таблиц совпали по числу строк
+(products 36, product_variants 449, orders 9, order_items 13, customers 1,
+staff 1, payments 5, `schema_migrations` = 43). Проверены отказы: непустая
+база без `--replace`, обрезанный дамп (база осталась пустой и удалена),
+«prod»-имя без терминала и с неверно набранным именем.
+
+### 8.8. RPO / RTO
+
+| Сценарий | RPO (сколько данных можно потерять) | RTO (время до работы) |
+|---|---|---|
+| Ошибка в данных / неудачная миграция, VPS жив | до 24 ч (дамп раз в сутки) | 15–30 мин: выбор дампа, `restore.sh`, `migrate up`, проверка |
+| Потеря VPS, off-site настроен | до 24 ч | 2–4 ч: новый VPS (5.1–5.4), `rclone copy`, восстановление базы и фото |
+| Потеря VPS, off-site **не** настроен | всё — данные не восстановить | — |
+
+Сейчас база маленькая (дамп демо-данных ~0,1 МБ, восстановление секунды);
+RTO определяется в основном подготовкой сервера и скачиванием фото. Если
+24 ч потерь заказов неприемлемо — запускать `backup.sh` чаще (например,
+`0 */6 * * *`, RPO 6 ч; `KEEP_DAYS` считается в днях, место вырастет в 4 раза)
+или настроить WAL-архивацию (pgBackRest/wal-g) — это отдельная задача.
 
 ---
 
