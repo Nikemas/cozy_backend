@@ -57,8 +57,10 @@ func TestLayoutHasSkipLinkAndPinnedHTMX(t *testing.T) {
 	if !strings.Contains(body, `href="#main"`) || !strings.Contains(body, `id="main"`) {
 		t.Error("layout should have a skip link to #main")
 	}
-	if !strings.Contains(body, `integrity="sha384-`) {
-		t.Error("htmx script must carry an SRI integrity hash")
+	// htmx is vendored; its bytes are pinned to upstream's SRI hash by
+	// TestVendoredHtmxMatchesUpstreamSRI, and the URL to the file's hash.
+	if !strings.Contains(body, `<script src="/static/js/htmx.min.js?v=`+rr.assets["js/htmx.min.js"]+`" defer>`) {
+		t.Error("layout must load the vendored, content-hashed htmx")
 	}
 	if strings.Count(body, `id="toast-slot"`) != 1 {
 		t.Error("layout must render exactly one #toast-slot")

@@ -121,7 +121,7 @@ VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` +
 - пока `deploy.sh` пересоздаёт контейнер бэкенда, Caddy до 15 с повторяет подключение вместо мгновенного `502`;
 - на media-хосте всё, кроме `GET`/`HEAD`, — `405`, служебный API MinIO `/minio/*` — `404`.
 
-Версии образов в compose закреплены (`caddy:2.11.4-alpine`, `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`, `postgres:16-alpine`); обновлять — осознанно, правкой тега. У всех сервисов ротация логов (5 × 10 МБ) и `stop_grace_period: 30s`, у Postgres — healthcheck, бэкенд стартует только после `healthy`.
+Версии образов в compose закреплены (`caddy:2.11.4-alpine`, `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`, `postgres:16.15-alpine`); обновлять — осознанно, правкой тега. У всех сервисов ротация логов (5 × 10 МБ) и `stop_grace_period: 30s`, у Postgres — healthcheck, бэкенд стартует только после `healthy`.
 
 ### Деплой
 

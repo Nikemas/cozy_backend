@@ -31,7 +31,7 @@
 | Сервис | Образ | Назначение |
 |---|---|---|
 | `backend` | `cozy-backend:<sha>` — собирается на самом сервере из `docker/Dockerfile` | Go-сервер, порт 8080 только внутри сети compose |
-| `postgres` | `postgres:16-alpine` | база `cozy`, роль `cozy`, том `postgres_data` |
+| `postgres` | `postgres:16.15-alpine` | база `cozy`, роль `cozy`, том `postgres_data` |
 | `minio` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | фото товаров и баннера, бакет `MINIO_BUCKET`, том `minio_data` |
 | `caddy` | `caddy:2.11.4-alpine` | HTTPS (Let's Encrypt автоматически), порты 80/443, reverse proxy на `backend` и `minio` |
 
@@ -695,9 +695,25 @@ MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
 ## 10. Обслуживание
 
 - **Обновление образов** Postgres/MinIO/Caddy — правкой тега в
-  `docker/docker-compose.prod.yml` и деплоем. Минорные версии Postgres 16.x
-  совместимы; переход на новую мажорную версию — только через
-  `pg_dump`/`pg_restore`.
+  `docker/docker-compose.prod.yml` и деплоем.
+- **Обновление Postgres внутри 16.x** (патч-релизы с исправлениями
+  безопасности выходят примерно раз в квартал). Тег закреплён точно
+  (`postgres:16.N-alpine`), плавающий `16-alpine` не используется, чтобы
+  повторный `pull` не менял сервер незаметно. Как поднять:
+  1. найти последний патч:
+     `curl -s 'https://hub.docker.com/v2/repositories/library/postgres/tags?name=16.&page_size=100' | grep -o '"name":"16\.[0-9]*-alpine"' | sort -t. -k2 -n | tail -1`;
+  2. заменить тег одним коммитом в трёх местах: `docker/docker-compose.prod.yml`,
+     `docker/docker-compose.yml` (локальная разработка), `.github/workflows/ci.yml`
+     (CI гоняет миграции и интеграционные тесты на той же версии) — и в
+     таблицах `docs/deployment.md` §1, `README.md`, `THIRD_PARTY_LICENSES.md`;
+  3. перед prod сделать бэкап (`scripts/backup.sh`, §8) и задеплоить сначала
+     staging. `deploy.sh` выполняет `up -d postgres` — контейнер пересоздаётся
+     с новым образом на тех же данных (том `postgres_data`), простой —
+     секунды на рестарт.
+
+  Минорные версии 16.x используют один формат данных, поэтому смена тега
+  безопасна без дампа. Переход на новую мажорную версию (17+) — только через
+  `pg_dump`/`pg_restore` (или `pg_upgrade`), никогда не просто правкой тега.
 - **Смена секрета**: поправить `.env`, затем `$C up -d backend` (и `caddy`,
   если менялся `BAKAI_WEBHOOK_TOKEN`). Смена `JWT_SECRET` разлогинит
   покупателей в приложении; смена `MINIO_*` ключей требует пересоздать

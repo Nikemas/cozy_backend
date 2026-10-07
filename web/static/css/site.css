@@ -46,7 +46,7 @@
   --cozy-map-road:        #E4E1D8;
 
   /* ---- Typography ---- */
-  --cozy-font: 'Manrope', system-ui, -apple-system, sans-serif;
+  --cozy-font: 'Manrope', 'Inter Kyrgyz', system-ui, -apple-system, sans-serif;
   --cozy-fs-10: 10px;
   --cozy-fs-11: 11px;
   --cozy-fs-12: 12px;

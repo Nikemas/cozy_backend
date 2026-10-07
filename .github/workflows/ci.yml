@@ -74,7 +74,7 @@ jobs:
     services:
       postgres:
         # Same major version as docker/docker-compose.prod.yml.
-        image: postgres:16-alpine
+        image: postgres:16.15-alpine
         env:
           POSTGRES_USER: cozy
           POSTGRES_PASSWORD: cozy

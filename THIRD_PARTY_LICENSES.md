@@ -58,12 +58,10 @@ PostgreSQL License) разрешают коммерческое использо
 
 Компилятор и стандартная библиотека Go 1.26 — BSD-3-Clause.
 
-## 3. Веб-ресурсы сайта и админки (подключаются с CDN)
+## 3. Веб-ресурсы сайта и админки
 
-| Компонент | Версия | Лицензия | Где |
-|---|---|---|---|
-| htmx (`unpkg.com/htmx.org`) | 1.9.12 | 0BSD | `web/templates/layout.gohtml`, `admin/templates/layout.gohtml` |
-| Шрифт Manrope (Google Fonts) | — | SIL Open Font License 1.1 | `web/templates/layout.gohtml`, `admin/templates/layout.gohtml` |
+Внешних CDN во время работы нет: всё, что нужно браузеру, отдаётся с нашего
+домена (`/static/`, `/admin/static/`, хэш в `?v=`, кэш на год).
 
 Собственные CSS/JS (`web/static`, `admin/static`) — код проекта, кроме перечисленного ниже.
 
@@ -71,13 +69,22 @@ PostgreSQL License) разрешают коммерческое использо
 
 | Компонент | Версия | Лицензия | Где |
 |---|---|---|---|
+| htmx (`htmx.org`, файл `dist/htmx.min.js`, байт-в-байт с upstream — SRI `sha384-ujb1lZYy…` проверяется тестом) | 1.9.12 | 0BSD | `web/static/js/htmx.min.js`, `admin/static/js/htmx.min.js` |
+| Шрифт Manrope, variable wght 200–800 (`@fontsource-variable/manrope`, © The Manrope Project Authors) — подмножества latin, cyrillic, cyrillic-ext | 5.3.0 | SIL Open Font License 1.1 | `{web,admin}/static/fonts/manrope-*.woff2`; текст лицензии — `{web,admin}/static/fonts/LICENSE-manrope.txt` |
+| Шрифт Inter, variable wght 100–900 (`@fontsource-variable/inter`, © The Inter Project Authors) — только глифы Ң ң (U+04A2–04A3), которых нет в Manrope | 5.3.0 | SIL Open Font License 1.1 | `{web,admin}/static/fonts/inter-kyrgyz.woff2`; текст лицензии — `{web,admin}/static/fonts/LICENSE-inter.txt` |
 | Tabler Icons webfont (`@tabler/icons-webfont`, © Paweł Kuna) — подмножество используемых иконок | 3.31.0 | MIT | `web/static/fonts/tabler-icons.woff2`, `web/static/css/icons.css`; текст лицензии — `web/static/fonts/LICENSE-tabler-icons.txt`; пересборка — `scripts/tabler-icons-subset.py` |
+
+htmx и шрифты пересобираются `scripts/vendor-web-assets.py` (скачивает
+закреплённые версии, сверяет хэши целостности, режет Inter до Ң/ң). Шрифты
+Inter/Manrope в изменённом (подмножество) виде распространяются по OFL 1.1
+под исходными именами семейств — OFL это допускает, т.к. Reserved Font Name
+у них не объявлен.
 
 ## 4. Серверное ПО (отдельные процессы в Docker, не линкуется в код)
 
 | Компонент | Версия / образ | Лицензия | Замечание |
 |---|---|---|---|
-| PostgreSQL | `postgres:16-alpine` | PostgreSQL License | |
+| PostgreSQL | `postgres:16.15-alpine` | PostgreSQL License | |
 | MinIO Server | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | **AGPL-3.0** | используется как отдельный немодифицированный сервис хранения файлов; код Cozy с ним не линкуется (общение по S3 API через `minio-go`, Apache-2.0). Требования AGPL по раскрытию кода относятся к изменениям самого MinIO — их нет. При желании полностью исключить AGPL MinIO можно заменить на любое S3-совместимое хранилище без изменения кода |
 | MinIO Client `mc` | `quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z` | AGPL-3.0 | только в `scripts/backup.sh` (зеркалирование бэкапа) |
 | Caddy | `caddy:2.11.4-alpine` | Apache-2.0 | |
