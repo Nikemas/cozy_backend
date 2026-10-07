@@ -10,6 +10,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpmw"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/points"
@@ -32,8 +33,11 @@ import (
 // is the single *media.Client cmd/server/main.go already constructs for
 // media.RegisterRoutes, not a second instance. reportsRepo is likewise the
 // single reports.CachedRepo also given to httpapi.RegisterAdminReportsRoutes,
-// so the reports page and the export share one cache.
-func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config, reportsRepo *reports.CachedRepo) error {
+// so the reports page and the export share one cache. importGuard is the
+// single importguard.Guard also given to httpapi.RegisterAdminImportRoutes,
+// so the import page and the JSON import share one per-staff rate limit
+// and one concurrency cap (nil = unlimited, tests only).
+func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, mediaClient *media.Client, cfg *config.Config, reportsRepo *reports.CachedRepo, importGuard *importguard.Guard) error {
 	renderer, err := NewRenderer()
 	if err != nil {
 		return err
@@ -67,12 +71,15 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 
 		importer:       newSQLProductImporter(db),
 		importTokenKey: newImportTokenKey(),
-		importLimiter:  newImportLimiter(),
-		importGate:     newImportGate(maxConcurrentImports, importSlotWait),
 
 		audit:      auditLog,
 		auditList:  auditLog,
 		productOps: &productOpsStore{db: db, audit: auditLog},
+	}
+
+	if importGuard != nil {
+		h.importLimiter = importGuard.Limiter
+		h.importGate = importGuard.Gate
 	}
 
 	mux.HandleFunc("GET /admin/login", h.loginPage)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -107,73 +108,13 @@ func (c *countingBody) Read(p []byte) (int, error) {
 
 const testSlotWait = 20 * time.Millisecond
 
-func TestImportGateLimitsConcurrentHolders(t *testing.T) {
-	// Arrange
-	g := newImportGate(2, testSlotWait)
-	ctx := context.Background()
-
-	// Act
-	rel1, ok1 := g.acquire(ctx)
-	rel2, ok2 := g.acquire(ctx)
-	_, ok3 := g.acquire(ctx)
-
-	// Assert
-	if !ok1 || !ok2 {
-		t.Fatal("the first two holders must get a slot")
-	}
-	if ok3 {
-		t.Fatal("a third concurrent holder must be refused")
-	}
-	rel1()
-	rel1() // releasing twice must not free a second slot
-	rel4, ok4 := g.acquire(ctx)
-	if !ok4 {
-		t.Fatal("a released slot must be reusable")
-	}
-	if _, ok := g.acquire(ctx); ok {
-		t.Fatal("a double release must not free an extra slot")
-	}
-	rel2()
-	rel4()
-	if n := len(g.slots); n != 0 {
-		t.Errorf("slots held after all releases = %d, want 0", n)
-	}
-}
-
-func TestImportGateGivesUpWhenRequestEnds(t *testing.T) {
-	// Arrange: the only slot is taken and the wait is long.
-	g := newImportGate(1, time.Hour)
-	rel, _ := g.acquire(context.Background())
-	defer rel()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	// Act
-	start := time.Now()
-	_, ok := g.acquire(ctx)
-
-	// Assert
-	if ok || time.Since(start) > time.Second {
-		t.Fatalf("acquire on a cancelled request = %v after %v, want an immediate refusal", ok, time.Since(start))
-	}
-}
-
-func TestNilImportGateIsUnlimited(t *testing.T) {
-	var g *importGate
-	rel, ok := g.acquire(context.Background())
-	if !ok {
-		t.Fatal("a nil gate must not limit")
-	}
-	rel()
-}
-
 func TestImportRefusesThirdConcurrentRequest(t *testing.T) {
 	for name, ep := range importEndpoints {
 		t.Run(name, func(t *testing.T) {
 			// Arrange: two requests hold both slots inside the importer.
 			imp := newBlockingImporter()
 			h := &handlers{render: newTestRenderer(t), importer: imp, importTokenKey: []byte("test-key")}
-			h.importGate = newImportGate(2, testSlotWait)
+			h.importGate = importguard.NewGate(2, testSlotWait)
 			holders := make([]*httptest.ResponseRecorder, 2)
 			var wg sync.WaitGroup
 			for i := range holders {
@@ -226,7 +167,7 @@ func TestImportRefusesThirdConcurrentRequest(t *testing.T) {
 			if next.Code != http.StatusOK {
 				t.Errorf("after the holders finished, status = %d, want 200", next.Code)
 			}
-			if n := len(h.importGate.slots); n != 0 {
+			if n := h.importGate.Held(); n != 0 {
 				t.Errorf("slots still held = %d, want 0", n)
 			}
 		})
@@ -239,7 +180,7 @@ func TestImportSlotReleasedOnPanic(t *testing.T) {
 	imp.panicMsg = "boom"
 	close(imp.release)
 	h := &handlers{render: newTestRenderer(t), importer: imp, importTokenKey: []byte("test-key")}
-	h.importGate = newImportGate(1, testSlotWait)
+	h.importGate = importguard.NewGate(1, testSlotWait)
 
 	// Act
 	func() {
@@ -252,7 +193,7 @@ func TestImportSlotReleasedOnPanic(t *testing.T) {
 	}()
 
 	// Assert
-	if n := len(h.importGate.slots); n != 0 {
+	if n := h.importGate.Held(); n != 0 {
 		t.Fatalf("slots held after a panic = %d, want 0", n)
 	}
 	h.importer = &fakeImporter{result: cleanImportResult()}
@@ -267,7 +208,7 @@ func TestImportRateLimitCheckedBeforeSlot(t *testing.T) {
 	// Arrange: no rate-limit tokens left, one free slot.
 	h := newImportHandlers(t, &fakeImporter{result: cleanImportResult()})
 	h.importLimiter = &fakeImportLimiter{n: 0}
-	h.importGate = newImportGate(1, testSlotWait)
+	h.importGate = importguard.NewGate(1, testSlotWait)
 
 	// Act
 	w := httptest.NewRecorder()
@@ -277,7 +218,7 @@ func TestImportRateLimitCheckedBeforeSlot(t *testing.T) {
 	if !strings.Contains(w.Body.String(), ruTr.T("admin.import.err_rate_limited")) {
 		t.Errorf("want the rate-limit message, not busy:\n%s", w.Body.String())
 	}
-	if n := len(h.importGate.slots); n != 0 {
+	if n := h.importGate.Held(); n != 0 {
 		t.Errorf("a rate-limited request held a slot: %d", n)
 	}
 }

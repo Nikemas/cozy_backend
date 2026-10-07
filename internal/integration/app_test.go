@@ -18,6 +18,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/httpapi"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/notify"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
@@ -45,6 +46,8 @@ type testApp struct {
 	auth    *auth.Service
 	staff   *staff.Service
 	reports *reports.CachedRepo
+	// importGuard is the one guard both import surfaces share.
+	importGuard *importguard.Guard
 }
 
 var (
@@ -111,8 +114,11 @@ func buildApp() (*testApp, error) {
 	httpapi.RegisterAdminOrdersRoutes(mux, testDB, staffSvc)
 	reportsRepo := reports.NewCachedRepo(reports.NewRepo(testDB), reports.CacheConfig{})
 	httpapi.RegisterAdminReportsRoutes(mux, reportsRepo, staffSvc)
-	httpapi.RegisterAdminImportRoutes(mux, testDB, staffSvc)
-	if err := admin.RegisterRoutes(mux, testDB, staffSvc, nil, cfg, reportsRepo); err != nil {
+	// Wired like cmd/server: one guard shared by the import page and the
+	// JSON import.
+	importGuard := importguard.New()
+	httpapi.RegisterAdminImportRoutes(mux, testDB, staffSvc, importGuard)
+	if err := admin.RegisterRoutes(mux, testDB, staffSvc, nil, cfg, reportsRepo, importGuard); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +126,7 @@ func buildApp() (*testApp, error) {
 	if err := web.RegisterRoutes(mux, testDB, cfg, authSvc, payProvider); err != nil {
 		return nil, err
 	}
-	return &testApp{handler: mux, cfg: cfg, auth: authSvc, staff: staffSvc, reports: reportsRepo}, nil
+	return &testApp{handler: mux, cfg: cfg, auth: authSvc, staff: staffSvc, reports: reportsRepo, importGuard: importGuard}, nil
 }
 
 // req describes one request to the app.

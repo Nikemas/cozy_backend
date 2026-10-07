@@ -16,12 +16,14 @@
 // <noscript> notice says importing needs JavaScript.
 //
 // fix/import-tails: a request without a staff ID is refused (403), and
-// at most maxConcurrentImports uploads are parsed/run at once per
-// process (importGate); a request that can't get a slot within
-// importSlotWait gets a 429 «busy» message instead.
+// at most importguard.MaxConcurrent uploads are parsed/run at once per
+// process; a request that can't get a slot within importguard.SlotWait
+// gets a 429 «busy» message instead.
 //
 // The JSON endpoints in internal/httpapi/admin_import.go stay for API
-// clients; both call catalog.ImportProducts.
+// clients; both call catalog.ImportProducts, and (fix/json-import-guards)
+// both share one importguard.Guard — the same per-staff bucket and the
+// same concurrency slots — built once in cmd/server.
 package admin
 
 import (
@@ -35,17 +37,15 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
-	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -71,67 +71,6 @@ const importTokenTTL = 30 * time.Minute
 // importTokenSep separates the token's issued-at (hex Unix seconds) from
 // its MAC.
 const importTokenSep = "."
-
-// Per-staff limit on check + apply (one shared bucket): a burst of
-// importRateBurst, refilled at importRatePerMinute.
-const (
-	importRateBurst     = 10
-	importRatePerMinute = 10
-	secondsPerMinute    = 60
-)
-
-// At most maxConcurrentImports check/apply handlers parse and run an
-// upload at once per process (each can hold a 20 MB file plus the parsed
-// sheet in memory); a request waits up to importSlotWait for a slot and
-// is then refused, told to retry after importBusyRetryAfter.
-const (
-	maxConcurrentImports = 2
-	importSlotWait       = 2 * time.Second
-	importBusyRetryAfter = 5 * time.Second
-)
-
-// importGate is a counting semaphore bounding concurrent imports. A nil
-// *importGate doesn't limit. Safe for concurrent use.
-type importGate struct {
-	slots chan struct{}
-	wait  time.Duration
-}
-
-func newImportGate(size int, wait time.Duration) *importGate {
-	return &importGate{slots: make(chan struct{}, size), wait: wait}
-}
-
-// acquire takes a slot, waiting up to g.wait or until ctx ends. On
-// success it returns an idempotent release func the caller must defer.
-func (g *importGate) acquire(ctx context.Context) (release func(), ok bool) {
-	if g == nil {
-		return func() {}, true
-	}
-	timer := time.NewTimer(g.wait)
-	defer timer.Stop()
-	select {
-	case g.slots <- struct{}{}:
-	case <-timer.C:
-		return nil, false
-	case <-ctx.Done():
-		return nil, false
-	}
-	var once sync.Once
-	return func() { once.Do(func() { <-g.slots }) }, true
-}
-
-// importRateLimiter limits check/apply per staff member.
-type importRateLimiter interface {
-	Allow(key string) (ok bool, retryAfter time.Duration)
-}
-
-// newImportLimiter is the production importRateLimiter: the same
-// token-bucket limiter the global per-IP middleware uses.
-func newImportLimiter() *httpmw.KeyedLimiter {
-	return httpmw.NewKeyedLimiter(httpmw.RateLimitConfig{
-		RPS: float64(importRatePerMinute) / secondsPerMinute, Burst: importRateBurst,
-	})
-}
 
 // productImporter is what the import screen needs: running an import
 // (dry or real) and listing the stock points to choose from.
@@ -272,56 +211,38 @@ func (h *handlers) importStaffID(w http.ResponseWriter, r *http.Request) (string
 	return "", false
 }
 
-// allowImportRequest checks who is asking and spends one of their
-// check/apply tokens. When none is left it answers 429 with the message
-// in the import report (the htmx target) and returns false.
-func (h *handlers) allowImportRequest(w http.ResponseWriter, r *http.Request) bool {
+// beginImport runs the checks every upload handler starts with — staff
+// ID, then the shared importguard (per-staff rate limit, process-wide
+// concurrency slot), all before the body is read. On a refusal it has
+// answered (403, or 429 with the message in the import report, the htmx
+// target) and returns ok=false; otherwise the caller must defer release.
+func (h *handlers) beginImport(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
 	staffID, ok := h.importStaffID(w, r)
 	if !ok {
-		return false
+		return nil, false
 	}
-	if h.importLimiter == nil {
-		return true
+	guard := importguard.Guard{Limiter: h.importLimiter, Gate: h.importGate}
+	d := guard.Begin(r.Context(), staffID)
+	switch d.Outcome {
+	case importguard.Allowed:
+		return d.Release, true
+	case importguard.RateLimited:
+		slog.WarnContext(r.Context(), "admin import rate limited", "staff_id", staffID, "retry_after", d.RetryAfter)
+		h.refuseImport(w, r, "admin.import.err_rate_limited", d.RetryAfter)
+	default:
+		slog.WarnContext(r.Context(), "admin import busy", "max_concurrent", h.importGate.Cap())
+		h.refuseImport(w, r, "admin.import.err_busy", d.RetryAfter)
 	}
-	ok, retry := h.importLimiter.Allow(staffID)
-	if ok {
-		return true
-	}
-	slog.WarnContext(r.Context(), "admin import rate limited", "staff_id", staffID, "retry_after", retry)
-	h.refuseImport(w, r, "admin.import.err_rate_limited", retry)
-	return false
-}
-
-// acquireImportSlot takes one of the process-wide import slots — after
-// the rate limit, before the body is read. When none frees up in time it
-// answers 429 (so the page script swaps the message into the report)
-// and returns ok=false; otherwise the caller must defer release.
-func (h *handlers) acquireImportSlot(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
-	release, ok = h.importGate.acquire(r.Context())
-	if ok {
-		return release, true
-	}
-	slog.WarnContext(r.Context(), "admin import busy", "max_concurrent", cap(h.importGate.slots))
-	h.refuseImport(w, r, "admin.import.err_busy", importBusyRetryAfter)
 	return nil, false
 }
 
 // refuseImport answers 429 with Retry-After and the localized message
 // msgKey in the import report.
 func (h *handlers) refuseImport(w http.ResponseWriter, r *http.Request, msgKey string, retry time.Duration) {
-	w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retry.Seconds())))))
+	w.Header().Set("Retry-After", importguard.RetryAfterSeconds(retry))
 	data := importBaseData()
 	data.Result = &ImportResultVM{Error: h.tr(r).T(msgKey)}
 	h.respondImportStatus(w, r, data, http.StatusTooManyRequests)
-}
-
-// beginImport runs the checks every upload handler starts with — staff,
-// rate limit, concurrency slot — and returns the slot's release func.
-func (h *handlers) beginImport(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
-	if !h.allowImportRequest(w, r) {
-		return nil, false
-	}
-	return h.acquireImportSlot(w, r)
 }
 
 // blocksImport reports whether a dry run's result must keep «Импортировать»

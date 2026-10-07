@@ -10,6 +10,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/importguard"
 	"github.com/Nikemas/cozy_backend/internal/media"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
@@ -59,10 +60,11 @@ type handlers struct {
 	// fix/import-hardening: the tokens' clock (nil = time.Now) and the
 	// per-staff limit on check/apply (nil = unlimited).
 	importNow     func() time.Time
-	importLimiter importRateLimiter
+	importLimiter importguard.Limiter
 	// fix/import-tails: process-wide cap on concurrent check/apply
-	// (nil = unlimited).
-	importGate *importGate
+	// (nil = unlimited). fix/json-import-guards: both come from the one
+	// importguard.Guard shared with the JSON import endpoint.
+	importGate *importguard.Gate
 
 	// fix/admin-ops (W5): audit journal (nil-safe: a nil *audit.Log
 	// records nothing) and the products list's bulk/per-point queries.
