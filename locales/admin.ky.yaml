@@ -721,8 +721,10 @@ admin.history.note.payment_cancelled: Сатып алуучу төлөмдү ж�
 
 # fix/admin-polish: server-rendered import flow (internal/admin/product_import.go)
 admin.import.run_hint: Файл катасыз текшерилгенден кийин импорттоо жеткиликтүү болот.
-admin.import.err_recheck: Текшерүүдөн кийин файл же сатуу жайы өзгөрдү — «Текшерүү» баскычын кайра басыңыз.
+admin.import.err_recheck: Текшерүүдөн кийин файл же сатуу жайы өзгөрдү, же текшерүү эскирди (30 мүнөттөн ашты) — «Текшерүү» баскычын кайра басыңыз.
 admin.import.err_no_file: .csv же .xlsx файлын тандаңыз.
 admin.import.err_upload: Файлды окуу мүмкүн болбоду — балким, ал 20 МБдан чоң.
 admin.import.err_format: .csv жана .xlsx файлдары гана колдоого алынат.
+admin.import.needs_js: "Импорттоо JavaScript күйгүзүлгөндө гана иштейт. Ансыз файлды текшерсе болот, бирок импорттоого болбойт — браузерде JavaScript'ти күйгүзүңүз."
+admin.import.err_rate_limited: "Текшерүү жана импорттоо өтө көп болуп кетти — бир мүнөт күтүп, кайра аракет кылыңыз."
 admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"

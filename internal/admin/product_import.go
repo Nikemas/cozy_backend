@@ -4,8 +4,16 @@
 // a check of that exact file (and stock point) came back without errors —
 // the check response swaps in an enabled button carrying a signed token
 // of the checked file, and the apply handler refuses any upload whose
-// token doesn't match. Without JS the same form posts normally and the
-// whole page comes back in the new state.
+// token doesn't match.
+//
+// fix/import-hardening: the token also binds the file format and when it
+// was issued (ts.mac, valid importTokenTTL), and check/apply share a
+// per-staff rate limit. Without JS the check form still posts normally
+// and the whole page comes back with the report, but «Импортировать» is
+// not offered: a full-page response can't keep the chosen file, so the
+// apply would always fail with "choose a file". The run slot is rendered
+// hidden and revealed by the page script once htmx has loaded; a
+// <noscript> notice says importing needs JavaScript.
 //
 // The JSON endpoints in internal/httpapi/admin_import.go stay for API
 // clients; both call catalog.ImportProducts.
@@ -22,11 +30,15 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
@@ -44,6 +56,36 @@ const maxImportUploadBytes = 20 << 20
 
 // importTokenKeyBytes is the size of the per-process token signing key.
 const importTokenKeyBytes = 32
+
+// importTokenTTL is how long a clean check's token can be applied: long
+// enough to read the report, short enough that a stale check of a
+// since-edited catalogue isn't applied hours later.
+const importTokenTTL = 30 * time.Minute
+
+// importTokenSep separates the token's issued-at (hex Unix seconds) from
+// its MAC.
+const importTokenSep = "."
+
+// Per-staff limit on check + apply (one shared bucket): a burst of
+// importRateBurst, refilled at importRatePerMinute.
+const (
+	importRateBurst     = 10
+	importRatePerMinute = 10
+	secondsPerMinute    = 60
+)
+
+// importRateLimiter limits check/apply per staff member.
+type importRateLimiter interface {
+	Allow(key string) (ok bool, retryAfter time.Duration)
+}
+
+// newImportLimiter is the production importRateLimiter: the same
+// token-bucket limiter the global per-IP middleware uses.
+func newImportLimiter() *httpmw.KeyedLimiter {
+	return httpmw.NewKeyedLimiter(httpmw.RateLimitConfig{
+		RPS: float64(importRatePerMinute) / secondsPerMinute, Burst: importRateBurst,
+	})
+}
 
 // productImporter is what the import screen needs: running an import
 // (dry or real) and listing the stock points to choose from.
@@ -125,24 +167,73 @@ func readImportUpload(w http.ResponseWriter, r *http.Request) importUpload {
 // failed reports whether the upload can't be imported at all.
 func (up importUpload) failed() bool { return up.errorKey != "" }
 
-// importToken signs what was checked: the file, the stock point and who
-// checked it.
-func importToken(key []byte, up importUpload) string {
+// importToken signs what was checked — the file, its format, the stock
+// point and who checked it — and when: "<issued hex>.<mac hex>". The
+// issued-at travels in the token so the server stays stateless.
+func importToken(key []byte, up importUpload, now time.Time) string {
+	issued := now.Unix()
+	return strconv.FormatInt(issued, 16) + importTokenSep + importTokenMAC(key, up, issued)
+}
+
+func importTokenMAC(key []byte, up importUpload, issued int64) string {
 	sum := sha256.Sum256(up.data)
 	mac := hmac.New(sha256.New, key)
 	mac.Write(sum[:])
-	mac.Write([]byte{0})
-	mac.Write([]byte(up.pointID))
-	mac.Write([]byte{0})
-	mac.Write([]byte(up.staffID))
+	for _, field := range []string{
+		strconv.Itoa(int(up.format)), up.pointID, up.staffID, strconv.FormatInt(issued, 10),
+	} {
+		mac.Write([]byte{0})
+		mac.Write([]byte(field))
+	}
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func validImportToken(key []byte, up importUpload) bool {
-	if up.token == "" {
+// validImportToken reports whether up carries an unexpired token for
+// exactly this upload (constant-time MAC compare).
+func validImportToken(key []byte, up importUpload, now time.Time) bool {
+	issuedHex, mac, ok := strings.Cut(up.token, importTokenSep)
+	if !ok || mac == "" {
 		return false
 	}
-	return hmac.Equal([]byte(up.token), []byte(importToken(key, up)))
+	issued, err := strconv.ParseInt(issuedHex, 16, 64)
+	if err != nil {
+		return false
+	}
+	if age := now.Sub(time.Unix(issued, 0)); age < 0 || age > importTokenTTL {
+		return false
+	}
+	return hmac.Equal([]byte(mac), []byte(importTokenMAC(key, up, issued)))
+}
+
+// importClock is the time tokens are issued and checked at.
+func (h *handlers) importClock() time.Time {
+	if h.importNow != nil {
+		return h.importNow()
+	}
+	return time.Now()
+}
+
+// allowImportRequest spends one of the staff member's check/apply
+// tokens. When none is left it answers 429 with the message in the
+// import report (the htmx target) and returns false.
+func (h *handlers) allowImportRequest(w http.ResponseWriter, r *http.Request) bool {
+	if h.importLimiter == nil {
+		return true
+	}
+	var staffID string
+	if st, ok := staff.FromContext(r.Context()); ok {
+		staffID = st.ID
+	}
+	ok, retry := h.importLimiter.Allow(staffID)
+	if ok {
+		return true
+	}
+	slog.WarnContext(r.Context(), "admin import rate limited", "staff_id", staffID, "retry_after", retry)
+	w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retry.Seconds())))))
+	data := importBaseData()
+	data.Result = &ImportResultVM{Error: h.tr(r).T("admin.import.err_rate_limited")}
+	h.respondImportStatus(w, r, data, http.StatusTooManyRequests)
+	return false
 }
 
 // blocksImport reports whether a dry run's result must keep «Импортировать»
@@ -159,6 +250,9 @@ func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
 
 // productImportCheck handles POST /admin/products/import/check: a dry run.
 func (h *handlers) productImportCheck(w http.ResponseWriter, r *http.Request) {
+	if !h.allowImportRequest(w, r) {
+		return
+	}
 	t := h.tr(r)
 	up := readImportUpload(w, r)
 	data := importBaseData()
@@ -177,8 +271,10 @@ func (h *handlers) productImportCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Result = buildImportResultVM(t, res)
-	if !blocksImport(res) {
-		data.Run = ImportRunVM{Enabled: true, Token: importToken(h.importTokenKey, up)}
+	// Only an htmx check gets a token: a full-page (no-JS) response can't
+	// keep the chosen file for the apply, so it offers no import at all.
+	if !blocksImport(res) && isHTMX(r) {
+		data.Run = ImportRunVM{Enabled: true, Token: importToken(h.importTokenKey, up, h.importClock())}
 	}
 	h.respondImport(w, r, data)
 }
@@ -186,6 +282,9 @@ func (h *handlers) productImportCheck(w http.ResponseWriter, r *http.Request) {
 // productImportApply handles POST /admin/products/import/apply: the real
 // import, only for the file a clean check signed.
 func (h *handlers) productImportApply(w http.ResponseWriter, r *http.Request) {
+	if !h.allowImportRequest(w, r) {
+		return
+	}
 	t := h.tr(r)
 	up := readImportUpload(w, r)
 	data := importBaseData()
@@ -193,7 +292,7 @@ func (h *handlers) productImportApply(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case up.failed():
 		data.Result = &ImportResultVM{Error: t.T(up.errorKey)}
-	case !validImportToken(h.importTokenKey, up):
+	case !validImportToken(h.importTokenKey, up, h.importClock()):
 		data.Result = &ImportResultVM{Error: t.T("admin.import.err_recheck")}
 	default:
 		res, err := h.importer.Import(r.Context(), bytes.NewReader(up.data), up.format,
@@ -235,7 +334,17 @@ func importBaseData() ImportPageData {
 // respondImport sends the htmx fragment (report + out-of-band run button)
 // to an htmx request, the whole page otherwise.
 func (h *handlers) respondImport(w http.ResponseWriter, r *http.Request, data ImportPageData) {
-	if r.Header.Get("HX-Request") != "true" {
+	h.respondImportStatus(w, r, data, http.StatusOK)
+}
+
+// respondImportStatus is respondImport with a non-200 status (the page
+// script lets htmx swap a 429 into the report).
+func (h *handlers) respondImportStatus(w http.ResponseWriter, r *http.Request, data ImportPageData, status int) {
+	if status != http.StatusOK {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
+	}
+	if !isHTMX(r) {
 		h.renderImportPage(w, r, data)
 		return
 	}
@@ -244,6 +353,9 @@ func (h *handlers) respondImport(w http.ResponseWriter, r *http.Request, data Im
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
 }
+
+// isHTMX reports whether r was sent by htmx (vs. a plain form post).
+func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
 
 func (h *handlers) renderImportPage(w http.ResponseWriter, r *http.Request, data ImportPageData) {
 	st, _ := staff.FromContext(r.Context())

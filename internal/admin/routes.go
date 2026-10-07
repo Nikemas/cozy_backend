@@ -67,6 +67,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 
 		importer:       newSQLProductImporter(db),
 		importTokenKey: newImportTokenKey(),
+		importLimiter:  newImportLimiter(),
 
 		audit:      auditLog,
 		auditList:  auditLog,

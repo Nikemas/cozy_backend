@@ -229,10 +229,11 @@ func TestImportCheckWithoutHTMXRendersFullPage(t *testing.T) {
 	// Act
 	h.productImportCheck(w, importRequest(t, "/admin/products/import/check", "A", "", "", false))
 
-	// Assert
+	// Assert: the report, but no import — a full-page reply can't keep
+	// the file (see TestImportPageHidesRunWithoutJS).
 	body := w.Body.String()
-	if !strings.Contains(body, "<html") || strings.Contains(runButton(t, body), "disabled") {
-		t.Errorf("want the whole page with the run button enabled:\n%s", body)
+	if !strings.Contains(body, "<html") || !strings.Contains(runButton(t, body), "disabled") {
+		t.Errorf("want the whole page with the run button disabled:\n%s", body)
 	}
 }
 
