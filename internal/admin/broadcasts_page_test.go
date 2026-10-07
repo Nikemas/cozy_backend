@@ -144,7 +144,7 @@ func TestBroadcastCreateValidationErrorKeepsForm(t *testing.T) {
 		t.Fatalf("status = %d, want 422", w.Code)
 	}
 	body := w.Body.String()
-	for _, want := range []string{"товар не найден или скрыт", `value="Скидки на Air"`, `value="tok-1"`, "Выбран: Air Max · Nike"} {
+	for _, want := range []string{"Товар не найден или скрыт", `value="Скидки на Air"`, `value="tok-1"`, "Выбран: Air Max · Nike"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("re-rendered form missing %q", want)
 		}

@@ -39,8 +39,8 @@ func TestImportZeroPriceIsRowError(t *testing.T) {
 		"Z-2,Кеды Two,sneakers,0.004,41,white,Z-2-41\n" +
 		"Z-3,Кеды Ok,sneakers,4990,40,white,Z-3-40\n"
 	cases := []struct{ lang, want0, wantRounded string }{
-		{i18n.LangRU, `цена должна быть больше нуля: "0"`, `цена должна быть больше нуля: "0.004"`},
-		{i18n.LangKY, `баасы нөлдөн чоң болушу керек: "0"`, `баасы нөлдөн чоң болушу керек: "0.004"`},
+		{i18n.LangRU, `Цена должна быть больше нуля: "0"`, `Цена должна быть больше нуля: "0.004"`},
+		{i18n.LangKY, `Баасы нөлдөн чоң болушу керек: "0"`, `Баасы нөлдөн чоң болушу керек: "0.004"`},
 	}
 	for _, c := range cases {
 		t.Run(c.lang, func(t *testing.T) {

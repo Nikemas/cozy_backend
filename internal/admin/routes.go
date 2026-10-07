@@ -62,6 +62,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		productStore: &productStore{db: db, audit: auditLog},
 		stockStore:   &stockPageRepo{db: db, audit: auditLog},
 
+		importer:       newSQLProductImporter(db),
+		importTokenKey: newImportTokenKey(),
+
 		audit:      auditLog,
 		auditList:  auditLog,
 		productOps: &productOpsStore{db: db, audit: auditLog},
@@ -158,14 +161,13 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// it maps to the same soft-delete as "Деактивировать" under the hood.
 	mux.HandleFunc("POST /admin/products/{id}/delete", ownerOnly(h.productDelete))
 
-	// GET /admin/products/import renders the upload page; the actual
-	// import POST already exists at this exact path/method
-	// (httpapi.RegisterAdminImportRoutes, wired in cmd/server/main.go) —
-	// see productImportPage's doc comment for why the page's own JS calls
-	// that endpoint directly instead of this package registering a second
-	// handler for the same pattern (net/http.ServeMux would panic on the
-	// duplicate registration).
-	mux.HandleFunc("GET /admin/products/import", ownerOrManager(h.productImportPage))
+	// Импорт (product_import.go): the page plus its htmx check/apply/reset.
+	// POST /admin/products/import itself is the JSON endpoint
+	// (httpapi.RegisterAdminImportRoutes), kept for API clients.
+	mux.HandleFunc("GET "+importBasePath, ownerOrManager(h.productImportPage))
+	mux.HandleFunc("POST "+importCheckPath, ownerOrManager(h.productImportCheck))
+	mux.HandleFunc("POST "+importApplyPath, ownerOrManager(h.productImportApply))
+	mux.HandleFunc("GET "+importResetPath, ownerOrManager(h.productImportReset))
 
 	// Same caching policy as the storefront's /static/: a year for URLs
 	// carrying the file's current ?v= hash (templates use {{asset}}),

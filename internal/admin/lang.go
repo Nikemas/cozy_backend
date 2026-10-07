@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
@@ -38,17 +40,9 @@ const (
 	langCookieMaxAge = 365 * 24 * 60 * 60
 )
 
-// adminBundle is the admin panel's translation set. A broken/missing
-// embedded file is a build-time mistake, so it fails loudly at startup.
-var adminBundle = mustLoadAdminBundle()
-
-func mustLoadAdminBundle() *i18n.Bundle {
-	b, err := i18n.LoadFS(locales.Admin, "admin.%s.yaml")
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
+// adminBundle is the admin panel's translation set (locales.AdminBundle,
+// shared with the Excel exports and the import template).
+var adminBundle = locales.AdminBundle()
 
 // supportedLang normalizes lang to a supported language code.
 func supportedLang(lang string) string {
@@ -225,4 +219,29 @@ func errText(t tr, err error) string {
 		return t.T(le.key)
 	}
 	return err.Error()
+}
+
+// Som renders amount as money in t's language — "7 900 сом": rounded to
+// whole som, thousands grouped with a space, the suffix from
+// admin.money.som.
+func (t tr) Som(amount float64) string {
+	return t.F("admin.money.som", groupThousands(int64(math.Round(amount))))
+}
+
+// groupThousands formats n with a space between every three digits.
+func groupThousands(n int64) string {
+	sign := ""
+	if n < 0 {
+		sign = "-"
+		n = -n
+	}
+	digits := strconv.FormatInt(n, 10)
+	var grouped strings.Builder
+	for i, d := range digits {
+		if i != 0 && (len(digits)-i)%3 == 0 {
+			grouped.WriteByte(' ')
+		}
+		grouped.WriteRune(d)
+	}
+	return sign + grouped.String()
 }

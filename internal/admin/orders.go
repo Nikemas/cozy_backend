@@ -14,7 +14,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -217,31 +216,6 @@ func awaitingPayment(o *orders.Order) bool {
 		return false
 	}
 	return o.PaymentStatus == nil || *o.PaymentStatus != orders.PaymentPaid
-}
-
-// formatSom renders amount as "7 900 сом" — duplicated from internal/web/
-// orders_handlers.go's identical helper rather than imported: it's
-// presentation (thousands grouping + a hardcoded currency suffix), owned
-// independently by each HTML-facing package, same rationale as that
-// file's own comment on why statusView lives there and not in
-// internal/orders.
-func formatSom(amount float64) string {
-	whole := int64(amount + 0.5)
-	sign := ""
-	if whole < 0 {
-		sign = "-"
-		whole = -whole
-	}
-	digits := strconv.FormatInt(whole, 10)
-
-	var grouped strings.Builder
-	for i, d := range digits {
-		if i != 0 && (len(digits)-i)%3 == 0 {
-			grouped.WriteByte(' ')
-		}
-		grouped.WriteRune(d)
-	}
-	return sign + grouped.String() + " сом"
 }
 
 // pluralRu picks the Russian plural form for n — "1 заказ"/"2 заказа"/
@@ -474,7 +448,7 @@ func (h *handlers) buildOrdersListViewFor(ctx context.Context, list []orders.Ord
 			Phone:        displayPhone(phones[o.CustomerID]),
 			ItemsCount:   itemsCount,
 			ItemsLabel:   t.N(itemsCount, "admin.plural.product"),
-			TotalLabel:   formatSom(o.TotalAmount),
+			TotalLabel:   t.Som(o.TotalAmount),
 			PaymentLabel: paymentLabel(t, o.PaymentMethod, o.PaymentStatus),
 			StatusLabel:  meta.Label,
 			StatusClass:  meta.Class,
@@ -641,7 +615,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 			Name:       it.ProductNameSnapshot,
 			Variant:    variant,
 			Qty:        it.Quantity,
-			PriceLabel: formatSom(it.Price * float64(it.Quantity)),
+			PriceLabel: t.Som(it.Price * float64(it.Quantity)),
 		})
 	}
 
@@ -661,7 +635,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
 		Comment:          comment,
 		Items:            items,
-		TotalLabel:       formatSom(o.TotalAmount),
+		TotalLabel:       t.Som(o.TotalAmount),
 		StatusButtons:    buildStatusButtons(t, o.Status, role),
 		OrderHistoryData: buildOrderHistoryData(t, o),
 	}

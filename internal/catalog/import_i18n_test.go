@@ -20,9 +20,9 @@ func TestImportRowMessagesFollowLang(t *testing.T) {
 		lang                               string
 		wantNegative, wantSkipped, wantCat string
 	}{
-		{i18n.LangRU, `цена не может быть отрицательной: "-5"`, "модель не импортирована из-за ошибки в строке 3", `категория "nope" не найдена`},
-		{i18n.LangKY, `баасы терс болбошу керек: "-5"`, "модель 3-саптагы катадан улам импорттолгон жок", `категория "nope" табылган жок`},
-		{"en", `цена не может быть отрицательной: "-5"`, "модель не импортирована из-за ошибки в строке 3", `категория "nope" не найдена`},
+		{i18n.LangRU, `Цена не может быть отрицательной: "-5"`, "Модель не импортирована из-за ошибки в строке 3", `Категория "nope" не найдена`},
+		{i18n.LangKY, `Баасы терс болбошу керек: "-5"`, "Модель 3-саптагы катадан улам импорттолгон жок", `Категория "nope" табылган жок`},
+		{"en", `Цена не может быть отрицательной: "-5"`, "Модель не импортирована из-за ошибки в строке 3", `Категория "nope" не найдена`},
 	}
 	for _, c := range cases {
 		t.Run(c.lang, func(t *testing.T) {
@@ -43,7 +43,7 @@ func TestImportRowMessagesFollowLang(t *testing.T) {
 func TestImportNestedRowMessageIsTranslated(t *testing.T) {
 	csv := "name_ru,category,price,price_override,size,color\nКеды,sneakers,100,abc,38,red\n"
 	res := runCSV(t, newMemStore(), csv, ImportOptions{DryRun: true, Lang: i18n.LangKY})
-	want := `вариациянын баасы: баасы сан эмес: "abc"`
+	want := `Вариациянын баасы: баасы сан эмес: "abc"`
 	if r := rowStatus(t, res, 2); r.Message != want {
 		t.Errorf("row 2 message = %q, want %q", r.Message, want)
 	}

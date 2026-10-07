@@ -989,6 +989,7 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
    and long labels spilled out of it on a phone. */
 .admin-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; white-space: nowrap; line-height: 1.2; }
 .admin-btn[hidden] { display: none; }
+.admin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 @media (max-width: 767px) {
   .admin-content { padding: 16px; }
@@ -1071,3 +1072,46 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   body:has(.admin-order-detail__actions) .admin-toast { bottom: 96px; }
 }
 .admin-order-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+
+/* fix/admin-polish: product form variants on a phone (<640px) — each
+   variant row becomes a stacked card instead of a wide sideways-scrolling
+   table. CSS only: the same inputs (same names) stay in the same <tr>, so
+   the form submits exactly as on desktop; each cell's caption comes from
+   its data-label (the column header / point name). */
+@media (max-width: 639.98px) {
+  .admin-variants-table thead { display: none; }
+  .admin-table-wrap .admin-variants-table,
+  .admin-variants-table tbody { display: block; width: 100%; min-width: 0; }
+  .admin-variants-table tbody { padding: 0 12px; }
+  .admin-variants-table .admin-variant-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    margin-bottom: 12px;
+    padding: 12px 44px 12px 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-card);
+    background: var(--admin-surface);
+  }
+  .admin-variants-table .admin-variant-row td {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: auto;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .admin-variants-table .admin-variant-row td[data-label]::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--admin-muted);
+  }
+  .admin-variants-table .admin-variant-input,
+  .admin-variants-table .admin-variant-input--qty,
+  .admin-variants-table .admin-variant-input--price { max-width: none; }
+  .admin-variants-table .admin-variant-cell--total { align-items: flex-start; }
+  .admin-variants-table .admin-variant-cell--remove { position: absolute; top: 8px; right: 8px; }
+}

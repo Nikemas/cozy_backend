@@ -77,21 +77,10 @@ func TestTopBrandsLabelsNoBrandInPageLanguage(t *testing.T) {
 }
 
 // templateCyrillicAllowed is Cyrillic that may stay literal in admin
-// templates: example values/placeholders for data fields (a Russian-name
-// field's example is Russian in either UI language), proper names, and
-// the currency "сом" (the same word in Kyrgyz). Anything else is UI text
-// and belongs in locales/admin.*.yaml.
-var templateCyrillicAllowed = map[string]bool{
-	"Скидки до 30% на кроссовки":                        true, // broadcasts: title_ru placeholder
-	"Только до воскресенья — успейте выбрать свою пару": true, // broadcasts: body_ru placeholder
-	"Кроссовки":    true, // categories: name_ru placeholder
-	"Кроссовкалар": true, // categories: name_ky placeholder
-	"Бишкек":       true, // delivery zone name_ru placeholder; point city default
-	"Бишкек ш.":    true, // delivery zone name_ky placeholder
-	"Дордой-Центр": true, // points: name placeholder (proper name)
-	"Айгерим Б.":   true, // staff: name placeholder
-	"сом":          true, // currency
-}
+// templates. It is empty: example values/placeholders, proper names and
+// the currency suffix all go through locales/admin.*.yaml too
+// (fix/admin-polish), so a Kyrgyz page never shows a stray literal.
+var templateCyrillicAllowed = map[string]bool{}
 
 var (
 	tmplComment   = regexp.MustCompile(`(?s)\{\{-?\s*/\*.*?\*/\s*-?\}\}|<!--.*?-->`)
@@ -126,6 +115,25 @@ func TestTemplatesHaveNoHardcodedRussian(t *testing.T) {
 		sort.Strings(bad)
 		if len(bad) > 0 {
 			t.Errorf("%s: hardcoded Cyrillic UI text (move to locales/admin.*.yaml): %q", filepath.Base(f), bad)
+		}
+	}
+}
+
+// standaloneErrorKey matches admin locale keys whose text is shown on its
+// own as an error/flash line (not composed mid-sentence).
+var standaloneErrorKey = regexp.MustCompile(`^admin\.(apperr|err)\.|_failed$|^admin\.(delivery|audit)\.err_|^admin\.staff\.passwords_mismatch$|^admin\.product\.err_stale_form$|^admin\.bulk\.already_in_status$`)
+
+// TestStandaloneAdminErrorsAreCapitalized: an error line starts with a
+// capital letter in both languages (fix/admin-polish).
+func TestStandaloneAdminErrorsAreCapitalized(t *testing.T) {
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		for _, key := range adminBundle.Keys(lang) {
+			if !standaloneErrorKey.MatchString(key) || key == "admin.broadcasts.stat_failed" {
+				continue
+			}
+			if v := adminBundle.T(lang, key); i18n.UpperFirst(v) != v {
+				t.Errorf("admin.%s.yaml %s starts lowercase: %q", lang, key, v)
+			}
 		}
 	}
 }

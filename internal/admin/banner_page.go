@@ -377,7 +377,7 @@ func bannerAuditEntry(before, after *banner.Banner) audit.Entry {
 	add("banner_bg_image", deref(before.BgImageKey), deref(after.BgImageKey))
 	return audit.Entry{
 		Action: audit.ActionBannerUpdate, EntityType: audit.EntityBanner, EntityID: "home",
-		Summary: "Изменён баннер на главной",
+		Summary: russianAuditSummary(audit.MsgBannerUpdated, nil, ""),
 		MsgKey:  audit.MsgBannerUpdated,
 		Details: d,
 	}

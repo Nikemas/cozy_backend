@@ -37,7 +37,7 @@ func orderZoneName(t tr, z *orders.OrderDeliveryZone) string {
 func buildOrderHistoryData(t tr, o *orders.Order) OrderHistoryData {
 	d := OrderHistoryData{RefundRequired: o.RefundRequired}
 	if o.DeliveryFee > 0 {
-		d.DeliveryFeeLabel = formatSom(o.DeliveryFee)
+		d.DeliveryFeeLabel = t.Som(o.DeliveryFee)
 	}
 	for _, h := range o.History {
 		row := OrderHistoryRowView{
@@ -49,7 +49,7 @@ func buildOrderHistoryData(t tr, o *orders.Order) OrderHistoryData {
 			row.FromLabel = orderStatusMetaFor(t, *h.FromStatus).Label
 		}
 		if h.Note != nil {
-			row.Note = *h.Note
+			row.Note = historyNote(t, *h.Note)
 		}
 		d.History = append(d.History, row)
 	}
@@ -70,4 +70,17 @@ func historyActorLabel(t tr, h orders.StatusChange) string {
 	default:
 		return string(h.ActorType)
 	}
+}
+
+// historyNoteKeyPrefix + a system note code is its locale key.
+const historyNoteKeyPrefix = "admin.history.note."
+
+// historyNote shows a status-change note: a system code (orders.Note*)
+// in t's language, anything else (a staff note, an old Russian row) as
+// written.
+func historyNote(t tr, note string) string {
+	if key := historyNoteKeyPrefix + note; adminBundle.Has(t.Lang(), key) {
+		return t.T(key)
+	}
+	return note
 }

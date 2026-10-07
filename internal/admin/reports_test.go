@@ -193,7 +193,7 @@ func TestBuildBarsFillsEveryDayIncludingZeroSalesDays(t *testing.T) {
 		{Key: "2026-09-03", Revenue: 200},
 	}
 
-	bars := buildBars(rows, from, to)
+	bars := buildBars(ruTr, rows, from, to)
 	if len(bars) != 3 {
 		t.Fatalf("expected 3 bars (one per day in range), got %d", len(bars))
 	}
@@ -210,7 +210,7 @@ func TestBuildBarsFillsEveryDayIncludingZeroSalesDays(t *testing.T) {
 
 func TestBuildBarsAllZeroRevenueNoDivideByZero(t *testing.T) {
 	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
-	bars := buildBars(nil, from, from)
+	bars := buildBars(ruTr, nil, from, from)
 	if len(bars) != 1 || bars[0].HeightPct != 0 {
 		t.Fatalf("unexpected bars: %+v", bars)
 	}
@@ -277,7 +277,7 @@ func TestBuildTopBrandsWidthRelativeToTopBrand(t *testing.T) {
 	}
 }
 
-// --- formatMoney (defined in products_view.go, exercised here too) ---
+// --- tr.Som (lang.go), exercised here too ---
 
 func TestFormatMoneyReports(t *testing.T) {
 	cases := []struct {
@@ -291,8 +291,8 @@ func TestFormatMoneyReports(t *testing.T) {
 		{133.33, "133 сом"},
 	}
 	for _, c := range cases {
-		if got := formatMoney(c.in); got != c.want {
-			t.Errorf("formatMoney(%v) = %q, want %q", c.in, got, c.want)
+		if got := ruTr.Som(c.in); got != c.want {
+			t.Errorf("Som(%v) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

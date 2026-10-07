@@ -147,18 +147,21 @@ func TestTrPluralAndFormat(t *testing.T) {
 
 func TestAppErrMessageLocalized(t *testing.T) {
 	err := apperr.Conflict("last_owner", "нельзя понизить или деактивировать последнего владельца")
-	if got := appErrMessage(ruTr, err); got != err.Message {
-		t.Errorf("ru = %q, want the service message", got)
+	if got := appErrMessage(ruTr, err); got != "Нельзя понизить или деактивировать последнего владельца" {
+		t.Errorf("ru = %q, want the service message, capitalized", got)
 	}
 	if got := appErrMessage(kyTr, err); got != kyTr.T("admin.apperr.last_owner") {
 		t.Errorf("ky = %q", got)
 	}
 	unknown := apperr.BadRequest("some_new_code", "что-то новое")
-	if got := appErrMessage(kyTr, unknown); got != "что-то новое" {
+	if got := appErrMessage(kyTr, unknown); got != "Что-то новое" {
 		t.Errorf("ky unknown code = %q, want the Russian fallback", got)
 	}
 	if got := appErrMessage(kyTr, context.Canceled); got != kyTr.T("admin.err.generic") {
 		t.Errorf("ky generic = %q", got)
+	}
+	if got := appErrMessage(ruTr, localizedError{"admin.qty.err_negative"}); got != "Количество не может быть отрицательным" {
+		t.Errorf("standalone localized error not capitalized: %q", got)
 	}
 	if got := errText(kyTr, localizedError{"admin.qty.err_negative"}); got != "саны терс болбошу керек" {
 		t.Errorf("errText ky = %q", got)
@@ -321,7 +324,7 @@ func kyScreenFixtures() map[string]PageData {
 	reportsPage := shell("reports", "admin.nav.reports")
 	reportsPage.Data = ReportsData{
 		Periods: reportPeriodOptions(kyTr, "custom"), Stats: buildStatCards(kyTr, nil),
-		Bars:        buildBars(nil, now, now),
+		Bars:        buildBars(ruTr, nil, now, now),
 		TopProducts: buildTopProducts(kyTr, nil), Categories: buildCategoryBars(kyTr, nil),
 		TopBrands: buildTopBrands(kyTr, []reports.Row{{Key: "Nike", Revenue: 2}, {Key: "", Revenue: 1}}),
 		Custom:    true, Err: "x",

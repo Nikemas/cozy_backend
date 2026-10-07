@@ -67,7 +67,7 @@ func TestImportRowMessagesFollowPageLanguage(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Rows) != 1 || res.Rows[0].Message != "баасы көрсөтүлгөн жок" {
+	if len(res.Rows) != 1 || res.Rows[0].Message != "Баасы көрсөтүлгөн жок" {
 		t.Errorf("rows = %+v, want the Kyrgyz \"no price\" message", res.Rows)
 	}
 }

@@ -219,9 +219,16 @@ const fragmentScreen = "orders"
 // the auth-gate attached to w — for small HTMX responses such as the
 // new-orders badge.
 func (rr *Renderer) RenderFragment(w http.ResponseWriter, name string, data any) error {
-	t, ok := rr.tmpl[supportedLang(langFromWriter(w))][fragmentScreen]
+	return rr.RenderScreenFragment(w, fragmentScreen, name, data)
+}
+
+// RenderScreenFragment executes one named template defined in screen's
+// own .gohtml (no layout), in the language the auth-gate attached to w —
+// for HTMX responses that swap part of that screen.
+func (rr *Renderer) RenderScreenFragment(w http.ResponseWriter, screen, name string, data any) error {
+	t, ok := rr.tmpl[supportedLang(langFromWriter(w))][screen]
 	if !ok {
-		return fmt.Errorf("admin: no template set for fragments")
+		return fmt.Errorf("admin: no template set for screen %q", screen)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return t.ExecuteTemplate(w, name, data)

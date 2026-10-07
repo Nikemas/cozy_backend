@@ -48,11 +48,11 @@
       <div class="bc-lang-title">{{t "admin.lang.ru_title"}}</div>
       <div class="admin-field">
         <label for="bc-title-ru">{{t "admin.broadcasts.title"}}</label>
-        <input id="bc-title-ru" name="title_ru" value="{{.Form.TitleRU}}" required maxlength="{{.MaxTitle}}" data-count="{{.MaxTitle}}" placeholder="Скидки до 30% на кроссовки">
+        <input id="bc-title-ru" name="title_ru" value="{{.Form.TitleRU}}" required maxlength="{{.MaxTitle}}" data-count="{{.MaxTitle}}" placeholder="{{t "admin.broadcasts.title_ru_placeholder"}}">
       </div>
       <div class="admin-field">
         <label for="bc-body-ru">{{t "admin.broadcasts.body"}}</label>
-        <textarea id="bc-body-ru" name="body_ru" class="bc-textarea" required maxlength="{{.MaxBody}}" data-count="{{.MaxBody}}" placeholder="Только до воскресенья — успейте выбрать свою пару">{{.Form.BodyRU}}</textarea>
+        <textarea id="bc-body-ru" name="body_ru" class="bc-textarea" required maxlength="{{.MaxBody}}" data-count="{{.MaxBody}}" placeholder="{{t "admin.broadcasts.body_ru_placeholder"}}">{{.Form.BodyRU}}</textarea>
       </div>
 
       <div class="bc-lang-title">{{t "admin.lang.ky_title"}}</div>

@@ -296,3 +296,23 @@ func TestAuditPageKyShowsTranslatedSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestRussianAuditSummaryFromLocale(t *testing.T) {
+	// Arrange
+	args := audit.Args{"name": "Кеды"}
+
+	// Act
+	got := russianAuditSummary(audit.MsgProductActivated, args, audit.ViaBulk)
+
+	// Assert: the stored Summary is exactly the Russian locale line.
+	if want := "Товар «Кеды» активирован (массово)"; got != want {
+		t.Errorf("russianAuditSummary = %q, want %q", got, want)
+	}
+	if got := russianAuditSummary(audit.MsgProductActivated, args, ""); got != "Товар «Кеды» активирован" {
+		t.Errorf("without via = %q", got)
+	}
+	stock := russianAuditSummary(audit.MsgStockChanged, audit.StockArgs("Nike", "42", "Белый", "Дордой", 2, 4), "")
+	if want := "Остаток «Nike» 42 / Белый, Дордой: 2 → 4"; stock != want {
+		t.Errorf("stock = %q, want %q", stock, want)
+	}
+}

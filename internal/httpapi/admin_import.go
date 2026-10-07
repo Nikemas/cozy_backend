@@ -90,7 +90,7 @@ func importTemplateHandler(b importBackend) apperr.HandlerFunc {
 		if err != nil {
 			return err
 		}
-		data, err := catalog.BuildImportTemplate(cats)
+		data, err := catalog.BuildImportTemplate(adminRequestLang(r), cats)
 		if err != nil {
 			return err
 		}

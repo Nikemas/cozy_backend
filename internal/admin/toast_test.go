@@ -24,8 +24,8 @@ func TestToastFromQueryKnownKeys(t *testing.T) {
 		{"bulk status", url.Values{"toast": {"bulk_status"}, "toast_st": {"delivered"}, "toast_n": {"1"}, "toast_of": {"2"}}, "1 из 2"},
 		{"products bulk", url.Values{"toast": {"products_bulk"}, "toast_n": {"3"}, "toast_of": {"3"}}, "изменено 3 из 3"},
 		{"stock", url.Values{"toast": {"stock_saved"}, "toast_n": {"2"}}, "Сохранено: 2"},
-		{"apperr code", url.Values{"toast": {"error"}, "toast_code": {"invalid_status_transition"}}, "нельзя перевести заказ в этот статус"},
-		{"unknown code is generic", url.Values{"toast": {"error"}, "toast_code": {"no_such_code"}}, "произошла ошибка"},
+		{"apperr code", url.Values{"toast": {"error"}, "toast_code": {"invalid_status_transition"}}, "Нельзя перевести заказ в этот статус"},
+		{"unknown code is generic", url.Values{"toast": {"error"}, "toast_code": {"no_such_code"}}, "Произошла ошибка"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -119,10 +119,10 @@ func TestBulkFailuresRoundTrip(t *testing.T) {
 	v := encodeBulkFailures(in, 0)
 	notes := bulkFailureNotes(ruTr, v)
 	want := []string{
-		"№ COZY-20261001-001: уже в этом статусе",
-		"№ COZY-20261001-002: не удалось изменить статус",
-		"№ abcdef12: заказ не найден",
-		"№ COZY-20261001-003: заказ с онлайн-оплатой можно подтвердить только после оплаты",
+		"№ COZY-20261001-001: Уже в этом статусе",
+		"№ COZY-20261001-002: Не удалось изменить статус",
+		"№ abcdef12: Заказ не найден",
+		"№ COZY-20261001-003: Заказ с онлайн-оплатой можно подтвердить только после оплаты",
 	}
 	if strings.Join(notes, "|") != strings.Join(want, "|") {
 		t.Errorf("notes = %q", notes)

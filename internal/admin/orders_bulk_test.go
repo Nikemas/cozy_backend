@@ -77,7 +77,7 @@ func TestOrderBulkStatusReportsPerOrderFailures(t *testing.T) {
 	if q.Get("status") != "placed" || !strings.Contains(toastFromQuery(ruTr, q), "1 из 2") {
 		t.Errorf("query = %v", q)
 	}
-	if fails := bulkFailureNotes(ruTr, q); len(fails) != 1 || !strings.Contains(fails[0], "COZY-2") || !strings.Contains(fails[0], "нельзя перевести") {
+	if fails := bulkFailureNotes(ruTr, q); len(fails) != 1 || !strings.Contains(fails[0], "COZY-2") || !strings.Contains(fails[0], "Нельзя перевести") {
 		t.Errorf("bulk_fail = %v", fails)
 	}
 }
@@ -89,7 +89,7 @@ func TestOrderBulkStatusManagerCannotCancel(t *testing.T) {
 	if len(svc.updated) != 0 {
 		t.Fatal("manager cancelled orders in bulk")
 	}
-	if loc, _ := url.Parse(w.Header().Get("Location")); !strings.Contains(toastFromQuery(ruTr, loc.Query()), "только владелец") {
+	if loc, _ := url.Parse(w.Header().Get("Location")); !strings.Contains(toastFromQuery(ruTr, loc.Query()), "Только владелец") {
 		t.Errorf("Location = %q", w.Header().Get("Location"))
 	}
 }

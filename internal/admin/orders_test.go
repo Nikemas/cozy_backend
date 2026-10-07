@@ -66,8 +66,8 @@ func TestFormatSom(t *testing.T) {
 		{4999.6, "5 000 сом"},
 	}
 	for _, c := range cases {
-		if got := formatSom(c.amount); got != c.want {
-			t.Errorf("formatSom(%v) = %q, want %q", c.amount, got, c.want)
+		if got := ruTr.Som(c.amount); got != c.want {
+			t.Errorf("Som(%v) = %q, want %q", c.amount, got, c.want)
 		}
 	}
 }
@@ -296,5 +296,18 @@ func TestRenderOrderDetailExecutesWithNoStatusButtons(t *testing.T) {
 	}
 	if w.Code != 200 {
 		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestSomGoesThroughLocale(t *testing.T) {
+	// Arrange
+	ky := kyTr
+
+	// Act
+	got := ky.Som(7900)
+
+	// Assert: the suffix comes from admin.money.som, not a literal.
+	if want := ky.F("admin.money.som", "7 900"); got != want {
+		t.Errorf("ky Som(7900) = %q, want %q", got, want)
 	}
 }

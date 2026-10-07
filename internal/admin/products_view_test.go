@@ -79,8 +79,8 @@ func TestFormatMoney(t *testing.T) {
 		{-500, "-500 сом"},
 	}
 	for _, c := range cases {
-		if got := formatMoney(c.v); got != c.want {
-			t.Errorf("formatMoney(%v) = %q, want %q", c.v, got, c.want)
+		if got := ruTr.Som(c.v); got != c.want {
+			t.Errorf("Som(%v) = %q, want %q", c.v, got, c.want)
 		}
 	}
 }

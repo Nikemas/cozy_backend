@@ -9,10 +9,8 @@ package admin
 import (
 	"encoding/json"
 	"html/template"
-	"math"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
@@ -262,7 +260,44 @@ type ImportRowError struct {
 }
 
 type ImportPageData struct {
-	ImportURL string
+	ImportURL string // base path; <ImportURL>/template is the .xlsx template
+	CheckURL  string // POST: dry run
+	ApplyURL  string // POST: real import (needs Run.Token)
+	ResetURL  string // GET: another file chosen
+
+	Points       []catalog.ImportPoint // stock point choices, default first
+	PointsFailed bool                  // points could not be loaded
+	PointID      string                // the chosen point ("" = default)
+
+	Result *ImportResultVM // nil before the first check
+	Run    ImportRunVM
+}
+
+// ImportRunVM is the «Импортировать» button's server-side state: enabled
+// only right after a clean check, carrying that check's token.
+type ImportRunVM struct {
+	Enabled bool
+	Token   string
+}
+
+// ImportResultVM is the report under the import form.
+type ImportResultVM struct {
+	Error       string // a file-level problem; nothing else is shown
+	DryRun      bool
+	HasProblems bool
+	Head        string
+	Summary     string
+	BadTitle    string
+	BadRows     []string
+	Rows        []ImportRowVM
+}
+
+// ImportRowVM is one report table row.
+type ImportRowVM struct {
+	Row                      int
+	StatusLabel, StatusClass string
+	Model, Size, Color, SKU  string
+	Message                  string
 }
 
 // --- pure helpers ---
@@ -289,34 +324,6 @@ func countLabel(t tr, total int) string {
 // variantsLabel renders the table's "Вариаций" cell / card subtitle.
 func variantsLabel(t tr, n int) string {
 	return t.N(n, "admin.plural.variant")
-}
-
-// formatMoney renders a KGS amount the same way internal/web's
-// handlers.formatMoney (catalog_view.go) does — thousands grouped with a
-// space, " сом" suffix, no decimals — kept as its own copy rather than an
-// import because internal/web doesn't export it and pulling in the whole
-// web package here for one formatting helper would be a much bigger
-// coupling than duplicating ~15 lines shared by design, not by code.
-func formatMoney(v float64) string {
-	n := int64(math.Round(v))
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	digits := strconv.FormatInt(n, 10)
-
-	var grouped []byte
-	for i := 0; i < len(digits); i++ {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			grouped = append(grouped, ' ')
-		}
-		grouped = append(grouped, digits[i])
-	}
-	out := string(grouped)
-	if neg {
-		out = "-" + out
-	}
-	return out + " сом"
 }
 
 // statusLabel mirrors the design's {{ p.status }} binding.

@@ -2179,7 +2179,7 @@ components:
         actor_type: { type: string, enum: [staff, customer, system], description: "`system` = payment callback / expiry job." }
         actor_staff_id: { type: string, format: uuid, nullable: true }
         actor_name: { type: string, nullable: true, description: Staff member's name. }
-        note: { type: string, nullable: true, description: "e.g. `не оплачен вовремя`, `оплата отклонена`." }
+        note: { type: string, nullable: true, description: "Staff free text, or a system code for automatic cancellations: `payment_expired`, `payment_open_failed`, `payment_cancelled` (older rows may hold Russian text)." }
         created_at: { type: string, format: date-time }
 
     OrderItem:

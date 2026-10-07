@@ -291,7 +291,7 @@ func (s *Service) abort(ctx context.Context, paymentID, orderID string) error {
 			`UPDATE orders SET payment_status = 'failed', idempotency_key = NULL, updated_at = now() WHERE id = $1`, orderID); err != nil {
 			return err
 		}
-		_, err = orders.CancelUnpaidOrderTx(ctx, tx, orderID, "не удалось открыть платёж")
+		_, err = orders.CancelUnpaidOrderTx(ctx, tx, orderID, orders.NotePaymentOpenFailed)
 		return err
 	})
 }
@@ -455,7 +455,7 @@ func (s *Service) HandleCallback(ctx context.Context, providerName string, heade
 		if ev.Status == StatusCancelled {
 			// The customer cancelled on the bank page: give the stock back.
 			// A declined card (failed) keeps the order open for a retry.
-			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID, "оплата отменена покупателем")
+			cancelled, err := orders.CancelUnpaidOrderTx(ctx, tx, res.OrderID, orders.NotePaymentCancelled)
 			if err != nil {
 				return err
 			}

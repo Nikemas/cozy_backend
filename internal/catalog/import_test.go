@@ -10,6 +10,8 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/locales"
 )
 
 // buildXLSX writes rows (row 0 = header) into a one-sheet workbook. A cell
@@ -245,7 +247,7 @@ func TestDatabaseFailureRollsBackWholeModel(t *testing.T) {
 		t.Fatalf("orphans left: products=%d variants=%d", len(s.st.products), len(s.st.variants))
 	}
 	wantSummary(t, res.Summary, ImportSummary{Rows: 2, Skipped: 1, Errors: 1})
-	if r := rowStatus(t, res, 3); r.Status != RowStatusError || !strings.Contains(r.Message, "внутренняя ошибка") {
+	if r := rowStatus(t, res, 3); r.Status != RowStatusError || !strings.Contains(r.Message, "Внутренняя ошибка") {
 		t.Errorf("row 3 = %+v", r)
 	}
 }
@@ -282,20 +284,20 @@ func TestPriceAndQuantityValidation(t *testing.T) {
 		price, qty string
 		wantMsg    string
 	}{
-		{"NaN", "", "цена не число"},
-		{"Inf", "", "цена не число"},
-		{"+Inf", "", "цена не число"},
+		{"NaN", "", "Цена не число"},
+		{"Inf", "", "Цена не число"},
+		{"+Inf", "", "Цена не число"},
 		{"-1", "", "отрицательной"},
 		{"0", "", "больше нуля"},
 		{"0.004", "", "больше нуля"},
-		{"0x1p3", "", "цена не число"},
-		{"1e3", "", "цена не число"},
-		{"abc", "", "цена не число"},
-		{"100000000", "", "слишком большая цена"},
+		{"0x1p3", "", "Цена не число"},
+		{"1e3", "", "Цена не число"},
+		{"abc", "", "Цена не число"},
+		{"100000000", "", "Слишком большая цена"},
 		{"100", "-1", "отрицательным"},
 		{"100", "1.5", "целым числом"},
 		{"100", "NaN", "целым числом"},
-		{"100", "2000000", "слишком большой остаток"},
+		{"100", "2000000", "Слишком большой остаток"},
 	}
 	for _, c := range cases {
 		t.Run(c.price+"/"+c.qty, func(t *testing.T) {
@@ -338,14 +340,14 @@ func TestRequiredFieldsAndVariantRules(t *testing.T) {
 	cases := []struct {
 		name, csv, wantMsg string
 	}{
-		{"no name", "name_ru,category,price\n,sneakers,100\n", "не указано название"},
-		{"no category", "name_ru,category,price\nКеды,,100\n", "не указана категория"},
-		{"no price", "name_ru,category,price\nКеды,sneakers,\n", "не указана цена"},
+		{"no name", "name_ru,category,price\n,sneakers,100\n", "Не указано название"},
+		{"no category", "name_ru,category,price\nКеды,,100\n", "Не указана категория"},
+		{"no price", "name_ru,category,price\nКеды,sneakers,\n", "Не указана цена"},
 		{"unknown category", "name_ru,category,price\nКеды,sandals,100\n", "не найдена"},
 		{"size without color", "name_ru,category,price,size,color\nКеды,sneakers,100,38,\n", "оба поля"},
 		{"sku without variant", "name_ru,category,price,sku\nКеды,sneakers,100,K1\n", "SKU указан без"},
-		{"qty without variant", "name_ru,category,price,quantity\nКеды,sneakers,100,4\n", "остаток указан без"},
-		{"article without name", "article,name_ru,category,price\nA1,,sneakers,100\n", "не указано название"},
+		{"qty without variant", "name_ru,category,price,quantity\nКеды,sneakers,100,4\n", "Остаток указан без"},
+		{"article without name", "article,name_ru,category,price\nA1,,sneakers,100\n", "Не указано название"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -424,7 +426,7 @@ func TestStockTargetPoint(t *testing.T) {
 		s := newMemStore()
 		s.defaultPoint = ""
 		res := runCSV(t, s, csv, ImportOptions{})
-		if r := rowStatus(t, res, 2); r.Status != RowStatusError || !strings.Contains(r.Message, "нет активной точки") {
+		if r := rowStatus(t, res, 2); r.Status != RowStatusError || !strings.Contains(r.Message, "Нет активной точки") {
 			t.Errorf("row = %+v", r)
 		}
 		// Without quantities the same file imports fine.
@@ -530,26 +532,55 @@ func TestLegacyEnglishFileStillImports(t *testing.T) {
 }
 
 func TestTemplateImportsCleanly(t *testing.T) {
-	data, err := BuildImportTemplate([]TemplateCategory{{Slug: "sneakers", NameRu: "Кроссовки", NameKy: "Кроссовкалар"}, {Slug: "boots", NameRu: "Ботинки"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := excelize.OpenReader(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := f.GetSheetList(); len(got) != 3 || got[0] != "Товары" {
-		t.Errorf("sheets = %v", got)
-	}
-	_ = f.Close()
+	cats := []TemplateCategory{{Slug: "sneakers", NameRu: "Кроссовки", NameKy: "Кроссовкалар"}, {Slug: "boots", NameRu: "Ботинки"}}
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		t.Run(lang, func(t *testing.T) {
+			data, err := BuildImportTemplate(lang, cats)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f, err := excelize.OpenReader(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantMain := locales.AdminBundle().T(lang, "admin.import.tpl.sheet_products")
+			if got := f.GetSheetList(); len(got) != 3 || got[0] != wantMain {
+				t.Errorf("sheets = %v, want %q first", got, wantMain)
+			}
+			_ = f.Close()
 
-	s := newMemStore()
-	res := runXLSX(t, s, data, ImportOptions{DryRun: true})
-	wantSummary(t, res.Summary, ImportSummary{Rows: 4, Created: 4, ProductsCreated: 2, VariantsCreated: 4})
+			// The localized headers round-trip through the importer.
+			s := newMemStore()
+			res := runXLSX(t, s, data, ImportOptions{DryRun: true})
+			wantSummary(t, res.Summary, ImportSummary{Rows: 4, Created: 4, ProductsCreated: 2, VariantsCreated: 4})
+		})
+	}
 
 	// Without categories (empty DB) the template still builds.
-	if _, err := BuildImportTemplate(nil); err != nil {
+	if _, err := BuildImportTemplate(i18n.LangRU, nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTemplateHeadersAreLocalizedAndParse(t *testing.T) {
+	for _, lang := range []string{i18n.LangRU, i18n.LangKY} {
+		headers := templateHeaders(lang)
+		cols, err := canonicalHeaders(headers)
+		if err != nil {
+			t.Fatalf("%s: template headers rejected: %v", lang, err)
+		}
+		for i, c := range templateColumns {
+			if cols[i] != c.col {
+				t.Errorf("%s: header %q parsed as %q, want %q", lang, headers[i], cols[i], c.col)
+			}
+		}
+	}
+	// The Russian captions stay what older templates already carry.
+	if got := templateHeaders(i18n.LangRU); got[1] != "Название*" || got[5] != "Цена*" {
+		t.Errorf("ru headers changed: %q", got)
+	}
+	if ru, ky := templateHeaders(i18n.LangRU), templateHeaders(i18n.LangKY); ru[6] == ky[6] {
+		t.Errorf("ky size header not translated: %q", ky[6])
 	}
 }
 

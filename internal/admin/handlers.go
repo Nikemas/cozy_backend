@@ -51,6 +51,11 @@ type handlers struct {
 	productStore productSaver
 	stockStore   stockPageStore
 
+	// fix/admin-polish: the import screen (product_import.go) and the key
+	// that signs its "checked without errors" tokens.
+	importer       productImporter
+	importTokenKey []byte
+
 	// fix/admin-ops (W5): audit journal (nil-safe: a nil *audit.Log
 	// records nothing) and the products list's bulk/per-point queries.
 	audit      *audit.Log

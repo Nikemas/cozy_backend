@@ -58,11 +58,11 @@
     <form method="post" action="/admin/points" id="admin-point-form">
       <div class="admin-field">
         <label for="point-name">{{t "admin.common.name"}}</label>
-        <input id="point-name" name="name" placeholder="Дордой-Центр" required maxlength="200">
+        <input id="point-name" name="name" placeholder="{{t "admin.points.name_placeholder"}}" required maxlength="200">
       </div>
       <div class="admin-field">
         <label for="point-city">{{t "admin.points.city"}}</label>
-        <input id="point-city" name="city" value="Бишкек" required maxlength="100">
+        <input id="point-city" name="city" value="{{t "admin.points.default_city"}}" required maxlength="100">
       </div>
       <div class="admin-field">
         <label for="point-address">{{t "admin.common.address"}}</label>
@@ -111,7 +111,7 @@ function openPointModal(btn) {
     title.textContent = {{t "admin.points.new_title"}};
     name.value = '';
     address.value = '';
-    city.value = 'Бишкек';
+    city.value = {{t "admin.points.default_city"}};
     hours.value = '';
     lat.value = '';
     lng.value = '';

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
+	"github.com/Nikemas/cozy_backend/internal/i18n"
 )
 
 // ImportFormat identifies the shape of a bulk product import file, per §8
@@ -484,6 +485,7 @@ func (res *ImportResult) addModel(m *plannedModel, out *modelOutcome, lang strin
 			r.Message = apperr.Translate(lang, "import.model_skipped",
 				map[string]string{"line": strconv.Itoa(m.firstErrLine())})
 		}
+		r.Message = i18n.UpperFirst(r.Message) // a report line of its own
 		res.Summary.Rows++
 		switch r.Status {
 		case RowStatusCreated:
