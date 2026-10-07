@@ -3,8 +3,8 @@
 // pure-CSS day-by-day bar chart, a "Топ товаров" ranked list and a "По
 // брендам" list with mini progress bars. All of it is a presentation over
 // internal/reports.AggregateSales' output (Wave 3, Task O) grouped
-// different ways, plus one extra query (BrandSales, below) for the one
-// dimension AggregateSales doesn't group by.
+// different ways, plus reports.Repo.BrandSales for the one dimension
+// AggregateSales doesn't group by.
 package admin
 
 import (
@@ -26,7 +26,7 @@ import (
 // reportsBackend is the subset of behavior reportsPage depends on — an
 // interface (mirroring salesRepo in internal/httpapi/admin_reports.go) so
 // the handler can be tested with a fake instead of a live database.
-// *reportsRepo satisfies it against a real *sql.DB.
+// *reports.CachedRepo satisfies it in production (see newReportsBackend).
 type reportsBackend interface {
 	Sales(ctx context.Context, from, to time.Time, groupBy reports.GroupBy, pointNames map[string]string) ([]reports.Row, error)
 	BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error)
@@ -34,66 +34,12 @@ type reportsBackend interface {
 	PointNames(ctx context.Context) (map[string]string, error)
 }
 
-// reportsRepo adapts *reports.Repo (Wave 3, Task O) for this screen,
-// adding BrandSales — a grouping AggregateSales doesn't offer today. See
-// BrandSales' doc comment for why.
-type reportsRepo struct {
-	*reports.Repo
-	db *sql.DB
-}
-
-func newReportsRepo(db *sql.DB) *reportsRepo {
-	return &reportsRepo{Repo: reports.NewRepo(db), db: db}
-}
-
-// BrandSales aggregates order line items by product brand over [from, to)
-// — the "По брендам" list's data source (Cozy Admin.dc.html lines
-// 597-608). AggregateSales can't produce this from an already-loaded
-// []orders.Order: orders.OrderItem only snapshots a product name, size and
-// color at checkout time — not brand — so brand can't be recovered from
-// those in-memory rows. Brand IS a real, stored column
-// (internal/catalog/product.go's Product.Brand), reachable via
-// order_items.variant_id -> product_variants.product_id -> products.brand,
-// so this queries that join directly instead of substituting a fake
-// breakdown. Revenue is computed the same way AggregateSales's
-// GroupByProduct does — line price × quantity, not the order's
-// total_amount — so brand rows sum to the same total as the "Топ товаров"
-// rows. Only orders that count as sales are included (reports.
-// SaleConditionSQL: not cancelled, online-card only once paid), same as
-// AggregateSales. Products with no brand set (or an all-whitespace one)
-// roll up into one "" bucket rather than being dropped; buildTopBrands
-// labels it (admin.reports.no_brand) in the page language. The brand is
-// grouped under COLLATE "C" (same groups, byte comparisons — see
-// reports.Repo.Sales).
-func (r *reportsRepo) BrandSales(ctx context.Context, from, to time.Time) ([]reports.Row, error) {
-	q := `
-		SELECT COALESCE(TRIM(p.brand), '') COLLATE "C" AS brand,
-		       COUNT(DISTINCT oi.order_id) AS order_count,
-		       COALESCE(SUM(oi.quantity), 0) AS item_count,
-		       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
-		FROM order_items oi
-		JOIN orders o ON o.id = oi.order_id
-		JOIN product_variants pv ON pv.id = oi.variant_id
-		JOIN products p ON p.id = pv.product_id
-		WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + reports.SaleConditionSQL + `
-		GROUP BY 1
-		ORDER BY revenue DESC`
-
-	rows, err := r.db.QueryContext(ctx, q, from, to)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var out []reports.Row
-	for rows.Next() {
-		var row reports.Row
-		if err := rows.Scan(&row.Key, &row.OrderCount, &row.ItemCount, &row.Revenue); err != nil {
-			return nil, err
-		}
-		out = append(out, row)
-	}
-	return out, rows.Err()
+// newReportsBackend is the reports screen's query layer: reports.Repo's
+// aggregates behind an in-process TTL cache (reports.CachedRepo) with
+// concurrent identical requests sharing one query — a year-long report
+// aggregates every order row of the year.
+func newReportsBackend(db *sql.DB) reportsBackend {
+	return reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
 }
 
 // --- Period selection ---

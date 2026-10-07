@@ -41,7 +41,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		staffSvc: staffSvc,
 		render:   renderer,
 
-		reports:    newReportsRepo(db),
+		reports:    newReportsBackend(db),
 		pointsRepo: points.NewPointsRepo(db),
 
 		ordersSvc: orders.NewService(db),
