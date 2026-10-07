@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -369,5 +370,51 @@ func TestAdminRequestLang(t *testing.T) {
 				t.Errorf("adminRequestLang = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestSalesReportXLSXEscapesFormulaLikeNames(t *testing.T) {
+	malicious := []string{`=HYPERLINK("http://x","y")`, "+1", "-2+3", "@SUM(A1)"}
+	var ords []orders.Order
+	for i, name := range malicious {
+		ords = append(ords, orders.Order{
+			ID: fmt.Sprintf("o%d", i), Status: orders.StatusDelivered, TotalAmount: 10,
+			CreatedAt: time.Date(2026, 1, 5, 10, 0, 0, 0, time.UTC),
+			Items:     []orders.OrderItem{{ProductNameSnapshot: name, Quantity: 1, Price: 10}},
+		})
+	}
+	handler := salesReportXLSXHandler(&fakeSalesRepo{orders: ords})
+
+	rec := httptest.NewRecorder()
+	if err := handler(rec, salesReportRequest("from=2026-01-01&to=2026-01-31&group_by=product")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(rec.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	sheet := f.GetSheetName(0)
+	rows, err := f.GetRows(sheet)
+	if err != nil {
+		t.Fatalf("GetRows: %v", err)
+	}
+	got := map[string]bool{}
+	for r, row := range rows[1:] {
+		got[row[0]] = true
+		cell := fmt.Sprintf("A%d", r+2)
+		if formula, _ := f.GetCellFormula(sheet, cell); formula != "" {
+			t.Errorf("%s holds a formula %q", cell, formula)
+		}
+		// Counts and revenue stay numeric cells.
+		if typ, _ := f.GetCellType(sheet, fmt.Sprintf("D%d", r+2)); typ == excelize.CellTypeSharedString || typ == excelize.CellTypeInlineString {
+			t.Errorf("revenue D%d written as text", r+2)
+		}
+	}
+	for _, name := range malicious {
+		if !got["'"+name] {
+			t.Errorf("name %q not escaped; rows = %q", name, rows)
+		}
 	}
 }

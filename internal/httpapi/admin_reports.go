@@ -12,6 +12,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/xlsxsafe"
 )
 
 // salesRepo is the subset of *reports.CachedRepo the report handlers depend on, so
@@ -210,7 +211,9 @@ func writeSalesXLSX(w http.ResponseWriter, lang string, groupBy reports.GroupBy,
 
 	for i, row := range rows {
 		cell := fmt.Sprintf("A%d", i+2)
-		values := []interface{}{row.Key, row.OrderCount, row.ItemCount, row.Revenue}
+		// row.Key is a product/point/category name — data, so it goes
+		// through xlsxsafe; the counts and revenue stay numeric cells.
+		values := xlsxsafe.Row([]any{row.Key, row.OrderCount, row.ItemCount, row.Revenue})
 		if err := f.SetSheetRow(sheet, cell, &values); err != nil {
 			return err
 		}
