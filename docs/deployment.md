@@ -353,6 +353,14 @@ docker run --rm --env-file .env -v "$PWD/docker/Caddyfile.prod:/etc/caddy/Caddyf
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
+**CSP.** Заголовок `Content-Security-Policy` неполный намеренно:
+`frame-ancestors 'none'; base-uri 'self'; object-src 'none'`. Шаблоны
+используют inline `<script>`, `onclick=` и htmx `hx-on` (eval), поэтому
+`script-src` всё равно пришлось бы открыть `'unsafe-inline' 'unsafe-eval'`.
+Сторонних CDN нет: htmx и шрифты (Manrope, Inter для Ң/ң) отдаются с того же
+домена из `/static/` и `/admin/static/` (см. §10, «Self-hosted ассеты»), так
+что CSP не нужно расширять под внешние домены.
+
 ### 5.5. Первый запуск
 
 `deploy.sh` подходит и для первого запуска: соберёт образ, поднимет
@@ -714,6 +722,19 @@ MC_HOST_cozy="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000" \
   Минорные версии 16.x используют один формат данных, поэтому смена тега
   безопасна без дампа. Переход на новую мажорную версию (17+) — только через
   `pg_dump`/`pg_restore` (или `pg_upgrade`), никогда не просто правкой тега.
+- **Self-hosted ассеты (htmx, шрифты).** Сайт и админка не грузят ничего с
+  unpkg / Google Fonts: `js/htmx.min.js` (htmx 1.9.12), `fonts/manrope-*.woff2`
+  и `fonts/inter-kyrgyz.woff2` (только Ң/ң — в Manrope их нет) лежат в git в
+  `web/static/` и `admin/static/`. URL в шаблонах идут через функцию `asset`
+  и получают `?v=<хеш>` — с ним файл отдаётся с `Cache-Control` на год, при
+  изменении файла хеш меняется сам. Обновить версии или пересобрать файлы —
+  на рабочей машине, не на сервере:
+  `pip install --user fonttools brotli && python3 scripts/vendor-web-assets.py`
+  (версии и хеши целостности закреплены в самом скрипте), затем
+  `go test ./internal/web/` (`selfhost_assets_test.go`), коммит изменённых
+  файлов в `web/static` и `admin/static` и обычный деплой. Проверка после
+  деплоя — `scripts/smoke.sh` (нет внешних CDN в HTML, ассеты отдаются с
+  долгим кэшем).
 - **Смена секрета**: поправить `.env`, затем `$C up -d backend` (и `caddy`,
   если менялся `BAKAI_WEBHOOK_TOKEN`). Смена `JWT_SECRET` разлогинит
   покупателей в приложении; смена `MINIO_*` ключей требует пересоздать
