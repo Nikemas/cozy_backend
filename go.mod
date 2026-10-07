@@ -10,7 +10,7 @@ require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/crypto v0.57.0
-	golang.org/x/image v0.45.0
+	golang.org/x/image v0.46.0
 	golang.org/x/sync v0.23.0
 )
 
