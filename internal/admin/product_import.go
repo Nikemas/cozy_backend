@@ -213,16 +213,29 @@ func (h *handlers) importClock() time.Time {
 	return time.Now()
 }
 
-// allowImportRequest spends one of the staff member's check/apply
-// tokens. When none is left it answers 429 with the message in the
-// import report (the htmx target) and returns false.
+// importStaffID is the signed-in staff member's ID. Without one (the
+// auth middleware should make that impossible) it answers 403 with a
+// generic error and returns false: an empty ID would put every such
+// request in one shared rate-limit bucket and sign tokens for nobody.
+func (h *handlers) importStaffID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if st, ok := staff.FromContext(r.Context()); ok && st != nil && st.ID != "" {
+		return st.ID, true
+	}
+	slog.ErrorContext(r.Context(), "admin import without a staff ID in context")
+	http.Error(w, h.tr(r).T("admin.err.generic"), http.StatusForbidden)
+	return "", false
+}
+
+// allowImportRequest checks who is asking and spends one of their
+// check/apply tokens. When none is left it answers 429 with the message
+// in the import report (the htmx target) and returns false.
 func (h *handlers) allowImportRequest(w http.ResponseWriter, r *http.Request) bool {
+	staffID, ok := h.importStaffID(w, r)
+	if !ok {
+		return false
+	}
 	if h.importLimiter == nil {
 		return true
-	}
-	var staffID string
-	if st, ok := staff.FromContext(r.Context()); ok {
-		staffID = st.ID
 	}
 	ok, retry := h.importLimiter.Allow(staffID)
 	if ok {
