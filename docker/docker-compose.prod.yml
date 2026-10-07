@@ -81,9 +81,12 @@ services:
       - "8080"
 
   postgres:
-    # Major version pinned; minor updates of 16.x are drop-in. A major
+    # Exact 16.x patch pinned so a re-pull never silently changes the
+    # server under us. Minor updates within 16.x are drop-in (same on-disk
+    # format) — bump the tag here, in docker-compose.yml and in
+    # .github/workflows/ci.yml together (docs/deployment.md §10). A major
     # upgrade needs pg_dump/restore (or pg_upgrade), never just a tag bump.
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     restart: unless-stopped
     logging: *default-logging
     stop_grace_period: 30s

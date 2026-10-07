@@ -84,7 +84,7 @@ Inter/Manrope в изменённом (подмножество) виде рас
 
 | Компонент | Версия / образ | Лицензия | Замечание |
 |---|---|---|---|
-| PostgreSQL | `postgres:16-alpine` | PostgreSQL License | |
+| PostgreSQL | `postgres:16.15-alpine` | PostgreSQL License | |
 | MinIO Server | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | **AGPL-3.0** | используется как отдельный немодифицированный сервис хранения файлов; код Cozy с ним не линкуется (общение по S3 API через `minio-go`, Apache-2.0). Требования AGPL по раскрытию кода относятся к изменениям самого MinIO — их нет. При желании полностью исключить AGPL MinIO можно заменить на любое S3-совместимое хранилище без изменения кода |
 | MinIO Client `mc` | `quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z` | AGPL-3.0 | только в `scripts/backup.sh` (зеркалирование бэкапа) |
 | Caddy | `caddy:2.11.4-alpine` | Apache-2.0 | |
