@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Nightly backup of the production stack (docker/docker-compose.prod.yml).
 #
-# Runs ON THE VPS, from cron (see README.md "Бэкапы" for the cron line and
-# the restore procedure):
+# Runs ON THE VPS, from cron (see docs/deployment.md section 8 for the cron
+# line, RPO/RTO and the monthly drill; restore with scripts/restore.sh):
 #   1. pg_dump -Fc of the `cozy` database from the compose `postgres`
 #      container -> $BACKUP_DIR/postgres/cozy_YYYYMMDD_HHMMSS.dump
 #      (written to a .partial file, verified with pg_restore --list, then
