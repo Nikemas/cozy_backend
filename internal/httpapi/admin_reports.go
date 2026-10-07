@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,11 +35,11 @@ const groupByCategory reports.GroupBy = "category"
 // sales report, so they get 403 (via staffSvc.RequireRole, same as every
 // other admin-only route in this package).
 //
-// The aggregates go through reports.CachedRepo: a short-TTL in-process
-// cache with concurrent identical requests sharing one query (a year-long
-// export aggregates every order row of the year).
-func RegisterAdminReportsRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
-	repo := reports.NewCachedRepo(reports.NewRepo(db), reports.CacheConfig{})
+// The aggregates go through repo, the process-wide reports.CachedRepo
+// cmd/server builds and also hands to the admin HTML reports page: a
+// short-TTL in-process cache with concurrent identical requests sharing
+// one query (a year-long export aggregates every order row of the year).
+func RegisterAdminReportsRoutes(mux *http.ServeMux, repo *reports.CachedRepo, staffSvc *staff.Service) {
 	ownerOrManager := staffSvc.RequireRole(staff.RoleOwner, staff.RoleManager)
 
 	mux.Handle("GET /admin/api/reports/sales", ownerOrManager(apperr.Wrap(salesReportJSONHandler(repo))))
