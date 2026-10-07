@@ -15,6 +15,11 @@
 // hidden and revealed by the page script once htmx has loaded; a
 // <noscript> notice says importing needs JavaScript.
 //
+// fix/import-tails: a request without a staff ID is refused (403), and
+// at most maxConcurrentImports uploads are parsed/run at once per
+// process (importGate); a request that can't get a slot within
+// importSlotWait gets a 429 «busy» message instead.
+//
 // The JSON endpoints in internal/httpapi/admin_import.go stay for API
 // clients; both call catalog.ImportProducts.
 package admin
@@ -34,6 +39,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Nikemas/cozy_backend/internal/apperr"
@@ -73,6 +79,46 @@ const (
 	importRatePerMinute = 10
 	secondsPerMinute    = 60
 )
+
+// At most maxConcurrentImports check/apply handlers parse and run an
+// upload at once per process (each can hold a 20 MB file plus the parsed
+// sheet in memory); a request waits up to importSlotWait for a slot and
+// is then refused, told to retry after importBusyRetryAfter.
+const (
+	maxConcurrentImports = 2
+	importSlotWait       = 2 * time.Second
+	importBusyRetryAfter = 5 * time.Second
+)
+
+// importGate is a counting semaphore bounding concurrent imports. A nil
+// *importGate doesn't limit. Safe for concurrent use.
+type importGate struct {
+	slots chan struct{}
+	wait  time.Duration
+}
+
+func newImportGate(size int, wait time.Duration) *importGate {
+	return &importGate{slots: make(chan struct{}, size), wait: wait}
+}
+
+// acquire takes a slot, waiting up to g.wait or until ctx ends. On
+// success it returns an idempotent release func the caller must defer.
+func (g *importGate) acquire(ctx context.Context) (release func(), ok bool) {
+	if g == nil {
+		return func() {}, true
+	}
+	timer := time.NewTimer(g.wait)
+	defer timer.Stop()
+	select {
+	case g.slots <- struct{}{}:
+	case <-timer.C:
+		return nil, false
+	case <-ctx.Done():
+		return nil, false
+	}
+	var once sync.Once
+	return func() { once.Do(func() { <-g.slots }) }, true
+}
 
 // importRateLimiter limits check/apply per staff member.
 type importRateLimiter interface {
@@ -213,27 +259,69 @@ func (h *handlers) importClock() time.Time {
 	return time.Now()
 }
 
-// allowImportRequest spends one of the staff member's check/apply
-// tokens. When none is left it answers 429 with the message in the
-// import report (the htmx target) and returns false.
+// importStaffID is the signed-in staff member's ID. Without one (the
+// auth middleware should make that impossible) it answers 403 with a
+// generic error and returns false: an empty ID would put every such
+// request in one shared rate-limit bucket and sign tokens for nobody.
+func (h *handlers) importStaffID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if st, ok := staff.FromContext(r.Context()); ok && st != nil && st.ID != "" {
+		return st.ID, true
+	}
+	slog.ErrorContext(r.Context(), "admin import without a staff ID in context")
+	http.Error(w, h.tr(r).T("admin.err.generic"), http.StatusForbidden)
+	return "", false
+}
+
+// allowImportRequest checks who is asking and spends one of their
+// check/apply tokens. When none is left it answers 429 with the message
+// in the import report (the htmx target) and returns false.
 func (h *handlers) allowImportRequest(w http.ResponseWriter, r *http.Request) bool {
+	staffID, ok := h.importStaffID(w, r)
+	if !ok {
+		return false
+	}
 	if h.importLimiter == nil {
 		return true
-	}
-	var staffID string
-	if st, ok := staff.FromContext(r.Context()); ok {
-		staffID = st.ID
 	}
 	ok, retry := h.importLimiter.Allow(staffID)
 	if ok {
 		return true
 	}
 	slog.WarnContext(r.Context(), "admin import rate limited", "staff_id", staffID, "retry_after", retry)
+	h.refuseImport(w, r, "admin.import.err_rate_limited", retry)
+	return false
+}
+
+// acquireImportSlot takes one of the process-wide import slots — after
+// the rate limit, before the body is read. When none frees up in time it
+// answers 429 (so the page script swaps the message into the report)
+// and returns ok=false; otherwise the caller must defer release.
+func (h *handlers) acquireImportSlot(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
+	release, ok = h.importGate.acquire(r.Context())
+	if ok {
+		return release, true
+	}
+	slog.WarnContext(r.Context(), "admin import busy", "max_concurrent", cap(h.importGate.slots))
+	h.refuseImport(w, r, "admin.import.err_busy", importBusyRetryAfter)
+	return nil, false
+}
+
+// refuseImport answers 429 with Retry-After and the localized message
+// msgKey in the import report.
+func (h *handlers) refuseImport(w http.ResponseWriter, r *http.Request, msgKey string, retry time.Duration) {
 	w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retry.Seconds())))))
 	data := importBaseData()
-	data.Result = &ImportResultVM{Error: h.tr(r).T("admin.import.err_rate_limited")}
+	data.Result = &ImportResultVM{Error: h.tr(r).T(msgKey)}
 	h.respondImportStatus(w, r, data, http.StatusTooManyRequests)
-	return false
+}
+
+// beginImport runs the checks every upload handler starts with — staff,
+// rate limit, concurrency slot — and returns the slot's release func.
+func (h *handlers) beginImport(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
+	if !h.allowImportRequest(w, r) {
+		return nil, false
+	}
+	return h.acquireImportSlot(w, r)
 }
 
 // blocksImport reports whether a dry run's result must keep «Импортировать»
@@ -250,9 +338,11 @@ func (h *handlers) productImportPage(w http.ResponseWriter, r *http.Request) {
 
 // productImportCheck handles POST /admin/products/import/check: a dry run.
 func (h *handlers) productImportCheck(w http.ResponseWriter, r *http.Request) {
-	if !h.allowImportRequest(w, r) {
+	release, ok := h.beginImport(w, r)
+	if !ok {
 		return
 	}
+	defer release()
 	t := h.tr(r)
 	up := readImportUpload(w, r)
 	data := importBaseData()
@@ -282,9 +372,11 @@ func (h *handlers) productImportCheck(w http.ResponseWriter, r *http.Request) {
 // productImportApply handles POST /admin/products/import/apply: the real
 // import, only for the file a clean check signed.
 func (h *handlers) productImportApply(w http.ResponseWriter, r *http.Request) {
-	if !h.allowImportRequest(w, r) {
+	release, ok := h.beginImport(w, r)
+	if !ok {
 		return
 	}
+	defer release()
 	t := h.tr(r)
 	up := readImportUpload(w, r)
 	data := importBaseData()

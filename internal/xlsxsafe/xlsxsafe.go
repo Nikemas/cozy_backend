@@ -1,8 +1,9 @@
 // Package xlsxsafe guards spreadsheet exports against formula (CSV)
 // injection: a text cell built from shop data — a product, category or
-// point name, an SKU, a colour — that starts with = + - @ TAB or CR could
-// be evaluated as a formula by Excel/LibreOffice once the file is
-// re-saved as CSV, pasted, or re-typed. Text prefixes such a value with
+// point name, an SKU, a colour — that starts with = + - @ TAB, CR or LF
+// could be evaluated as a formula by Excel/LibreOffice once the file is
+// re-saved as CSV, pasted, or re-typed (a leading line break pushes the
+// formula onto its own CSV line). Text prefixes such a value with
 // an apostrophe (the OWASP-recommended neutralizer); Unescape is its exact
 // inverse, used by the product importer so an exported/template file
 // re-uploaded as-is round-trips unchanged.
@@ -23,7 +24,7 @@ func needsQuote(s string) bool {
 		return false
 	}
 	switch rest[0] {
-	case '=', '+', '-', '@', '\t', '\r':
+	case '=', '+', '-', '@', '\t', '\r', '\n':
 		return true
 	}
 	return false

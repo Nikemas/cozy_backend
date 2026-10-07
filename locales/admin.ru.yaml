@@ -728,4 +728,5 @@ admin.import.err_upload: Не удалось прочитать файл — в�
 admin.import.err_format: Поддерживаются только файлы .csv и .xlsx.
 admin.import.needs_js: "Импорт работает только с включённым JavaScript. Без него можно проверить файл, но не импортировать — включите JavaScript в браузере."
 admin.import.err_rate_limited: "Слишком много проверок и импортов подряд — подождите минуту и попробуйте снова."
+admin.import.err_busy: "Сейчас уже идут другие проверки или импорты — подождите несколько секунд и попробуйте снова."
 admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"

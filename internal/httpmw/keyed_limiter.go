@@ -20,10 +20,15 @@ func NewKeyedLimiter(cfg RateLimitConfig) *KeyedLimiter {
 }
 
 // Allow spends one of key's tokens. When none is left it returns false
-// and how long until the next one.
+// and how long until the next one. An enabled limiter refuses an empty
+// key outright (fail closed): callers that couldn't identify who is
+// asking would otherwise all share one "" bucket.
 func (k *KeyedLimiter) Allow(key string) (bool, time.Duration) {
 	if k == nil || k.l == nil {
 		return true, 0
+	}
+	if key == "" {
+		return false, 0
 	}
 	return k.l.allow(key)
 }

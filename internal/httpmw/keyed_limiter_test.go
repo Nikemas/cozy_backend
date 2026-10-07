@@ -38,3 +38,16 @@ func TestKeyedLimiterDisabledAllowsAll(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyedLimiterRefusesEmptyKey(t *testing.T) {
+	// Arrange: an empty key would make every caller share one bucket.
+	k := NewKeyedLimiter(RateLimitConfig{RPS: 1, Burst: 5})
+
+	// Act
+	ok, _ := k.Allow("")
+
+	// Assert
+	if ok {
+		t.Fatal("an enabled limiter must refuse an empty key")
+	}
+}

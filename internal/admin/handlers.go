@@ -60,6 +60,9 @@ type handlers struct {
 	// per-staff limit on check/apply (nil = unlimited).
 	importNow     func() time.Time
 	importLimiter importRateLimiter
+	// fix/import-tails: process-wide cap on concurrent check/apply
+	// (nil = unlimited).
+	importGate *importGate
 
 	// fix/admin-ops (W5): audit journal (nil-safe: a nil *audit.Log
 	// records nothing) and the products list's bulk/per-point queries.

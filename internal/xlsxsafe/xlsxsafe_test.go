@@ -10,6 +10,9 @@ func TestTextEscapesFormulaTriggers(t *testing.T) {
 		{"@SUM(A1)", "'@SUM(A1)"},
 		{"\t=1+1", "'\t=1+1"},
 		{"\r=1+1", "'\r=1+1"},
+		{"\n=1+1", "'\n=1+1"},
+		{"'\n=x", "''\n=x"},
+		{"line one\nline two", "line one\nline two"},
 		{"'=already quoted", "''=already quoted"},
 		{"Кроссовки Cozy Run", "Кроссовки Cozy Run"},
 		{"CZ-1001-39", "CZ-1001-39"},
@@ -26,8 +29,8 @@ func TestTextEscapesFormulaTriggers(t *testing.T) {
 
 func TestUnescapeRoundTripsText(t *testing.T) {
 	values := []string{
-		`=HYPERLINK("http://x","y")`, "+1", "-2+3", "@SUM(A1)", "\t=x", "\r=x",
-		"'=x", "''-1", "'plain", "plain", "", "Белый",
+		`=HYPERLINK("http://x","y")`, "+1", "-2+3", "@SUM(A1)", "\t=x", "\r=x", "\n=x",
+		"'=x", "'\n=x", "''-1", "'plain", "plain", "", "Белый",
 	}
 	for _, v := range values {
 		if got := Unescape(Text(v)); got != v {
@@ -37,7 +40,7 @@ func TestUnescapeRoundTripsText(t *testing.T) {
 }
 
 func TestUnescapeLeavesOrdinaryApostrophesAlone(t *testing.T) {
-	for _, v := range []string{"'plain", "'", "O'Neill", "''"} {
+	for _, v := range []string{"'plain", "'", "O'Neill", "''", "'line\nbreak"} {
 		if got := Unescape(v); got != v {
 			t.Errorf("Unescape(%q) = %q, want unchanged", v, got)
 		}
