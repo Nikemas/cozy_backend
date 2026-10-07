@@ -25,7 +25,6 @@ func TestLayoutLinksContentHashedAssetsAndPreconnects(t *testing.T) {
 	for _, want := range []string{
 		`href="/static/css/site.css?v=` + rr.assets["css/site.css"] + `"`,
 		`src="/static/img/logo-64.png?v=` + rr.assets["img/logo-64.png"] + `"`,
-		`<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
 		`<link rel="preconnect" href="https://media.cozy.test">`,
 	} {
 		if !strings.Contains(body, want) {

@@ -35,7 +35,7 @@ html, body { margin: 0; padding: 0; }
 body {
   background: var(--admin-bg);
   color: var(--admin-text);
-  font-family: 'Manrope', system-ui, sans-serif;
+  font-family: 'Manrope', 'Inter Kyrgyz', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--admin-primary); text-decoration: none; }

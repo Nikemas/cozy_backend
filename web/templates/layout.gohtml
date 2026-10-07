@@ -24,12 +24,6 @@
   <meta name="theme-color" content="#FF7A1A">
   {{if .SEO.JSONLD}}<script type="application/ld+json">{{.SEO.JSONLD}}</script>{{end}}
   {{if .SEO.BreadcrumbJSONLD}}<script type="application/ld+json">{{.SEO.BreadcrumbJSONLD}}</script>{{end}}
-  {{/* Open the third-party connections the render-blocking Google Fonts
-       stylesheet (and the font files it pulls in, which are CORS
-       requests — hence the crossorigin preconnect) needs while the HTML
-       is still parsing, instead of only after the stylesheet is found. */}}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   {{with mediaOrigin}}<link rel="preconnect" href="{{.}}">{{end}}
   {{/* Self-hosted Tabler Icons subset (scripts/tabler-icons-subset.py):
        only the glyphs the templates use. The font is preloaded so icons
@@ -37,12 +31,31 @@
        url() inside icons.css (same ?v= hash) or it downloads twice. */}}
   <link rel="preload" href="{{asset "fonts/tabler-icons.woff2"}}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{asset "css/icons.css"}}">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+  {{/* Self-hosted Manrope (variable, wght 200-800; scripts/vendor-web-assets.py),
+       split by script so a page downloads only the subsets it renders.
+       Manrope has no Ң/ң (it has Ө ө Ү ү), so "Inter Kyrgyz" — Inter cut
+       down to U+04A2-04A3 — fills just those two and loads only on pages
+       that contain them. The @font-face rules are inline (no extra
+       render-blocking request) and their URLs go through "asset", so
+       they always equal the preload href (same ?v=, no double download).
+       The Cyrillic file carries most of the text and is preloaded. */}}
+  <link rel="preload" href="{{asset "fonts/manrope-cyrillic.woff2"}}" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face { font-family: 'Manrope'; font-style: normal; font-weight: 200 800; font-display: swap;
+      src: url("{{asset "fonts/manrope-latin.woff2"}}") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+    @font-face { font-family: 'Manrope'; font-style: normal; font-weight: 200 800; font-display: swap;
+      src: url("{{asset "fonts/manrope-cyrillic.woff2"}}") format("woff2"); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+    @font-face { font-family: 'Manrope'; font-style: normal; font-weight: 200 800; font-display: swap;
+      src: url("{{asset "fonts/manrope-cyrillic-ext.woff2"}}") format("woff2"); unicode-range: U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F; }
+    @font-face { font-family: 'Inter Kyrgyz'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url("{{asset "fonts/inter-kyrgyz.woff2"}}") format("woff2"); unicode-range: U+04A2-04A3; }
+  </style>
   <link rel="stylesheet" href="{{asset "css/site.css"}}">
   {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
-  {{/* htmx pinned to an exact file with Subresource Integrity: if the CDN
-       ever serves different bytes the browser refuses to run them. */}}
-  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous" defer></script>
+  {{/* htmx 1.9.12, vendored from unpkg (scripts/vendor-web-assets.py);
+       internal/web/selfhost_assets_test.go pins its bytes to upstream's
+       SRI hash, so no integrity attribute is needed on our own origin. */}}
+  <script src="{{asset "js/htmx.min.js"}}" defer></script>
   <script>
     // Let htmx swap 4xx/5xx responses that the server explicitly
     // retargeted (internal/web/errors.go sends HX-Retarget: #toast-slot
