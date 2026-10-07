@@ -185,6 +185,9 @@ func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
 		// Kyrgyz nouns don't inflect for number, so ky.yaml repeats the
 		// same word in all three): {{plural .Total "shop.results"}}.
 		"plural": func(n int, key string) string { return bundle.T(lang, key+"."+pluralForm(n)) },
+		// colorLabel shows a stored (Russian) product color in lang:
+		// {{colorLabel .Color}}. Form/filter values keep the raw color.
+		"colorLabel": func(color string) string { return i18n.ColorLabel(lang, color) },
 	}
 }
 
