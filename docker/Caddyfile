@@ -1,4 +1,4 @@
-# Hostnames served by this VPS (95.215.244.199).
+# Hostnames served by this VPS (95.215.247.51).
 #
 # STAGING (active now): cozy.erpsystemsales.com — a subdomain of our own
 # erpsystemsales.com zone (DNS on Cloudflare), used while the client has not
@@ -17,8 +17,8 @@
 #
 # Cloudflare DNS records to create (both "DNS only" / grey cloud is the
 # simplest — no Cloudflare SSL-mode or upload-size limits to think about):
-#   A  cozy        -> 95.215.244.199
-#   A  media.cozy  -> 95.215.244.199
+#   A  cozy        -> 95.215.247.51
+#   A  media.cozy  -> 95.215.247.51
 # If you do proxy them (orange cloud), set the zone's SSL/TLS mode to
 # "Full (strict)"; "Flexible" talks plain HTTP to the origin and loops with
 # Caddy's HTTP->HTTPS redirect.
@@ -54,7 +54,7 @@
 	# certificate to present and the handshake fails with a TLS "internal
 	# error" alert. Only affects the bare-IP fallback block below; SNI-based
 	# selection for real hostnames works normally regardless.
-	default_sni 95.215.244.199
+	default_sni 95.215.247.51
 }
 
 (security_headers) {
@@ -158,7 +158,7 @@ media.cozy.erpsystemsales.com {
 }
 
 # --- bare-IP fallback -------------------------------------------------------
-95.215.244.199 {
+95.215.247.51 {
 	tls internal
 	import security_headers
 	import noindex

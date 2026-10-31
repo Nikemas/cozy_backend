@@ -106,7 +106,7 @@ make test-integration       # TEST_DATABASE_URL по умолчанию — post
 
 ## Staging-сервер
 
-VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` + `docker/Caddyfile`. Пока заказчик не передал `cozy.kg`, сервер живёт на нашем поддомене (DNS — Cloudflare, зона `erpsystemsales.com`):
+VPS `95.215.247.51`, поднят через `docker/docker-compose.prod.yml` + `docker/Caddyfile`. Пока заказчик не передал `cozy.kg`, сервер живёт на нашем поддомене (DNS — Cloudflare, зона `erpsystemsales.com`):
 
 | Хост | Что | Куда проксирует |
 |------|-----|-----------------|
@@ -144,7 +144,7 @@ VPS `95.215.244.199`, поднят через `docker/docker-compose.prod.yml` +
 Вручную (то же самое, что делает CI):
 
 ```bash
-ssh deploy@95.215.244.199 'bash /opt/cozy/scripts/deploy.sh'
+ssh deploy@95.215.247.51 'bash /opt/cozy/scripts/deploy.sh'
 ```
 
 Ручной откат кода на предыдущий или любой из оставшихся образов:

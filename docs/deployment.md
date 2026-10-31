@@ -58,7 +58,7 @@ Container registry не используется: образ собираетс�
 | | staging (работает сейчас) | prod (к сдаче) |
 |---|---|---|
 | Домен | `cozy.erpsystemsales.com`, `media.cozy.erpsystemsales.com` | `cozy.kg`, `www.cozy.kg`, `media.cozy.kg` |
-| VPS | `95.215.244.199`, каталог `/opt/cozy` | **отдельный VPS** (рекомендуется), каталог `/opt/cozy` |
+| VPS | `95.215.247.51`, каталог `/opt/cozy` | **отдельный VPS** (рекомендуется), каталог `/opt/cozy` |
 | `APP_ENV` | `staging` | `prod` |
 | Оплата | `PAYMENTS_PROVIDER=mock` допустим | только `bakai` (`mock` — отказ старта) |
 | SMS | `SMS_MOCK_OTP=true` допустим (код всегда `0000`) | `SMS_MOCK_OTP=true` — отказ старта |

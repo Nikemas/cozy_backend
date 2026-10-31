@@ -83,7 +83,7 @@
 | | staging (работает сейчас) | prod (к сдаче) |
 |---|---|---|
 | Домены | `cozy.erpsystemsales.com`, `media.cozy.erpsystemsales.com` | `cozy.kg`, `www.cozy.kg` (редирект), `media.cozy.kg` |
-| Сервер | VPS `95.215.244.199`, `/opt/cozy` | отдельный VPS (ещё не создан), `/opt/cozy` |
+| Сервер | VPS `95.215.247.51`, `/opt/cozy` | отдельный VPS (ещё не создан), `/opt/cozy` |
 | Caddy | `docker/Caddyfile` (+ `noindex`) | `docker/Caddyfile.prod` (хосты из `SITE_HOST`/`MEDIA_HOST`) |
 | Compose-проект / образ | `docker` / `cozy-backend:<sha>` | `cozy-prod` / `cozy-backend-prod:<sha>` |
 | Деплой | автоматически на каждый push в `main` (`deploy.yml`) | вручную: Actions → «Deploy production» → тег/SHA, подтверждение в Environment `production` (`deploy-prod.yml`) |
@@ -179,7 +179,7 @@
 | Сервис | Что сейчас | Что сделать | Статус |
 |---|---|---|---|
 | GitHub | репозитории у аккаунта `Nikemas` | Transfer ownership в аккаунт/организацию заказчика (Settings → Danger Zone) или передача архива + push в новый репо; затем заново завести секреты Actions и Environment `production` | уточнить владельца `Nikemas` |
-| VPS staging | `95.215.244.199` | перенос на аккаунт заказчика или выключение после запуска prod | провайдер уточнить |
+| VPS staging | `95.215.247.51` | перенос на аккаунт заказчика или выключение после запуска prod | провайдер уточнить |
 | VPS prod | нет | заказчик арендует на своё имя (2 vCPU / 4 ГБ / 40+ ГБ, Ubuntu LTS) | не создан |
 | Домен `cozy.kg` и DNS | у заказчика, Cloudflare | дать доступ к DNS на время настройки, потом забрать | регистратор уточнить |
 | Домен `erpsystemsales.com` | исполнителя | не передаётся; staging с него снять | — |
