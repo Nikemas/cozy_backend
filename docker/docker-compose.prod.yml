@@ -104,23 +104,20 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   minio:
-    # Docker Hub's minio/minio now requires an authenticated pull —
-    # quay.io is MinIO's own public mirror, no login needed. Pinned to the
-    # release `latest` pointed at in 2026-09 (MinIO has stopped publishing
-    # community images since, so `latest` will not move anyway).
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO no longer serves community images: Docker Hub's minio/minio needs
+    # a login and quay.io/minio/minio answers 401 since 2026-10. Chainguard
+    # builds MinIO from source and publishes it anonymously; pinned by digest
+    # (RELEASE.2026-10-23T20-06-51Z) so a deploy never picks up a new build.
+    image: cgr.dev/chainguard/minio@sha256:3b6e40c30ecd5cea627e382ff0b82ca841f58c52294578787043ee80c8ef7c82
     restart: unless-stopped
     logging: *default-logging
     stop_grace_period: 30s
-    # `mc` ships inside the minio image; `mc ready local` is MinIO's own
-    # compose example healthcheck. Informational only (nothing waits on
-    # service_healthy for minio), so a false negative can't block a deploy.
+    # The Chainguard image runs as uid 65532 and has no `mc`/shell for a
+    # healthcheck. Root keeps a fresh named volume writable (the old official
+    # image ran as root too); nothing waits on service_healthy for minio.
+    user: "0:0"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      disable: true
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
