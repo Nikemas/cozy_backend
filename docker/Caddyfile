@@ -111,7 +111,7 @@
 # images). Done here rather than in Go so the backend stays simple and
 # compression is handled by the TLS terminator. Not on the media block:
 # product photos are JPEG/PNG/WebP and gain nothing.
-cozy.erpsystemsales.com {
+cozy.erpsystemsales.com, cozy.95-215-247-51.sslip.io {
 	import security_headers
 	import noindex
 	encode zstd gzip
@@ -147,7 +147,7 @@ cozy.erpsystemsales.com {
 # through this host. Refusing other methods and MinIO's own /minio/* API
 # (admin, health, metrics) keeps a leaked access key from being usable
 # from the internet.
-media.cozy.erpsystemsales.com {
+media.cozy.erpsystemsales.com, media.95-215-247-51.sslip.io {
 	import security_headers
 	import noindex
 	@not_read not method GET HEAD
