@@ -34,7 +34,7 @@ func TestCreateOnlineOrderInsertsPendingPayment(t *testing.T) {
 	expectPickupLine(mock, testVar1, 5000, 10, 1)
 	pending := PaymentPending
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentOnlineCard, &pending,
-		5000.0, 0.0, nil, "key-1", nil})
+		5000.0, 0.0, nil, "key-1", nil, nil, nil})
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO payments")).
 		WithArgs("order-1", "mock", 5000.0).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("pay-1"))

@@ -22,7 +22,17 @@ const (
 // orderColumnNames matches orderColumns (the scanOrderRow column list).
 var orderColumnNames = []string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method",
 	"payment_status", "total_amount", "delivery_fee", "refund_required", "comment", "created_at", "updated_at",
-	"delivery_zone_id", "zone_name_ru", "zone_name_ky"}
+	"delivery_zone_id", "zone_name_ru", "zone_name_ky", "delivery_address_label", "delivery_address_text"}
+
+// addressColumns matches loadAddressSnapshot's SELECT.
+var addressColumns = []string{"label", "address_text"}
+
+// expectAddressSnapshot scripts createOrder's ownership check + snapshot
+// read of addr-1 (label nil or string).
+func expectAddressSnapshot(mock sqlmock.Sqlmock, label any, text string) {
+	mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
+		WithArgs("addr-1", "cust-1").WillReturnRows(sqlmock.NewRows(addressColumns).AddRow(label, text))
+}
 
 var variantColumns = []string{"id", "product_id", "size", "color", "price_override", "name_ru", "base_price", "is_active"}
 
@@ -35,12 +45,13 @@ type orderRow struct {
 	payment              any // nil or string
 	total, fee           float64
 	refund               bool
+	addrLabel, addrText  any // delivery address snapshot, nil or string
 }
 
 func (r orderRow) rows() *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(orderColumnNames).AddRow(r.id, r.number, r.customer, r.address, r.point,
-		string(r.status), string(r.method), r.payment, r.total, r.fee, r.refund, nil, now, now, nil, nil, nil)
+		string(r.status), string(r.method), r.payment, r.total, r.fee, r.refund, nil, now, now, nil, nil, nil, r.addrLabel, r.addrText)
 }
 
 func codOrder(status OrderStatus) orderRow {

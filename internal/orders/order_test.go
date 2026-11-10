@@ -3,6 +3,7 @@ package orders
 import (
 	"context"
 	"database/sql/driver"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -144,7 +145,7 @@ func TestCreateOrderPickupHappyPath(t *testing.T) {
 	expectOrderPrologue(mock, 0)
 	expectPickupLine(mock, testVar1, 5000, 10, 2)
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		10000.0, 0.0, nil, nil, nil})
+		10000.0, 0.0, nil, nil, nil, nil, nil})
 	mock.ExpectCommit()
 
 	pickupID := "point-1"
@@ -162,6 +163,9 @@ func TestCreateOrderPickupHappyPath(t *testing.T) {
 	if order.AddressID != nil {
 		t.Errorf("AddressID = %v, want nil for a pickup order", *order.AddressID)
 	}
+	if order.DeliveryAddress != nil {
+		t.Errorf("DeliveryAddress = %+v, want nil for a pickup order", order.DeliveryAddress)
+	}
 	if len(order.Items) != 1 || order.Items[0].Price != 5000 || order.Items[0].Quantity != 2 {
 		t.Errorf("Items = %+v, want one line: qty 2 @ 5000", order.Items)
 	}
@@ -177,8 +181,7 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 	svc.WithSettings(Settings{DeliveryFee: 250, MaxOpenOrders: 0})
 
 	expectOrderPrologue(mock, -1) // cap disabled → no count query
-	mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
-		WithArgs("addr-1", "cust-1").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	expectAddressSnapshot(mock, "Дом", "ул. Киевская, 5")
 	// No active delivery zone → the flat fee applies.
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM delivery_zones WHERE is_active)")).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
@@ -192,7 +195,7 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 		WithArgs(testVar1, "point-1").WillReturnRows(sqlmock.NewRows([]string{"quantity"}).AddRow(3))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE stock SET quantity")).WillReturnResult(sqlmock.NewResult(0, 1))
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", "addr-1", "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		5250.0, 250.0, "позвоните за час", nil, nil})
+		5250.0, 250.0, "позвоните за час", nil, nil, "Дом", "ул. Киевская, 5"})
 	mock.ExpectCommit()
 
 	addr := "addr-1"
@@ -208,6 +211,10 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 	}
 	if order.Comment == nil || *order.Comment != "позвоните за час" {
 		t.Errorf("comment = %v, want trimmed text", order.Comment)
+	}
+	want := OrderDeliveryAddress{Label: strPtr("Дом"), AddressText: "ул. Киевская, 5"}
+	if order.DeliveryAddress == nil || !reflect.DeepEqual(*order.DeliveryAddress, want) {
+		t.Errorf("DeliveryAddress = %+v, want snapshot %+v", order.DeliveryAddress, want)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
