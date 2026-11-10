@@ -92,8 +92,7 @@ const testZone = "33333333-3333-4333-8333-333333333333"
 // check, the lookup of testZone (fee zoneFee, free_from freeFrom), then one
 // variant fulfilled from point-1.
 func expectZonedDeliveryUntilInsert(mock sqlmock.Sqlmock, zoneFee float64, freeFrom any) {
-	mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
-		WithArgs("addr-1", "cust-1").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	expectAddressSnapshot(mock, "Дом", "ул. Киевская, 5")
 	mock.ExpectQuery(regexp.QuoteMeta("FROM delivery_zones WHERE id = $1 AND is_active")).
 		WithArgs(testZone).
 		WillReturnRows(sqlmock.NewRows(zoneColumnNames).AddRow(testZone, "Бишкек", "Бишкек", zoneFee, freeFrom, true, 0))
@@ -129,7 +128,7 @@ func TestCreateOrderChargesZoneFee(t *testing.T) {
 		expectZonedDeliveryUntilInsert(mock, 350, c.freeFrom)
 		items := 5000.0 * float64(c.qty)
 		expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", "addr-1", "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-			items + c.wantFee, c.wantFee, nil, nil, testZone})
+			items + c.wantFee, c.wantFee, nil, nil, testZone, "Дом", "ул. Киевская, 5"})
 		mock.ExpectCommit()
 
 		addr, zone := "addr-1", testZone
@@ -157,8 +156,7 @@ func TestCreateOrderZoneErrors(t *testing.T) {
 		svc, mock := newMockService(t)
 		svc.WithSettings(Settings{DeliveryFee: 200})
 		expectOrderPrologue(mock, -1)
-		mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
-			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+		expectAddressSnapshot(mock, "Дом", "ул. Киевская, 5")
 		mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM delivery_zones WHERE is_active)")).
 			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 		mock.ExpectRollback()
@@ -178,8 +176,7 @@ func TestCreateOrderZoneErrors(t *testing.T) {
 		svc, mock := newMockService(t)
 		svc.WithSettings(Settings{DeliveryFee: 200})
 		expectOrderPrologue(mock, -1)
-		mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
-			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+		expectAddressSnapshot(mock, "Дом", "ул. Киевская, 5")
 		mock.ExpectQuery(regexp.QuoteMeta("FROM delivery_zones WHERE id = $1 AND is_active")).
 			WillReturnRows(sqlmock.NewRows(zoneColumnNames))
 		mock.ExpectRollback()
@@ -197,8 +194,7 @@ func TestCreateOrderZoneErrors(t *testing.T) {
 		svc, mock := newMockService(t)
 		svc.WithSettings(Settings{DeliveryFee: 200})
 		expectOrderPrologue(mock, -1)
-		mock.ExpectQuery(regexp.QuoteMeta("FROM customer_addresses")).
-			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+		expectAddressSnapshot(mock, "Дом", "ул. Киевская, 5")
 		mock.ExpectRollback()
 
 		addr, zone := "addr-1", "not-a-uuid"
@@ -220,7 +216,7 @@ func TestCreatePickupOrderIgnoresZone(t *testing.T) {
 	expectOrderPrologue(mock, 0)
 	expectPickupLine(mock, testVar1, 5000, 10, 1)
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		5000.0, 0.0, nil, nil, nil})
+		5000.0, 0.0, nil, nil, nil, nil, nil})
 	mock.ExpectCommit()
 
 	point, zone := "point-1", testZone
@@ -244,7 +240,7 @@ func TestScanOrderRowFillsDeliveryZone(t *testing.T) {
 	r := codOrder(StatusPlaced)
 	rows := sqlmock.NewRows(orderColumnNames).AddRow(r.id, r.number, r.customer, "addr-1", r.point,
 		string(r.status), string(r.method), nil, 5350.0, 350.0, false, nil, time.Now(), time.Now(),
-		testZone, "Бишкек", "Бишкек ш.")
+		testZone, "Бишкек", "Бишкек ш.", "Дом", "ул. Киевская, 5")
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, order_number")).WillReturnRows(rows)
 	expectNoItems(mock)
 

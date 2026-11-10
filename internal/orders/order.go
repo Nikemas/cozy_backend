@@ -62,6 +62,10 @@ type Order struct {
 	// DeliveryZone is the zone the delivery fee was charged for; null for
 	// pickup and for delivery orders placed while no zone was active.
 	DeliveryZone *OrderDeliveryZone `json:"delivery_zone"`
+	// DeliveryAddress is the delivery address snapshot taken at checkout;
+	// null for pickup orders (and for delivery orders with no snapshot).
+	// AddressID still names the saved address it was copied from.
+	DeliveryAddress *OrderDeliveryAddress `json:"delivery_address"`
 	// RefundRequired: money was taken for an order that ended up cancelled
 	// — staff must refund it through the bank.
 	RefundRequired bool        `json:"refund_required"`
@@ -223,6 +227,7 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 	var order Order
 	var replayID string
 	var zone *DeliveryZone
+	var deliveryAddr *OrderDeliveryAddress
 	err = dbtx.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		// One order at a time per customer: serializes the idempotency
 		// lookup and the open-orders count against a concurrent double
@@ -247,9 +252,11 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 		}
 
 		if addressID != nil {
-			if err := verifyAddressOwnership(ctx, tx, customerID, *addressID); err != nil {
+			a, err := loadAddressSnapshot(ctx, tx, customerID, *addressID)
+			if err != nil {
 				return err
 			}
+			deliveryAddr = a
 			z, err := resolveDeliveryZoneTx(ctx, tx, in.DeliveryZoneID)
 			if err != nil {
 				return err
@@ -302,12 +309,13 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 		}
 
 		order = Order{
-			OrderNumber:   orderNumber,
-			CustomerID:    customerID,
-			AddressID:     addressID,
-			Status:        StatusPlaced,
-			PaymentMethod: method,
-			Comment:       comment,
+			OrderNumber:     orderNumber,
+			CustomerID:      customerID,
+			AddressID:       addressID,
+			DeliveryAddress: deliveryAddr,
+			Status:          StatusPlaced,
+			PaymentMethod:   method,
+			Comment:         comment,
 		}
 		if method == PaymentOnlineCard {
 			pending := PaymentPending
@@ -349,12 +357,14 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 
 		const insertOrderQ = `
 			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, payment_status,
-				total_amount, delivery_fee, comment, idempotency_key, delivery_zone_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+				total_amount, delivery_fee, comment, idempotency_key, delivery_zone_id,
+				delivery_address_label, delivery_address_text)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			RETURNING id, created_at, updated_at`
+		addrLabel, addrText := order.DeliveryAddress.snapshotColumns()
 		err = tx.QueryRowContext(ctx, insertOrderQ,
 			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.PaymentStatus,
-			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey, zoneID,
+			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey, zoneID, addrLabel, addrText,
 		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return err
@@ -608,12 +618,13 @@ func scanOrder(rows *sql.Rows, o *Order) error {
 }
 
 func scanOrderRow(row rowScanner, o *Order) error {
-	var zoneID, zoneRu, zoneKy sql.NullString
+	var zoneID, zoneRu, zoneKy, addrLabel, addrText sql.NullString
 	if err := row.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
 		&o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.TotalAmount, &o.DeliveryFee, &o.RefundRequired,
-		&o.Comment, &o.CreatedAt, &o.UpdatedAt, &zoneID, &zoneRu, &zoneKy); err != nil {
+		&o.Comment, &o.CreatedAt, &o.UpdatedAt, &zoneID, &zoneRu, &zoneKy, &addrLabel, &addrText); err != nil {
 		return err
 	}
+	o.DeliveryAddress = deliveryAddressFromSnapshot(addrLabel, addrText)
 	o.DeliveryZone = nil
 	if zoneID.Valid {
 		o.DeliveryZone = &OrderDeliveryZone{ID: zoneID.String, NameRu: zoneRu.String, NameKy: zoneKy.String}
@@ -728,18 +739,6 @@ func mergeItemQuantities(items []OrderItemInput) (map[string]int, []string, erro
 	sort.Strings(variantIDs)
 
 	return merged, variantIDs, nil
-}
-
-func verifyAddressOwnership(ctx context.Context, tx *sql.Tx, customerID, addressID string) error {
-	var exists bool
-	const q = `SELECT EXISTS(SELECT 1 FROM customer_addresses WHERE id = $1 AND customer_id = $2)`
-	if err := tx.QueryRowContext(ctx, q, addressID, customerID).Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
-		return apperr.NotFound("address_not_found", "адрес не найден")
-	}
-	return nil
 }
 
 func pointIsActive(ctx context.Context, tx *sql.Tx, pointID string) (bool, error) {

@@ -68,7 +68,8 @@ var ErrNotCancellable = apperr.Conflict("order_not_cancellable",
 const orderColumns = `id, order_number, customer_id, address_id, point_id, status, payment_method, payment_status,
 	total_amount, delivery_fee, refund_required, comment, created_at, updated_at, delivery_zone_id,
 	(SELECT z.name_ru FROM delivery_zones z WHERE z.id = orders.delivery_zone_id),
-	(SELECT z.name_ky FROM delivery_zones z WHERE z.id = orders.delivery_zone_id)`
+	(SELECT z.name_ky FROM delivery_zones z WHERE z.id = orders.delivery_zone_id),
+	delivery_address_label, delivery_address_text`
 
 // staffActor derives the acting staff member from ctx (put there by
 // staff.RequireRole / the admin auth gate).

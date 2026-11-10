@@ -34,7 +34,16 @@ func (l *SQLOrderInfoLookup) OrderInfo(ctx context.Context, o orders.Order) (Ord
 	if errors.Is(err, sql.ErrNoRows) {
 		return OrderInfo{}, nil
 	}
-	return info, err
+	if err != nil {
+		return OrderInfo{}, err
+	}
+	// The checkout-time snapshot wins over the saved address, which the
+	// customer may have edited since; the live join is only a fallback
+	// for orders without one.
+	if o.DeliveryAddress != nil {
+		info.AddressText = o.DeliveryAddress.AddressText
+	}
+	return info, nil
 }
 
 // SQLContactLookup reads a customer's language and phone from customers.

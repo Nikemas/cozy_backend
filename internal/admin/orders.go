@@ -641,8 +641,11 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 	}
 }
 
-// orderDeliveryInfo resolves the "Доставка" card's address line: a saved
-// customer_addresses row when o.AddressID is set (a delivery order —
+// orderDeliveryInfo resolves the "Доставка" card's address line: the
+// order's checkout-time address snapshot (o.DeliveryAddress, migration
+// 000045) for a delivery order, falling back to the live saved
+// customer_addresses row only when there is no snapshot — when
+// o.AddressID is set (a delivery order —
 // exactly one of AddressID/pickup-point-choice is ever set at checkout,
 // see internal/orders/order.go's CreateOrder/validateFulfillment), or the
 // chosen pickup point's own address when it's nil (self-pickup — o.PointID
@@ -656,13 +659,12 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 		comment = *o.Comment
 	}
 
+	if o.DeliveryAddress != nil {
+		return labeledAddress(o.DeliveryAddress.Label, o.DeliveryAddress.AddressText), o.DeliveryAddress.AddressText, comment
+	}
 	if o.AddressID != nil {
 		if a, err := h.addresses.GetByID(ctx, o.CustomerID, *o.AddressID); err == nil && a != nil {
-			address = a.AddressText
-			if a.Label != nil && *a.Label != "" {
-				address = *a.Label + ": " + address
-			}
-			return address, a.AddressText, comment
+			return labeledAddress(a.Label, a.AddressText), a.AddressText, comment
 		}
 	}
 
@@ -677,6 +679,15 @@ func (h *handlers) orderDeliveryInfo(ctx context.Context, o *orders.Order) (addr
 	}
 
 	return "—", "", comment
+}
+
+// labeledAddress is the card's "Дом: ул. Киевская, 5" line (just the text
+// when there is no label).
+func labeledAddress(label *string, text string) string {
+	if label != nil && *label != "" {
+		return *label + ": " + text
+	}
+	return text
 }
 
 // mapSearchBaseURL is 2GIS's search in Bishkek; the address is appended

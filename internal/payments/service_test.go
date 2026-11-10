@@ -142,9 +142,9 @@ func orderLockRows(status orders.OrderStatus, payment Status) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{"id", "order_number", "customer_id", "address_id", "point_id", "status", "payment_method",
 		"payment_status", "total_amount", "delivery_fee", "refund_required", "comment", "created_at", "updated_at",
-		"delivery_zone_id", "zone_ru", "zone_ky"}).
+		"delivery_zone_id", "zone_ru", "zone_ky", "delivery_address_label", "delivery_address_text"}).
 		AddRow("order-1", "COZY-1", "cust-1", nil, "point-1", string(status), "online_card", string(payment), 10.0, 0.0, false, nil, now, now,
-			nil, nil, nil)
+			nil, nil, nil, nil, nil)
 }
 
 // expectLockOrder scripts orders.LockOrderTx on order-1.
