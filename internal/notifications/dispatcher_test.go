@@ -329,6 +329,30 @@ func TestSQLOrderInfoLookup(t *testing.T) {
 	}
 }
 
+// TestSQLOrderInfoLookupPrefersAddressSnapshot: staff messages show the
+// address the order was placed with, not the saved address as edited since.
+func TestSQLOrderInfoLookupPrefersAddressSnapshot(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+
+	o := deliveryOrder(orders.StatusPlaced)
+	o.DeliveryAddress = &orders.OrderDeliveryAddress{AddressText: "Киевская 5"}
+	mock.ExpectQuery(regexp.QuoteMeta("FROM customers c")).
+		WillReturnRows(sqlmock.NewRows([]string{"name", "phone", "address_text", "p_name", "p_address"}).
+			AddRow("Айбек", "+996700123456", "Чуй 1 (изменён)", "ЦУМ", "Чуй 155"))
+
+	info, err := NewSQLOrderInfoLookup(db).OrderInfo(context.Background(), o)
+	if err != nil {
+		t.Fatalf("OrderInfo: %v", err)
+	}
+	if info.AddressText != "Киевская 5" {
+		t.Errorf("AddressText = %q, want the snapshot", info.AddressText)
+	}
+}
+
 func TestStaffMessageShowsDeliveryFeeAndPaidOnline(t *testing.T) {
 	staff := &fakeStaff{}
 	d := NewDispatcher(Config{Staff: staff})
