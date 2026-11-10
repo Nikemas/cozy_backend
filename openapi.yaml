@@ -2159,7 +2159,15 @@ components:
         id: { type: string, format: uuid }
         order_number: { type: string, example: "COZY-20260915-001" }
         customer_id: { type: string, format: uuid }
-        address_id: { type: string, format: uuid, nullable: true }
+        address_id: { type: string, format: uuid, nullable: true, description: "The saved customer address the delivery order was placed with (omitted for pickup). Show `delivery_address` instead: the saved address may have been edited since." }
+        delivery_address:
+          type: object
+          nullable: true
+          description: "Delivery address as it was at checkout — a snapshot that later edits of the saved address don't change. Always present; null for pickup orders (and for old delivery orders whose address could not be recovered)."
+          required: [label, address_text]
+          properties:
+            label: { type: string, nullable: true, example: "Дом" }
+            address_text: { type: string, example: "г. Бишкек, ул. Киевская, 5" }
         point_id: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
         status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
         payment_method: { type: string, enum: [online_card, cash_on_delivery] }
