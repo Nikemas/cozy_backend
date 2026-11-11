@@ -18,6 +18,7 @@ type fakeAuthAPI struct {
 }
 
 func (f *fakeAuthAPI) RequestOTP(context.Context, string) error { return nil }
+func (f *fakeAuthAPI) OTPChannel() string                       { return "telegram" }
 func (f *fakeAuthAPI) VerifyOTP(context.Context, string, string) (string, string, *storefront.Customer, error) {
 	return "a", "r", &storefront.Customer{ID: "c1", Phone: "+996700123456"}, nil
 }
@@ -75,5 +76,20 @@ func TestDecodeJSONMapsBodyLimitTo413(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want 413", rec.Code)
+	}
+}
+
+func TestOTPRequestReportsChannel(t *testing.T) {
+	mux := http.NewServeMux()
+	registerAuthRoutes(mux, &fakeAuthAPI{})
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/auth/otp/request", strings.NewReader(`{"phone":"+996700123456"}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `"channel":"telegram"`) || !strings.Contains(body, `"status":"sent"`) {
+		t.Errorf("body = %s, want status sent and channel telegram", body)
 	}
 }

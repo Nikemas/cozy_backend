@@ -8,12 +8,12 @@
   <h1>{{t "screen.profile.title"}}</h1>
 
   {{if eq .Data.Step "otp"}}
-    <p class="muted">{{t "auth.enter_code"}} {{.Data.Phone}}</p>
+    <p class="muted">{{if eq .Data.Channel "telegram"}}{{t "auth.enter_code_telegram"}}{{else}}{{t "auth.enter_code"}}{{end}} {{.Data.Phone}}</p>
     {{if .Data.Error}}<p class="form-error" role="alert">{{.Data.Error}}</p>{{end}}
     <form class="form-stack" hx-post="/login/otp/verify" hx-target="#auth-card" hx-swap="outerHTML"
           method="post" action="/login/otp/verify">
       <input type="hidden" name="phone" value="{{.Data.Phone}}">
-      <label class="field-label" for="auth-code">{{t "auth.code_label"}}</label>
+      <label class="field-label" for="auth-code">{{if eq .Data.Channel "telegram"}}{{t "auth.code_label_telegram"}}{{else}}{{t "auth.code_label"}}{{end}}</label>
       <input type="text" id="auth-code" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="0000" maxlength="8" required autofocus>
       <button type="submit" class="btn btn--primary">{{t "auth.confirm"}}</button>
     </form>

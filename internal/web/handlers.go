@@ -72,6 +72,9 @@ type ProfileData struct {
 	Step  string
 	Phone string
 	Error string
+	// Channel is where the code was sent (notify.OTPChannelSMS/Telegram),
+	// set on the "otp" step so the page says where to look for it.
+	Channel string
 	// DeleteError explains, to a logged-in customer, why the account
 	// deletion they just requested didn't happen (?delete=… on /profile).
 	DeleteError string
@@ -271,7 +274,7 @@ func (h *handlers) loginRequestOTP(w http.ResponseWriter, r *http.Request) error
 	if canonical, err := auth.NormalizePhone(phone); err == nil {
 		phone = canonical
 	}
-	return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone})
+	return h.renderProfileAuth(w, r, ProfileData{Step: "otp", Phone: phone, Channel: h.auth.OTPChannel()})
 }
 
 // loginVerifyOTP calls the same auth.Service.VerifyOTP the mobile JSON

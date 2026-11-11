@@ -18,6 +18,7 @@ import (
 // so handler tests can inject a fake.
 type authAPI interface {
 	RequestOTP(ctx context.Context, phone string) error
+	OTPChannel() string
 	VerifyOTP(ctx context.Context, phone, code string) (access, refresh string, customer *storefront.Customer, err error)
 	Refresh(ctx context.Context, refreshToken string) (access, refresh string, err error)
 	Logout(ctx context.Context, refreshToken string) error
@@ -43,7 +44,7 @@ func registerAuthRoutes(mux *http.ServeMux, svc authAPI) {
 			return err
 		}
 
-		return writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+		return writeJSON(w, http.StatusOK, map[string]string{"status": "sent", "channel": svc.OTPChannel()})
 	}))
 
 	mux.Handle("POST /api/v1/auth/otp/verify", apperr.Wrap(func(w http.ResponseWriter, r *http.Request) error {

@@ -32,6 +32,11 @@ const (
 	refreshReuseGrace = 30 * time.Second
 )
 
+// OTPTTL is how long a login code stays valid. OTP providers that take
+// a TTL per request (Telegram Gateway) must be given this value so the
+// code and our otp_codes row expire together.
+const OTPTTL = otpTTL
+
 // customerStore is the subset of *storefront.CustomerRepo the login flow
 // needs.
 type customerStore interface {
@@ -80,6 +85,10 @@ func NewService(db *sql.DB, sms notify.OTPSender, jwtSecret []byte, limits confi
 		refreshReuseGrace: refreshReuseGrace,
 	}
 }
+
+// OTPChannel is where RequestOTP delivers codes: notify.OTPChannelSMS or
+// notify.OTPChannelTelegram. Clients use it to tell the user where to look.
+func (s *Service) OTPChannel() string { return notify.ChannelOf(s.sms) }
 
 // RequestOTP validates and rate-limits the phone, then asks the SMS
 // provider to text a code. Always succeeds from the caller's point of view

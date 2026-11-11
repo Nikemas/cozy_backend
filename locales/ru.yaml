@@ -41,6 +41,7 @@ screen.checkout.title: Оформление заказа
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Получить код
 auth.enter_code: Введите код из SMS, отправленного на
+auth.enter_code_telegram: Введите код из Telegram, отправленный на
 auth.confirm: Подтвердить
 auth.resend_code: Отправить код ещё раз
 auth.enter_name: Как вас зовут?
@@ -187,6 +188,7 @@ error.code.order_not_cancellable: Этот заказ уже нельзя отм
 error.code.otp_invalid: Неверный код. Проверьте SMS и попробуйте ещё раз.
 error.code.otp_attempts_exceeded: Слишком много неверных попыток. Запросите новый код.
 error.code.otp_daily_limit: Вход по SMS временно недоступен. Попробуйте позже.
+error.code.otp_telegram_unavailable: Не удалось отправить код в Telegram на этот номер. Проверьте, что на этом номере есть Telegram.
 error.code.invalid_payment_method: Выберите способ оплаты
 error.code.payments_not_configured: Онлайн-оплата пока недоступна. Выберите оплату при получении.
 error.code.payment_create_failed: Не удалось создать платёж. Попробуйте ещё раз.
@@ -255,6 +257,7 @@ a11y.skip_to_content: Перейти к содержимому
 a11y.main_nav: Основное меню
 auth.phone_label: Номер телефона
 auth.code_label: Код из SMS
+auth.code_label_telegram: Код из Telegram
 address.label_label: Название адреса
 address.text_label: Адрес доставки
 
