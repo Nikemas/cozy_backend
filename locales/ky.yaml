@@ -218,6 +218,8 @@ product.stock_few: калды
 product.out_of_stock: Бул өлчөм жана түс азыр жок
 product.delivery.more: Жеткирүү жана төлөө жөнүндө кененирээк
 product.description: Сыпаттамасы
+product.may_like: Сизге жагышы мүмкүн
+product.more_from_brand: %s брендинен дагы
 
 # Shop filters and sorting.
 shop.heading: Бут кийим каталогу

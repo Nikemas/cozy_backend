@@ -879,6 +879,11 @@ button, input { font-family: inherit; }
 .product-stock__none { font-size: 13.5px; color: var(--cozy-ink-2); }
 .product-delivery__more { font-size: var(--cozy-fs-13); color: var(--cozy-accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .product-description { margin-top: 28px; }
+.product-meta__brand-link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.product-meta__brand-link i { color: var(--cozy-accent); font-size: 13px; }
+.product-meta__brand-link:hover { color: var(--cozy-ink); }
+.product-related { margin-top: 40px; padding-top: 24px; border-top: 6px solid var(--cozy-surface-2); }
+.product-related__title { font-size: var(--cozy-fs-19); font-weight: 700; margin: 0 0 16px; letter-spacing: -0.01em; }
 .product-description__text { font-size: var(--cozy-fs-15); line-height: 1.6; color: var(--cozy-ink); white-space: pre-line; }
 @media (max-width: 900px) {
   .product-detail { grid-template-columns: 1fr; gap: 20px; }

@@ -218,6 +218,8 @@ product.stock_few: осталось
 product.out_of_stock: Этого размера и цвета сейчас нет в наличии
 product.delivery.more: Подробнее о доставке и оплате
 product.description: Описание
+product.may_like: Может понравиться
+product.more_from_brand: Больше от %s
 
 # Shop filters and sorting.
 shop.heading: Каталог обуви
