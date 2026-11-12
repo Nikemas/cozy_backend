@@ -96,7 +96,9 @@
 
     <aside class="checkout-summary">
       <div class="checkout-summary__row"><span>{{t "cart.items_total"}} ({{.Data.ItemCount}})</span><span>{{money .Data.ItemsTotal}}</span></div>
-      <div class="checkout-summary__row"><span>{{t "cart.delivery"}}</span><span id="checkout-fee">{{money $d.InitialFee}}</span></div>
+      {{/* Hidden while the shown fee is 0 (pickup, DELIVERY_FEE_SOM=0, a
+           free zone); the script below toggles it as the choice changes. */}}
+      <div class="checkout-summary__row" id="checkout-fee-row"{{if not $d.InitialFee}} hidden{{end}}><span>{{t "cart.delivery"}}</span><span id="checkout-fee">{{money $d.InitialFee}}</span></div>
       <div class="checkout-summary__row checkout-summary__row--total"><span>{{t "cart.total"}}</span><span id="checkout-total">{{money $d.InitialTotal}}</span></div>
       <div class="checkout-summary__row muted"><span>{{t "checkout.pickup_free"}}</span></div>
       {{if .Data.HasUnavailable}}<p class="checkout-hint">{{t "cart.has_unavailable"}}</p>{{end}}
@@ -110,6 +112,7 @@
     if (!form) return;
     var zone = document.getElementById('checkout-zone');
     var fee = document.getElementById('checkout-fee');
+    var feeRow = document.getElementById('checkout-fee-row');
     var total = document.getElementById('checkout-total');
     var submit = form.querySelector('[type=submit]');
     function checked(name) {
@@ -123,6 +126,8 @@
         else { feeKey = 'flatFee'; totalKey = 'flatTotal'; }
       }
       fee.textContent = src[feeKey];
+      // pickupFee is the formatted zero amount: hide the row for any 0 fee.
+      feeRow.hidden = src[feeKey] === form.dataset.pickupFee;
       total.textContent = src[totalKey];
       if (zone) zone.disabled = checked('fulfillment') !== 'delivery';
       submit.textContent = checked('payment_method') === 'online_card' ? submit.dataset.labelCard : submit.dataset.labelCash;
