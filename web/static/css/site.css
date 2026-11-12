@@ -497,6 +497,7 @@ button, input { font-family: inherit; }
   padding: 18px;
 }
 .checkout-summary__row { display: flex; justify-content: space-between; font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); padding: 6px 0 16px; }
+.checkout-summary__row[hidden] { display: none; }
 .checkout-summary__cta { display: flex; width: 100%; justify-content: center; }
 
 @media (max-width: 700px) {
