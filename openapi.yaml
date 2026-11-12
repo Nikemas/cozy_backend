@@ -129,10 +129,20 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: sent }
+                  channel:
+                    type: string
+                    enum: [sms, telegram]
+                    description: Where the code was sent (server's OTP_PROVIDER) — show "код отправлен в Telegram" vs "по SMS".
+                    example: telegram
         "400":
           description: Malformed phone number.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "422":
+          description: |
+            `otp_telegram_unavailable` — OTP_PROVIDER=telegram and the code
+            can't be delivered to this number (no Telegram account on it).
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "429":
           description: |
             `otp_cooldown` (60 s per phone), `otp_rate_limited` (phone or IP
@@ -140,10 +150,10 @@ paths:
             temporarily unavailable for everyone).
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "502":
-          description: Nikita SMSPro unreachable or returned an unexpected status.
+          description: OTP provider (Nikita SMSPro or Telegram Gateway) unreachable or returned an unexpected status.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "503":
-          description: Nikita SMSPro account out of funds (`sms_provider_out_of_funds`).
+          description: OTP provider account out of funds (`sms_provider_out_of_funds`).
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /api/v1/auth/otp/verify:

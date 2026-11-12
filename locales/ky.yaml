@@ -41,6 +41,7 @@ screen.checkout.title: Буйрутманы тариздөө
 auth.phone_placeholder: +996 700 000 000
 auth.get_code: Кодду алуу
 auth.enter_code: Жиберилген SMS коддун санын киргизиңиз
+auth.enter_code_telegram: Telegram аркылуу жиберилген коддун санын киргизиңиз
 auth.confirm: Ырастоо
 auth.resend_code: Кодду кайра жиберүү
 auth.enter_name: Атыңыз кандай?
@@ -187,6 +188,7 @@ error.code.order_not_cancellable: Бул буйрутманы мындан ар�
 error.code.otp_invalid: Код туура эмес. SMSти текшерип, кайра аракет кылыңыз.
 error.code.otp_attempts_exceeded: Туура эмес аракеттер өтө көп болду. Жаңы код сураңыз.
 error.code.otp_daily_limit: SMS аркылуу кирүү убактылуу жеткиликсиз. Кийинчерээк аракет кылыңыз.
+error.code.otp_telegram_unavailable: Бул номерге Telegram аркылуу код жөнөтүү мүмкүн болгон жок. Номериңизде Telegram бар экенин текшериңиз.
 error.code.invalid_payment_method: Төлөө ыкмасын тандаңыз
 error.code.payments_not_configured: Онлайн-төлөм азырынча жеткиликсиз. Алганда төлөөнү тандаңыз.
 error.code.payment_create_failed: Төлөмдү түзүү мүмкүн болгон жок. Кайра аракет кылыңыз.
@@ -255,6 +257,7 @@ a11y.skip_to_content: Мазмунга өтүү
 a11y.main_nav: Негизги меню
 auth.phone_label: Телефон номери
 auth.code_label: SMS-код
+auth.code_label_telegram: Telegram-код
 address.label_label: Даректин аталышы
 address.text_label: Жеткирүү дареги
 

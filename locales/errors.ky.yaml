@@ -153,6 +153,7 @@ err.order_not_found: буйрутма табылган жок
 err.otp_attempts_exceeded: туура эмес аракеттер өтө көп болду — жаңы код сураңыз
 err.otp_cooldown: код жиберилди — бир аздан кийин кайра аракет кылыңыз
 err.otp_daily_limit: SMS аркылуу кирүү убактылуу жеткиликсиз — кийинчерээк аракет кылыңыз
+err.otp_telegram_unavailable: бул номерге Telegram аркылуу код жөнөтүлгөн жок — номериңизде Telegram бар экенин текшериңиз
 err.otp_duplicate_request: код буга чейин суралган, күтө туруңуз
 err.otp_expired: коддун мөөнөтү бүттү — жаңысын сураңыз
 err.otp_invalid: код туура эмес

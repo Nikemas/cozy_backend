@@ -160,6 +160,7 @@ err.order_not_found: заказ не найден
 err.otp_attempts_exceeded: слишком много неверных попыток, запросите новый код
 err.otp_cooldown: код уже отправлен, попробуйте чуть позже
 err.otp_daily_limit: вход по SMS временно недоступен, попробуйте позже
+err.otp_telegram_unavailable: на этот номер не удалось отправить код в Telegram — проверьте, что Telegram установлен на этом номере
 err.otp_duplicate_request: код уже запрошен, подождите
 err.otp_expired: код устарел, запросите новый
 err.otp_invalid: неверный код

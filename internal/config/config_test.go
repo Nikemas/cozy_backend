@@ -37,6 +37,8 @@ func setDevEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "dev")
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("JWT_SECRET", testSecret)
+	t.Setenv("OTP_PROVIDER", "")
+	t.Setenv("TELEGRAM_GATEWAY_TOKEN", "")
 }
 
 func TestLoad_PoolAndTimeoutDefaults(t *testing.T) {
@@ -359,5 +361,46 @@ func TestLoad_RateLimitOverrides(t *testing.T) {
 		if _, err := Load(); err == nil {
 			t.Errorf("RATE_LIMIT_RPS=%q RATE_LIMIT_BURST=%q: want error", bad.rps, bad.burst)
 		}
+	}
+}
+
+func TestLoad_OTPProvider(t *testing.T) {
+	setDevEnv(t)
+	t.Setenv("OTP_PROVIDER", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("default: %v", err)
+	}
+	if cfg.OTPProvider != OTPProviderNikita {
+		t.Errorf("default OTPProvider = %q, want %q", cfg.OTPProvider, OTPProviderNikita)
+	}
+
+	setDevEnv(t)
+	t.Setenv("OTP_PROVIDER", " Telegram ")
+	t.Setenv("TELEGRAM_GATEWAY_TOKEN", "tg-token")
+	if cfg, err = Load(); err != nil || cfg.OTPProvider != OTPProviderTelegram || cfg.TelegramGatewayToken != "tg-token" {
+		t.Errorf("telegram: provider=%v token set=%v err=%v", cfg != nil && cfg.OTPProvider == OTPProviderTelegram, cfg != nil && cfg.TelegramGatewayToken != "", err)
+	}
+
+	setDevEnv(t)
+	t.Setenv("OTP_PROVIDER", "whatsapp")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OTP_PROVIDER") {
+		t.Errorf("unknown provider: err = %v, want OTP_PROVIDER error", err)
+	}
+}
+
+func TestLoad_ProdWithTelegramOTP(t *testing.T) {
+	// Telegram replaces Nikita: no Nikita key needed, the Gateway token is.
+	setProdEnv(t)
+	t.Setenv("OTP_PROVIDER", "telegram")
+	t.Setenv("NIKITA_API_KEY", "")
+	t.Setenv("TELEGRAM_GATEWAY_TOKEN", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "TELEGRAM_GATEWAY_TOKEN") || strings.Contains(err.Error(), "NIKITA_API_KEY") {
+		t.Errorf("prod telegram without token: err = %v, want only TELEGRAM_GATEWAY_TOKEN missing", err)
+	}
+
+	t.Setenv("TELEGRAM_GATEWAY_TOKEN", "tg-token")
+	if _, err := Load(); err != nil {
+		t.Errorf("prod telegram with token: %v", err)
 	}
 }

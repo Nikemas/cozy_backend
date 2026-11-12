@@ -4,6 +4,22 @@ package notify
 
 import "context"
 
+// Channels a login code can arrive through, shown to the user ("код
+// отправлен в Telegram" vs "по SMS").
+const (
+	OTPChannelSMS      = "sms"
+	OTPChannelTelegram = "telegram"
+)
+
+// ChannelOf reports the channel sender delivers codes through: senders
+// that aren't SMS implement Channel(); everything else is SMS.
+func ChannelOf(sender OTPSender) string {
+	if c, ok := sender.(interface{ Channel() string }); ok {
+		return c.Channel()
+	}
+	return OTPChannelSMS
+}
+
 // OTPSender abstracts the OTP provider so auth doesn't depend on Nikita
 // SMSPro directly — swapping providers later means a new implementation
 // here, nothing changes in internal/auth.

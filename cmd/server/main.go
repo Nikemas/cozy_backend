@@ -72,6 +72,9 @@ func run() error {
 		// config.Load already refuses SMS_MOCK_OTP with APP_ENV=prod.
 		slog.Warn("notify: SMS_MOCK_OTP is on — every login accepts code 0000, no real SMS is sent. Never set this in production.")
 		sms = notify.NewMockClient()
+	} else if cfg.OTPProvider == config.OTPProviderTelegram {
+		slog.Info("notify: login codes are sent via Telegram Gateway")
+		sms = notify.NewTelegramGatewayClient(cfg.TelegramGatewayToken, auth.OTPTTL)
 	} else {
 		sms = notify.NewNikitaClient(cfg.NikitaAPIKey)
 	}

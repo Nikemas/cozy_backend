@@ -16,6 +16,14 @@ const (
 	PaymentsProviderBakai = "bakai"
 )
 
+// OTP providers selectable via OTP_PROVIDER: login codes by SMS (Nikita
+// SMSPro, the default) or as a Telegram message (Telegram Gateway API).
+// SMS_MOCK_OTP=true overrides both outside prod.
+const (
+	OTPProviderNikita   = "nikita"
+	OTPProviderTelegram = "telegram"
+)
+
 type Config struct {
 	Env         string // EnvDev | EnvStaging | EnvProd — APP_ENV, required
 	HTTPAddr    string
@@ -65,6 +73,12 @@ type Config struct {
 	PaymentsProvider string
 
 	NikitaAPIKey string
+
+	// OTPProvider is OTPProviderNikita (default) or OTPProviderTelegram;
+	// TelegramGatewayToken is the Telegram Gateway API token used by the
+	// latter (gateway.telegram.org → API).
+	OTPProvider          string
+	TelegramGatewayToken string
 
 	// SMSMockOTP switches the OTP provider to a local mock (any phone,
 	// code always "0000", no network call, no real SMS) — for local dev
@@ -170,6 +184,9 @@ func Load() (*Config, error) {
 		NikitaAPIKey: os.Getenv("NIKITA_API_KEY"),
 		SMSMockOTP:   getEnv("SMS_MOCK_OTP", "false") == "true",
 
+		OTPProvider:          strings.ToLower(strings.TrimSpace(getEnv("OTP_PROVIDER", OTPProviderNikita))),
+		TelegramGatewayToken: os.Getenv("TELEGRAM_GATEWAY_TOKEN"),
+
 		FCMCredentialsFile: os.Getenv("FCM_CREDENTIALS_FILE"),
 		FCMProjectID:       os.Getenv("FCM_PROJECT_ID"),
 		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
@@ -213,6 +230,10 @@ func Load() (*Config, error) {
 	}
 	if cfg.PaymentsProvider != PaymentsProviderMock && cfg.PaymentsProvider != PaymentsProviderBakai {
 		return nil, fmt.Errorf("PAYMENTS_PROVIDER must be %q or %q, got %q", PaymentsProviderMock, PaymentsProviderBakai, cfg.PaymentsProvider)
+	}
+
+	if cfg.OTPProvider != OTPProviderNikita && cfg.OTPProvider != OTPProviderTelegram {
+		return nil, fmt.Errorf("OTP_PROVIDER must be %q or %q, got %q", OTPProviderNikita, OTPProviderTelegram, cfg.OTPProvider)
 	}
 
 	if cfg.DatabaseURL == "" {

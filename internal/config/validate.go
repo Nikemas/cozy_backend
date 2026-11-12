@@ -77,8 +77,17 @@ func (c *Config) validate() error {
 	if c.MinIOSecretKey == "" {
 		missing = append(missing, "MINIO_SECRET_KEY")
 	}
-	if !c.SMSMockOTP && isPlaceholder(c.NikitaAPIKey) {
-		missing = append(missing, "NIKITA_API_KEY")
+	if !c.SMSMockOTP {
+		switch c.OTPProvider {
+		case OTPProviderTelegram:
+			if isPlaceholder(c.TelegramGatewayToken) {
+				missing = append(missing, "TELEGRAM_GATEWAY_TOKEN")
+			}
+		default:
+			if isPlaceholder(c.NikitaAPIKey) {
+				missing = append(missing, "NIKITA_API_KEY")
+			}
+		}
 	}
 	if c.PaymentsProvider == PaymentsProviderBakai {
 		if isPlaceholder(c.BakaiWebhookToken) {
