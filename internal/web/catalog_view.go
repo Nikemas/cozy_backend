@@ -87,6 +87,11 @@ type ShopData struct {
 	Products  []ProductCard
 	Total     int
 	NoResults bool
+
+	// Rails is the home page's per-category rows (catalog_rails.go): set
+	// only in browse mode (no category/search/filter/sort, page 1), and
+	// then shown instead of the grid. Empty categories are left out.
+	Rails []CategoryRail
 }
 
 // FilterOption is one choice in a filter control.
@@ -192,44 +197,13 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		return nil, err
 	}
 
-	ids := make([]string, len(products))
-	for i, p := range products {
-		ids[i] = p.ID
-	}
-	images, err := h.images.PrimaryForProducts(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	prices, err := h.effectivePrices(ctx, ids)
+	cards, err := h.productCards(ctx, products, lang)
 	if err != nil {
 		return nil, err
 	}
 	facets, err := h.loadFacets(ctx, categoryIDs)
 	if err != nil {
 		return nil, err
-	}
-
-	cards := make([]ProductCard, 0, len(products))
-	for _, p := range products {
-		price := p.BasePrice
-		from := false
-		if pr, ok := prices[p.ID]; ok {
-			price = pr.Min
-			from = pr.Max > pr.Min
-		}
-		card := ProductCard{
-			ID:        p.ID,
-			Name:      pickName(p.NameRu, p.NameKy, lang),
-			Brand:     stringOr(p.Brand, ""),
-			PriceText: formatAmount(price, h.t(lang, "common.currency")),
-			PriceFrom: from,
-			DetailURL: ProductPath(p.ID, p.NameRu),
-		}
-		if img, ok := images[p.ID]; ok {
-			card.HasPhoto = true
-			card.PhotoURL = h.photoURL(media.ThumbKey(img.ObjectKey))
-		}
-		cards = append(cards, card)
 	}
 
 	chips := make([]CategoryChip, 0, len(tree)+1)
@@ -256,6 +230,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		page = totalPages
 	}
 
+	browse := params.Query == "" && categorySlug == "" && !params.hasFilters() && page == 1
 	sd := &ShopData{
 		BasePath:     basePath,
 		CategoryName: categoryName,
@@ -275,7 +250,7 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 		TotalPages:   totalPages,
 		HasPrev:      page > 1,
 		HasNext:      page < totalPages,
-		ShowBanner:   params.Query == "" && categorySlug == "" && !params.hasFilters() && page == 1,
+		ShowBanner:   browse,
 		Categories:   chips,
 		Products:     cards,
 		Total:        total,
@@ -286,7 +261,57 @@ func (h *handlers) buildShopData(r *http.Request, lang string) (*ShopData, error
 	if sd.ShowBanner {
 		sd.Banner = h.homeBanner(ctx, lang)
 	}
+	// Rails replace the grid only on the plain home page; a custom sort
+	// is an explicit "show me the list" request, so it keeps the grid.
+	if browse && params.Sort == "" {
+		rails, err := h.categoryRails(ctx, tree, lang)
+		if err != nil {
+			return nil, err
+		}
+		sd.Rails = rails
+	}
 	return sd, nil
+}
+
+// productCards shapes products into grid/rail cards: localized name,
+// effective (variant) price and the primary photo's thumbnail.
+func (h *handlers) productCards(ctx context.Context, products []catalog.Product, lang string) ([]ProductCard, error) {
+	ids := make([]string, len(products))
+	for i, p := range products {
+		ids[i] = p.ID
+	}
+	images, err := h.images.PrimaryForProducts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	prices, err := h.effectivePrices(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	cards := make([]ProductCard, 0, len(products))
+	for _, p := range products {
+		price := p.BasePrice
+		from := false
+		if pr, ok := prices[p.ID]; ok {
+			price = pr.Min
+			from = pr.Max > pr.Min
+		}
+		card := ProductCard{
+			ID:        p.ID,
+			Name:      pickName(p.NameRu, p.NameKy, lang),
+			Brand:     stringOr(p.Brand, ""),
+			PriceText: formatAmount(price, h.t(lang, "common.currency")),
+			PriceFrom: from,
+			DetailURL: ProductPath(p.ID, p.NameRu),
+		}
+		if img, ok := images[p.ID]; ok {
+			card.HasPhoto = true
+			card.PhotoURL = h.photoURL(media.ThumbKey(img.ObjectKey))
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
 }
 
 // filterOptions marks selected among values; a selected value that's no

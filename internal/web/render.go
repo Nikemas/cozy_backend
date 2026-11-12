@@ -171,6 +171,14 @@ func NewRenderer(bundle *i18n.Bundle) (*Renderer, error) {
 // cards get loading="lazy" (shop.gohtml).
 const eagerCardCount = 4
 
+// cardSlot is the "_product_card" partial's data: the card plus whether
+// its photo loads eagerly (above the fold) and with fetchpriority=high.
+type cardSlot struct {
+	Card     ProductCard
+	Eager    bool
+	Priority bool
+}
+
 // viewFuncs are the storefront's own template helpers, on top of
 // i18n's "t".
 func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
@@ -179,6 +187,11 @@ func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
 		"inc": func(i int) int { return i + 1 },
 		// eagerCards is eagerCardCount for templates.
 		"eagerCards": func() int { return eagerCardCount },
+		// card wraps a ProductCard for the "_product_card" partial with its
+		// image loading hints: {{template "_product_card" (card $p eager priority)}}.
+		"card": func(c ProductCard, eager, priority bool) cardSlot {
+			return cardSlot{Card: c, Eager: eager, Priority: priority}
+		},
 		// money formats a som amount: {{money .Total}} → "7 900 сом".
 		"money": func(v float64) string { return formatAmount(v, bundle.T(lang, "common.currency")) },
 		// plural picks key.one / key.few / key.many for n (Russian rules;

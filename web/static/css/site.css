@@ -769,6 +769,25 @@ button, input { font-family: inherit; }
 .shop-empty i { display: block; font-size: 34px; margin-bottom: 10px; }
 
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+/* Home page category rails (catalog_rails.go): one horizontally
+   scrollable row per subcategory — swipe on phones, scroll/shift-wheel on
+   desktop — ending in a "see all" card. */
+.shop-rail { margin-bottom: 28px; }
+.shop-rail__title { font-size: var(--cozy-fs-19); font-weight: 700; margin: 0 0 12px; letter-spacing: -0.01em; }
+.shop-rail__parent { color: var(--cozy-ink-3); font-weight: 600; }
+.shop-rail__track {
+  display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; padding-bottom: 8px;
+}
+.shop-rail__item, .shop-rail__all { flex: 0 0 220px; scroll-snap-align: start; }
+.shop-rail__all {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  border-radius: var(--cozy-r-16); border: 0.5px solid var(--cozy-accent-border); background: var(--cozy-accent-bg);
+  color: var(--cozy-accent-ink); font-size: var(--cozy-fs-15); font-weight: 800; text-align: center; min-height: 200px;
+}
+.shop-rail__all i { font-size: 28px; }
+.shop-rail__all:hover { background: var(--cozy-accent-bg-2); }
 /* Ported from the mobile design's catalog card (COZY_WEB_DESIGN.md §3.1):
    solid bright accent background, white photo square, white text, plus
    the "Купить" quick-buy button (.product-card__buy) — see
@@ -1064,6 +1083,8 @@ button, input { font-family: inherit; }
   .shop-banner__btn { margin-top: 12px; }
   .shop-toolbar__right { flex-wrap: wrap; justify-content: flex-end; }
   .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .shop-rail__track { gap: 10px; }
+  .shop-rail__item, .shop-rail__all { flex-basis: 44%; }
   .product-card { padding: 10px; }
   .product-card__thumb { margin-top: 26px; }
   .quickbuy-modal { padding: 18px; }
