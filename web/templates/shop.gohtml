@@ -110,7 +110,24 @@
     </div>
   </div>
 
-  {{if $d.NoResults}}
+  {{if $d.Rails}}
+  {{range $ri, $r := $d.Rails}}
+  <section class="shop-rail" aria-labelledby="rail-{{$ri}}">
+    <h2 class="shop-rail__title" id="rail-{{$ri}}">{{if $r.Parent}}<span class="shop-rail__parent">{{$r.Parent}} · </span>{{end}}{{$r.Name}}</h2>
+    <div class="shop-rail__track">
+      {{range $i, $p := $r.Products}}
+      <div class="shop-rail__item">{{template "_product_card" (card $p (and (eq $ri 0) (lt $i eagerCards)) (and (eq $ri 0) (eq $i 0)))}}</div>
+      {{end}}
+      <a class="shop-rail__all" href="{{$r.Href}}"
+         hx-get="{{$r.Href}}" hx-target="#shop-results" hx-select="#shop-results" hx-swap="outerHTML" hx-push-url="true"
+         hx-select-oob="#aside-categories,#shop-filters">
+        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+        <span>{{t "shop.see_all"}}</span>
+      </a>
+    </div>
+  </section>
+  {{end}}
+  {{else if $d.NoResults}}
   <div class="shop-empty">
     <i class="ti ti-mood-empty" aria-hidden="true"></i>
     <div>{{t "shop.empty"}}</div>
@@ -119,36 +136,7 @@
   {{else}}
   <div class="shop-grid">
     {{range $i, $p := $d.Products}}
-    <div class="product-card">
-      <button class="product-card__fav" type="button" aria-label="{{t "product.add_to_favorites"}}: {{.Name}}"
-              hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
-        <i class="ti ti-heart" aria-hidden="true"></i>
-      </button>
-      <a class="product-card__link" href="{{.DetailURL}}">
-        <div class="product-card__thumb">
-          {{if .HasPhoto}}
-          {{/* The first row is above the fold (and holds the LCP image when
-               there's no banner photo): load it eagerly, lazy-load the rest. */}}
-          <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400"{{if lt $i eagerCards}}{{if eq $i 0}} fetchpriority="high"{{end}}{{else}} loading="lazy"{{end}} decoding="async">
-          {{else}}
-          <svg width="110" height="66" viewBox="0 0 100 60" aria-hidden="true">
-            <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
-            <path d="M20 33 L45 33" stroke="var(--cozy-accent-aa)" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-          {{end}}
-        </div>
-        {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
-        <div class="product-card__name">{{.Name}}</div>
-        <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
-      </a>
-      {{/* Quick-buy (COZY_WEB_DESIGN.md §3.1, ported from the mobile
-           design's "Быстрая покупка"): opens _quickbuy_modal below in
-           #quickbuy-slot instead of leaving the shop screen. */}}
-      <button class="product-card__buy" type="button" aria-label="{{t "shop.quick_buy"}}: {{.Name}}"
-              hx-get="/quickbuy/{{.ID}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">
-        <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i> {{t "shop.quick_buy"}}
-      </button>
-    </div>
+    {{template "_product_card" (card $p (lt $i eagerCards) (eq $i 0))}}
     {{end}}
   </div>
 
@@ -171,6 +159,43 @@
   {{end}}
   {{end}}
 </div>
+{{end}}
+
+{{/* One product tile (shop grid and home rails). Data is a cardSlot
+     (render.go's "card" func): .Card plus its photo loading hints. */}}
+{{define "_product_card"}}
+{{with .Card}}
+<div class="product-card">
+  <button class="product-card__fav" type="button" aria-label="{{t "product.add_to_favorites"}}: {{.Name}}"
+          hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
+    <i class="ti ti-heart" aria-hidden="true"></i>
+  </button>
+  <a class="product-card__link" href="{{.DetailURL}}">
+    <div class="product-card__thumb">
+      {{if .HasPhoto}}
+      {{/* The first row is above the fold (and holds the LCP image when
+           there's no banner photo): load it eagerly, lazy-load the rest. */}}
+      <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400"{{if $.Eager}}{{if $.Priority}} fetchpriority="high"{{end}}{{else}} loading="lazy"{{end}} decoding="async">
+      {{else}}
+      <svg width="110" height="66" viewBox="0 0 100 60" aria-hidden="true">
+        <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
+        <path d="M20 33 L45 33" stroke="var(--cozy-accent-aa)" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      {{end}}
+    </div>
+    {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
+    <div class="product-card__name">{{.Name}}</div>
+    <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
+  </a>
+  {{/* Quick-buy (COZY_WEB_DESIGN.md §3.1, ported from the mobile
+       design's "Быстрая покупка"): opens _quickbuy_modal below in
+       #quickbuy-slot instead of leaving the shop screen. */}}
+  <button class="product-card__buy" type="button" aria-label="{{t "shop.quick_buy"}}: {{.Name}}"
+          hx-get="/quickbuy/{{.ID}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">
+    <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i> {{t "shop.quick_buy"}}
+  </button>
+</div>
+{{end}}
 {{end}}
 
 {{/* Quick-buy modal (COZY_WEB_DESIGN.md §3.1) — rendered by
