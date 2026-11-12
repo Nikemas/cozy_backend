@@ -1,0 +1,37 @@
+{{/* One product tile (shop grid, home rails and the product page's
+     "may like" block). Data is a cardSlot
+     (render.go's "card" func): .Card plus its photo loading hints. */}}
+{{define "_product_card"}}
+{{with .Card}}
+<div class="product-card">
+  <button class="product-card__fav" type="button" aria-label="{{t "product.add_to_favorites"}}: {{.Name}}"
+          hx-post="/favorites/{{.ID}}" hx-target="#toast-slot" hx-swap="innerHTML">
+    <i class="ti ti-heart" aria-hidden="true"></i>
+  </button>
+  <a class="product-card__link" href="{{.DetailURL}}">
+    <div class="product-card__thumb">
+      {{if .HasPhoto}}
+      {{/* The first row is above the fold (and holds the LCP image when
+           there's no banner photo): load it eagerly, lazy-load the rest. */}}
+      <img src="{{.PhotoURL}}" alt="{{.Name}}" width="400" height="400"{{if $.Eager}}{{if $.Priority}} fetchpriority="high"{{end}}{{else}} loading="lazy"{{end}} decoding="async">
+      {{else}}
+      <svg width="110" height="66" viewBox="0 0 100 60" aria-hidden="true">
+        <path d="M8 42 Q8 30 22 28 L40 24 Q52 20 64 24 L82 30 Q92 33 92 42 L92 46 L8 46 Z" fill="#FFFFFF" stroke="var(--cozy-accent-aa)" stroke-width="2"/>
+        <path d="M20 33 L45 33" stroke="var(--cozy-accent-aa)" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      {{end}}
+    </div>
+    {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
+    <div class="product-card__name">{{.Name}}</div>
+    <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
+  </a>
+  {{/* Quick-buy (COZY_WEB_DESIGN.md §3.1, ported from the mobile
+       design's "Быстрая покупка"): opens _quickbuy_modal below in
+       #quickbuy-slot instead of leaving the shop screen. */}}
+  <button class="product-card__buy" type="button" aria-label="{{t "shop.quick_buy"}}: {{.Name}}"
+          hx-get="/quickbuy/{{.ID}}" hx-target="#quickbuy-slot" hx-swap="innerHTML">
+    <i class="ti ti-shopping-cart-filled" aria-hidden="true"></i> {{t "shop.quick_buy"}}
+  </button>
+</div>
+{{end}}
+{{end}}

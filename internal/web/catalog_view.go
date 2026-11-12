@@ -370,6 +370,9 @@ type ProductData struct {
 	Price        float64 // selected variant's price (JSON-LD)
 	PriceText    string
 	Description  string // in the visitor's language; "" if none
+	// Related backs the "may like" block: same-category products topped up
+	// with popular ones (related_products.go), empty when none or on error.
+	Related []ProductCard
 
 	HasPhoto bool // see ProductCard.HasPhoto
 	PhotoURL string
@@ -496,6 +499,7 @@ func (h *handlers) product(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	pd.Trail = categoryTrail(tree, pd.CategoryID, data.Lang)
+	pd.Related = h.relatedCards(r.Context(), productID, pd.CategoryID, data.Lang)
 	data.Data = pd
 	h.productSEO(r, &data, pd)
 	return h.render.Render(w, "product", data)

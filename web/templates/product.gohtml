@@ -55,7 +55,8 @@
   </div>
 
   <div class="product-info">
-  {{if $d.Brand}}<div class="product-meta__brand">{{$d.Brand}}</div>{{end}}
+  {{/* "Больше от {бренд}" as in the app: a search for the brand. */}}
+  {{if $d.Brand}}<a class="product-meta__brand product-meta__brand-link" href="/?q={{$d.Brand}}">{{printf (t "product.more_from_brand") $d.Brand}} <i class="ti ti-chevron-right" aria-hidden="true"></i></a>{{end}}
   <h1 class="product-meta__name">{{$d.Name}}</h1>
   <div class="product-meta__price">{{$d.PriceText}}</div>
 
@@ -130,4 +131,13 @@
   {{end}}
   </div>
 </div>
+
+{{if $d.Related}}
+<section class="product-related" aria-labelledby="product-related-title">
+  <h2 class="product-related__title" id="product-related-title">{{t "product.may_like"}}</h2>
+  <div class="shop-grid">
+    {{range $d.Related}}{{template "_product_card" (card . false false)}}{{end}}
+  </div>
+</section>
+{{end}}
 {{end}}
