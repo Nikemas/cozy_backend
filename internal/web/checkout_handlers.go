@@ -144,9 +144,11 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	points, err := listActivePoints(r.Context(), h.db)
-	if err != nil {
-		return err
+	var points []PointView
+	if orders.CurrentSettings().PickupEnabled() {
+		if points, err = listActivePoints(r.Context(), h.db); err != nil {
+			return err
+		}
 	}
 
 	cartPage, err := h.buildCartPageData(r.Context(), customerID)
@@ -207,6 +209,9 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 			zoneID = &z
 		}
 	case "pickup":
+		if !orders.CurrentSettings().PickupEnabled() {
+			return apperr.BadRequest("pickup_disabled", "самовывоз сейчас недоступен — выберите доставку")
+		}
 		v := r.FormValue("point_id")
 		if v == "" {
 			return apperr.BadRequest("point_required", "выберите точку самовывоза")

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/config"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
+	"github.com/Nikemas/cozy_backend/internal/orders"
 )
 
 const templatesDir = "web/templates"
@@ -183,6 +184,9 @@ type cardSlot struct {
 // i18n's "t".
 func viewFuncs(bundle *i18n.Bundle, lang string) template.FuncMap {
 	return template.FuncMap{
+		// pickupEnabled reports PICKUP_ENABLED: self-pickup texts and the
+		// checkout option render only when it is on.
+		"pickupEnabled": func() bool { return orders.CurrentSettings().PickupEnabled() },
 		// inc turns a 0-based range index into a 1-based label.
 		"inc": func(i int) int { return i + 1 },
 		// eagerCards is eagerCardCount for templates.

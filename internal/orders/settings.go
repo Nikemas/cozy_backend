@@ -26,6 +26,13 @@ type Settings struct {
 	// before the expiry job cancels its order and returns the stock.
 	// PAYMENT_PENDING_TTL, default 30m.
 	PaymentPendingTTL time.Duration
+	// PickupDisabled hides self-pickup at a point of sale: no checkout
+	// option, no pickup texts on the site, and PlaceOrder rejects a pickup
+	// point (pickup_disabled). The contract has no self-pickup, so the
+	// environment default is disabled; PICKUP_ENABLED=true turns it back on.
+	// The zero value (and DefaultSettings) keeps pickup available, so code
+	// that never reads the environment (tests, tools) behaves as before.
+	PickupDisabled bool
 }
 
 // Defaults for Settings.
@@ -85,7 +92,25 @@ func settingsFromLookup(lookup func(string) (string, bool)) (Settings, error) {
 		}
 		s.PaymentPendingTTL = d
 	}
+	pickup, err := parsePickupEnabled(lookup)
+	if err != nil {
+		return s, err
+	}
+	s.PickupDisabled = !pickup
 	return s, nil
+}
+
+// parsePickupEnabled reads PICKUP_ENABLED; unset or empty means off.
+func parsePickupEnabled(lookup func(string) (string, bool)) (bool, error) {
+	v, ok := lookup("PICKUP_ENABLED")
+	if !ok || strings.TrimSpace(v) == "" {
+		return false, nil
+	}
+	b, err := strconv.ParseBool(strings.TrimSpace(v))
+	if err != nil {
+		return false, fmt.Errorf("PICKUP_ENABLED must be true or false, got %q", v)
+	}
+	return b, nil
 }
 
 var defaultSettings atomic.Value // Settings
@@ -117,6 +142,9 @@ func (s *Service) currentSettings() Settings {
 	}
 	return CurrentSettings()
 }
+
+// PickupEnabled reports whether customers may choose self-pickup.
+func (st Settings) PickupEnabled() bool { return !st.PickupDisabled }
 
 // DeliveryFeeFor is the delivery charge for an order with (or without) a
 // delivery address.
