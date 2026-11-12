@@ -176,6 +176,7 @@ err.payments_not_configured: онлайн-оплата пока недоступ
 err.not_owner: "этот номер принадлежит сотруднику без роли владельца: смените роль в админке или укажите другой номер"
 err.phone_taken: этот номер телефона уже используется
 err.pickup_point_not_found: точка самовывоза не найдена
+err.pickup_disabled: самовывоз сейчас недоступен — выберите доставку
 err.point_id_forbidden: point_id должен быть пустым для роли owner/manager
 err.point_id_required: point_id обязателен для роли point_staff
 err.point_in_use: "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"

@@ -169,6 +169,7 @@ err.payments_not_configured: онлайн-төлөм азырынча жетки
 err.not_owner: "бул номер ээ ролу жок кызматкерге таандык: админкада ролун өзгөртүңүз же башка номер көрсөтүңүз"
 err.phone_taken: бул телефон номери колдонулуп жатат
 err.pickup_point_not_found: өзү алып кетүү пункту табылган жок
+err.pickup_disabled: өзү алып кетүү азыр жеткиликсиз — жеткирүүнү тандаңыз
 err.point_id_forbidden: owner/manager ролу үчүн point_id бош болушу керек
 err.point_id_required: point_staff ролу үчүн point_id милдеттүү
 err.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"

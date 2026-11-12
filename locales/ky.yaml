@@ -107,7 +107,7 @@ branches.empty: Азырынча жеткиликтүү дүкөндөр жок
 
 # Task 2 (Catalog: shop + product) keys.
 shop.banner.eyebrow: Бүт үй-бүлө үчүн бут кийим
-shop.banner.title: Бишкек боюнча жеткирүү жана дүкөндөрүбүздөн алып кетүү
+shop.banner.title: Бишкек боюнча жеткирүү
 shop.empty: Эч нерсе табылган жок
 shop.prev: Артка
 shop.next: Кийинки
@@ -137,7 +137,7 @@ cart.has_unavailable: Себетте азыр жок товарлар бар —
 
 checkout.delivery: Жеткирүү
 checkout.pickup: Өзү алып кетүү
-checkout.no_addresses: Дареги азырынча жок — өзү алып кетүүнү тандасаңыз болот.
+checkout.no_addresses: Дареги азырынча жок — жеткирүү дарегин кошуңуз.
 checkout.no_points: Жеткиликтүү дүкөндөр жок.
 checkout.unavailable: Алуу ыкмалары убактылуу жеткиликсиз.
 checkout.place_order: Буйрутма берүү
@@ -182,6 +182,7 @@ error.code.invalid_address: Жеткирүү дарегин жазыңыз
 error.code.address_not_found: Дарек табылган жок
 error.code.address_in_use: Бул дарек буйрутмада колдонулган, аны өчүрүүгө болбойт
 error.code.pickup_point_not_found: Алып кетүүчү дүкөн табылган жок
+error.code.pickup_disabled: Өзү алып кетүү азыр жеткиликсиз — жеткирүүнү тандаңыз
 error.code.order_not_found: Буйрутма табылган жок
 error.code.order_not_cancellable: Бул буйрутманы мындан ары жокко чыгарууга болбойт
 # Site error texts for codes that previously fell back to the generic
@@ -240,15 +241,15 @@ filter.apply: Колдонуу
 # SEO: titles and meta descriptions (internal/web/seo.go).
 seo.page.title: %s | Cozy
 seo.home.title: Cozy — Бишкектеги бут кийим интернет-дүкөнү
-seo.home.description: Cozy дүкөндөрүндө кроссовкалар, кеддер, ботинкалар жана башка бут кийимдер бар. Бишкек боюнча жеткирүү жана акысыз алып кетүү.
+seo.home.description: Cozy дүкөндөрүндө кроссовкалар, кеддер, ботинкалар жана башка бут кийимдер бар. Бишкек боюнча жеткирүү.
 seo.category.title: %s — Бишкектен сатып алуу | Cozy
-seo.category.description: Cozy интернет-дүкөнүндө %s: баалар, өлчөмдөр жана Бишкектеги дүкөндөрдө бар болушу. Жеткирүү жана өзү алып кетүү.
+seo.category.description: Cozy интернет-дүкөнүндө %s: баалар, өлчөмдөр жана Бишкектеги дүкөндөрдө бар болушу. Шаар боюнча жеткирүү.
 seo.product.title: %s — Бишкектен сатып алуу | Cozy
-seo.product.description: %s — %s. Өлчөмдөр, түстөр жана Бишкектеги Cozy дүкөндөрүндө бар болушу. Жеткирүү жана өзү алып кетүү.
+seo.product.description: %s — %s. Өлчөмдөр, түстөр жана Бишкектеги Cozy дүкөндөрүндө бар болушу. Шаар боюнча жеткирүү.
 seo.branches.description: Бишкектеги Cozy дүкөндөрүнүн даректери: бут кийимди көрүп, кийип көрүү, буйрутманы алуу жана маршрут түзүү.
-seo.page_about.description: Cozy — Бишкектеги ыңгайлуу бут кийим дүкөнү: дүкөндөрдө бар, жеткирүү, өзү алып кетүү, 14 күндүн ичинде алмаштыруу жана кайтаруу.
+seo.page_about.description: Cozy — Бишкектеги ыңгайлуу бут кийим дүкөнү: дүкөндөрдө бар, шаар боюнча жеткирүү, 14 күндүн ичинде алмаштыруу жана кайтаруу.
 seo.page_contacts.description: Бишкектеги Cozy бут кийим дүкөнүнүн телефону, мессенджерлери, e-mail дареги жана иш убактысы.
-seo.page_delivery.description: Бишкек боюнча жеткирүүнүн шарттары, Cozy дүкөндөрүнөн акысыз алып кетүү, төлөө ыкмалары, алмаштыруу жана кайтаруу.
+seo.page_delivery.description: Бишкек боюнча жеткирүүнүн шарттары, төлөө ыкмалары, алмаштыруу жана кайтаруу.
 seo.page_privacy.description: Cozy интернет-дүкөнү сатып алуучулардын жеке маалыматтарын кантип иштетет жана коргойт.
 seo.page_account-deletion.description: Cozy аккаунтун жана жеке маалыматтарды кантип өчүрүү керек — тиркемеде же сайтта, тиркемени орнотпостон. Эмне өчүрүлөт жана эмне сакталат.
 seo.page_terms.description: Cozy бут кийим интернет-дүкөнүнүн коомдук офертасы: буйрутма берүү, төлөө, жеткирүү, алмаштыруу жана кайтаруу.

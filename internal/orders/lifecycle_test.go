@@ -379,7 +379,9 @@ func TestSettingsFromLookup(t *testing.T) {
 		return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
 	}
 	s, err := settingsFromLookup(env(nil))
-	if err != nil || s != DefaultSettings() {
+	wantDefaults := DefaultSettings()
+	wantDefaults.PickupDisabled = true // PICKUP_ENABLED unset = no self-pickup
+	if err != nil || s != wantDefaults {
 		t.Fatalf("defaults: %+v, %v", s, err)
 	}
 	if s.DeliveryFee != 200 || s.MaxOpenOrders != 5 || s.PaymentPendingTTL != 30*time.Minute {
@@ -394,9 +396,16 @@ func TestSettingsFromLookup(t *testing.T) {
 	for _, bad := range []map[string]string{
 		{"DELIVERY_FEE_SOM": "-1"}, {"DELIVERY_FEE_SOM": "abc"},
 		{"MAX_OPEN_ORDERS_PER_CUSTOMER": "-2"}, {"PAYMENT_PENDING_TTL": "10s"}, {"PAYMENT_PENDING_TTL": "soon"},
+		{"PICKUP_ENABLED": "maybe"},
 	} {
 		if _, err := settingsFromLookup(env(bad)); err == nil {
 			t.Errorf("%v accepted", bad)
+		}
+	}
+	for v, want := range map[string]bool{"true": true, "1": true, "false": false, " ": false} {
+		s, err := settingsFromLookup(env(map[string]string{"PICKUP_ENABLED": v}))
+		if err != nil || s.PickupEnabled() != want {
+			t.Errorf("PICKUP_ENABLED=%q: PickupEnabled()=%v, %v; want %v", v, s.PickupEnabled(), err, want)
 		}
 	}
 	if (Settings{DeliveryFee: 200}).DeliveryFeeFor(false) != 0 {

@@ -3,6 +3,8 @@ package orders
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
@@ -171,6 +173,26 @@ func TestCreateOrderPickupHappyPath(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestCreateOrderPickupDisabledRejected: with PICKUP_ENABLED off a pickup
+// order is refused before any database work.
+func TestCreateOrderPickupDisabledRejected(t *testing.T) {
+	svc, mock := newMockService(t)
+	st := testSettings()
+	st.PickupDisabled = true
+	svc.WithSettings(st)
+
+	pickupID := "point-1"
+	_, err := svc.CreateOrder(context.Background(), "cust-1",
+		[]OrderItemInput{{VariantID: testVar1, Quantity: 1}}, nil, &pickupID)
+	var ae *apperr.AppError
+	if !errors.As(err, &ae) || ae.Code != "pickup_disabled" || ae.Status != http.StatusBadRequest {
+		t.Fatalf("err = %v, want 400 pickup_disabled", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unexpected database work: %v", err)
 	}
 }
 

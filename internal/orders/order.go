@@ -209,6 +209,9 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 	if pickupPointID != nil && *pickupPointID == "" {
 		pickupPointID = nil
 	}
+	if pickupPointID != nil && !s.currentSettings().PickupEnabled() {
+		return nil, false, apperr.BadRequest("pickup_disabled", "самовывоз сейчас недоступен — выберите доставку")
+	}
 	qtyByVariant, variantIDs, err := mergeItemQuantities(in.Items)
 	if err != nil {
 		return nil, false, err

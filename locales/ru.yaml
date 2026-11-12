@@ -107,7 +107,7 @@ branches.empty: Пока нет доступных точек продаж
 
 # Task 2 (Catalog: shop + product) keys.
 shop.banner.eyebrow: Обувь для всей семьи
-shop.banner.title: Доставка по Бишкеку и самовывоз из наших магазинов
+shop.banner.title: Доставка по Бишкеку
 shop.empty: Ничего не найдено
 shop.prev: Назад
 shop.next: Дальше
@@ -137,7 +137,7 @@ cart.has_unavailable: В корзине есть товары, которых н
 
 checkout.delivery: Доставка
 checkout.pickup: Самовывоз
-checkout.no_addresses: У вас пока нет сохранённых адресов — можно выбрать самовывоз.
+checkout.no_addresses: У вас пока нет сохранённых адресов — добавьте адрес доставки.
 checkout.no_points: Нет доступных точек самовывоза.
 checkout.unavailable: Способы получения заказа временно недоступны.
 checkout.place_order: Оформить заказ
@@ -182,6 +182,7 @@ error.code.invalid_address: Укажите адрес доставки
 error.code.address_not_found: Адрес не найден
 error.code.address_in_use: Этот адрес использован в заказе, его нельзя удалить
 error.code.pickup_point_not_found: Точка самовывоза не найдена
+error.code.pickup_disabled: Самовывоз сейчас недоступен — выберите доставку
 error.code.order_not_found: Заказ не найден
 error.code.order_not_cancellable: Этот заказ уже нельзя отменить
 # Site error texts for codes that previously fell back to the generic
@@ -240,15 +241,15 @@ filter.apply: Применить
 # SEO: titles and meta descriptions (internal/web/seo.go).
 seo.page.title: %s | Cozy
 seo.home.title: Cozy — интернет-магазин обуви в Бишкеке
-seo.home.description: Кроссовки, кеды, ботинки и другая обувь в наличии в магазинах Cozy в Бишкеке. Доставка по городу и бесплатный самовывоз.
+seo.home.description: Кроссовки, кеды, ботинки и другая обувь в наличии в магазинах Cozy в Бишкеке. Доставка по городу.
 seo.category.title: %s — купить в Бишкеке | Cozy
-seo.category.description: %s в интернет-магазине Cozy: цены, размеры и наличие в магазинах Бишкека. Доставка по городу и самовывоз.
+seo.category.description: %s в интернет-магазине Cozy: цены, размеры и наличие в магазинах Бишкека. Доставка по городу.
 seo.product.title: %s — купить в Бишкеке | Cozy
-seo.product.description: %s за %s. Размеры, цвета и наличие в магазинах Cozy в Бишкеке. Доставка по городу и самовывоз.
+seo.product.description: %s за %s. Размеры, цвета и наличие в магазинах Cozy в Бишкеке. Доставка по городу.
 seo.branches.description: Адреса магазинов Cozy в Бишкеке: где посмотреть и примерить обувь, забрать заказ и построить маршрут.
-seo.page_about.description: Cozy — магазин удобной обуви в Бишкеке: наличие в магазинах, доставка, самовывоз, обмен и возврат 14 дней.
+seo.page_about.description: Cozy — магазин удобной обуви в Бишкеке: наличие в магазинах, доставка по городу, обмен и возврат 14 дней.
 seo.page_contacts.description: Телефон, мессенджеры, e-mail и режим работы магазина обуви Cozy в Бишкеке.
-seo.page_delivery.description: Условия доставки по Бишкеку, бесплатный самовывоз из магазинов Cozy, способы оплаты, обмен и возврат.
+seo.page_delivery.description: Условия доставки по Бишкеку, способы оплаты, обмен и возврат.
 seo.page_privacy.description: Как интернет-магазин Cozy обрабатывает и защищает персональные данные покупателей.
 seo.page_account-deletion.description: Как удалить аккаунт Cozy и персональные данные — в приложении или на сайте, без установки приложения. Что удаляется и что хранится.
 seo.page_terms.description: Публичная оферта интернет-магазина обуви Cozy: оформление заказа, оплата, доставка, обмен и возврат.
