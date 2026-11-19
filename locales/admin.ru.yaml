@@ -249,6 +249,10 @@ admin.product.new_short: Новая
 admin.product.no_subcategory: Без подкатегории
 admin.product.brand: Бренд
 admin.product.base_price: Базовая цена, сом
+admin.product.old_price: Старая цена (до скидки), сом
+admin.product.old_price_hint: "Заполните, чтобы показать скидку: старая цена будет красной и зачёркнутой, текущая — зелёной. Пусто — скидки нет."
+admin.product.old_price_label: Старая цена
+admin.product.err_old_price_not_above: "Старая цена: должна быть больше базовой цены"
 admin.product.description_ru: Описание (рус.)
 admin.product.description_ky: Описание (кырг.)
 admin.product.description_placeholder: Короткое описание модели, материал, особенности
@@ -393,6 +397,7 @@ admin.audit.field.description_ru: описание (рус)
 admin.audit.field.description_ky: описание (кырг)
 admin.audit.field.brand: бренд
 admin.audit.field.price: цена
+admin.audit.field.old_price: старая цена
 admin.audit.field.quantity: количество
 admin.audit.field.point: точка
 admin.audit.field.is_active: активен
@@ -554,6 +559,8 @@ admin.apperr.invalid_name_ru: Укажите название на русско�
 admin.apperr.invalid_name_ky: Укажите название на кыргызском
 admin.apperr.invalid_category_id: Выберите категорию
 admin.apperr.invalid_base_price: Цена не может быть отрицательной
+admin.apperr.invalid_old_price: Старая цена должна быть больше нуля
+admin.apperr.old_price_not_above_price: Старая цена должна быть больше базовой цены
 admin.apperr.invalid_variant: У каждой вариации должны быть размер и цвет
 admin.apperr.invalid_object_key: object_key обязателен
 admin.apperr.product_not_found: Товар не найден

@@ -62,6 +62,8 @@ err.invalid_address.field: address обязателен
 err.invalid_address: укажите адрес доставки
 err.invalid_base_price.field: base_price не может быть отрицательным
 err.invalid_base_price: цена не может быть отрицательной
+err.invalid_old_price: старая цена должна быть больше нуля
+err.old_price_not_above_price: старая цена должна быть больше текущей цены
 err.invalid_broadcast.body_ky_too_long: текст (KY) длиннее 240 символов
 err.invalid_broadcast.body_ru_too_long: текст (RU) длиннее 240 символов
 err.invalid_broadcast.title_ky_too_long: заголовок (KY) длиннее 65 символов

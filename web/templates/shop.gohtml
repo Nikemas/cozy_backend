@@ -188,7 +188,7 @@
     <div class="quickbuy-modal__info">
       {{if $d.Brand}}<div class="quickbuy-modal__brand">{{$d.Brand}}</div>{{end}}
       <div class="quickbuy-modal__name">{{$d.Name}}</div>
-      <div class="quickbuy-modal__price">{{$d.PriceText}}</div>
+      <div class="quickbuy-modal__price{{if $d.OldPriceText}} price--sale{{end}}"><span class="price-now">{{$d.PriceText}}</span>{{template "_price_old" $d.OldPriceText}}</div>
     </div>
   </div>
 

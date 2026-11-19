@@ -182,3 +182,39 @@ func TestBuildVariantRowsPerPointCells(t *testing.T) {
 		t.Errorf("total = %d, want 4 (per-point, not written anywhere)", rows[0].Qty)
 	}
 }
+
+func TestParseProductFormOldPrice(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		want    *float64
+		wantErr string // substring of the joined form errors; "" = none
+	}{
+		{"blank means no discount", "", nil, ""},
+		{"valid discount", "5500", func() *float64 { v := 5500.0; return &v }(), ""},
+		{"not a number", "дорого", nil, "Старая цена"},
+		{"not above the base price", "4500", nil, "больше базовой цены"},
+		{"zero", "0", nil, "Старая цена"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := baseProductForm()
+			f.Set("old_price", tc.value)
+			got := parseProductForm(ruTr, f, "", true, parsePoints)
+			joined := strings.Join(got.Errs, " | ")
+			if tc.wantErr == "" {
+				if len(got.Errs) != 0 {
+					t.Fatalf("Errs = %v, want none", got.Errs)
+				}
+				op := got.Input.Product.OldPrice
+				if (op == nil) != (tc.want == nil) || (op != nil && *op != *tc.want) {
+					t.Fatalf("OldPrice = %v, want %v", op, tc.want)
+				}
+				return
+			}
+			if !strings.Contains(joined, tc.wantErr) {
+				t.Fatalf("Errs = %v, want one containing %q", got.Errs, tc.wantErr)
+			}
+		})
+	}
+}

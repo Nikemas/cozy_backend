@@ -15,6 +15,7 @@ type FavoriteCard struct {
 	Brand     string
 	Name      string
 	Price     string
+	OldPrice  string // pre-discount price text; "" = no discount
 	PhotoURL  string // thumbnail; "" → shoe icon
 	DetailURL string
 }
@@ -82,6 +83,7 @@ func (h *handlers) loadFavoriteCards(ctx context.Context, customerID, lang strin
 			Brand:     brand,
 			Name:      name,
 			Price:     formatAmount(p.BasePrice, h.t(lang, "common.currency")),
+			OldPrice:  h.oldPriceText(p.OldPrice, p.BasePrice, lang),
 			DetailURL: ProductPath(p.ID, p.NameRu),
 		}
 		if img, ok := images[p.ID]; ok {

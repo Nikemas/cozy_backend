@@ -1979,6 +1979,15 @@ components:
         description_ky: { type: string, nullable: true }
         brand: { type: string, nullable: true }
         base_price: { type: number, format: double }
+        old_price:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            Price before the discount (null = no discount). Show it struck
+            through (red) next to the current price (green) only when it is
+            above the price being displayed — a variant's `price_override`
+            may differ from `base_price`. Orders always use the current price.
         is_active: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -1994,6 +2003,7 @@ components:
         description_ky: { type: string, nullable: true }
         brand: { type: string, nullable: true }
         base_price: { type: number, format: double, minimum: 0 }
+        old_price: { type: number, format: double, nullable: true, description: "Optional pre-discount price; must be > base_price. Null/omitted = no discount (update replaces it)." }
         is_active: { type: boolean, nullable: true, description: "Defaults to true if omitted." }
 
     Variant:

@@ -139,6 +139,9 @@ type productRequest struct {
 	DescriptionKy *string `json:"description_ky"`
 	Brand         *string `json:"brand"`
 	BasePrice     float64 `json:"base_price"`
+	// OldPrice is the optional pre-discount price; null/omitted = no
+	// discount (Update replaces every field, so omitting it clears it).
+	OldPrice *float64 `json:"old_price"`
 	// IsActive is a pointer so a request that omits it defaults to true
 	// (a newly created/edited product is active unless explicitly hidden)
 	// rather than silently defaulting to Go's bool zero value (false).
@@ -158,6 +161,7 @@ func (req productRequest) toInput() catalog.ProductInput {
 		DescriptionKy: req.DescriptionKy,
 		Brand:         req.Brand,
 		BasePrice:     req.BasePrice,
+		OldPrice:      req.OldPrice,
 		IsActive:      isActive,
 	}
 }

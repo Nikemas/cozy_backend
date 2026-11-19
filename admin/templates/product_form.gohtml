@@ -67,6 +67,12 @@
         <input type="text" inputmode="decimal" name="base_price" value="{{.BasePrice}}" placeholder="4500">
       </div>
 
+      <div class="admin-field" style="max-width:260px">
+        <label for="product-old-price">{{t "admin.product.old_price"}}</label>
+        <input type="text" inputmode="decimal" id="product-old-price" name="old_price" value="{{.OldPrice}}" placeholder="5500" aria-describedby="product-old-price-hint">
+        <div class="admin-card__hint" id="product-old-price-hint">{{t "admin.product.old_price_hint"}}</div>
+      </div>
+
       <div class="admin-field admin-lang-field" data-lang="ru">
         <label>{{t "admin.product.description_ru"}}</label>
         <textarea name="description_ru" placeholder="{{t "admin.product.description_placeholder"}}">{{.DescriptionRu}}</textarea>
