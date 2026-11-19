@@ -231,6 +231,7 @@ type ProductFormData struct {
 
 	Brand         string
 	BasePrice     string
+	OldPrice      string // pre-discount price; "" = no discount
 	DescriptionRu string
 	DescriptionKy string
 

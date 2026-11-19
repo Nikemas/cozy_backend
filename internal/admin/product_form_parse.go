@@ -126,6 +126,14 @@ func parsePrice(s string) (float64, error) {
 	return v, nil
 }
 
+// formatOptionalPrice renders an optional price for a form field ("" = unset).
+func formatOptionalPrice(p *float64) string {
+	if p == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*p, 'f', -1, 64)
+}
+
 // parseVariantPrice parses a variant's price_override field. Blank means
 // "no override" (nil → NULL); otherwise it's parsePrice — a zero override
 // would make the variant free rather than "inherit the base price".
@@ -234,6 +242,13 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 	if err != nil {
 		addErr(t.T("admin.product.price_label") + ": " + errText(t, err))
 	}
+	oldPrice, oldErr := parseVariantPrice(form.Get("old_price"))
+	switch {
+	case oldErr != nil:
+		addErr(t.T("admin.product.old_price_label") + ": " + errText(t, oldErr))
+	case err == nil && oldPrice != nil && !catalog.HasDiscount(oldPrice, price):
+		addErr(t.T("admin.product.err_old_price_not_above"))
+	}
 	out.Input = productSaveInput{
 		ProductID: productID,
 		Product: catalog.ProductInput{
@@ -244,6 +259,7 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 			DescriptionKy: nilIfEmpty(form.Get("description_ky")),
 			Brand:         nilIfEmpty(form.Get("brand")),
 			BasePrice:     price,
+			OldPrice:      oldPrice,
 			IsActive:      isActive,
 		},
 	}

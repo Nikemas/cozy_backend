@@ -38,6 +38,8 @@
 
   /* ---- Status ---- */
   --cozy-danger:          #E5484D;
+  --cozy-price-sale:      #15803D;  /* цена со скидкой (5.0:1 на белом) */
+  --cozy-price-old:       #D32F2F;  /* старая цена, зачёркнутая (5.0:1 на белом) */
   --cozy-geo:             #2F6FED;
 
   /* ---- Map (branches screen) ---- */
@@ -1114,3 +1116,19 @@ button, input { font-family: inherit; }
 .pay-qr__link { display: block; max-width: 320px; word-break: break-all; font-size: var(--cozy-fs-13); color: var(--cozy-ink); background: var(--cozy-surface); border-radius: 8px; padding: 8px 10px; }
 .pay-qr__error { color: var(--cozy-danger); font-size: var(--cozy-fs-13); }
 .quickbuy-modal__unavailable { margin: 8px 0 0; color: #b3261e; font-size: 14px; }
+
+/* ---- Discount price (_price.gohtml): current price green, the old
+   (pre-discount) price red and struck through next to it. Both colors
+   keep ≥4.5:1 on white and on the #F5F5F3 canvas. ---- */
+.price--sale { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 2px; }
+.price--sale .price-now { color: var(--cozy-price-sale); }
+.price-old {
+  color: var(--cozy-price-old); font-size: 0.8em; font-weight: 600;
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
+}
+/* The grid card is orange with white text — green/red would be unreadable
+   on it, so a discounted card price sits on a white pill. */
+.product-card__price.price--sale {
+  display: inline-flex; background: var(--cozy-surface);
+  border-radius: var(--cozy-r-pill); padding: 0 10px;
+}

@@ -58,7 +58,7 @@
   {{/* "Больше от {бренд}" as in the app: a search for the brand. */}}
   {{if $d.Brand}}<a class="product-meta__brand product-meta__brand-link" href="/?q={{$d.Brand}}">{{printf (t "product.more_from_brand") $d.Brand}} <i class="ti ti-chevron-right" aria-hidden="true"></i></a>{{end}}
   <h1 class="product-meta__name">{{$d.Name}}</h1>
-  <div class="product-meta__price">{{$d.PriceText}}</div>
+  <div class="product-meta__price{{if $d.OldPriceText}} price--sale{{end}}"><span class="price-now">{{$d.PriceText}}</span>{{template "_price_old" $d.OldPriceText}}</div>
 
   {{if $d.Sizes}}
   <div class="product-section-title">{{t "product.size"}}</div>

@@ -246,6 +246,10 @@ admin.product.new_short: Жаңы
 admin.product.no_subcategory: Ички категориясыз
 admin.product.brand: Бренд
 admin.product.base_price: Негизги баасы, сом
+admin.product.old_price: Эски баасы (арзандатууга чейин), сом
+admin.product.old_price_hint: "Арзандатууну көрсөтүү үчүн толтуруңуз: эски баасы кызыл жана сызылган, учурдагы баасы жашыл болот. Бош болсо — арзандатуу жок."
+admin.product.old_price_label: Эски баасы
+admin.product.err_old_price_not_above: "Эски баасы: негизги баадан чоң болушу керек"
 admin.product.description_ru: Сыпаттамасы (орусча)
 admin.product.description_ky: Сыпаттамасы (кыргызча)
 admin.product.description_placeholder: Моделдин кыскача сыпаттамасы, материалы, өзгөчөлүктөрү
@@ -390,6 +394,7 @@ admin.audit.field.description_ru: сыпаттамасы (орусча)
 admin.audit.field.description_ky: сыпаттамасы (кыргызча)
 admin.audit.field.brand: бренд
 admin.audit.field.price: баасы
+admin.audit.field.old_price: эски баасы
 admin.audit.field.quantity: саны
 admin.audit.field.point: сатуу жайы
 admin.audit.field.is_active: активдүү
@@ -551,6 +556,8 @@ admin.apperr.invalid_name_ru: Орусча аталышын жазыңыз
 admin.apperr.invalid_name_ky: Кыргызча аталышын жазыңыз
 admin.apperr.invalid_category_id: Категорияны тандаңыз
 admin.apperr.invalid_base_price: Баасы терс болбошу керек
+admin.apperr.invalid_old_price: Эски баасы нөлдөн чоң болушу керек
+admin.apperr.old_price_not_above_price: Эски баасы негизги баадан чоң болушу керек
 admin.apperr.invalid_variant: Ар бир вариациянын өлчөмү жана түсү болушу керек
 admin.apperr.invalid_object_key: Сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
 admin.apperr.product_not_found: Товар табылган жок

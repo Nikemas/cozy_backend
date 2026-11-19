@@ -29,7 +29,7 @@ func TestProductStoreSaveWritesOnlyChangedCellsInOneTx(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`UPDATE products`).WithArgs("p1", "cat1", "Nike", "Nike", nil, nil, nil, 4500.0).
+	mock.ExpectQuery(`UPDATE products`).WithArgs("p1", "cat1", "Nike", "Nike", nil, nil, nil, 4500.0, nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("p1"))
 	mock.ExpectQuery(`SELECT id FROM product_variants WHERE product_id = \$1`).WithArgs("p1").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("v1"))

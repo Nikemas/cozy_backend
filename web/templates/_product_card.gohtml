@@ -23,7 +23,7 @@
     </div>
     {{if .Brand}}<div class="product-card__brand">{{.Brand}}</div>{{end}}
     <div class="product-card__name">{{.Name}}</div>
-    <div class="product-card__price">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</div>
+    <div class="product-card__price{{if .OldPriceText}} price--sale{{end}}"><span class="price-now">{{if .PriceFrom}}{{printf (t "shop.price_from") .PriceText}}{{else}}{{.PriceText}}{{end}}</span>{{template "_price_old" .OldPriceText}}</div>
   </a>
   {{/* Quick-buy (COZY_WEB_DESIGN.md §3.1, ported from the mobile
        design's "Быстрая покупка"): opens _quickbuy_modal below in

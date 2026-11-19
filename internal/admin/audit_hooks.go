@@ -26,15 +26,16 @@ type productSnapshot struct {
 	DescriptionKy *string
 	Brand         *string
 	BasePrice     float64
+	OldPrice      *float64
 }
 
 func loadProductSnapshotTx(ctx context.Context, tx *sql.Tx, productID string) (*productSnapshot, error) {
 	const q = `
-		SELECT category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price
+		SELECT category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, old_price
 		FROM products WHERE id = $1`
 	var s productSnapshot
 	err := tx.QueryRowContext(ctx, q, productID).Scan(&s.CategoryID, &s.NameRu, &s.NameKy,
-		&s.DescriptionRu, &s.DescriptionKy, &s.Brand, &s.BasePrice)
+		&s.DescriptionRu, &s.DescriptionKy, &s.Brand, &s.BasePrice, &s.OldPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +84,7 @@ var productFieldLabels = map[string]string{
 	"description_ky": "admin.audit.field.description_ky",
 	"brand":          "admin.audit.field.brand",
 	"base_price":     "admin.audit.field.price",
+	"old_price":      "admin.audit.field.old_price",
 }
 
 // productChanges diffs old against the submitted input: only fields that
@@ -101,6 +103,7 @@ func productChanges(old *productSnapshot, in catalog.ProductInput) map[string]an
 	add("description_ky", deref(old.DescriptionKy), deref(in.DescriptionKy), deref(old.DescriptionKy) != deref(in.DescriptionKy))
 	add("brand", deref(old.Brand), deref(in.Brand), deref(old.Brand) != deref(in.Brand))
 	add("base_price", old.BasePrice, in.BasePrice, old.BasePrice != in.BasePrice)
+	add("old_price", moneyPtrValue(old.OldPrice), moneyPtrValue(in.OldPrice), !sameMoneyPtr(old.OldPrice, in.OldPrice))
 	return out
 }
 

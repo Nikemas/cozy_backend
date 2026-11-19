@@ -114,6 +114,9 @@ type ProductCard struct {
 	Name      string
 	Brand     string
 	PriceText string
+	// OldPriceText is the pre-discount price ("" = no discount), shown red
+	// and struck through next to the (then green) current price.
+	OldPriceText string
 	// PriceFrom marks a product whose variants differ in price — the card
 	// then reads "от <min>".
 	PriceFrom bool
@@ -298,12 +301,13 @@ func (h *handlers) productCards(ctx context.Context, products []catalog.Product,
 			from = pr.Max > pr.Min
 		}
 		card := ProductCard{
-			ID:        p.ID,
-			Name:      pickName(p.NameRu, p.NameKy, lang),
-			Brand:     stringOr(p.Brand, ""),
-			PriceText: formatAmount(price, h.t(lang, "common.currency")),
-			PriceFrom: from,
-			DetailURL: ProductPath(p.ID, p.NameRu),
+			ID:           p.ID,
+			Name:         pickName(p.NameRu, p.NameKy, lang),
+			Brand:        stringOr(p.Brand, ""),
+			PriceText:    formatAmount(price, h.t(lang, "common.currency")),
+			OldPriceText: h.oldPriceText(p.OldPrice, price, lang),
+			PriceFrom:    from,
+			DetailURL:    ProductPath(p.ID, p.NameRu),
 		}
 		if img, ok := images[p.ID]; ok {
 			card.HasPhoto = true
@@ -312,6 +316,16 @@ func (h *handlers) productCards(ctx context.Context, products []catalog.Product,
 		cards = append(cards, card)
 	}
 	return cards, nil
+}
+
+// oldPriceText formats a product's pre-discount price for display next
+// to price, or "" when there is no discount to show (unset, or not above
+// the price actually displayed — e.g. a variant priced above base_price).
+func (h *handlers) oldPriceText(oldPrice *float64, price float64, lang string) string {
+	if !catalog.HasDiscount(oldPrice, price) {
+		return ""
+	}
+	return formatAmount(*oldPrice, h.t(lang, "common.currency"))
 }
 
 // filterOptions marks selected among values; a selected value that's no
@@ -369,6 +383,7 @@ type ProductData struct {
 	Brand        string
 	Price        float64 // selected variant's price (JSON-LD)
 	PriceText    string
+	OldPriceText string // pre-discount price; "" = no discount
 	Description  string // in the visitor's language; "" if none
 	// Related backs the "may like" block: same-category products topped up
 	// with popular ones (related_products.go), empty when none or on error.
@@ -622,6 +637,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		Brand:             stringOr(product.Brand, ""),
 		Price:             price,
 		PriceText:         formatAmount(price, h.t(lang, "common.currency")),
+		OldPriceText:      h.oldPriceText(product.OldPrice, price, lang),
 		Description:       pickName(stringOr(product.DescriptionRu, ""), stringOr(product.DescriptionKy, ""), lang),
 		HasPhoto:          len(photos) > 0,
 		PhotoURL:          photoURL,
@@ -648,9 +664,10 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 // the picker options' own Href (back to this product's /quickbuy/:id,
 // not the product page) differs.
 type QuickBuyData struct {
-	Name      string
-	Brand     string
-	PriceText string
+	Name         string
+	Brand        string
+	PriceText    string
+	OldPriceText string // pre-discount price; "" = no discount
 
 	HasPhoto bool
 	PhotoURL string
@@ -742,6 +759,7 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 		Name:          pickName(product.NameRu, product.NameKy, lang),
 		Brand:         stringOr(product.Brand, ""),
 		PriceText:     formatAmount(price, h.t(lang, "common.currency")),
+		OldPriceText:  h.oldPriceText(product.OldPrice, price, lang),
 		HasPhoto:      len(photos) > 0,
 		PhotoURL:      photoURL,
 		Sizes:         sizeOpts,

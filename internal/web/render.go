@@ -58,6 +58,7 @@ var layoutPartials = []string{
 	"_footer.gohtml",
 	"_toast.gohtml",
 	"_product_card.gohtml",
+	"_price.gohtml",
 	"_profile_auth.gohtml",
 	"_address_list.gohtml",
 	"_address_form.gohtml",

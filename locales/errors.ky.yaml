@@ -55,6 +55,8 @@ err.invalid_address: жеткирүү дарегин көрсөтүңүз
 err.invalid_address.field: address милдеттүү
 err.invalid_base_price: баасы терс болбошу керек
 err.invalid_base_price.field: base_price терс болбошу керек
+err.invalid_old_price: эски баасы нөлдөн чоң болушу керек
+err.old_price_not_above_price: эски баасы учурдагы баадан чоң болушу керек
 err.invalid_broadcast: орусча аталышын жана текстин толтуруңуз
 err.invalid_broadcast.body_ky_too_long: текст (KY) 240 белгиден узун
 err.invalid_broadcast.body_ru_too_long: текст (RU) 240 белгиден узун

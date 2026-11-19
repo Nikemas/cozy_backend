@@ -1,0 +1,7 @@
+{{/* Discount price pair, shared by the product card, product page,
+     quick-buy modal and favorites. Data is the old (pre-discount) price
+     text: "" renders nothing. The caller puts the current price in an
+     element with class "price-now" (green via .price--sale). The old price
+     is red and struck through; <s> alone isn't announced by screen
+     readers, hence the visually-hidden prefix. */}}
+{{define "_price_old"}}{{if .}}<s class="price-old"><span class="visually-hidden">{{t "price.old_sr"}} </span>{{.}}</s>{{end}}{{end}}

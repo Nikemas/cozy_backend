@@ -376,6 +376,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		SubCategoryID:  subID,
 		Brand:          stringOrEmpty(product.Brand),
 		BasePrice:      strconv.FormatFloat(product.BasePrice, 'f', -1, 64),
+		OldPrice:       formatOptionalPrice(product.OldPrice),
 		DescriptionRu:  stringOrEmpty(product.DescriptionRu),
 		DescriptionKy:  stringOrEmpty(product.DescriptionKy),
 		Categories:     options,
@@ -527,6 +528,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		SubCategoryID:   subID,
 		Brand:           r.FormValue("brand"),
 		BasePrice:       r.FormValue("base_price"),
+		OldPrice:        r.FormValue("old_price"),
 		DescriptionRu:   r.FormValue("description_ru"),
 		DescriptionKy:   r.FormValue("description_ky"),
 		Categories:      formOptions,
@@ -574,6 +576,7 @@ func (h *handlers) productToggleActive(w http.ResponseWriter, r *http.Request) {
 		DescriptionKy: product.DescriptionKy,
 		Brand:         product.Brand,
 		BasePrice:     product.BasePrice,
+		OldPrice:      product.OldPrice,
 		IsActive:      !product.IsActive,
 	})
 	if err != nil {

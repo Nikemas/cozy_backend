@@ -83,10 +83,10 @@ func TestProductStoreSaveJournalsInTx(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(`SELECT category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price\s+FROM products WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, old_price\s+FROM products WHERE id = \$1`).
 		WithArgs("p1").
-		WillReturnRows(sqlmock.NewRows([]string{"category_id", "name_ru", "name_ky", "description_ru", "description_ky", "brand", "base_price"}).
-			AddRow("cat1", "Nike", "Nike", nil, nil, nil, 4000.0))
+		WillReturnRows(sqlmock.NewRows([]string{"category_id", "name_ru", "name_ky", "description_ru", "description_ky", "brand", "base_price", "old_price"}).
+			AddRow("cat1", "Nike", "Nike", nil, nil, nil, 4000.0, nil))
 	mock.ExpectQuery(`SELECT id, size, color, price_override FROM product_variants WHERE product_id = \$1`).WithArgs("p1").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "size", "color", "price_override"}).AddRow("v1", "42", "Белый", nil))
 	mock.ExpectExec(`RELEASE SAVEPOINT audit_log_write`).WillReturnResult(sqlmock.NewResult(0, 0))
@@ -181,5 +181,19 @@ func TestStockEntriesSkipUnchangedAndRemovedRows(t *testing.T) {
 	b, _ := json.Marshal(entries[0].Details)
 	if !strings.Contains(string(b), `"quantity":{"from":0,"to":4}`) || !strings.Contains(entries[0].Summary, "pA: 0 → 4") {
 		t.Errorf("entry = %s / %s", entries[0].Summary, b)
+	}
+}
+
+func TestProductChangesOldPrice(t *testing.T) {
+	old := &productSnapshot{CategoryID: "c1", NameRu: "Кеды", NameKy: "Кеды", BasePrice: 4500}
+	sale := 5500.0
+	in := catalog.ProductInput{CategoryID: "c1", NameRu: "Кеды", NameKy: "Кеды", BasePrice: 4500, OldPrice: &sale}
+	got := productChanges(old, in)
+	c, ok := got["old_price"].(audit.Change)
+	if len(got) != 1 || !ok || c.From != nil || c.To != 5500.0 {
+		t.Fatalf("changes = %v, want only old_price nil -> 5500", got)
+	}
+	if lbl := changedFieldsLabel(got); lbl != "старая цена" {
+		t.Errorf("label = %q", lbl)
 	}
 }
