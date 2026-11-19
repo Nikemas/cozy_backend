@@ -75,6 +75,9 @@ type PageData struct {
 	CustomerID   string
 	CustomerName string
 	MaskedPhone  string
+	// CustomerPhone is the account phone in full (+996…), for pre-filling
+	// forms such as the checkout's courier number; never shown in chrome.
+	CustomerPhone string
 
 	// CartCount/FavCount/OrdersCount back the header/aside badges.
 	// Foundation leaves these at 0 — Tasks 2-5 wire real counts once

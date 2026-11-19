@@ -16,6 +16,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
+	"github.com/Nikemas/cozy_backend/internal/phonenorm"
 )
 
 // AddressView is one row of customer_addresses, read directly by SQL
@@ -57,6 +58,9 @@ type CheckoutPageData struct {
 	HasUnavailable bool
 	// OnlinePayment offers "card online" (a payment provider is ready).
 	OnlinePayment bool
+	// CourierPhone pre-fills the delivery "number for the courier" field
+	// with the account phone; the customer may change it.
+	CourierPhone string
 }
 
 // CheckoutZoneView is one delivery zone option, priced for this cart.
@@ -172,6 +176,7 @@ func (h *handlers) checkoutForm(w http.ResponseWriter, r *http.Request) error {
 		CommentMaxLen:  orders.MaxCommentLen,
 		HasUnavailable: cartPage.HasUnavailable,
 		OnlinePayment:  h.onlinePaymentAvailable(),
+		CourierPhone:   phonenorm.Display(data.CustomerPhone),
 	}
 	return h.render.Render(w, "checkout", data)
 }
@@ -248,6 +253,7 @@ func (h *handlers) checkoutSubmit(w http.ResponseWriter, r *http.Request) error 
 		AddressID:      addressID,
 		PickupPointID:  pickupPointID,
 		DeliveryZoneID: zoneID,
+		CourierPhone:   r.FormValue("courier_phone"), // ignored for pickup
 		Comment:        r.FormValue("comment"),
 		IdempotencyKey: r.FormValue("idempotency_key"),
 		ClearCart:      true,
