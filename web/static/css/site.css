@@ -38,6 +38,7 @@
 
   /* ---- Status ---- */
   --cozy-danger:          #E5484D;
+  --cozy-danger-bg:       #FDECEC;  /* подложка бейджа «Отменён» */
   --cozy-price-sale:      #15803D;  /* цена со скидкой (5.0:1 на белом) */
   --cozy-price-old:       #D32F2F;  /* старая цена, зачёркнутая (5.0:1 на белом) */
   --cozy-geo:             #2F6FED;
@@ -550,7 +551,7 @@ button, input { font-family: inherit; }
 .order-status--confirmed { background: var(--cozy-surface-2); color: var(--cozy-ink-2); }
 .order-status--transit { background: var(--cozy-accent-bg); color: var(--cozy-accent-ink); }
 .order-status--delivered { background: var(--cozy-surface-2); color: var(--cozy-ink-2); }
-.order-status--cancelled { background: #FDECEC; color: var(--cozy-danger); }
+.order-status--cancelled { background: var(--cozy-danger-bg); color: var(--cozy-danger); }
 
 .order-card__items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .order-item { display: flex; align-items: center; gap: 12px; }
@@ -678,7 +679,7 @@ button, input { font-family: inherit; }
 .account-delete { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .account-delete__title { font-size: var(--cozy-fs-15); font-weight: 700; margin: 0; }
 .account-delete__text { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin: 0; }
-.account-delete__text a { color: var(--cozy-accent-ink); text-decoration: underline; }
+.account-delete__text a { color: var(--cozy-accent); text-decoration: underline; }
 .account-delete .form-error { margin: 0; }
 .account-delete .btn--danger { align-self: flex-start; }
 .static-notice { background: var(--cozy-accent-bg-2); border-radius: var(--cozy-r-14); padding: 12px 16px; margin: 0 0 16px; font-weight: 600; }
@@ -836,7 +837,7 @@ button, input { font-family: inherit; }
 .product-card__price { font-size: 15px; font-weight: 800; color: var(--cozy-surface); }
 .product-card__buy {
   width: 100%; margin-top: 12px; height: 40px; border: none; border-radius: var(--cozy-r-pill);
-  background: var(--cozy-surface); color: var(--cozy-accent-ink); font-family: inherit; font-size: 13.5px; font-weight: 800;
+  background: var(--cozy-surface); color: var(--cozy-accent); font-family: inherit; font-size: 13.5px; font-weight: 800;
   cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
 }
 
@@ -890,15 +891,15 @@ button, input { font-family: inherit; }
 .product-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .product-thumb--active { border-color: var(--cozy-accent); }
 .product-stock { margin-bottom: 20px; }
-.product-stock .product-section-title i { color: var(--cozy-accent-ink); }
+.product-stock .product-section-title i { color: var(--cozy-accent); }
 .product-stock__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .product-stock__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 8px 12px; background: var(--cozy-surface); border: 0.5px solid var(--cozy-border); border-radius: var(--cozy-r-10); }
 .product-stock__name { font-weight: 700; }
 .product-stock__addr { color: var(--cozy-ink-2); }
 .product-stock__qty { color: var(--cozy-ink); font-weight: 600; white-space: nowrap; }
-.product-stock__qty--few { color: var(--cozy-accent-ink); }
+.product-stock__qty--few { color: var(--cozy-accent); }
 .product-stock__none { font-size: 13.5px; color: var(--cozy-ink-2); }
-.product-delivery__more { font-size: var(--cozy-fs-13); color: var(--cozy-accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.product-delivery__more { font-size: var(--cozy-fs-13); color: var(--cozy-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .product-description { margin-top: 28px; }
 .product-meta__brand-link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .product-meta__brand-link i { color: var(--cozy-accent); font-size: 13px; }
@@ -970,17 +971,17 @@ button, input { font-family: inherit; }
 .static-page { max-width: 760px; background: var(--cozy-surface); border: 0.5px solid var(--cozy-border); border-radius: var(--cozy-r-18); padding: 28px 32px; line-height: 1.6; font-size: var(--cozy-fs-15); color: var(--cozy-ink); }
 .static-page h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; line-height: 1.25; }
 .static-page h2 { font-size: var(--cozy-fs-17); font-weight: 700; margin: 26px 0 8px; display: flex; align-items: center; gap: 8px; }
-.static-page h2 i { color: var(--cozy-accent-ink); font-size: 20px; }
+.static-page h2 i { color: var(--cozy-accent); font-size: 20px; }
 .static-page p, .static-page ul { margin: 0 0 12px; }
 .static-page ul { padding-left: 22px; }
 .static-page li { margin-bottom: 6px; }
-.static-page a:not(.btn) { color: var(--cozy-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.static-page a:not(.btn) { color: var(--cozy-accent); text-decoration: underline; text-underline-offset: 2px; }
 .static-page ul.static-requisites { list-style: none; padding-left: 0; }
 .static-page__meta { color: var(--cozy-ink-2); font-size: var(--cozy-fs-13); }
 .static-page mark.fill { background: var(--cozy-accent-bg-2); color: var(--cozy-ink); padding: 0 3px; border-radius: 3px; }
 .static-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 16px 0 8px; }
 .static-contacts__item { display: flex; gap: 12px; align-items: flex-start; background: var(--cozy-surface-2); border-radius: var(--cozy-r-14); padding: 14px; }
-.static-contacts__item i { font-size: 22px; color: var(--cozy-accent-ink); }
+.static-contacts__item i { font-size: 22px; color: var(--cozy-accent); }
 .static-contacts__label { font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); font-weight: 700; margin-bottom: 2px; }
 .footer__links { flex-wrap: wrap; }
 @media (max-width: 700px) { .static-page { padding: 20px 16px; } }
@@ -996,7 +997,7 @@ button, input { font-family: inherit; }
   border: 0.5px solid var(--cozy-border); background: var(--cozy-surface-2); color: var(--cozy-ink);
   padding: 7px 12px; border-radius: var(--cozy-r-pill); font-size: 12.5px; font-weight: 600;
 }
-.chip-radio input:checked + span { background: var(--cozy-ink); border-color: var(--cozy-ink); color: var(--cozy-surface); }
+.chip-radio input:checked + span { background: var(--cozy-accent); border-color: var(--cozy-accent); color: var(--cozy-surface); }
 .chip-radio input:focus-visible + span { outline: 2px solid var(--cozy-accent-ink); outline-offset: 2px; }
 .aside__price { display: flex; gap: 8px; }
 .aside__price-field { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: var(--cozy-fs-12); color: var(--cozy-ink-2); }
@@ -1017,12 +1018,10 @@ button, input { font-family: inherit; }
 /* ==== Accessibility (WCAG 2.1 AA) overrides ====
    Kept as one block at the end so the design-derived rules above stay
    readable and this can be reviewed against the design in one place.
-   --cozy-accent-aa is the darkest-needed shade of the brand orange for
-   white text (4.5:1 on #C85000); propose adding it to
-   design-system/tokens.css. */
+   Brand orange stays the bright --cozy-accent (#FF7A1A) on buttons, links
+   and badges, as in the web design and the mobile app — the client's
+   brand rule; it is not darkened for contrast (was #C85000 / #B35400). */
 :root {
-  --cozy-accent-aa:       #C85000;
-  --cozy-accent-aa-hover: #A84300;
   --cozy-focus:           #1A1A1A;
 }
 
@@ -1044,24 +1043,6 @@ button, input { font-family: inherit; }
 
 /* Field labels (previously placeholder-only inputs). */
 .field-label { font-size: var(--cozy-fs-13); font-weight: 600; color: var(--cozy-ink-2); margin-bottom: -6px; }
-
-/* White text on brand orange: 2.6:1 → 4.5:1+. */
-.btn--primary,
-.product-option--active,
-.icon-btn .badge { background: var(--cozy-accent-aa); }
-.product-option--active { border-color: var(--cozy-accent-aa); }
-.btn--primary:hover { background: var(--cozy-accent-aa-hover); }
-
-/* Orange text on white/light backgrounds → accent-ink (≈5:1). */
-.nav__link--active,
-.link-btn,
-.aside__reset,
-.shop-pager__link,
-.branch-card__route,
-.icon-btn--active { color: var(--cozy-accent-ink); }
-/* Large price text needs 3:1. It sits on the #F5F5F3 canvas, where
-   accent-strong is only 2.98:1 (Lighthouse); accent-aa gives ~4.2:1. */
-.product-meta__price { color: var(--cozy-accent-aa); }
 
 /* Secondary text: #999 (2.8:1) → #666 (5.7:1). */
 .muted,
@@ -1088,7 +1069,7 @@ button, input { font-family: inherit; }
 .cart-line__thumb img, .order-item__thumb img { width: 100%; height: 100%; object-fit: contain; background: var(--cozy-surface); display: block; }
 .fav-card__photo img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--cozy-surface); }
 .fav-card__name { display: block; color: inherit; }
-.fav-card__name:hover { color: var(--cozy-accent-ink); }
+.fav-card__name:hover { color: var(--cozy-accent-hover); }
 
 /* ---- Phones: less chrome before the content ---- */
 .aside__filters-summary { display: none; }
@@ -1099,7 +1080,7 @@ button, input { font-family: inherit; }
   .aside__filters-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--cozy-fs-14); font-weight: 700; list-style: none; }
   .aside__filters-summary::-webkit-details-marker { display: none; }
   .aside__filters-wrap[open] .aside__filters-summary { margin-bottom: 14px; }
-  .aside__filters-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cozy-accent-aa); display: inline-block; }
+  .aside__filters-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cozy-accent); display: inline-block; }
 }
 @media (max-width: 860px) {
   .page { align-items: stretch; }
@@ -1131,11 +1112,11 @@ button, input { font-family: inherit; }
 .pay-status__actions .btn { min-width: 240px; justify-content: center; }
 .pay-status__icon--bad { color: var(--cozy-danger); }
 .pay-qr { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 18px; text-align: center; }
-.pay-qr__image { width: 240px; height: 240px; border: 0.5px solid var(--cozy-border); border-radius: 12px; background: #fff; }
+.pay-qr__image { width: 240px; height: 240px; border: 0.5px solid var(--cozy-border); border-radius: 12px; background: var(--cozy-surface); }
 .pay-qr__hint { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin: 0; }
 .pay-qr__link { display: block; max-width: 320px; word-break: break-all; font-size: var(--cozy-fs-13); color: var(--cozy-ink); background: var(--cozy-surface); border-radius: 8px; padding: 8px 10px; }
 .pay-qr__error { color: var(--cozy-danger); font-size: var(--cozy-fs-13); }
-.quickbuy-modal__unavailable { margin: 8px 0 0; color: #b3261e; font-size: 14px; }
+.quickbuy-modal__unavailable { margin: 8px 0 0; color: var(--cozy-danger); font-size: 14px; }
 
 /* ---- Discount price (_price.gohtml): current price green, the old
    (pre-discount) price red and struck through next to it. Both colors
