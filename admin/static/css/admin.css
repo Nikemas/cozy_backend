@@ -401,6 +401,8 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
    inactive the same neutral grey as the "placed" order-status chip. */
 .admin-chip--active { color: #2E7D32; background: #E8F5E9; }
 .admin-chip--inactive { color: #8A8A86; background: #EDEDEB; }
+.admin-chip--kind-branch { color: #1F5FA8; background: #E7F0FB; margin-left: 6px; vertical-align: middle; }
+.admin-chip--kind-warehouse { color: #8A5A00; background: #FBF1DC; margin-left: 6px; vertical-align: middle; }
 
 /* Staff role chips — not modeled in the design canvas (it only shows
    owner/manager without distinct styling); this task's own choice: owner
@@ -1114,4 +1116,20 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
   .admin-variants-table .admin-variant-input--price { max-width: none; }
   .admin-variants-table .admin-variant-cell--total { align-items: flex-start; }
   .admin-variants-table .admin-variant-cell--remove { position: absolute; top: 8px; right: 8px; }
+}
+
+/* "Добавить вариацию" modal: size + many colors × per-point quantities. */
+.admin-modal--xl { width: 720px; max-height: calc(100vh - 48px); overflow-y: auto; }
+.admin-vm-table-wrap { margin-top: 14px; overflow-x: auto; }
+.admin-vm-table { width: 100%; border-collapse: collapse; }
+.admin-vm-table th {
+  text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--admin-muted); padding: 0 8px 8px 0; white-space: nowrap;
+}
+.admin-vm-table td { padding: 0 8px 8px 0; vertical-align: middle; }
+.admin-vm-table td:first-child { min-width: 160px; }
+.admin-vm-table .admin-variant-input--qty { width: 96px; }
+.admin-vm-add-color { margin-top: 4px; }
+@media (max-width: 640px) {
+  .admin-modal--xl { width: auto; padding: 18px; }
 }

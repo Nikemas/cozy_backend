@@ -729,3 +729,16 @@ admin.import.needs_js: "Импорттоо JavaScript күйгүзүлгөндө
 admin.import.err_rate_limited: "Текшерүү жана импорттоо өтө көп болуп кетти — бир мүнөт күтүп, кайра аракет кылыңыз."
 admin.import.err_busy: "Азыр башка текшерүүлөр же импорттор жүрүп жатат — бир нече секунд күтүп, кайра аракет кылыңыз."
 admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"
+admin.points.kind: Түрү
+admin.points.kind_branch: Филиал
+admin.points.kind_warehouse: Кампа
+admin.points.kind_hint: "Филиал сатып алуучуларга картада көрүнөт жана өзү алып кетүү үчүн жеткиликтүү. Кампа товарды гана сактайт: анын калдыктары жеткирүү менен сатылат, бирок сатып алуучулар кампаны көрүшпөйт."
+admin.product.warehouse_suffix: кампа
+admin.product.variant_modal_title: Жаңы вариация
+admin.product.variant_modal_hint: "Өлчөмдү көрсөтүп, түстөрдү кошуңуз. Ар бир түстүн ар бир филиалда жана ар бир кампада өз саны бар — вариациялар таблицасында ар бир түскө бир сап пайда болот."
+admin.product.add_color: Түс кошуу
+admin.product.remove_color: Түстү өчүрүү
+admin.product.add_to_table: Таблицага кошуу
+admin.product.err_size_required: Өлчөмдү көрсөтүңүз
+admin.product.err_color_required: Жок дегенде бир түс кошуңуз
+admin.product.err_qty: "Саны — 0дөн 100000гө чейинки бүтүн сан"

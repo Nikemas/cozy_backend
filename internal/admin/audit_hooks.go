@@ -391,7 +391,7 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 	switch action {
 	case audit.ActionPointCreate:
 		e.MsgKey = audit.MsgPointCreated
-		e.Details = map[string]any{"name": in.Name, "city": in.City, "address": in.Address, "working_hours": in.WorkingHours}
+		e.Details = map[string]any{"name": in.Name, "city": in.City, "address": in.Address, "working_hours": in.WorkingHours, "kind": auditPointKind(in.Kind)}
 	case audit.ActionPointActivate, audit.ActionPointDeactivate:
 		e.MsgKey = audit.MsgPointDisabled
 		if in.IsActive {
@@ -409,6 +409,9 @@ func (h *handlers) auditPoint(ctx context.Context, action, id string, before *po
 		}
 		if before != nil && before.Address != in.Address {
 			d["address"] = audit.Change{From: before.Address, To: in.Address}
+		}
+		if before != nil && auditPointKind(before.Kind) != auditPointKind(in.Kind) {
+			d["kind"] = audit.Change{From: auditPointKind(before.Kind), To: auditPointKind(in.Kind)}
 		}
 		if before != nil && before.WorkingHours != in.WorkingHours {
 			d["working_hours"] = audit.Change{From: before.WorkingHours, To: in.WorkingHours}
@@ -492,4 +495,14 @@ func moneyPtrValue(p *float64) any {
 		return nil
 	}
 	return *p
+}
+
+// auditPointKind mirrors PointInput's own defaulting (blank = branch) so the
+// audit trail records the kind actually stored, not the raw form value.
+func auditPointKind(raw string) string {
+	k := strings.ToLower(strings.TrimSpace(raw))
+	if k == "" {
+		return points.KindBranch
+	}
+	return k
 }

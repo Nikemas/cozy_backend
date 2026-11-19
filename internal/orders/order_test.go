@@ -252,7 +252,7 @@ func TestCreateOrderInsufficientStockRollsBack(t *testing.T) {
 	svc.WithSettings(testSettings())
 
 	expectOrderPrologue(mock, 0)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active AND kind = 'branch' FROM points_of_sale")).
 		WithArgs("point-1").
 		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
@@ -290,7 +290,7 @@ func TestCreateOrderUnknownVariantRollsBack(t *testing.T) {
 	svc.WithSettings(testSettings())
 
 	expectOrderPrologue(mock, 0)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active AND kind = 'branch' FROM points_of_sale")).
 		WithArgs("point-1").
 		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
@@ -317,7 +317,7 @@ func TestCreateOrderInactiveProductNamesIt(t *testing.T) {
 	svc.WithSettings(testSettings())
 
 	expectOrderPrologue(mock, 0)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active AND kind = 'branch' FROM points_of_sale")).
 		WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
 		WillReturnRows(sqlmock.NewRows(variantColumns).AddRow(testVar1, "product-1", "40", "Белый", nil, "Old Boot", 3000.0, false))

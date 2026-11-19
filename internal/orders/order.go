@@ -269,7 +269,7 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 
 		fulfillmentPointID := ""
 		if pickupPointID != nil {
-			active, err := pointIsActive(ctx, tx, *pickupPointID)
+			active, err := pickupPointIsActive(ctx, tx, *pickupPointID)
 			if err != nil {
 				return err
 			}
@@ -744,9 +744,11 @@ func mergeItemQuantities(items []OrderItemInput) (map[string]int, []string, erro
 	return merged, variantIDs, nil
 }
 
-func pointIsActive(ctx context.Context, tx *sql.Tx, pointID string) (bool, error) {
+// pickupPointIsActive reports whether pointID is an active branch — a
+// warehouse only stores goods and can never be a self-pickup point.
+func pickupPointIsActive(ctx context.Context, tx *sql.Tx, pointID string) (bool, error) {
 	var active bool
-	const q = `SELECT is_active FROM points_of_sale WHERE id = $1`
+	const q = `SELECT is_active AND kind = 'branch' FROM points_of_sale WHERE id = $1`
 	err := tx.QueryRowContext(ctx, q, pointID).Scan(&active)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil

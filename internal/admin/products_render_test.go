@@ -215,8 +215,8 @@ func (f *fakeSaver) Save(_ context.Context, in productSaveInput) (string, error)
 
 func expectFormLookups(mock sqlmock.Sqlmock) {
 	pointsRows := func() *sqlmock.Rows {
-		return sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}).
-			AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, true, time.Now())
+		return sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "kind", "is_active", "created_at"}).
+			AddRow("pA", "Главный склад", "Бишкек", "ул. 1", "", nil, nil, "branch", true, time.Now())
 	}
 	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(pointsRows())
 	mock.ExpectQuery(`FROM categories`).WillReturnRows(sqlmock.NewRows([]string{"id", "parent_id", "name_ru", "name_ky", "slug", "sort_order", "image_key"}).
@@ -309,5 +309,44 @@ func TestSaveProductConflictRerendersWithCurrentValue(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
+	}
+}
+
+// The "Добавить вариацию" modal lists only active points as quantity
+// columns and marks warehouses, both in the modal and in the table header.
+func TestRenderProductFormVariantModal(t *testing.T) {
+	rr := newTestRenderer(t)
+	manager := &staff.Staff{ID: "s2", Name: "Данияр К.", Role: staff.RoleManager, IsActive: true}
+	pts := []StockPointVM{
+		{ID: "b1", Name: "Cozy ЦУМ"},
+		{ID: "w1", Name: "Склад Ош", Warehouse: true},
+		{ID: "old", Name: "Закрытая", Inactive: true},
+	}
+	pageData := PageData{
+		Screen: "product_form", PageTitle: "Товар", ShowSidebar: true, ShowBack: true,
+		Staff: manager, Initials: initialsFor(manager.Name), RoleLabel: roleLabel(manager.Role),
+		NavItems: navItemsForRole(manager.Role, "products"),
+		Data:     ProductFormData{StockPoints: pts, StockPointsJSON: marshalJS(pts)},
+	}
+
+	w := httptest.NewRecorder()
+	if err := rr.Render(w, "product_form", pageData); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	body := w.Body.String()
+	start := strings.Index(body, `id="pf-variant-modal"`)
+	if start < 0 {
+		t.Fatal("variant modal missing")
+	}
+	modal := body[start:]
+	modal = modal[:strings.Index(modal, `id="pf-colorphoto-modal"`)]
+	for _, want := range []string{"Новая вариация", "Cozy ЦУМ", "Склад Ош", "склад", "Добавить цвет", "Добавить в таблицу"} {
+		if !strings.Contains(modal, want) {
+			t.Errorf("modal lacks %q", want)
+		}
+	}
+	if strings.Contains(modal, "Закрытая") {
+		t.Error("inactive point offered as a quantity column in the modal")
 	}
 }

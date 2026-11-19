@@ -54,13 +54,14 @@ func (b Branch) EmbedURL() string {
 	return "https://maps.google.com/maps?z=16&output=embed&q=" + url.QueryEscape(q)
 }
 
-// List returns every active point of sale, ordered by name for a stable
+// List returns every active branch (warehouses are never customer-facing),
+// ordered by name for a stable
 // display order.
 func (r *BranchRepo) List(ctx context.Context) ([]Branch, error) {
 	const q = `
 		SELECT id, name, city, address, working_hours, latitude, longitude
 		FROM points_of_sale
-		WHERE is_active
+		WHERE is_active AND kind = 'branch'
 		ORDER BY name`
 
 	rows, err := r.db.QueryContext(ctx, q)

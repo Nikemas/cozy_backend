@@ -395,7 +395,7 @@ func listCustomerAddresses(ctx context.Context, db *sql.DB, customerID string) (
 }
 
 func listActivePoints(ctx context.Context, db *sql.DB) ([]PointView, error) {
-	const q = `SELECT id, name, address FROM points_of_sale WHERE is_active = true ORDER BY name`
+	const q = `SELECT id, name, address FROM points_of_sale WHERE is_active = true AND kind = 'branch' ORDER BY name`
 
 	rows, err := db.QueryContext(ctx, q)
 	if err != nil {

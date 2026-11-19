@@ -248,3 +248,4 @@ import.sku_without_variant: SKU указан без размера и цвета
 import.stock_without_variant: остаток указан без размера и цвета
 import.variant_needs_size_and_color: "для вариации нужны оба поля: размер и цвет"
 import.variant_price: "цена варианта: {reason}"
+err.invalid_kind: тип точки должен быть «филиал» или «склад»

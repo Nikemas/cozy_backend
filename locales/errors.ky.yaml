@@ -241,3 +241,4 @@ import.sku_without_variant: SKU өлчөмү жана түсү жок көрсө
 import.stock_without_variant: калдык өлчөмү жана түсү жок көрсөтүлгөн
 import.variant_needs_size_and_color: "вариация үчүн эки талаа тең керек: өлчөм жана түс"
 import.variant_price: "вариациянын баасы: {reason}"
+err.invalid_kind: "точканын түрү «филиал» же «кампа» болушу керек"

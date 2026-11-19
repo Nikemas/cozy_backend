@@ -730,3 +730,16 @@ admin.import.needs_js: "Импорт работает только с включ
 admin.import.err_rate_limited: "Слишком много проверок и импортов подряд — подождите минуту и попробуйте снова."
 admin.import.err_busy: "Сейчас уже идут другие проверки или импорты — подождите несколько секунд и попробуйте снова."
 admin.import.summary_line: "%s: %s %d, %s %d · %s: %s %d, %s %d · %s: %d, %s %d, %s %d"
+admin.points.kind: Тип
+admin.points.kind_branch: Филиал
+admin.points.kind_warehouse: Склад
+admin.points.kind_hint: "Филиал виден покупателям на карте и доступен для самовывоза. Склад только хранит товар: его остатки продаются с доставкой, но покупатели склад не видят."
+admin.product.warehouse_suffix: склад
+admin.product.variant_modal_title: Новая вариация
+admin.product.variant_modal_hint: "Укажите размер и добавьте цвета. У каждого цвета своё количество в каждом филиале и на каждом складе — по строке на цвет появится в таблице вариаций."
+admin.product.add_color: Добавить цвет
+admin.product.remove_color: Удалить цвет
+admin.product.add_to_table: Добавить в таблицу
+admin.product.err_size_required: Укажите размер
+admin.product.err_color_required: Добавьте хотя бы один цвет
+admin.product.err_qty: "Количество — целое число от 0 до 100000"

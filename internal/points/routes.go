@@ -22,7 +22,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service) {
 	mux.Handle("DELETE /admin/api/points/{id}", ownerOnly(apperr.Wrap(deletePointHandler(repo))))
 }
 
-// createPointRequest is the POST body: {name, city, address, working_hours, latitude, longitude}. is_active isn't
+// createPointRequest is the POST body: {name, city, address, working_hours, latitude, longitude, kind}. is_active isn't
 // accepted here — a newly created point always defaults to active.
 type createPointRequest struct {
 	Name         string   `json:"name"`
@@ -31,6 +31,7 @@ type createPointRequest struct {
 	WorkingHours string   `json:"working_hours"`
 	Latitude     *float64 `json:"latitude"`
 	Longitude    *float64 `json:"longitude"`
+	Kind         string   `json:"kind"`
 }
 
 func (req createPointRequest) toInput() PointInput {
@@ -41,11 +42,12 @@ func (req createPointRequest) toInput() PointInput {
 		WorkingHours: req.WorkingHours,
 		Latitude:     req.Latitude,
 		Longitude:    req.Longitude,
+		Kind:         req.Kind,
 		IsActive:     true,
 	}
 }
 
-// updatePointRequest is the PUT body: {name, city, address, working_hours, latitude, longitude, is_active} — unlike
+// updatePointRequest is the PUT body: {name, city, address, working_hours, latitude, longitude, kind, is_active} — unlike
 // create, is_active is an explicit, required field so a point can be
 // deactivated/reactivated through this endpoint.
 type updatePointRequest struct {
@@ -55,11 +57,21 @@ type updatePointRequest struct {
 	WorkingHours string   `json:"working_hours"`
 	Latitude     *float64 `json:"latitude"`
 	Longitude    *float64 `json:"longitude"`
+	Kind         *string  `json:"kind"` // omitted = keep the point's current kind
 	IsActive     bool     `json:"is_active"`
 }
 
-func (req updatePointRequest) toInput() PointInput {
-	return PointInput(req)
+// toInput builds the PointInput; currentKind is used when the body has no
+// kind, so an older client never silently turns a warehouse into a branch.
+func (req updatePointRequest) toInput(currentKind string) PointInput {
+	kind := currentKind
+	if req.Kind != nil {
+		kind = *req.Kind
+	}
+	return PointInput{
+		Name: req.Name, City: req.City, Address: req.Address, WorkingHours: req.WorkingHours,
+		Latitude: req.Latitude, Longitude: req.Longitude, Kind: kind, IsActive: req.IsActive,
+	}
 }
 
 func listPointsHandler(repo *PointsRepo) apperr.HandlerFunc {
@@ -94,7 +106,16 @@ func updatePointHandler(repo *PointsRepo) apperr.HandlerFunc {
 			return err
 		}
 
-		p, err := repo.Update(r.Context(), r.PathValue("id"), req.toInput())
+		currentKind := ""
+		if req.Kind == nil {
+			current, err := repo.GetByID(r.Context(), r.PathValue("id"))
+			if err != nil {
+				return err
+			}
+			currentKind = current.Kind
+		}
+
+		p, err := repo.Update(r.Context(), r.PathValue("id"), req.toInput(currentKind))
 		if err != nil {
 			return err
 		}

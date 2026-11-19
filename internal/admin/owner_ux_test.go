@@ -406,7 +406,7 @@ func TestListReturnURLFromReferer(t *testing.T) {
 func TestSaveProductReturnsToListPage(t *testing.T) {
 	saver := &fakeSaver{}
 	h, mock := newProductFormHandlers(t, saver)
-	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}))
+	mock.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "kind", "is_active", "created_at"}))
 
 	form := url.Values{
 		"category_id": {"cat1"}, "name_ru": {"Nike"}, "name_ky": {"Nike"}, "base_price": {"4500"},
@@ -424,7 +424,7 @@ func TestSaveProductReturnsToListPage(t *testing.T) {
 
 	saver2 := &fakeSaver{}
 	h2, mock2 := newProductFormHandlers(t, saver2)
-	mock2.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "is_active", "created_at"}))
+	mock2.ExpectQuery(`FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "city", "address", "working_hours", "latitude", "longitude", "kind", "is_active", "created_at"}))
 	form.Set("back", "https://evil.test/admin/products")
 	w = postProductForm(h2, form)
 	if loc := w.Header().Get("Location"); !strings.HasPrefix(loc, "/admin/products?toast=") {

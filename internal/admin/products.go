@@ -29,6 +29,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/media"
+	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 )
 
@@ -299,7 +300,7 @@ func (h *handlers) stockPoints(ctx context.Context) ([]StockPointVM, error) {
 	}
 	out := make([]StockPointVM, 0, len(pts))
 	for _, p := range pts {
-		out = append(out, StockPointVM{ID: p.ID, Name: p.Name, Inactive: !p.IsActive})
+		out = append(out, StockPointVM{ID: p.ID, Name: p.Name, Inactive: !p.IsActive, Warehouse: p.Kind == points.KindWarehouse})
 	}
 	return out, nil
 }
