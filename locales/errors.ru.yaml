@@ -122,6 +122,7 @@ err.invalid_payment_method: неизвестный способ оплаты
 err.invalid_phone.provider: некорректный номер телефона
 err.invalid_phone.required: телефон обязателен
 err.invalid_phone: укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
+err.invalid_courier_phone: укажите номер для курьера — номер Кыргызстана, например 0700 123 456 или +996 700 123 456
 err.invalid_platform: platform должен быть ios или android
 err.invalid_point.inactive: точка продаж не найдена или отключена
 err.invalid_point: точка продаж не найдена

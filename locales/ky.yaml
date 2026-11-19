@@ -143,6 +143,9 @@ checkout.unavailable: Алуу ыкмалары убактылуу жеткил�
 checkout.place_order: Буйрутма берүү
 checkout.comment: Буйрутмага комментарий
 checkout.comment_placeholder: Мисалы, жеткирүүгө ыңгайлуу убакыт
+checkout.courier_phone: Курьер үчүн номер
+checkout.courier_phone_placeholder: 0700 123 456
+checkout.courier_phone_hint: Курьер ушул номерге чалат. Алуучунун номерин жазсаңыз болот.
 checkout.pickup_free: Өзү алып кетүү — акысыз
 
 done.total: Жыйынтык
@@ -163,6 +166,7 @@ error.code.bad_request: Туура эмес суроо. Баракты жаңы�
 error.code.unauthorized: Улантуу үчүн аккаунтка кириңиз.
 error.code.unauthenticated: Улантуу үчүн аккаунтка кириңиз.
 error.code.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
+error.code.invalid_courier_phone: Курьер үчүн Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
 error.code.otp_cooldown: Код жиберилди. Жаңы кодду бир аздан кийин сурай аласыз.
 error.code.otp_rate_limited: Код өтө көп суралды. Кийинчерээк аракет кылыңыз.
 error.code.otp_expired: Код туура эмес же эскирген. Жаңы код сураңыз.

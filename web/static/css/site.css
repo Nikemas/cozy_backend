@@ -469,6 +469,25 @@ button, input { font-family: inherit; }
 .checkout-suboption { display: flex; align-items: center; gap: 9px; font-size: var(--cozy-fs-13); color: var(--cozy-ink); padding: 6px 2px; cursor: pointer; }
 .checkout-suboption input { accent-color: var(--cozy-accent); }
 .checkout-hint { margin: 0 0 4px 30px; }
+/* Courier contact number (delivery only): label above a tel input, same
+   field look as the order comment. */
+.checkout-courier-phone { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 4px 30px; }
+.checkout-courier-phone .field-label { margin-bottom: 0; }
+.checkout-courier-phone input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  box-sizing: border-box;
+  border: 0.5px solid var(--cozy-border);
+  background: var(--cozy-surface);
+  border-radius: var(--cozy-r-12);
+  padding: 13px 16px;
+  font-family: inherit;
+  font-size: var(--cozy-fs-15);
+  color: var(--cozy-ink);
+}
+.checkout-courier-phone input:disabled { opacity: 0.5; }
+.checkout-courier-phone .checkout-hint { margin: 0; }
 /* Order comment: label above a full-width textarea, same field look as
    .address-form textarea. */
 .checkout-comment { display: flex; flex-direction: column; gap: 8px; }
@@ -1015,6 +1034,7 @@ button, input { font-family: inherit; }
 .form-stack input:focus-visible,
 .address-form textarea:focus-visible,
 .checkout-comment textarea:focus-visible,
+.checkout-courier-phone input:focus-visible,
 .aside__price-field input:focus-visible,
 .shop-sort select:focus-visible { outline: 2px solid var(--cozy-focus); outline-offset: 1px; border-color: var(--cozy-ink-2); }
 

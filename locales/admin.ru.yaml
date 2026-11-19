@@ -313,6 +313,7 @@ admin.nav.broadcasts: Рассылки
 admin.nav.delivery: Доставка
 admin.nav.audit: Журнал
 admin.order.zone: Зона доставки
+admin.order.courier_phone: Номер для курьера
 admin.broadcasts.status_queued: В очереди
 admin.broadcasts.status_sending: Отправляется
 admin.broadcasts.status_done: Отправлена
@@ -536,6 +537,7 @@ admin.err.internal: Внутренняя ошибка
 admin.apperr.invalid_credentials: Неверный телефон или пароль
 admin.apperr.too_many_attempts: Слишком много попыток входа, попробуйте позже
 admin.apperr.invalid_phone: Укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
+admin.apperr.invalid_courier_phone: Укажите номер для курьера — номер Кыргызстана, например 0700 123 456 или +996 700 123 456
 admin.apperr.invalid_name: Имя обязательно
 admin.apperr.invalid_address: Адрес обязателен
 admin.apperr.invalid_city: Город обязателен

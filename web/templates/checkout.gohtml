@@ -55,6 +55,13 @@
         </select>
       </label>
       {{end}}
+      <div class="checkout-courier-phone">
+        <label class="field-label" for="checkout-courier-phone">{{t "checkout.courier_phone"}}</label>
+        <input type="tel" id="checkout-courier-phone" name="courier_phone" value="{{$d.CourierPhone}}"
+               required autocomplete="tel" inputmode="tel" maxlength="32"
+               placeholder="{{t "checkout.courier_phone_placeholder"}}">
+        <p class="muted checkout-hint">{{t "checkout.courier_phone_hint"}}</p>
+      </div>
       {{else}}
       <p class="muted checkout-hint">{{t "checkout.no_addresses"}} <a href="/addresses">{{t "address.add"}}</a></p>
       {{end}}
@@ -116,6 +123,7 @@
     var form = document.getElementById('checkout-form');
     if (!form) return;
     var zone = document.getElementById('checkout-zone');
+    var courierPhone = document.getElementById('checkout-courier-phone');
     var fee = document.getElementById('checkout-fee');
     var feeRow = document.getElementById('checkout-fee-row');
     var total = document.getElementById('checkout-total');
@@ -135,6 +143,8 @@
       feeRow.hidden = src[feeKey] === form.dataset.pickupFee;
       total.textContent = src[totalKey];
       if (zone) zone.disabled = checked('fulfillment') !== 'delivery';
+      // Pickup needs no courier: a disabled field is neither required nor sent.
+      if (courierPhone) courierPhone.disabled = checked('fulfillment') !== 'delivery';
       submit.textContent = checked('payment_method') === 'online_card' ? submit.dataset.labelCard : submit.dataset.labelCash;
     }
     form.addEventListener('change', update);

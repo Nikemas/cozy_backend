@@ -113,6 +113,7 @@ err.invalid_password: сырсөз кеминде 8 белгиден туруш�
 err.invalid_password.too_long: сырсөз өтө узун (эң көп 72 байт)
 err.invalid_payment_method: белгисиз төлөм ыкмасы
 err.invalid_phone: Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
+err.invalid_courier_phone: курьер үчүн Кыргызстандын номерин жазыңыз, мисалы 0700 123 456 же +996 700 123 456
 err.invalid_phone.provider: телефон номери туура эмес
 err.invalid_phone.required: телефон милдеттүү
 err.invalid_platform: platform ios же android болушу керек

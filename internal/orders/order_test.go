@@ -147,7 +147,7 @@ func TestCreateOrderPickupHappyPath(t *testing.T) {
 	expectOrderPrologue(mock, 0)
 	expectPickupLine(mock, testVar1, 5000, 10, 2)
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		10000.0, 0.0, nil, nil, nil, nil, nil})
+		10000.0, 0.0, nil, nil, nil, nil, nil, nil})
 	mock.ExpectCommit()
 
 	pickupID := "point-1"
@@ -217,13 +217,13 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 		WithArgs(testVar1, "point-1").WillReturnRows(sqlmock.NewRows([]string{"quantity"}).AddRow(3))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE stock SET quantity")).WillReturnResult(sqlmock.NewResult(0, 1))
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", "addr-1", "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		5250.0, 250.0, "позвоните за час", nil, nil, "Дом", "ул. Киевская, 5"})
+		5250.0, 250.0, "позвоните за час", nil, nil, "Дом", "ул. Киевская, 5", "+996555123456"})
 	mock.ExpectCommit()
 
 	addr := "addr-1"
 	order, created, err := svc.PlaceOrder(context.Background(), PlaceOrderInput{
 		CustomerID: "cust-1", Items: []OrderItemInput{{VariantID: testVar1, Quantity: 1}},
-		AddressID: &addr, Comment: "  позвоните за час ",
+		AddressID: &addr, Comment: "  позвоните за час ", CourierPhone: "0555 12-34-56",
 	})
 	if err != nil || !created {
 		t.Fatalf("PlaceOrder = %v, %v", created, err)
@@ -237,6 +237,9 @@ func TestCreateOrderDeliveryAddsFeeToTotal(t *testing.T) {
 	want := OrderDeliveryAddress{Label: strPtr("Дом"), AddressText: "ул. Киевская, 5"}
 	if order.DeliveryAddress == nil || !reflect.DeepEqual(*order.DeliveryAddress, want) {
 		t.Errorf("DeliveryAddress = %+v, want snapshot %+v", order.DeliveryAddress, want)
+	}
+	if order.CourierPhone == nil || *order.CourierPhone != "+996555123456" {
+		t.Errorf("CourierPhone = %v, want normalized +996555123456", deref(order.CourierPhone))
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -390,5 +393,53 @@ func TestOrderKeyPredicate(t *testing.T) {
 	}
 	if got := orderKeyPredicate("", 1); got != "order_number = $1" {
 		t.Errorf("empty: got %q", got)
+	}
+}
+
+// TestPlaceOrderRejectsInvalidCourierPhone: a delivery order with a
+// non-Kyrgyz courier number is refused before any database work.
+func TestPlaceOrderRejectsInvalidCourierPhone(t *testing.T) {
+	svc, mock := newMockService(t)
+	svc.WithSettings(testSettings())
+
+	addr := "addr-1"
+	_, _, err := svc.PlaceOrder(context.Background(), PlaceOrderInput{
+		CustomerID: "cust-1", Items: []OrderItemInput{{VariantID: testVar1, Quantity: 1}},
+		AddressID: &addr, CourierPhone: "12345",
+	})
+	var ae *apperr.AppError
+	if !errors.As(err, &ae) || ae.Code != "invalid_courier_phone" || ae.Status != http.StatusBadRequest {
+		t.Fatalf("err = %v, want 400 invalid_courier_phone", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unexpected database work: %v", err)
+	}
+}
+
+// TestPlaceOrderPickupDropsCourierPhone: a pickup order stores no courier
+// number even when the client sends one.
+func TestPlaceOrderPickupDropsCourierPhone(t *testing.T) {
+	svc, mock := newMockService(t)
+	svc.WithSettings(testSettings())
+
+	expectOrderPrologue(mock, 0)
+	expectPickupLine(mock, testVar1, 5000, 10, 1)
+	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
+		5000.0, 0.0, nil, nil, nil, nil, nil, nil})
+	mock.ExpectCommit()
+
+	pickupID := "point-1"
+	order, _, err := svc.PlaceOrder(context.Background(), PlaceOrderInput{
+		CustomerID: "cust-1", Items: []OrderItemInput{{VariantID: testVar1, Quantity: 1}},
+		PickupPointID: &pickupID, CourierPhone: "0700123456",
+	})
+	if err != nil {
+		t.Fatalf("PlaceOrder: %v", err)
+	}
+	if order.CourierPhone != nil {
+		t.Errorf("CourierPhone = %v, want nil for pickup", *order.CourierPhone)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }

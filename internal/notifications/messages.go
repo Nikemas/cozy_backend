@@ -9,6 +9,7 @@ import (
 
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
+	"github.com/Nikemas/cozy_backend/internal/phonenorm"
 )
 
 // statusText is one push notification's title/body template; %s in Title
@@ -118,6 +119,9 @@ func staffOrderMessage(o orders.Order, info OrderInfo, adminBaseURL string) stri
 	if info.CustomerPhone != "" || info.CustomerName != "" {
 		customer := strings.TrimSpace(info.CustomerName + " " + info.CustomerPhone)
 		fmt.Fprintf(&b, "Покупатель: %s\n", e(customer))
+	}
+	if o.CourierPhone != nil && *o.CourierPhone != "" && !isPickup(o) {
+		fmt.Fprintf(&b, "Номер для курьера: %s\n", e(phonenorm.Display(*o.CourierPhone)))
 	}
 	if o.Comment != nil && *o.Comment != "" {
 		fmt.Fprintf(&b, "Комментарий: %s\n", e(*o.Comment))

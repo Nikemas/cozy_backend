@@ -143,6 +143,9 @@ checkout.unavailable: Способы получения заказа време�
 checkout.place_order: Оформить заказ
 checkout.comment: Комментарий к заказу
 checkout.comment_placeholder: Например, удобное время доставки
+checkout.courier_phone: Номер для курьера
+checkout.courier_phone_placeholder: 0700 123 456
+checkout.courier_phone_hint: Курьер позвонит по этому номеру. Можно указать номер получателя.
 checkout.pickup_free: Самовывоз — бесплатно
 
 done.total: Итого
@@ -163,6 +166,7 @@ error.code.bad_request: Некорректный запрос. Обновите 
 error.code.unauthorized: Войдите в аккаунт, чтобы продолжить.
 error.code.unauthenticated: Войдите в аккаунт, чтобы продолжить.
 error.code.invalid_phone: Укажите номер Кыргызстана, например 0700 123 456 или +996 700 123 456
+error.code.invalid_courier_phone: Укажите номер для курьера — номер Кыргызстана, например 0700 123 456 или +996 700 123 456
 error.code.otp_cooldown: Код уже отправлен. Запросить новый можно чуть позже.
 error.code.otp_rate_limited: Слишком много запросов кода. Попробуйте позже.
 error.code.otp_expired: Код неверный или устарел. Запросите новый.

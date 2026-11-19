@@ -35,3 +35,14 @@ func E164(raw string) (string, bool) {
 		return "", false
 	}
 }
+
+// Display spaces a canonical +996XXXXXXXXX as "+996 XXX XXX XXX" for
+// reading or dictating; anything else is returned unchanged.
+func Display(phone string) string {
+	const prefix = "+996"
+	if !intlPhoneRe.MatchString(strings.TrimPrefix(phone, "+")) || !strings.HasPrefix(phone, prefix) {
+		return phone
+	}
+	d := phone[len(prefix):]
+	return prefix + " " + d[:3] + " " + d[3:6] + " " + d[6:]
+}

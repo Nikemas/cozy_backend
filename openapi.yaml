@@ -787,7 +787,7 @@ paths:
         "201": { description: Order placed., content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "200": { description: "Idempotent replay — the order created earlier with the same `Idempotency-Key`.", content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreateResponse" } } } }
         "400":
-          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_idempotency_key`, `invalid_payment_method`, `delivery_zone_required` (delivery order without a zone while zones are active), `invalid_delivery_zone` (unknown or deactivated zone), or malformed body."
+          description: "`invalid_fulfillment` (not exactly one of address/pickup), `empty_order`, `invalid_qty`, `qty_too_large`, `invalid_variant_id` (not a UUID), `comment_too_long`, `invalid_courier_phone` (courier_phone is not a Kyrgyz number), `invalid_idempotency_key`, `invalid_payment_method`, `delivery_zone_required` (delivery order without a zone while zones are active), `invalid_delivery_zone` (unknown or deactivated zone), or malformed body."
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { description: "`address_not_found`, `pickup_point_not_found`, or `variant_not_found`.", content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } } }
@@ -2188,6 +2188,7 @@ components:
           properties:
             label: { type: string, nullable: true, example: "Дом" }
             address_text: { type: string, example: "г. Бишкек, ул. Киевская, 5" }
+        courier_phone: { type: string, nullable: true, example: "+996700123456", description: "Recipient's number for the courier, entered at checkout (+996XXXXXXXXX). Always present; null for pickup orders and for delivery orders placed without one." }
         point_id: { type: string, format: uuid, nullable: true, description: "Delivery: the auto-selected fulfilling point. Pickup: the chosen point. Null until fulfillment is decided." }
         status: { type: string, enum: [placed, confirmed, courier_assigned, delivered, cancelled] }
         payment_method: { type: string, enum: [online_card, cash_on_delivery] }
@@ -2261,6 +2262,7 @@ components:
         address_id: { type: string, format: uuid, nullable: true, description: "Delivery. Exactly one of address_id/pickup_point_id must be set." }
         pickup_point_id: { type: string, format: uuid, nullable: true, description: "Self-pickup. Exactly one of address_id/pickup_point_id must be set." }
         delivery_zone_id: { type: string, format: uuid, nullable: true, description: "Delivery only (ignored for pickup): a zone from `GET /api/v1/delivery-zones` — required while any zone is active. The fee is computed server-side." }
+        courier_phone: { type: string, nullable: true, example: "0700 123 456", description: "Delivery only (ignored for pickup): the recipient's number the courier calls — may differ from the account phone; the app pre-fills it with the profile phone. A Kyrgyz number in any common form (+996…, 0…, 9 digits; separators ignored), stored as +996XXXXXXXXX. Blank/omitted = none (staff call the account phone). Anything else → 400 `invalid_courier_phone`." }
         payment_method: { type: string, enum: [cash_on_delivery, online_card], default: cash_on_delivery }
         comment: { type: string, maxLength: 500, description: "Optional note to the store (delivery time, intercom code…). Blank = none." }
 

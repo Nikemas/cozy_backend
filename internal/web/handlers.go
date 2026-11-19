@@ -143,6 +143,7 @@ func (h *handlers) base(r *http.Request, screen string) PageData {
 			data.CustomerName = *customer.Name
 		}
 		data.MaskedPhone = maskPhone(customer.Phone)
+		data.CustomerPhone = customer.Phone
 	}
 
 	if n, ferr := h.favoriteRepo.Count(r.Context(), customerID); ferr != nil {
