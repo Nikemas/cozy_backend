@@ -262,7 +262,7 @@ func pointsFormRetry(r *http.Request, t tr) *FormRetry {
 	if !isFormRetryRequest(r) {
 		return nil
 	}
-	fields := []string{"name", "city", "address", "working_hours", "latitude", "longitude"}
+	fields := []string{"name", "city", "address", "working_hours", "latitude", "longitude", "kind"}
 	switch {
 	case r.URL.Path == "/admin/points":
 		return newFormRetry(r, "admin-point-modal", r.URL.Path, t.T("admin.points.new_title"), fields...)

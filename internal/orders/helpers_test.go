@@ -84,7 +84,7 @@ func expectOrderPrologue(mock sqlmock.Sqlmock, openCount int) {
 // expectPickupLine scripts point check, one variant snapshot, its stock
 // lock and decrement at point-1.
 func expectPickupLine(mock sqlmock.Sqlmock, variantID string, price float64, stock, qty int) {
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active FROM points_of_sale")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_active AND kind = 'branch' FROM points_of_sale")).
 		WithArgs("point-1").WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants pv")).
 		WithArgs(variantID).

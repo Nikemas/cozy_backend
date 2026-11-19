@@ -111,7 +111,7 @@
             <th scope="col">{{t "admin.product.color_photos"}}</th>
             <th scope="col">{{t "admin.product.variant_price"}}</th>
             {{range .StockPoints}}
-            <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Inactive}} <span class="admin-variants-table__inactive">{{t "admin.common.inactive_suffix"}}</span>{{end}}</th>
+            <th scope="col" class="admin-variants-table__point">{{.Name}}{{if .Warehouse}} <span class="admin-variants-table__inactive">{{t "admin.product.warehouse_suffix"}}</span>{{end}}{{if .Inactive}} <span class="admin-variants-table__inactive">{{t "admin.common.inactive_suffix"}}</span>{{end}}</th>
             {{end}}
             <th scope="col">{{t "admin.product.total"}}</th>
             <th scope="col"><span class="admin-visually-hidden">{{t "admin.common.delete"}}</span></th>
@@ -153,6 +153,48 @@
 
 <div id="pf-image-inputs"></div>
 <script id="pf-initial-images" type="application/json">{{.ImagesJSON}}</script>
+
+{{/* "Добавить вариацию" modal: one size, many colors, each color with its
+     own quantity per active point (филиал or склад). pfVariantModalApply
+     turns every color into a row of the table above (or adds the
+     quantities to an existing size+color row), so saving still goes through
+     the same variant_size/variant_color/qty_<key>_<point> form contract (product_form_parse.go). */}}
+<div id="pf-variant-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--xl" role="dialog" aria-modal="true" aria-labelledby="pf-variant-modal-title">
+    <div class="admin-modal__title" id="pf-variant-modal-title">{{t "admin.product.variant_modal_title"}}</div>
+    <div class="admin-modal__text">{{t "admin.product.variant_modal_hint"}}</div>
+    <div class="admin-field-row" style="margin-top:14px">
+      <div class="admin-field">
+        <label for="pf-vm-size">{{t "admin.common.size"}}</label>
+        <input id="pf-vm-size" type="text" placeholder="42" maxlength="20" autocomplete="off">
+      </div>
+      <div class="admin-field">
+        <label for="pf-vm-price">{{t "admin.product.variant_price"}}</label>
+        <input id="pf-vm-price" type="text" inputmode="decimal" placeholder="{{t "admin.product.variant_price_placeholder"}}" maxlength="12" autocomplete="off">
+      </div>
+    </div>
+    <div class="admin-vm-table-wrap">
+      <table class="admin-vm-table">
+        <thead>
+          <tr>
+            <th scope="col">{{t "admin.common.color"}}</th>
+            {{range .StockPoints}}{{if not .Inactive}}
+            <th scope="col">{{.Name}}{{if .Warehouse}} <span class="admin-variants-table__inactive">{{t "admin.product.warehouse_suffix"}}</span>{{end}}</th>
+            {{end}}{{end}}
+            <th scope="col"><span class="admin-visually-hidden">{{t "admin.common.delete"}}</span></th>
+          </tr>
+        </thead>
+        <tbody id="pf-vm-colors"></tbody>
+      </table>
+    </div>
+    <button type="button" class="admin-btn admin-btn--secondary admin-vm-add-color" onclick="pfVariantModalAddColor()">+ {{t "admin.product.add_color"}}</button>
+    <div id="pf-vm-error" class="admin-form-error" role="alert" style="display:none;margin-top:12px"></div>
+    <div class="admin-modal__actions">
+      <button type="button" class="admin-btn admin-btn--secondary" onclick="pfCloseVariantModal()">{{t "admin.common.cancel"}}</button>
+      <button type="button" class="admin-btn admin-btn--primary" onclick="pfVariantModalApply()">{{t "admin.product.add_to_table"}}</button>
+    </div>
+  </div>
+</div>
 
 {{/* Per-color photo picker: opened from a variant row's "Фото цвета"
      button (pfOpenColorPhotos), scoped to that row's current color text —
@@ -257,6 +299,10 @@
     uploadOffline: {{t "admin.product.upload_offline"}},
     uploadFailed: {{t "admin.product.upload_failed"}},
     colorFirst: {{t "admin.product.color_first"}},
+    removeColor: {{t "admin.product.remove_color"}},
+    errSizeRequired: {{t "admin.product.err_size_required"}},
+    errColorRequired: {{t "admin.product.err_color_required"}},
+    errQty: {{t "admin.product.err_qty"}},
     colorPhotosOf: {{t "admin.product.color_photos_of"}}
   };
   var initialTop = {{.TopCategoryID}};
@@ -455,7 +501,9 @@
   }
 
   var newRowSeq = 0;
-  window.pfAddVariant = function () {
+  // pfAppendVariantRow adds one size+color row to the table. v carries the
+  // prefilled values: {size, color, price, qty: {pointID: n}}.
+  function pfAppendVariantRow(v) {
     newRowSeq++;
     var key = 'n' + Date.now().toString(36) + newRowSeq;
     var tbody = document.getElementById('pf-variant-rows');
@@ -464,11 +512,11 @@
     var tdSize = el('td', { 'data-label': L.size });
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_key', value: key }));
     tdSize.appendChild(el('input', { type: 'hidden', name: 'variant_id', value: '' }));
-    tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': L.size }));
+    tdSize.appendChild(el('input', { type: 'text', name: 'variant_size', value: v.size || '', 'class': 'admin-variant-input', placeholder: '42', 'aria-label': L.size }));
     tr.appendChild(tdSize);
 
     var tdColor = el('td', { 'data-label': L.color });
-    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', 'class': 'admin-variant-input', placeholder: L.colorPlaceholder, 'aria-label': L.color }));
+    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', value: v.color || '', 'class': 'admin-variant-input', placeholder: L.colorPlaceholder, 'aria-label': L.color }));
     tr.appendChild(tdColor);
 
     var tdPhoto = el('td', { 'data-label': L.colorPhotos });
@@ -481,14 +529,14 @@
     // row gets no orig_variant_price_<key>: it has no stored price, so the
     // server always takes what was typed (see product_form_parse.go).
     var tdPrice = el('td', { 'data-label': L.variantPrice });
-    tdPrice.appendChild(el('input', { type: 'text', inputmode: 'decimal', name: 'variant_price', value: '', 'class': 'admin-variant-input admin-variant-input--price', placeholder: L.variantPricePlaceholder, 'aria-label': L.variantPrice }));
+    tdPrice.appendChild(el('input', { type: 'text', inputmode: 'decimal', name: 'variant_price', value: v.price || '', 'class': 'admin-variant-input admin-variant-input--price', placeholder: L.variantPricePlaceholder, 'aria-label': L.variantPrice }));
     tr.appendChild(tdPrice);
 
     stockPoints.forEach(function (p) {
       var td = el('td', { 'class': 'admin-variant-cell--qty', 'data-label': p.Name });
       var input = el('input', {
         type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric',
-        name: 'qty_' + key + '_' + p.ID, value: '0',
+        name: 'qty_' + key + '_' + p.ID, value: String((v.qty && v.qty[p.ID]) || 0),
         'class': 'admin-variant-input admin-variant-input--qty',
         'aria-label': L.stock + ': ' + p.Name
       });
@@ -508,8 +556,127 @@
     tr.appendChild(tdRemove);
 
     tbody.appendChild(tr);
-    tr.querySelector('input[name="variant_size"]').focus();
+    pfUpdateBadge(tr.querySelector('.admin-variant-input--qty') || tdBadge);
+    return tr;
+  }
+
+  // --- "Добавить вариацию" modal (see #pf-variant-modal) ---
+  var MAX_QTY = 100000;
+  var activePoints = stockPoints.filter(function (p) { return !p.Inactive; });
+  var vmColors = document.getElementById('pf-vm-colors');
+
+  function vmError(msg) {
+    var box = document.getElementById('pf-vm-error');
+    box.textContent = msg || '';
+    box.style.display = msg ? 'block' : 'none';
+  }
+
+  window.pfVariantModalAddColor = function () {
+    var tr = el('tr', { 'class': 'admin-vm-color' });
+    var tdColor = el('td', {});
+    tdColor.appendChild(el('input', { type: 'text', 'class': 'admin-variant-input admin-vm-color-name', placeholder: L.colorPlaceholder, 'aria-label': L.color, maxlength: '60', autocomplete: 'off' }));
+    tr.appendChild(tdColor);
+    activePoints.forEach(function (p) {
+      var td = el('td', {});
+      td.appendChild(el('input', {
+        type: 'number', min: '0', max: String(MAX_QTY), step: '1', inputmode: 'numeric', value: '0',
+        'class': 'admin-variant-input admin-variant-input--qty admin-vm-qty', 'data-point': p.ID,
+        'aria-label': L.stock + ': ' + p.Name
+      }));
+      tr.appendChild(td);
+    });
+    var tdRemove = el('td', {});
+    tdRemove.innerHTML = '<button type="button" class="admin-variant-remove"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    tdRemove.firstChild.setAttribute('aria-label', L.removeColor);
+    tdRemove.firstChild.addEventListener('click', function () {
+      tr.remove();
+      if (!vmColors.children.length) pfVariantModalAddColor();
+    });
+    tr.appendChild(tdRemove);
+    vmColors.appendChild(tr);
+    tr.querySelector('.admin-vm-color-name').focus();
   };
+
+  // "+ Добавить вариацию" opens the modal; size prefills it (optional).
+  window.pfAddVariant = function (size) {
+    document.getElementById('pf-vm-size').value = size || '';
+    document.getElementById('pf-vm-price').value = '';
+    vmColors.innerHTML = '';
+    vmError('');
+    document.getElementById('pf-variant-modal').style.display = 'flex';
+    pfVariantModalAddColor();
+    if (!size) document.getElementById('pf-vm-size').focus();
+  };
+  window.pfCloseVariantModal = function () {
+    document.getElementById('pf-variant-modal').style.display = 'none';
+  };
+
+  // vmReadColors collects the modal's color lines as
+  // [{color, qty: {pointID: n}}], summing a color typed twice. Returns
+  // null (after showing the error) on an invalid quantity.
+  function vmReadColors() {
+    var byColor = {};
+    var order = [];
+    var lines = vmColors.querySelectorAll('.admin-vm-color');
+    for (var i = 0; i < lines.length; i++) {
+      var color = lines[i].querySelector('.admin-vm-color-name').value.trim();
+      if (!color) continue;
+      var k = color.toLowerCase();
+      if (!byColor[k]) { byColor[k] = { color: color, qty: {} }; order.push(k); }
+      var inputs = lines[i].querySelectorAll('.admin-vm-qty');
+      for (var j = 0; j < inputs.length; j++) {
+        var raw = inputs[j].value.trim();
+        var n = raw === '' ? 0 : Number(raw);
+        if (!Number.isInteger(n) || n < 0 || n > MAX_QTY) { inputs[j].focus(); vmError(L.errQty); return null; }
+        var pid = inputs[j].getAttribute('data-point');
+        byColor[k].qty[pid] = (byColor[k].qty[pid] || 0) + n;
+      }
+    }
+    return order.map(function (k) { return byColor[k]; });
+  }
+
+  function findVariantRow(size, color) {
+    var rows = document.querySelectorAll('#pf-variant-rows .admin-variant-row');
+    for (var i = 0; i < rows.length; i++) {
+      var s = rows[i].querySelector('input[name="variant_size"]').value.trim().toLowerCase();
+      var c = rows[i].querySelector('input[name="variant_color"]').value.trim().toLowerCase();
+      if (s === size.toLowerCase() && c === color.toLowerCase()) return rows[i];
+    }
+    return null;
+  }
+
+  // An existing size+color row keeps its price; the modal only adds to its
+  // per-point quantities.
+  function addQtyToRow(row, qty) {
+    var key = row.getAttribute('data-key');
+    Object.keys(qty).forEach(function (pid) {
+      var input = row.querySelector('input[name="qty_' + key + '_' + pid + '"]');
+      if (!input || !qty[pid]) return;
+      input.value = String(Math.min(MAX_QTY, (parseInt(input.value, 10) || 0) + qty[pid]));
+      pfUpdateBadge(input);
+    });
+  }
+
+  window.pfVariantModalApply = function () {
+    var sizeInput = document.getElementById('pf-vm-size');
+    var size = sizeInput.value.trim();
+    if (!size) { sizeInput.focus(); vmError(L.errSizeRequired); return; }
+    var colors = vmReadColors();
+    if (colors === null) return;
+    if (!colors.length) { vmError(L.errColorRequired); vmColors.querySelector('.admin-vm-color-name').focus(); return; }
+    var price = document.getElementById('pf-vm-price').value.trim();
+    colors.forEach(function (c) {
+      var existing = findVariantRow(size, c.color);
+      if (existing) { addQtyToRow(existing, c.qty); return; }
+      pfAppendVariantRow({ size: size, color: c.color, price: price, qty: c.qty });
+    });
+    pfRefreshPhotoBadges();
+    pfCloseVariantModal();
+  };
+
+  document.getElementById('pf-variant-modal').addEventListener('keydown', function (evt) {
+    if (evt.key === 'Enter' && evt.target.tagName === 'INPUT') { evt.preventDefault(); pfVariantModalApply(); }
+  });
 
   window.pfRemoveVariantRow = function (btn) {
     btn.closest('tr').remove();

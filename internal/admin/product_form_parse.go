@@ -42,9 +42,10 @@ const maxStockQty = 100000
 
 // StockPointVM is one point-of-sale column of the Вариации stock matrix.
 type StockPointVM struct {
-	ID       string
-	Name     string
-	Inactive bool
+	ID        string
+	Name      string
+	Inactive  bool
+	Warehouse bool // points.KindWarehouse: stores goods only, never customer-facing
 }
 
 // StockCellVM is one (variant row × point) stock input.

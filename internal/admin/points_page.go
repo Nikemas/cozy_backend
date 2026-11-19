@@ -27,6 +27,8 @@ type pointRow struct {
 	FullAddress string // "city, address" shown in the list
 	Hours       string
 	Lat, Lng    string // formatted for the edit form; empty when unset
+	Kind        string // points.KindBranch or points.KindWarehouse
+	KindLabel   string
 	IsActive    bool
 	ChipLabel   string
 	ChipClass   string // admin-chip modifier class, see admin.css
@@ -44,6 +46,10 @@ func newPointRow(t tr, p *points.Point) pointRow {
 		ID: p.ID, Name: p.Name, City: p.City, Address: p.Address, Hours: p.WorkingHours, IsActive: p.IsActive,
 		FullAddress: strings.Trim(p.City+", "+p.Address, ", "),
 		Lat:         formatCoord(p.Latitude), Lng: formatCoord(p.Longitude),
+		Kind: p.Kind, KindLabel: t.T("admin.points.kind_branch"),
+	}
+	if p.Kind == points.KindWarehouse {
+		row.KindLabel = t.T("admin.points.kind_warehouse")
 	}
 	if p.IsActive {
 		row.ChipLabel = t.T("admin.points.active")
@@ -168,7 +174,7 @@ func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 
 	in := points.PointInput{
 		Name: target.Name, City: target.City, Address: target.Address, WorkingHours: target.WorkingHours,
-		Latitude: target.Latitude, Longitude: target.Longitude, IsActive: !target.IsActive,
+		Latitude: target.Latitude, Longitude: target.Longitude, Kind: target.Kind, IsActive: !target.IsActive,
 	}
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
@@ -226,5 +232,6 @@ func pointInputFromForm(r *http.Request) (points.PointInput, error) {
 		WorkingHours: strings.TrimSpace(r.FormValue("working_hours")),
 		Latitude:     lat,
 		Longitude:    lng,
+		Kind:         r.FormValue("kind"),
 	}, nil
 }

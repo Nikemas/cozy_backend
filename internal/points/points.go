@@ -27,9 +27,18 @@ type Point struct {
 	WorkingHours string    `json:"working_hours"`
 	Latitude     *float64  `json:"latitude"`
 	Longitude    *float64  `json:"longitude"`
+	Kind         string    `json:"kind"`
 	IsActive     bool      `json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+// Point kinds (points_of_sale.kind, migration 000047_points_kind). A branch
+// is customer-facing (map, branches screen, self-pickup); a warehouse only
+// stores goods — its stock still counts for availability and delivery.
+const (
+	KindBranch    = "branch"
+	KindWarehouse = "warehouse"
+)
 
 // PointsRepo is the CRUD repo behind /admin/api/points. It mirrors the
 // shape of catalog.CategoryRepo: a validate()-ing input type shared by
@@ -52,7 +61,25 @@ type PointInput struct {
 	WorkingHours string
 	Latitude     *float64
 	Longitude    *float64
+	Kind         string // "" defaults to KindBranch
 	IsActive     bool
+}
+
+// normalized returns a copy of in with Kind trimmed, lower-cased and
+// defaulted to KindBranch, validating every field. in itself is untouched.
+func (in PointInput) normalized() (PointInput, error) {
+	out := in
+	out.Kind = strings.ToLower(strings.TrimSpace(in.Kind))
+	if out.Kind == "" {
+		out.Kind = KindBranch
+	}
+	if out.Kind != KindBranch && out.Kind != KindWarehouse {
+		return PointInput{}, apperr.BadRequest("invalid_kind", "тип точки должен быть «филиал» или «склад»")
+	}
+	if err := out.validate(); err != nil {
+		return PointInput{}, err
+	}
+	return out, nil
 }
 
 func (in PointInput) validate() error {
@@ -82,13 +109,13 @@ func validateCoords(lat, lng *float64) error {
 	return nil
 }
 
-const pointColumns = `id, name, city, address, working_hours, latitude, longitude, is_active, created_at`
+const pointColumns = `id, name, city, address, working_hours, latitude, longitude, kind, is_active, created_at`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanPoint(row rowScanner) (*Point, error) {
 	var p Point
-	err := row.Scan(&p.ID, &p.Name, &p.City, &p.Address, &p.WorkingHours, &p.Latitude, &p.Longitude, &p.IsActive, &p.CreatedAt)
+	err := row.Scan(&p.ID, &p.Name, &p.City, &p.Address, &p.WorkingHours, &p.Latitude, &p.Longitude, &p.Kind, &p.IsActive, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -133,34 +160,36 @@ func (r *PointsRepo) GetByID(ctx context.Context, id string) (*Point, error) {
 }
 
 // Create inserts a new point of sale and returns the row as stored.
-func (r *PointsRepo) Create(ctx context.Context, in PointInput) (*Point, error) {
-	if err := in.validate(); err != nil {
+func (r *PointsRepo) Create(ctx context.Context, raw PointInput) (*Point, error) {
+	in, err := raw.normalized()
+	if err != nil {
 		return nil, err
 	}
 
 	const q = `
-		INSERT INTO points_of_sale (name, city, address, working_hours, latitude, longitude, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO points_of_sale (name, city, address, working_hours, latitude, longitude, kind, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING ` + pointColumns
 
-	return scanPoint(r.db.QueryRowContext(ctx, q, in.Name, in.City, in.Address, in.WorkingHours, in.Latitude, in.Longitude, in.IsActive))
+	return scanPoint(r.db.QueryRowContext(ctx, q, in.Name, in.City, in.Address, in.WorkingHours, in.Latitude, in.Longitude, in.Kind, in.IsActive))
 }
 
 // Update replaces every writable field of the point of sale with the given
 // id. Returns apperr.NotFound if no such point exists.
-func (r *PointsRepo) Update(ctx context.Context, id string, in PointInput) (*Point, error) {
-	if err := in.validate(); err != nil {
+func (r *PointsRepo) Update(ctx context.Context, id string, raw PointInput) (*Point, error) {
+	in, err := raw.normalized()
+	if err != nil {
 		return nil, err
 	}
 
 	const q = `
 		UPDATE points_of_sale
 		SET name = $2, city = $3, address = $4, working_hours = $5,
-		    latitude = $6, longitude = $7, is_active = $8
+		    latitude = $6, longitude = $7, kind = $8, is_active = $9
 		WHERE id = $1
 		RETURNING ` + pointColumns
 
-	p, err := scanPoint(r.db.QueryRowContext(ctx, q, id, in.Name, in.City, in.Address, in.WorkingHours, in.Latitude, in.Longitude, in.IsActive))
+	p, err := scanPoint(r.db.QueryRowContext(ctx, q, id, in.Name, in.City, in.Address, in.WorkingHours, in.Latitude, in.Longitude, in.Kind, in.IsActive))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperr.NotFound("point_not_found", "точка продаж не найдена")
 	}
