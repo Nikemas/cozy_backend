@@ -468,3 +468,31 @@ func TestSQLContactLookup(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestStaffMessageShowsCourierPhone(t *testing.T) {
+	staff := &fakeStaff{}
+	d := NewDispatcher(Config{Staff: staff})
+	o := deliveryOrder(orders.StatusPlaced)
+	phone := "+996555123456"
+	o.CourierPhone = &phone
+	d.OrderCreated(o)
+	d.OrderCreated(deliveryOrder(orders.StatusPlaced)) // none given
+	shutdown(t, d)
+
+	if len(staff.msgs) != 2 {
+		t.Fatalf("got %d staff messages", len(staff.msgs))
+	}
+	// Delivery may be concurrent: exactly one of the two carries the line.
+	with, total := 0, 0
+	for _, m := range staff.msgs {
+		if strings.Contains(m, "Номер для курьера: +996 555 123 456\n") {
+			with++
+		}
+		if strings.Contains(m, "Номер для курьера") {
+			total++
+		}
+	}
+	if with != 1 || total != 1 {
+		t.Errorf("want the courier line in exactly one message, got %d/%d:\n%s", with, total, strings.Join(staff.msgs, "\n---\n"))
+	}
+}

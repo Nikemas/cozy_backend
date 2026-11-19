@@ -38,6 +38,12 @@
       <div class="admin-order-detail__address">{{.Data.AddressText}}</div>
       {{if .Data.MapURL}}<a class="admin-btn admin-btn--secondary admin-btn--row admin-order-detail__map" href="{{.Data.MapURL}}" target="_blank" rel="noopener noreferrer">{{t "admin.order.on_map"}}</a>{{end}}
       {{if .Data.ZoneName}}<div class="admin-order-detail__sub">{{t "admin.order.zone"}}: {{.Data.ZoneName}}</div>{{end}}
+      {{with .Data.CourierContact}}{{if .Tel}}
+      <div class="admin-order-detail__sub admin-order-detail__courier">{{t "admin.order.courier_phone"}}:
+        <a class="admin-order-detail__phone" href="{{.Tel}}">{{.Display}}</a>
+        <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" data-copy="{{.Raw}}">{{t "admin.common.copy"}}</button>
+      </div>
+      {{end}}{{end}}
       <div class="admin-order-detail__sub">{{t "admin.order.comment"}}: {{.Data.Comment}}</div>
     </div>
   </div>

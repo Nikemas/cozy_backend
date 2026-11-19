@@ -141,10 +141,13 @@ type OrderDetailData struct {
 	AddressText     string
 	MapURL          string // 2GIS search for a delivery address ("" for pickup)
 	ZoneName        string // delivery zone, in the admin's language ("" = none)
-	Comment         string
-	Items           []OrderDetailItemView
-	TotalLabel      string
-	StatusButtons   []StatusButtonView
+	// CourierContact is the recipient's number for the courier, entered at
+	// checkout (orders.courier_phone); zero for pickup / none given.
+	CourierContact PhoneContact
+	Comment        string
+	Items          []OrderDetailItemView
+	TotalLabel     string
+	StatusButtons  []StatusButtonView
 	// Order history / money flags (fix/orders-integrity, order_history.go).
 	OrderHistoryData
 }
@@ -633,12 +636,21 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		AddressText:      addressText,
 		MapURL:           mapSearchURL(mapAddress),
 		ZoneName:         orderZoneName(t, o.DeliveryZone),
+		CourierContact:   courierContact(o.CourierPhone),
 		Comment:          comment,
 		Items:            items,
 		TotalLabel:       t.Som(o.TotalAmount),
 		StatusButtons:    buildStatusButtons(t, o.Status, role),
 		OrderHistoryData: buildOrderHistoryData(t, o),
 	}
+}
+
+// courierContact is the call/copy view of the order's courier number.
+func courierContact(phone *string) PhoneContact {
+	if phone == nil {
+		return PhoneContact{}
+	}
+	return phoneContact(*phone)
 }
 
 // orderDeliveryInfo resolves the "Доставка" card's address line: the
