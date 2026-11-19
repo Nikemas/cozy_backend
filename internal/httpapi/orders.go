@@ -110,6 +110,10 @@ type createOrderRequest struct {
 	// for a delivery order — required while any zone is active; ignored
 	// for pickup. The fee is computed server-side from it.
 	DeliveryZoneID *string `json:"delivery_zone_id"`
+	// CourierPhone is the number the courier calls (delivery only; ignored
+	// for pickup). Optional: blank → none. Validated and normalized to
+	// +996XXXXXXXXX by orders.Service (400 invalid_courier_phone).
+	CourierPhone string `json:"courier_phone"`
 	// PaymentMethod is "cash_on_delivery" (default when omitted, the
 	// pre-Task-S behavior) or "online_card".
 	PaymentMethod string `json:"payment_method"`
@@ -135,6 +139,7 @@ func (req createOrderRequest) toInput(customerID, idempotencyKey string) orders.
 		AddressID:      req.AddressID,
 		PickupPointID:  req.PickupPointID,
 		DeliveryZoneID: req.DeliveryZoneID,
+		CourierPhone:   req.CourierPhone,
 		Comment:        req.Comment,
 		IdempotencyKey: idempotencyKey,
 	}

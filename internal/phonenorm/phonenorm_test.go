@@ -48,3 +48,18 @@ func TestE164(t *testing.T) {
 		})
 	}
 }
+
+func TestDisplay(t *testing.T) {
+	for in, want := range map[string]string{
+		"+996555123456": "+996 555 123 456",
+		"+99655512345":  "+99655512345",
+		"996555123456":  "996555123456",
+		"0555123456":    "0555123456",
+		"+996abc123456": "+996abc123456",
+		"":              "",
+	} {
+		if got := Display(in); got != want {
+			t.Errorf("Display(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

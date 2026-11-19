@@ -692,3 +692,31 @@ func TestRemoveCartItemHandlerUnauthenticatedWithoutContext(t *testing.T) {
 		t.Fatal("expected Remove NOT to be called without an authenticated customer")
 	}
 }
+
+// TestCreateOrderHandlerPassesCourierPhone: courier_phone from the body
+// reaches orders.PlaceOrderInput as-is (the service normalizes it) and the
+// stored value comes back in the response.
+func TestCreateOrderHandlerPassesCourierPhone(t *testing.T) {
+	phone := "+996555123456"
+	fake := &fakeOrderService{createResult: &orders.Order{ID: "order-1", CourierPhone: &phone}}
+	handler := apperr.Wrap(createOrderHandler(fake, nil))
+
+	req := newCustomerRequest(http.MethodPost, "/api/v1/orders", "cust-1",
+		`{"items":[{"variant_id":"v","quantity":1}],"address_id":"addr-1","courier_phone":"0555 123 456"}`)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if fake.lastInput.CourierPhone != "0555 123 456" {
+		t.Errorf("CourierPhone = %q, want the raw body value", fake.lastInput.CourierPhone)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["courier_phone"] != phone {
+		t.Errorf("courier_phone = %v, want %s", body["courier_phone"], phone)
+	}
+}

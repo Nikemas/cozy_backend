@@ -66,6 +66,10 @@ type Order struct {
 	// null for pickup orders (and for delivery orders with no snapshot).
 	// AddressID still names the saved address it was copied from.
 	DeliveryAddress *OrderDeliveryAddress `json:"delivery_address"`
+	// CourierPhone is the recipient's number for the courier (+996…),
+	// entered at checkout; null for pickup and when none was given (staff
+	// then call the account phone).
+	CourierPhone *string `json:"courier_phone"`
 	// RefundRequired: money was taken for an order that ended up cancelled
 	// — staff must refund it through the bank.
 	RefundRequired bool        `json:"refund_required"`
@@ -156,6 +160,10 @@ type PlaceOrderInput struct {
 	// for pickup). Required while at least one zone is active; the fee is
 	// then the zone's, else Settings.DeliveryFee.
 	DeliveryZoneID *string
+	// CourierPhone is the number the courier calls (delivery orders only;
+	// ignored for pickup). Blank → NULL; otherwise a Kyrgyz number,
+	// normalized to +996XXXXXXXXX.
+	CourierPhone string
 	// Comment is the customer's note to the store (≤ MaxCommentLen runes;
 	// blank is stored as NULL).
 	Comment string
@@ -217,6 +225,10 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 		return nil, false, err
 	}
 	comment, err := normalizeComment(in.Comment)
+	if err != nil {
+		return nil, false, err
+	}
+	courierPhone, err := normalizeCourierPhone(in.CourierPhone, addressID != nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -316,6 +328,7 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 			CustomerID:      customerID,
 			AddressID:       addressID,
 			DeliveryAddress: deliveryAddr,
+			CourierPhone:    courierPhone,
 			Status:          StatusPlaced,
 			PaymentMethod:   method,
 			Comment:         comment,
@@ -361,13 +374,13 @@ func (s *Service) createOrder(ctx context.Context, in PlaceOrderInput, method Pa
 		const insertOrderQ = `
 			INSERT INTO orders (order_number, customer_id, address_id, point_id, status, payment_method, payment_status,
 				total_amount, delivery_fee, comment, idempotency_key, delivery_zone_id,
-				delivery_address_label, delivery_address_text)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+				delivery_address_label, delivery_address_text, courier_phone)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 			RETURNING id, created_at, updated_at`
 		addrLabel, addrText := order.DeliveryAddress.snapshotColumns()
 		err = tx.QueryRowContext(ctx, insertOrderQ,
 			order.OrderNumber, order.CustomerID, order.AddressID, order.PointID, order.Status, order.PaymentMethod, order.PaymentStatus,
-			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey, zoneID, addrLabel, addrText,
+			order.TotalAmount, order.DeliveryFee, order.Comment, idemKey, zoneID, addrLabel, addrText, order.CourierPhone,
 		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return err
@@ -624,7 +637,7 @@ func scanOrderRow(row rowScanner, o *Order) error {
 	var zoneID, zoneRu, zoneKy, addrLabel, addrText sql.NullString
 	if err := row.Scan(&o.ID, &o.OrderNumber, &o.CustomerID, &o.AddressID, &o.PointID,
 		&o.Status, &o.PaymentMethod, &o.PaymentStatus, &o.TotalAmount, &o.DeliveryFee, &o.RefundRequired,
-		&o.Comment, &o.CreatedAt, &o.UpdatedAt, &zoneID, &zoneRu, &zoneKy, &addrLabel, &addrText); err != nil {
+		&o.Comment, &o.CreatedAt, &o.UpdatedAt, &zoneID, &zoneRu, &zoneKy, &addrLabel, &addrText, &o.CourierPhone); err != nil {
 		return err
 	}
 	o.DeliveryAddress = deliveryAddressFromSnapshot(addrLabel, addrText)

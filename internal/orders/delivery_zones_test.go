@@ -128,7 +128,7 @@ func TestCreateOrderChargesZoneFee(t *testing.T) {
 		expectZonedDeliveryUntilInsert(mock, 350, c.freeFrom)
 		items := 5000.0 * float64(c.qty)
 		expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", "addr-1", "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-			items + c.wantFee, c.wantFee, nil, nil, testZone, "Дом", "ул. Киевская, 5"})
+			items + c.wantFee, c.wantFee, nil, nil, testZone, "Дом", "ул. Киевская, 5", nil})
 		mock.ExpectCommit()
 
 		addr, zone := "addr-1", testZone
@@ -216,7 +216,7 @@ func TestCreatePickupOrderIgnoresZone(t *testing.T) {
 	expectOrderPrologue(mock, 0)
 	expectPickupLine(mock, testVar1, 5000, 10, 1)
 	expectOrderInsert(mock, []driver.Value{sqlmock.AnyArg(), "cust-1", nil, "point-1", StatusPlaced, PaymentCashOnDelivery, nil,
-		5000.0, 0.0, nil, nil, nil, nil, nil})
+		5000.0, 0.0, nil, nil, nil, nil, nil, nil})
 	mock.ExpectCommit()
 
 	point, zone := "point-1", testZone
@@ -240,7 +240,7 @@ func TestScanOrderRowFillsDeliveryZone(t *testing.T) {
 	r := codOrder(StatusPlaced)
 	rows := sqlmock.NewRows(orderColumnNames).AddRow(r.id, r.number, r.customer, "addr-1", r.point,
 		string(r.status), string(r.method), nil, 5350.0, 350.0, false, nil, time.Now(), time.Now(),
-		testZone, "Бишкек", "Бишкек ш.", "Дом", "ул. Киевская, 5")
+		testZone, "Бишкек", "Бишкек ш.", "Дом", "ул. Киевская, 5", "+996700123456")
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, order_number")).WillReturnRows(rows)
 	expectNoItems(mock)
 
@@ -250,5 +250,8 @@ func TestScanOrderRowFillsDeliveryZone(t *testing.T) {
 	}
 	if o.DeliveryZone == nil || *o.DeliveryZone != (OrderDeliveryZone{ID: testZone, NameRu: "Бишкек", NameKy: "Бишкек ш."}) {
 		t.Errorf("DeliveryZone = %+v", o.DeliveryZone)
+	}
+	if o.CourierPhone == nil || *o.CourierPhone != "+996700123456" {
+		t.Errorf("CourierPhone = %v, want +996700123456", deref(o.CourierPhone))
 	}
 }
