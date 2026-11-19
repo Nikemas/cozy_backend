@@ -1130,5 +1130,5 @@ button, input { font-family: inherit; }
    on it, so a discounted card price sits on a white pill. */
 .product-card__price.price--sale {
   display: inline-flex; background: var(--cozy-surface);
-  border-radius: var(--cozy-r-pill); padding: 2px 10px;
+  border-radius: var(--cozy-r-pill); padding: 0 10px;
 }
