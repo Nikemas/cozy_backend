@@ -126,9 +126,6 @@ func parsePrice(s string) (float64, error) {
 	return v, nil
 }
 
-// parseVariantPrice parses a variant's price_override field. Blank means
-// "no override" (nil → NULL); otherwise it's parsePrice — a zero override
-// would make the variant free rather than "inherit the base price".
 // formatOptionalPrice renders an optional price for a form field ("" = unset).
 func formatOptionalPrice(p *float64) string {
 	if p == nil {
@@ -137,6 +134,9 @@ func formatOptionalPrice(p *float64) string {
 	return strconv.FormatFloat(*p, 'f', -1, 64)
 }
 
+// parseVariantPrice parses a variant's price_override field. Blank means
+// "no override" (nil → NULL); otherwise it's parsePrice — a zero override
+// would make the variant free rather than "inherit the base price".
 func parseVariantPrice(s string) (*float64, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, nil

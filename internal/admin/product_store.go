@@ -133,7 +133,7 @@ func validateProductInput(in catalog.ProductInput) error {
 	if math.IsNaN(in.BasePrice) || math.IsInf(in.BasePrice, 0) || in.BasePrice < 0 {
 		return apperr.BadRequest("invalid_base_price", "цена не может быть отрицательной")
 	}
-	return catalog.ValidateOldPrice(in.OldPrice, in.BasePrice)
+	return catalog.ValidateOldPrice(in.OldPrice)
 }
 
 // Save persists in and returns the product's id. Any error rolls back the

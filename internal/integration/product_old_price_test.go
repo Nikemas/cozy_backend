@@ -61,10 +61,13 @@ func TestProductOldPriceStorefrontAndAPI(t *testing.T) {
 		t.Fatalf("API old_price = %v (err %v), want %v", body.OldPrice, err, old)
 	}
 
+	// An import can raise base_price above old_price; later full-row
+	// writes (the activate toggle) must keep working and keep old_price.
 	below := 2000.0
 	in.OldPrice = &below
-	if _, err := repo.Update(ctx, f.ProductID, in); err == nil {
-		t.Error("Update accepted an old price below the base price")
+	in.IsActive = false
+	if _, err := repo.Update(ctx, f.ProductID, in); err != nil {
+		t.Errorf("Update with a stale old price must succeed: %v", err)
 	}
 	if _, err := testDB.ExecContext(ctx, `UPDATE products SET old_price = 0 WHERE id = $1`, f.ProductID); err == nil {
 		t.Error("DB accepted old_price = 0")

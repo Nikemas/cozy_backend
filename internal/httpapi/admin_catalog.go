@@ -173,6 +173,9 @@ func createProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.
 			return err
 		}
 
+		if err := catalog.ValidateOldPriceAbove(req.OldPrice, req.BasePrice); err != nil {
+			return err
+		}
 		p, err := repo.Create(r.Context(), req.toInput())
 		if err != nil {
 			return err
@@ -189,6 +192,9 @@ func updateProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.
 			return err
 		}
 
+		if err := catalog.ValidateOldPriceAbove(req.OldPrice, req.BasePrice); err != nil {
+			return err
+		}
 		p, err := repo.Update(r.Context(), r.PathValue("id"), req.toInput())
 		if err != nil {
 			return err

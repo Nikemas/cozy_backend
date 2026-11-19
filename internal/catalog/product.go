@@ -480,19 +480,34 @@ func HasDiscount(oldPrice *float64, price float64) bool {
 	return oldPrice != nil && *oldPrice > price
 }
 
-// ValidateOldPrice checks an optional pre-discount price against the
-// product's base price: nil is "no discount"; otherwise it must be a finite
-// number above basePrice (a discount the storefront would never show is a
-// data-entry mistake, so it is rejected rather than silently stored).
-func ValidateOldPrice(oldPrice *float64, basePrice float64) error {
+// MaxOldPrice is the largest value products.old_price (NUMERIC(10,2)) holds.
+const MaxOldPrice = 99999999.99
+
+// ValidateOldPrice checks that an optional pre-discount price can be
+// stored: nil is "no discount"; otherwise a finite number in
+// (0, MaxOldPrice]. It deliberately does not compare against base_price —
+// an import can raise base_price above an existing old_price, and every
+// later write of the row (e.g. the activate toggle) must still succeed;
+// the storefront simply hides such an old price (HasDiscount). Entry
+// points where staff type the old price use ValidateOldPriceAbove.
+func ValidateOldPrice(oldPrice *float64) error {
 	if oldPrice == nil {
 		return nil
 	}
-	v := *oldPrice
-	if math.IsNaN(v) || math.IsInf(v, 0) || v <= 0 {
+	if v := *oldPrice; math.IsNaN(v) || math.IsInf(v, 0) || v <= 0 || v > MaxOldPrice {
 		return apperr.BadRequest("invalid_old_price", "старая цена должна быть больше нуля")
 	}
-	if v <= basePrice {
+	return nil
+}
+
+// ValidateOldPriceAbove is ValidateOldPrice plus "above basePrice": for
+// requests where staff set the old price themselves, a discount the
+// storefront would never show is a data-entry mistake.
+func ValidateOldPriceAbove(oldPrice *float64, basePrice float64) error {
+	if err := ValidateOldPrice(oldPrice); err != nil {
+		return err
+	}
+	if oldPrice != nil && *oldPrice <= basePrice {
 		return apperr.BadRequest("old_price_not_above_price", "старая цена должна быть больше текущей цены")
 	}
 	return nil
@@ -511,7 +526,7 @@ func (in ProductInput) validate() error {
 	if in.BasePrice < 0 {
 		return apperr.BadRequest("invalid_base_price", "base_price не может быть отрицательным").WithVariant("field")
 	}
-	return ValidateOldPrice(in.OldPrice, in.BasePrice)
+	return ValidateOldPrice(in.OldPrice)
 }
 
 // Create inserts a new product and returns the row as stored.

@@ -31,7 +31,7 @@ func TestHasDiscount(t *testing.T) {
 	}
 }
 
-func TestValidateOldPrice(t *testing.T) {
+func TestValidateOldPriceAbove(t *testing.T) {
 	tests := []struct {
 		name     string
 		oldPrice *float64
@@ -46,10 +46,11 @@ func TestValidateOldPrice(t *testing.T) {
 		{"negative", floatPtr(-1), 0, "invalid_old_price"},
 		{"NaN", floatPtr(math.NaN()), 4500, "invalid_old_price"},
 		{"Inf", floatPtr(math.Inf(1)), 4500, "invalid_old_price"},
+		{"too big for NUMERIC(10,2)", floatPtr(1e12), 4500, "invalid_old_price"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateOldPrice(tc.oldPrice, tc.base)
+			err := ValidateOldPriceAbove(tc.oldPrice, tc.base)
 			if tc.wantCode == "" {
 				if err != nil {
 					t.Fatalf("err = %v, want nil", err)
@@ -64,13 +65,16 @@ func TestValidateOldPrice(t *testing.T) {
 	}
 }
 
+// The repo only checks the old price is storable, not that it is above
+// base_price: after an import raised base_price, writes like the
+// activate toggle must still succeed (the storefront hides the old price).
 func TestProductInputValidateChecksOldPrice(t *testing.T) {
 	in := ProductInput{CategoryID: "c1", NameRu: "Кеды", NameKy: "Кеды", BasePrice: 4500, OldPrice: floatPtr(4000)}
-	if err := in.validate(); err == nil {
-		t.Fatal("validate accepted an old price below the base price")
-	}
-	in.OldPrice = floatPtr(5000)
 	if err := in.validate(); err != nil {
-		t.Fatalf("validate rejected a valid discount: %v", err)
+		t.Fatalf("validate rejected a stored old price below base price: %v", err)
+	}
+	in.OldPrice = floatPtr(0)
+	if err := in.validate(); err == nil {
+		t.Fatal("validate accepted old price 0")
 	}
 }
