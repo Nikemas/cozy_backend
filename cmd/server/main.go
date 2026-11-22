@@ -37,6 +37,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == createOwnerCmd {
 		os.Exit(createOwnerMain(os.Args[2:], os.Stdin, os.Stdout, os.Stderr, os.Getenv("DATABASE_URL")))
 	}
+	if len(os.Args) > 1 && os.Args[1] == reprocessPhotosCmd {
+		os.Exit(reprocessPhotosMain(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if err := run(); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)

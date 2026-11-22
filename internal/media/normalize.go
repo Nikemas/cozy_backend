@@ -17,19 +17,23 @@ import (
 )
 
 // Normalization parameters for product photos (Wave 5 / Task R in
-// tasks/plan.md). The numbers come from the mobile design system §4.2:
-// the product photo sits in a white 1:1 well with BoxFit.contain, the
-// shoe taking up ~88% of the scene.
+// tasks/plan.md). The photo is fitted edge to edge into a white 1:1
+// square (client request 23.11.2026: "фото обуви полностью по контуру
+// квадрата") — a square source fills it completely, a non-square one
+// touches two opposite edges. Until then every photo was saved with a
+// legacyPaddingRatio white frame; reprocess.go strips it from photos
+// uploaded before the change.
 const (
 	// fullSize is the side of the `full` variant (product screen).
 	fullSize = 1200
 	// thumbSize is the side of the `thumb` variant (2-column grid on a
 	// 3x screen: ~130pt tile ≈ 400px).
 	thumbSize = 400
-	// paddingRatio is the empty margin on every side, as a fraction of
-	// the canvas side — the image is fitted into the inner
-	// (1 - 2*paddingRatio) square.
-	paddingRatio = 0.08
+	// legacyPaddingRatio is the white margin on every side, as a fraction
+	// of the canvas side, that photos uploaded before 23.11.2026 carry
+	// (they were fitted into the inner (1 - 2*legacyPaddingRatio)
+	// square). New uploads have no margin; see reprocess.go.
+	legacyPaddingRatio = 0.08
 	// jpegQuality is the encoder quality for both variants.
 	jpegQuality = 85
 
@@ -61,8 +65,7 @@ type normalizedImage struct {
 // normalizeImage turns an uploaded file into the two product-photo
 // variants: the real format is detected by decoding (never from a
 // client-supplied Content-Type), EXIF orientation is applied, and the
-// result is fitted (contain) into a white square with paddingRatio
-// margins — so every product photo in the catalog has the same geometry
+// result is fitted (contain) edge to edge into a white square — so every product photo in the catalog has the same geometry
 // and background regardless of how it was shot. Transparent PNG/WebP
 // pixels end up white too (composited over the white canvas).
 //
@@ -78,8 +81,8 @@ func normalizeImage(data []byte) (*normalizedImage, error) {
 
 	full := fitOnWhiteSquare(src, fullSize)
 	// thumb is downscaled from the already-normalized full canvas: the
-	// padding scales proportionally, so it is identical geometry for a
-	// fraction of the work of resampling the multi-megapixel source again.
+	// geometry is identical, for a fraction of the work of resampling the
+	// multi-megapixel source again.
 	thumb := image.NewRGBA(image.Rect(0, 0, thumbSize, thumbSize))
 	draw.CatmullRom.Scale(thumb, thumb.Bounds(), full, full.Bounds(), draw.Src, nil)
 
@@ -131,16 +134,16 @@ func errUnsupportedImage() error {
 }
 
 // fitOnWhiteSquare returns a size×size opaque canvas filled with white,
-// with src scaled (up or down, preserving aspect ratio) to fit inside the
-// inner square left after paddingRatio margins, and centered. draw.Over
+// with src scaled (up or down, preserving aspect ratio) to fit inside it
+// edge to edge, and centered. draw.Over
 // composites any transparency in src onto the white background.
 func fitOnWhiteSquare(src image.Image, size int) *image.RGBA {
 	dst := image.NewRGBA(image.Rect(0, 0, size, size))
 	draw.Draw(dst, dst.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 
 	sb := src.Bounds()
-	inner := float64(size) * (1 - 2*paddingRatio)
-	scale := math.Min(inner/float64(sb.Dx()), inner/float64(sb.Dy()))
+	side := float64(size)
+	scale := math.Min(side/float64(sb.Dx()), side/float64(sb.Dy()))
 	w := max(1, int(math.Round(float64(sb.Dx())*scale)))
 	h := max(1, int(math.Round(float64(sb.Dy())*scale)))
 	x0 := (size - w) / 2

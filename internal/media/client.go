@@ -8,6 +8,8 @@ package media
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -115,6 +117,27 @@ func (c *Client) PutObject(ctx context.Context, objectKey string, data []byte, c
 		CacheControl: "public, max-age=31536000, immutable",
 	})
 	return err
+}
+
+// maxGetObjectBytes caps GetObject reads: product photos are normalized
+// JPEGs well under a megabyte, so anything larger is not one of ours.
+const maxGetObjectBytes = 20 << 20
+
+// GetObject reads objectKey into memory (at most maxGetObjectBytes).
+func (c *Client) GetObject(ctx context.Context, objectKey string) ([]byte, error) {
+	obj, err := c.sdk.GetObject(ctx, c.bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = obj.Close() }()
+	data, err := io.ReadAll(io.LimitReader(obj, maxGetObjectBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxGetObjectBytes {
+		return nil, fmt.Errorf("object %s is larger than %d bytes", objectKey, maxGetObjectBytes)
+	}
+	return data, nil
 }
 
 // RemoveObject deletes objectKey. Removing a key that doesn't exist is

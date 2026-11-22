@@ -163,42 +163,40 @@ func mustNormalize(t *testing.T, data []byte) (full, thumb image.Image) {
 	return full, thumb
 }
 
-// Padding is 8% of 1200 = 96 px on every side, so the content box is
-// [96, 1104). A 2:1 source fits 1008×504 → rows [348, 852).
+// No margin: a 2:1 source fits 1200×600 → rows [300, 900), touching the
+// left and right edges; a 1:2 one fits 600×1200 → columns [300, 900).
 
 func TestNormalizeWideImage(t *testing.T) {
 	full, thumb := mustNormalize(t, encodePNG(t, solid(1600, 800, red)))
 
 	assertPixel(t, full, 600, 600, red, "center")
-	assertPixel(t, full, 110, 600, red, "left edge of content, inside padding box")
-	assertPixel(t, full, 40, 600, white, "left padding")
-	assertPixel(t, full, 600, 300, white, "above content (letterbox)")
-	assertPixel(t, full, 600, 900, white, "below content (letterbox)")
+	assertPixel(t, full, 3, 600, red, "left edge reaches the canvas edge")
+	assertPixel(t, full, 1196, 600, red, "right edge reaches the canvas edge")
+	assertPixel(t, full, 600, 280, white, "above content (letterbox)")
+	assertPixel(t, full, 600, 920, white, "below content (letterbox)")
 	assertPixel(t, full, 5, 5, white, "corner")
 
 	assertPixel(t, thumb, 200, 200, red, "thumb center")
-	assertPixel(t, thumb, 200, 100, white, "thumb letterbox")
+	assertPixel(t, thumb, 200, 80, white, "thumb letterbox")
 }
 
 func TestNormalizeTallImage(t *testing.T) {
 	full, _ := mustNormalize(t, encodePNG(t, solid(800, 1600, blue)))
 
 	assertPixel(t, full, 600, 600, blue, "center")
-	assertPixel(t, full, 600, 110, blue, "top edge of content")
-	assertPixel(t, full, 600, 40, white, "top padding")
-	assertPixel(t, full, 300, 600, white, "left of content (pillarbox)")
-	assertPixel(t, full, 900, 600, white, "right of content (pillarbox)")
+	assertPixel(t, full, 600, 3, blue, "top edge reaches the canvas edge")
+	assertPixel(t, full, 600, 1196, blue, "bottom edge reaches the canvas edge")
+	assertPixel(t, full, 280, 600, white, "left of content (pillarbox)")
+	assertPixel(t, full, 920, 600, white, "right of content (pillarbox)")
 }
 
-func TestNormalizeSquareImage(t *testing.T) {
+func TestNormalizeSquareImageFillsTheWholeCanvas(t *testing.T) {
 	full, _ := mustNormalize(t, encodeTestJPEG(t, solid(1000, 1000, red)))
 
-	assertPixel(t, full, 110, 110, red, "just inside the padding box")
-	assertPixel(t, full, 1090, 1090, red, "just inside the padding box (far corner)")
-	assertPixel(t, full, 50, 600, white, "left padding")
-	assertPixel(t, full, 1150, 600, white, "right padding")
-	assertPixel(t, full, 600, 50, white, "top padding")
-	assertPixel(t, full, 600, 1150, white, "bottom padding")
+	assertPixel(t, full, 3, 3, red, "top-left corner")
+	assertPixel(t, full, 1196, 1196, red, "bottom-right corner")
+	assertPixel(t, full, 3, 600, red, "left edge")
+	assertPixel(t, full, 600, 1196, red, "bottom edge")
 }
 
 func TestNormalizeSmallButValidImageIsUpscaled(t *testing.T) {
