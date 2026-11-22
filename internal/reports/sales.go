@@ -98,7 +98,10 @@ func ValidateRange(from, to time.Time) error {
 // Row is one line of the aggregated report: revenue and counts for one key
 // (a calendar day, a product name, or a point-of-sale name), per GroupBy.
 type Row struct {
-	Key        string
+	Key string
+	// ID is the grouped entity's id where there is one (CategorySales:
+	// the top-level category), "" otherwise.
+	ID         string
 	OrderCount int
 	ItemCount  int
 	Revenue    float64

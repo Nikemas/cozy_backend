@@ -129,7 +129,8 @@ func (r *Repo) PointNames(ctx context.Context) (map[string]string, error) {
 }
 
 // CategorySales aggregates sold line items by top-level catalog category
-// over [from, to): a product filed under a subcategory counts toward its
+// (Row.ID is that category's id, for the detail report link) over
+// [from, to): a product filed under a subcategory counts toward its
 // parent. Only orders that count as sales (SaleConditionSQL) are included;
 // revenue is line price × quantity, like AggregateSales' GroupByProduct.
 // Rows are sorted by revenue, highest first (ties by name in the database
@@ -137,8 +138,9 @@ func (r *Repo) PointNames(ctx context.Context) (map[string]string, error) {
 // groups, byte comparisons, see Sales).
 func (r *Repo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, error) {
 	const q = `
-		SELECT category, order_count, item_count, revenue FROM (
+		SELECT category, category_id, order_count, item_count, revenue FROM (
 			SELECT COALESCE(parent.name_ru, c.name_ru) COLLATE "C" AS category,
+			       COALESCE(parent.id, c.id)::text AS category_id,
 			       COUNT(DISTINCT oi.order_id) AS order_count,
 			       COALESCE(SUM(oi.quantity), 0) AS item_count,
 			       COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue
@@ -149,11 +151,25 @@ func (r *Repo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, er
 			JOIN categories c ON c.id = p.category_id
 			LEFT JOIN categories parent ON parent.id = c.parent_id
 			WHERE o.created_at >= $1 AND o.created_at < $2 AND ` + SaleConditionSQL + `
-			GROUP BY 1
+			GROUP BY 1, 2
 		) sales
 		ORDER BY revenue DESC, category COLLATE "default"`
 
-	return r.queryRows(ctx, q, from, to)
+	rows, err := r.db.QueryContext(ctx, q, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Row
+	for rows.Next() {
+		var row Row
+		if err := rows.Scan(&row.Key, &row.ID, &row.OrderCount, &row.ItemCount, &row.Revenue); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 // BrandSales aggregates sold line items by product brand over [from, to)
