@@ -231,6 +231,8 @@ admin.products.empty_text: Башка аталышты же категориян
 admin.products.col_photo: Сүрөт
 admin.products.col_price: Баасы
 admin.products.col_code: Коду
+admin.products.color_filter: Түсү
+admin.products.all_colors: Бардык түстөр
 admin.products.col_variants: Вариациялар
 admin.products.delete_title: Товарды өчүрөсүзбү?
 admin.products.delete_text: "«%s» өчүрүлөт жана каталогдо көрүнбөй калат."

@@ -234,6 +234,8 @@ admin.products.empty_text: Попробуйте другое название и
 admin.products.col_photo: Фото
 admin.products.col_price: Цена
 admin.products.col_code: Код
+admin.products.color_filter: Цвет
+admin.products.all_colors: Все цвета
 admin.products.col_variants: Вариаций
 admin.products.delete_title: Удалить товар?
 admin.products.delete_text: "«%s» будет удалён и перестанет отображаться в каталоге."

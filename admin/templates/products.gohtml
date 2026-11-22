@@ -42,6 +42,14 @@
         {{range .PointOptions}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
     </div>
+    {{if gt (len .ColorOptions) 1}}
+    <div class="admin-field admin-filterbar__field">
+      <label for="products-color">{{t "admin.products.color_filter"}}</label>
+      <select id="products-color" name="color" onchange="this.form.submit()">
+        {{range .ColorOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
+    {{end}}
     {{if .PointID}}
     <label class="admin-check"><input type="checkbox" name="oos" value="1"{{if .OutOfStockOnly}} checked{{end}} onchange="this.form.submit()"> {{t "admin.products.oos_only"}}</label>
     {{end}}
@@ -175,6 +183,7 @@
         {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
         {{if .PointID}}<input type="hidden" name="point" value="{{.PointID}}">{{end}}
         {{if .OutOfStockOnly}}<input type="hidden" name="oos" value="1">{{end}}
+        {{if .Color}}<input type="hidden" name="color" value="{{.Color}}">{{end}}
         <span class="admin-table__muted">{{t "admin.products.page_size"}}</span>
         <select name="page_size" onchange="this.form.submit()" class="admin-pagesize__select">
           <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>

@@ -89,6 +89,9 @@ type ProductsPageData struct {
 	PointID        string
 	PointName      string
 	OutOfStockOnly bool
+	// feat/product-code: color filter (raw color; options labelled).
+	Color          string
+	ColorOptions   []ColorOptionVM
 	BulkURL        string
 	ReturnURL      string
 	BulkCategories []BulkCategoryOption
