@@ -213,6 +213,42 @@ admin.reports.per_order: бир буйрутмага
 admin.reports.pcs: "%d даана"
 admin.reports.no_brand: Бренди жок
 admin.reports.build_failed: Отчетту түзүү мүмкүн болбоду
+admin.reports.detail_category: Категория боюнча отчёт
+admin.reports.detail_brand: Бренд боюнча отчёт
+admin.reports.detail_product: Товардын коду боюнча отчёт
+admin.reports.detail_links: "Кененирээк:"
+admin.reports.pick_category: Категория
+admin.reports.pick_brand: Бренд
+admin.reports.pick_code: Товардын коду
+admin.reports.pick_placeholder: Тандаңыз…
+admin.reports.pick_hint_category: Категорияны тандаңыз — отчёт анын ар бир товарын көрсөтөт (подкатегориялары менен)
+admin.reports.pick_hint_brand: Брендди тандаңыз — отчёт анын ар бир товарын көрсөтөт
+admin.reports.pick_hint_product: Товардын кодун жазыңыз — отчёт өлчөмдөр, түстөр жана сатуу жайлары боюнча сатууларды жана учурдагы калдыктарды көрсөтөт
+admin.reports.open_code_report: Ачуу
+admin.reports.open_product: Товардын карточкасы
+admin.reports.col_code: Коду
+admin.reports.col_product: Товар
+admin.reports.col_brand: Бренд
+admin.reports.col_cancelled: Жокко чыгарылды, даана
+admin.reports.col_size: Өлчөмү
+admin.reports.col_color: Түсү
+admin.reports.col_variant: Вариация
+admin.reports.total: Жыйынтык
+admin.reports.inactive: (активдүү эмес)
+admin.reports.category_not_found: Категория табылган жок — аны тизмеден тандаңыз
+admin.reports.code_not_found: "«%s» коду бар товар табылган жок"
+admin.reports.by_variant: Өлчөмдөр жана түстөр боюнча сатуулар
+admin.reports.by_point_lines_hint: Киреше — заказдардагы бул товардын баасы (жеткирүүсүз), заказдын сатуу жайы боюнча.
+admin.reports.stock_now: Учурдагы калдыктар
+admin.reports.stock_note: Сатуу жайлары жана кампалар боюнча учурдагы калдыктар — тандалган мезгилге көз каранды эмес.
+admin.reports.no_stock: Эч бир сатуу жайында калдык жок
+admin.reports.no_variants: Товардын вариациялары жок
+admin.reports.no_products: Товар жок: активдүүлөрү да, мезгил ичинде сатылгандары да жок
+admin.reports.warehouse_suffix: (кампа)
+admin.reports.cancelled_hint: «Жокко чыгарылды» — мезгил ичинде жокко чыгарылган заказдардагы даана саны, сатууга жана кирешеге кирбейт.
+admin.reports.sheet_variants: Вариациялар
+admin.reports.sheet_points: Сатуу жайлары
+admin.reports.sheet_stock: Калдыктар
 
 # Products: list, form, import
 admin.points.address_placeholder: Дордой көч., 1

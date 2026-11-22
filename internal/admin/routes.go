@@ -48,8 +48,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		staffSvc: staffSvc,
 		render:   renderer,
 
-		reports:    reportsRepo,
-		pointsRepo: points.NewPointsRepo(db),
+		reports:       reportsRepo,
+		reportDetails: reportsRepo,
+		pointsRepo:    points.NewPointsRepo(db),
 
 		ordersSvc: orders.NewService(db),
 		orderMeta: newOrderListMetaRepo(db),
@@ -119,6 +120,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("GET /admin/stock", anyRole(h.stockPage))
 	mux.HandleFunc("POST /admin/stock", anyRole(h.stockSave))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
+	// feat/product-code: per-category / per-brand / per-product reports.
+	registerReportDetailRoutes(mux, h, ownerOrManager)
 
 	// W2 fix/promo-push: Рассылки (promo push) — broadcasts_page.go; the
 	// sending itself is broadcasts.Worker, started in cmd/server.

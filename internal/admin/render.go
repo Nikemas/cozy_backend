@@ -49,6 +49,7 @@ var screenPages = map[string]string{
 	"product_form":   "product_form.gohtml",
 	"product_import": "product_import.gohtml",
 	"reports":        "reports.gohtml",
+	"report_detail":  "report_detail.gohtml", // feat/product-code: category/brand/product reports, reached from Отчёты
 	"points":         "points.gohtml",
 	"staff":          "staff.gohtml",
 	"categories":     "categories.gohtml",

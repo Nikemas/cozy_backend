@@ -100,25 +100,7 @@ func reportRange(period string, now time.Time) (from, to time.Time) {
 func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 	st, _ := staff.FromContext(r.Context())
 
-	q := r.URL.Query()
-	period := q.Get("period")
-	if !isValidReportPeriod(period) {
-		period = defaultReportPeriod()
-	}
-
-	var from, to time.Time
-	var rangeErr string
-	if period == "custom" {
-		var err error
-		from, to, err = parseCustomReportRange(q.Get("from"), q.Get("to"))
-		if err != nil {
-			rangeErr = appErrMessage(h.tr(r), err)
-			period = defaultReportPeriod()
-		}
-	}
-	if period != "custom" {
-		from, to = reportRange(period, time.Now())
-	}
+	period, from, to, rangeErr := resolveReportRange(h.tr(r), r.URL.Query(), time.Now())
 
 	reportData, err := h.buildReportsData(r.Context(), period, from, to)
 	if err != nil {
@@ -135,6 +117,49 @@ func (h *handlers) reportsPage(w http.ResponseWriter, r *http.Request) {
 	if err := h.render.Render(w, "reports", data); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
 	}
+}
+
+// resolveReportRange reads the ?period=&from=&to= params shared by the
+// summary and detail report pages: an unknown period falls back to the
+// default, a rejected custom range too (rangeErr says why, in t's
+// language). from/to are inclusive Bishkek days.
+func resolveReportRange(t tr, q url.Values, now time.Time) (period string, from, to time.Time, rangeErr string) {
+	period = q.Get("period")
+	if !isValidReportPeriod(period) {
+		period = defaultReportPeriod()
+	}
+	if period == "custom" {
+		var err error
+		from, to, err = parseCustomReportRange(q.Get("from"), q.Get("to"))
+		if err == nil {
+			return period, from, to, ""
+		}
+		rangeErr = appErrMessage(t, err)
+		period = defaultReportPeriod()
+	}
+	from, to = reportRange(period, now)
+	return period, from, to, rangeErr
+}
+
+// reportPeriodQuery is the period part of a report link's query string,
+// so drilling into a detail report (and back) keeps the chosen period.
+func reportPeriodQuery(period string, from, to time.Time) url.Values {
+	v := url.Values{}
+	v.Set("period", period)
+	if period == "custom" {
+		v.Set("from", from.Format("2006-01-02"))
+		v.Set("to", to.Format("2006-01-02"))
+	}
+	return v
+}
+
+// reportLink builds path?<period params>&<extra>.
+func reportLink(path, period string, from, to time.Time, extra url.Values) string {
+	v := reportPeriodQuery(period, from, to)
+	for k, vals := range extra {
+		v[k] = vals
+	}
+	return path + "?" + v.Encode()
 }
 
 // parseCustomReportRange validates the custom period's from/to dates
@@ -202,8 +227,12 @@ func (h *handlers) buildReportsData(ctx context.Context, period string, from, to
 		ChartNote:         from.Format("02.01.2006") + " — " + to.Format("02.01.2006"),
 		Bars:              buildBars(t, dayRows, from, to),
 		TopProducts:       buildTopProducts(t, productRows),
-		TopBrands:         buildTopBrands(t, brandRows),
-		Categories:        buildCategoryBars(t, categoryRows),
+		TopBrands:         withBrandLinks(buildTopBrands(t, brandRows), brandRows, period, from, to),
+		Categories:        withCategoryLinks(buildCategoryBars(t, categoryRows), categoryRows, period, from, to),
+		CategoryReportURL: reportLink(categoryReportPath, period, from, to, nil),
+		BrandReportURL:    reportLink(brandReportPath, period, from, to, nil),
+		ProductReportPath: productReportPath,
+		PeriodParams:      reportPeriodHidden(period, from, to),
 		Points:            buildPointBars(t, pointRows),
 	}, nil
 }
@@ -219,6 +248,12 @@ type ReportsData struct {
 	ExportURL         string
 	CategoryExportURL string
 	PointExportURL    string
+
+	// feat/product-code: entry points to the detail reports.
+	CategoryReportURL string
+	BrandReportURL    string
+	ProductReportPath string
+	PeriodParams      []HiddenParam // the code form's period fields
 
 	Stats []StatCard
 
@@ -241,6 +276,7 @@ type ReportsData struct {
 // CategoryBar is one row of the "По категориям" report.
 type CategoryBar struct {
 	Name     string
+	URL      string // detail report link, "" for none
 	Sum      string
 	Qty      string
 	Orders   string
@@ -282,6 +318,7 @@ type RankedRow struct {
 // progress bar, relative to the period's top-selling brand.
 type BrandBar struct {
 	Name     string
+	URL      string // brand detail report link
 	Sum      string
 	WidthPct int
 }

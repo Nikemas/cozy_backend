@@ -216,6 +216,42 @@ admin.reports.per_order: на заказ
 admin.reports.pcs: "%d шт."
 admin.reports.no_brand: Без бренда
 admin.reports.build_failed: Не удалось построить отчёт
+admin.reports.detail_category: Отчёт по категории
+admin.reports.detail_brand: Отчёт по бренду
+admin.reports.detail_product: Отчёт по коду товара
+admin.reports.detail_links: "Подробно:"
+admin.reports.pick_category: Категория
+admin.reports.pick_brand: Бренд
+admin.reports.pick_code: Код товара
+admin.reports.pick_placeholder: Выберите…
+admin.reports.pick_hint_category: Выберите категорию — отчёт покажет каждый её товар (с подкатегориями)
+admin.reports.pick_hint_brand: Выберите бренд — отчёт покажет каждый его товар
+admin.reports.pick_hint_product: Введите код товара — отчёт покажет продажи по размерам, цветам и точкам и текущие остатки
+admin.reports.open_code_report: Открыть
+admin.reports.open_product: Карточка товара
+admin.reports.col_code: Код
+admin.reports.col_product: Товар
+admin.reports.col_brand: Бренд
+admin.reports.col_cancelled: Отменено, шт.
+admin.reports.col_size: Размер
+admin.reports.col_color: Цвет
+admin.reports.col_variant: Вариация
+admin.reports.total: Итого
+admin.reports.inactive: (неактивен)
+admin.reports.category_not_found: Категория не найдена — выберите её из списка
+admin.reports.code_not_found: "Товар с кодом «%s» не найден"
+admin.reports.by_variant: Продажи по размерам и цветам
+admin.reports.by_point_lines_hint: Выручка — стоимость этого товара в заказах (без доставки), по точке заказа.
+admin.reports.stock_now: Остатки сейчас
+admin.reports.stock_note: Текущие остатки по точкам и складам — не зависят от выбранного периода.
+admin.reports.no_stock: Остатков нет ни в одной точке
+admin.reports.no_variants: У товара нет вариаций
+admin.reports.no_products: Нет товаров: ни активных, ни проданных за период
+admin.reports.warehouse_suffix: (склад)
+admin.reports.cancelled_hint: «Отменено» — штук в отменённых заказах за период, в продажи и выручку не входят.
+admin.reports.sheet_variants: Вариации
+admin.reports.sheet_points: Точки
+admin.reports.sheet_stock: Остатки
 
 # Products: list, form, import
 admin.points.address_placeholder: ул. Дордой, 1
