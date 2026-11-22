@@ -1133,3 +1133,16 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
 @media (max-width: 640px) {
   .admin-modal--xl { width: auto; padding: 18px; }
 }
+
+/* ---- Обращения (feat/support-tickets) ---- */
+.admin-chip--new { color: var(--admin-primary-hover); background: var(--admin-primary-tint); }
+.admin-status-btn.admin-chip--new { background: var(--admin-primary-tint); color: var(--admin-primary-hover); }
+.admin-tickets-guest { display: inline-block; font-size: 11px; font-weight: 600; color: var(--admin-muted); background: #EDEDEB; border-radius: var(--admin-radius-chip); padding: 1px 6px; }
+.admin-tickets-preview { color: var(--admin-text); font-size: 13px; max-width: 360px; overflow-wrap: anywhere; }
+.admin-order-card .admin-tickets-preview { max-width: none; margin: 6px 0; }
+.admin-ticket-thread { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-ticket-msg { max-width: 85%; align-self: flex-start; background: #F5F5F3; border: 1px solid var(--admin-border); border-radius: 12px; padding: 10px 12px; }
+.admin-ticket-msg--staff { align-self: flex-end; background: var(--admin-primary-tint); border-color: #FFD9B8; }
+.admin-ticket-msg__meta { font-size: 12px; color: var(--admin-muted); margin-bottom: 4px; }
+.admin-ticket-msg__meta b { color: var(--admin-text); }
+.admin-ticket-msg__text { font-size: 14px; color: var(--admin-text); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }

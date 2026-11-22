@@ -22,6 +22,7 @@ const (
 	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
 	broadcastsIconPath = "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0"
 	bannerIconPath     = "M3 5h18v14H3z M8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 19"
+	ticketsIconPath    = "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
 	deliveryIconPath   = "M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
 )
 
@@ -45,6 +46,9 @@ type navDef struct {
 
 var navDefs = []navDef{
 	{"orders", "admin.nav.orders", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
+	// feat/support-tickets: customer support requests. Not point_staff
+	// (requests aren't tied to a point) and no other roles.
+	{"tickets", "admin.nav.tickets", ticketsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"products", "admin.nav.products", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"stock", "admin.nav.stock", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
 	{"categories", "admin.nav.categories", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
@@ -61,6 +65,17 @@ func roleCanSee(d navDef, role staff.Role) bool {
 	for _, r := range d.roles {
 		if r == role {
 			return true
+		}
+	}
+	return false
+}
+
+// roleSeesNav reports whether role may see the nav entry key (false for
+// an unknown key).
+func roleSeesNav(key string, role staff.Role) bool {
+	for _, d := range navDefs {
+		if d.key == key {
+			return roleCanSee(d, role)
 		}
 	}
 	return false

@@ -36,6 +36,7 @@ const (
 	EntityStaff    = "staff"
 	EntityOrder    = "order"
 	EntityBanner   = "banner"
+	EntityTicket   = "ticket" // support request (feat/support-tickets)
 )
 
 // Actions. The prefix before the dot is the entity type.
@@ -64,6 +65,7 @@ const (
 	ActionStaffPassword     = "staff.password_reset"
 	ActionOrderStatus       = "order.status"
 	ActionBannerUpdate      = "banner.update"
+	ActionTicketStatus      = "ticket.status"
 )
 
 // Entry is one journal line. Summary is the human-readable Russian line

@@ -1,0 +1,97 @@
+{{/* tickets.gohtml (feat/support-tickets) — Обращения: status chips,
+     topic filter, search by name / phone / number; desktop table and
+     mobile cards over the same .Rows (the orders list's classes and
+     @media switch). Data is internal/admin/tickets_page.go's
+     TicketsListData. */}}
+{{define "content"}}
+<h1>{{t "admin.nav.tickets"}}</h1>
+
+<form method="get" action="/admin/tickets" class="admin-filterbar" role="search">
+  {{if .Data.Status}}<input type="hidden" name="status" value="{{.Data.Status}}">{{end}}
+  <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
+    <label for="tickets-q">{{t "admin.common.search"}}</label>
+    <input type="search" id="tickets-q" name="q" value="{{.Data.Query}}" placeholder="{{t "admin.tickets.search_placeholder"}}" maxlength="100">
+  </div>
+  <div class="admin-field admin-filterbar__field">
+    <label for="tickets-topic">{{t "admin.tickets.topic_label"}}</label>
+    <select id="tickets-topic" name="topic" onchange="this.form.submit()">
+      {{range .Data.TopicOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </div>
+  <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.common.find"}}</button>
+  {{if .Data.Filtered}}<a href="{{.Data.ResetURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.reset"}}</a>{{end}}
+</form>
+
+{{if .Data.Err}}<div class="admin-form-error" role="alert">{{.Data.Err}}</div>{{end}}
+
+<div class="admin-orders-filters">
+  <div class="admin-orders-chips" role="group" aria-label="{{t "admin.tickets.status_filter"}}">
+    {{range .Data.StatusChips}}
+    <a href="{{.URL}}" class="admin-chip-btn {{.Class}}{{if .Active}} active{{end}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}{{if .Count}} <span class="admin-chip-btn__count">{{.Count}}</span>{{end}}</a>
+    {{end}}
+  </div>
+</div>
+
+<div class="admin-card">
+  {{if .Data.Empty}}
+  <div class="admin-empty">
+    <div class="admin-empty__icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    </div>
+    <div class="admin-empty__title">{{if .Data.Filtered}}{{t "admin.tickets.empty_filtered_title"}}{{else}}{{t "admin.tickets.empty_title"}}{{end}}</div>
+    <div class="admin-empty__text">{{if .Data.Filtered}}{{t "admin.tickets.empty_filtered_text"}}{{else}}{{t "admin.tickets.empty_text"}}{{end}}</div>
+  </div>
+  {{else}}
+  <div class="admin-orders-table">
+    <table>
+      <thead>
+        <tr>
+          <th>{{t "admin.tickets.col_number"}}</th>
+          <th>{{t "admin.tickets.col_date"}}</th>
+          <th>{{t "admin.tickets.col_customer"}}</th>
+          <th>{{t "admin.tickets.topic_label"}}</th>
+          <th>{{t "admin.tickets.col_message"}}</th>
+          <th>{{t "admin.common.status"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Rows}}
+        <tr onclick="location.href='{{.URL}}'">
+          <td class="admin-orders-table__num"><a href="{{.URL}}">{{.NumberLabel}}</a></td>
+          <td class="admin-orders-table__muted">{{.DateLabel}}</td>
+          <td class="admin-orders-table__phone">{{if .Name}}{{.Name}}<br>{{end}}{{.Phone}}{{if .Guest}} <span class="admin-tickets-guest">{{t "admin.tickets.guest"}}</span>{{end}}</td>
+          <td>{{.TopicLabel}}<div class="admin-orders-table__muted">{{.ChannelLabel}}</div></td>
+          <td class="admin-tickets-preview">{{if .FromStaff}}<span class="admin-orders-table__muted">{{t "admin.tickets.you_prefix"}}</span> {{end}}{{.Preview}}</td>
+          <td><span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span></td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-orders-cards">
+    {{range .Data.Rows}}
+    <div class="admin-order-card" onclick="location.href='{{.URL}}'">
+      <div class="admin-order-card__top">
+        <a href="{{.URL}}" class="admin-order-card__num">{{.NumberLabel}} · {{.TopicLabel}}</a>
+        <span class="admin-order-card__chips"><span class="admin-chip {{.StatusClass}}">{{.StatusLabel}}</span></span>
+      </div>
+      <div class="admin-order-card__phone">{{if .Name}}{{.Name}} · {{end}}{{.Phone}}{{if .Guest}} <span class="admin-tickets-guest">{{t "admin.tickets.guest"}}</span>{{end}}</div>
+      <div class="admin-tickets-preview">{{.Preview}}</div>
+      <div class="admin-order-card__meta"><span>{{.DateLabel}}</span><span>{{.ChannelLabel}}</span></div>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="admin-orders-footer">
+    <div class="admin-orders-count">{{.Data.CountLabel}}</div>
+    {{if or .Data.HasPrev .Data.HasNext}}
+    <div class="admin-orders-pager">
+      {{if .Data.HasPrev}}<a href="{{.Data.PrevURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.prev"}}</a>{{end}}
+      {{if .Data.HasNext}}<a href="{{.Data.NextURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.next"}}</a>{{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

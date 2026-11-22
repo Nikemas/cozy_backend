@@ -147,6 +147,11 @@ var adminToasts = map[string]toastRenderer{
 	"cancel_forbidden":     fixedToast("admin.apperr.cancel_forbidden"),
 	"invalid_category":     fixedToast("admin.apperr.invalid_category_id"),
 	"status_change_failed": fixedToast("admin.order.status_change_failed"),
+	// feat/support-tickets
+	"ticket_replied":            fixedToast("admin.tickets.toast_replied"),
+	"ticket_status_new":         fixedToast("admin.tickets.toast_status_new"),
+	"ticket_status_in_progress": fixedToast("admin.tickets.toast_status_in_progress"),
+	"ticket_status_closed":      fixedToast("admin.tickets.toast_status_closed"),
 	"bulk_too_many": func(t tr, _ flash) string {
 		return t.F("admin.bulk.too_many", maxBulkItems)
 	},

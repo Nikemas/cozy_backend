@@ -1,0 +1,77 @@
+{{/* ticket_detail.gohtml (feat/support-tickets) — one support request:
+     header (number + status), customer card (call / WhatsApp / copy, like
+     the order screen), request card (topic, channel, linked order), the
+     conversation, the reply form (hidden while closed) and status buttons.
+     Data is internal/admin/tickets_page.go's TicketDetailData. */}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="admin-order-detail">
+  <div class="admin-card admin-card--pad admin-order-detail__header">
+    <div>
+      <div class="admin-order-detail__title">{{$d.NumberLabel}}</div>
+      <div class="admin-order-detail__date">{{$d.DateLabel}}</div>
+    </div>
+    <div class="admin-order-detail__chips"><span class="admin-chip {{$d.StatusClass}}">{{$d.StatusLabel}}</span></div>
+  </div>
+
+  <div class="admin-order-detail__grid">
+    <div class="admin-card admin-card--pad">
+      <div class="admin-order-detail__label">{{t "admin.tickets.col_customer"}}{{if $d.Guest}} · {{t "admin.tickets.guest"}}{{end}}</div>
+      {{if $d.Name}}<div class="admin-order-detail__name">{{$d.Name}}</div>{{end}}
+      {{with $d.Contact}}{{if .Tel}}
+      <a class="admin-order-detail__value admin-order-detail__phone" href="{{.Tel}}">{{.Display}}</a>
+      <div class="admin-order-detail__contact">
+        <a class="admin-btn admin-btn--secondary admin-btn--row" href="{{.Tel}}">{{t "admin.order.call"}}</a>
+        <a class="admin-btn admin-btn--secondary admin-btn--row" href="{{.WhatsApp}}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <button type="button" class="admin-btn admin-btn--secondary admin-btn--row" data-copy="{{.Raw}}">{{t "admin.common.copy"}}</button>
+      </div>
+      {{end}}{{end}}
+    </div>
+    <div class="admin-card admin-card--pad">
+      <div class="admin-order-detail__label">{{t "admin.tickets.request"}}</div>
+      <div class="admin-order-detail__sub">{{t "admin.tickets.topic_label"}}: {{$d.TopicLabel}}</div>
+      <div class="admin-order-detail__sub">{{t "admin.tickets.channel"}}: {{$d.ChannelLabel}}</div>
+      <div class="admin-order-detail__sub">{{t "admin.tickets.order"}}:
+        {{if $d.OrderID}}<a href="/admin/orders/{{$d.OrderID}}">{{if $d.OrderNumber}}{{$d.OrderNumber}}{{else}}{{t "admin.tickets.open_order"}}{{end}}</a>{{else}}{{t "admin.tickets.no_order"}}{{end}}
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-card admin-card--pad">
+    <div class="admin-order-detail__label">{{t "admin.tickets.conversation"}}</div>
+    <ol class="admin-ticket-thread">
+      {{range $d.Messages}}
+      <li class="admin-ticket-msg{{if .FromStaff}} admin-ticket-msg--staff{{end}}">
+        <div class="admin-ticket-msg__meta"><b>{{.Author}}</b> · {{.DateLabel}}</div>
+        <div class="admin-ticket-msg__text">{{.Text}}</div>
+      </li>
+      {{end}}
+    </ol>
+  </div>
+
+  {{if $d.Closed}}
+  <div class="admin-card admin-card--pad"><div class="admin-order-detail__sub">{{t "admin.tickets.closed_hint"}}</div></div>
+  {{else}}
+  <form class="admin-card admin-card--pad" method="post" action="/admin/tickets/{{$d.ID}}/reply">
+    <div class="admin-field">
+      <label for="ticket-reply">{{t "admin.tickets.reply"}}</label>
+      <textarea id="ticket-reply" name="message" rows="4" maxlength="{{$d.MaxMessage}}" required placeholder="{{t "admin.tickets.reply_placeholder"}}"></textarea>
+    </div>
+    {{if $d.Guest}}<p class="admin-order-detail__sub">{{t "admin.tickets.reply_guest_hint"}}</p>{{end}}
+    <button type="submit" class="admin-btn admin-btn--dark">{{t "admin.tickets.send"}}</button>
+  </form>
+  {{end}}
+
+  <div class="admin-card admin-card--pad admin-order-detail__actions">
+    <div class="admin-order-detail__label">{{t "admin.order.change_status"}}</div>
+    <div class="admin-order-detail__statusbtns">
+      {{range $d.StatusButtons}}
+      <form method="post" action="/admin/tickets/{{$d.ID}}/status">
+        <input type="hidden" name="status" value="{{.Value}}">
+        <button type="submit" class="admin-status-btn {{.Class}}">{{.Label}}</button>
+      </form>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

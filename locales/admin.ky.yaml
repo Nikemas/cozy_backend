@@ -751,3 +751,59 @@ admin.product.add_to_table: Таблицага кошуу
 admin.product.err_size_required: Өлчөмдү көрсөтүңүз
 admin.product.err_color_required: Жок дегенде бир түс кошуңуз
 admin.product.err_qty: "Саны — 0дөн 100000гө чейинки бүтүн сан"
+
+# Обращения (feat/support-tickets)
+admin.nav.tickets: Кайрылуулар
+admin.nav.new_tickets: Жаңы кайрылуулар: %d
+admin.tickets.status.new: Жаңы
+admin.tickets.status.in_progress: Иштелүүдө
+admin.tickets.status.closed: Жабылды
+admin.tickets.status_all: Баары
+admin.tickets.status_filter: Статус боюнча чыпка
+admin.tickets.topic.order: Буйрутма
+admin.tickets.topic.payment: Төлөм
+admin.tickets.topic.delivery: Жеткирүү
+admin.tickets.topic.return: Кайтаруу / алмаштыруу
+admin.tickets.topic.product: Товар
+admin.tickets.topic.other: Башка
+admin.tickets.all_topics: Бардык темалар
+admin.tickets.topic_label: Тема
+admin.tickets.search_placeholder: Аты, телефону же кайрылуунун №
+admin.tickets.col_number: №
+admin.tickets.col_date: Түзүлдү
+admin.tickets.col_customer: Кардар
+admin.tickets.col_message: Акыркы билдирүү
+admin.tickets.you_prefix: Жооп:
+admin.tickets.empty_title: Азырынча кайрылуулар жок
+admin.tickets.empty_text: Бул жерде сайттан жана тиркемеден келген кардарлардын суроолору көрүнөт
+admin.tickets.empty_filtered_title: Эч нерсе табылган жок
+admin.tickets.empty_filtered_text: Чыпкаларды өзгөртүп көрүңүз
+admin.tickets.count: Бардыгы: %d
+admin.tickets.number: №%d кайрылуу
+admin.tickets.channel: Канал
+admin.tickets.channel.web: Сайт
+admin.tickets.channel.app: Тиркеме
+admin.tickets.guest: аккаунтсуз
+admin.tickets.request: Кайрылуу
+admin.tickets.order: Буйрутма
+admin.tickets.no_order: көрсөтүлгөн эмес
+admin.tickets.open_order: ачуу
+admin.tickets.conversation: Кат алышуу
+admin.tickets.author_customer: Кардар
+admin.tickets.author_staff: Кызматкер
+admin.tickets.reply: Кардарга жооп
+admin.tickets.reply_placeholder: Кардар жоопту сайттан жана тиркемеден көрөт
+admin.tickets.reply_guest_hint: Кардар аккаунтсуз жазган, жоопту сайттан көрбөйт — чалыңыз же WhatsApp аркылуу жазыңыз.
+admin.tickets.send: Жоопту жөнөтүү
+admin.tickets.closed_hint: Кайрылуу жабылган. Жооп берүү үчүн аны кайра иштетүүгө кайтарыңыз.
+admin.tickets.toast_replied: Жооп жөнөтүлдү
+admin.tickets.toast_status_new: Кайрылуу кайра жаңы
+admin.tickets.toast_status_in_progress: Кайрылуу иштелүүдө
+admin.tickets.toast_status_closed: Кайрылуу жабылды
+admin.apperr.ticket_not_found: Кайрылуу табылган жок
+admin.apperr.ticket_closed: Кайрылуу жабылган — адегенде аны иштетүүгө кайтарыңыз
+admin.apperr.message_required: Жооптун текстин жазыңыз
+admin.apperr.message_too_long: Жооп 2000 белгиден узун
+admin.apperr.invalid_ticket_status: Кайрылуунун белгисиз статусу
+admin.audit.entity.ticket: Кайрылуу
+admin.audit.summary.ticket_status: №{number} кайрылуу
