@@ -30,12 +30,12 @@ func TestGetActiveByIDsSingleQuery(t *testing.T) {
 
 	now := time.Now()
 	cols := []string{"id", "category_id", "name_ru", "name_ky", "description_ru", "description_ky",
-		"brand", "base_price", "old_price", "is_active", "created_at", "updated_at"}
+		"brand", "model_code", "base_price", "old_price", "is_active", "created_at", "updated_at"}
 	mock.ExpectQuery(`FROM products\s+WHERE id = ANY\(\$1\) AND is_active = true`).
 		WithArgs([]string{"p1", "p2", "gone"}).
 		WillReturnRows(sqlmock.NewRows(cols).
-			AddRow("p1", "c1", "Кроссовки", "Кроссовка", nil, nil, "Nike", 4500.0, nil, true, now, now).
-			AddRow("p2", "c1", "Ботинки", "Бут", nil, nil, nil, 5200.0, nil, true, now, now))
+			AddRow("p1", "c1", "Кроссовки", "Кроссовка", nil, nil, "Nike", "CZ-00001", 4500.0, nil, true, now, now).
+			AddRow("p2", "c1", "Ботинки", "Бут", nil, nil, nil, "CZ-00002", 5200.0, nil, true, now, now))
 
 	got, err := NewProductRepo(db).GetActiveByIDs(context.Background(), []string{"p1", "p2", "gone"})
 	if err != nil {

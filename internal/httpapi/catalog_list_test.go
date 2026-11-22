@@ -21,7 +21,7 @@ const (
 
 var productListColumns = []string{
 	"id", "category_id", "name_ru", "name_ky", "description_ru", "description_ky",
-	"brand", "base_price", "old_price", "is_active", "created_at", "updated_at",
+	"brand", "model_code", "base_price", "old_price", "is_active", "created_at", "updated_at",
 }
 
 func newProductListMux(t *testing.T) (*http.ServeMux, sqlmock.Sqlmock) {
@@ -52,8 +52,8 @@ func TestProductListResolvesCategorySlugAndAttachesPrimaryPhoto(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 	mock.ExpectQuery(`SELECT id, category_id, name_ru`).
 		WillReturnRows(sqlmock.NewRows(productListColumns).
-			AddRow(listTestProductA, listTestCategoryID, "Кеды", "Кеды", "", "", "Nike", 4500.0, nil, true, now, now).
-			AddRow(listTestProductB, listTestCategoryID, "Туфли", "Туфли", "", "", "Ecco", 7000.0, nil, true, now, now))
+			AddRow(listTestProductA, listTestCategoryID, "Кеды", "Кеды", "", "", "Nike", "CZ-00001", 4500.0, nil, true, now, now).
+			AddRow(listTestProductB, listTestCategoryID, "Туфли", "Туфли", "", "", "Ecco", "CZ-00002", 7000.0, nil, true, now, now))
 	mock.ExpectQuery(`FROM product_images\s+WHERE product_id = ANY\(\$1\)`).
 		WithArgs([]string{listTestProductA, listTestProductB}).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "product_id", "object_key", "sort_order", "color"}).
@@ -133,7 +133,7 @@ func TestProductListErrors(t *testing.T) {
 					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 				m.ExpectQuery(`SELECT id, category_id, name_ru`).
 					WillReturnRows(sqlmock.NewRows(productListColumns).
-						AddRow(listTestProductA, listTestCategoryID, "Кеды", "Кеды", "", "", "Nike", 4500.0, nil, true, now, now))
+						AddRow(listTestProductA, listTestCategoryID, "Кеды", "Кеды", "", "", "Nike", "CZ-00001", 4500.0, nil, true, now, now))
 				m.ExpectQuery(`FROM product_images`).WillReturnError(dbErr)
 			},
 			status: http.StatusInternalServerError,

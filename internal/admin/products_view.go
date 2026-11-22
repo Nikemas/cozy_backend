@@ -33,6 +33,7 @@ type ProductRowVM struct {
 	ID              string
 	Name            string
 	Brand           string
+	Code            string
 	CategoryPath    string
 	PriceText       string
 	VariantsLabel   string
@@ -229,7 +230,10 @@ type ProductFormData struct {
 	TopCategoryID string
 	SubCategoryID string
 
-	Brand         string
+	Brand string
+	// Code is the product code («код товара»); "" on a new product means
+	// "generate one".
+	Code          string
 	BasePrice     string
 	OldPrice      string // pre-discount price; "" = no discount
 	DescriptionRu string

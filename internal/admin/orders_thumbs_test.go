@@ -75,4 +75,7 @@ func TestOrderDetailShowsItemThumbnails(t *testing.T) {
 	if len(view.Items) != 1 || !strings.Contains(view.Items[0].ThumbURL, "products/v1") {
 		t.Fatalf("items = %+v", view.Items)
 	}
+	if view.Items[0].Code != "CODE-v1" {
+		t.Errorf("item code = %q, want the product code of variant v1", view.Items[0].Code)
+	}
 }

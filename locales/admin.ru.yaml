@@ -233,6 +233,7 @@ admin.products.subcategory: Подкатегория
 admin.products.empty_text: Попробуйте другое название или категорию
 admin.products.col_photo: Фото
 admin.products.col_price: Цена
+admin.products.col_code: Код
 admin.products.col_variants: Вариаций
 admin.products.delete_title: Удалить товар?
 admin.products.delete_text: "«%s» будет удалён и перестанет отображаться в каталоге."
@@ -248,6 +249,10 @@ admin.product.toast_deleted: Товар удалён
 admin.product.new_short: Новая
 admin.product.no_subcategory: Без подкатегории
 admin.product.brand: Бренд
+admin.product.code: Код товара
+admin.product.code_auto: Сгенерируется автоматически
+admin.product.code_hint_new: Для склада и поддержки. Оставьте пустым — код вида CZ-00123 появится сам
+admin.product.code_hint_edit: Для склада и поддержки. Уникален среди всех товаров
 admin.product.base_price: Базовая цена, сом
 admin.product.old_price: Старая цена (до скидки), сом
 admin.product.old_price_hint: "Заполните, чтобы показать скидку: старая цена будет красной и зачёркнутой, текущая — зелёной. Пусто — скидки нет."
@@ -563,6 +568,8 @@ admin.apperr.invalid_category_id: Выберите категорию
 admin.apperr.invalid_base_price: Цена не может быть отрицательной
 admin.apperr.invalid_old_price: Старая цена должна быть больше нуля
 admin.apperr.old_price_not_above_price: Старая цена должна быть больше базовой цены
+admin.apperr.invalid_product_code: Код товара: до 40 символов, без переносов строк
+admin.apperr.product_code_taken: Товар с таким кодом уже есть — укажите другой код или оставьте поле пустым
 admin.apperr.invalid_variant: У каждой вариации должны быть размер и цвет
 admin.apperr.invalid_object_key: object_key обязателен
 admin.apperr.product_not_found: Товар не найден

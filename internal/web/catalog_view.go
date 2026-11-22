@@ -381,6 +381,7 @@ type ProductData struct {
 	DeliveryFrom bool
 	Name         string
 	Brand        string
+	Code         string  // product code, shown small for support calls
 	Price        float64 // selected variant's price (JSON-LD)
 	PriceText    string
 	OldPriceText string // pre-discount price; "" = no discount
@@ -635,6 +636,7 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		Name:              name,
 		CategoryID:        product.CategoryID,
 		Brand:             stringOr(product.Brand, ""),
+		Code:              product.Code,
 		Price:             price,
 		PriceText:         formatAmount(price, h.t(lang, "common.currency")),
 		OldPriceText:      h.oldPriceText(product.OldPrice, price, lang),

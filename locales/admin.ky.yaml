@@ -230,6 +230,7 @@ admin.products.subcategory: Ички категория
 admin.products.empty_text: Башка аталышты же категорияны байкап көрүңүз
 admin.products.col_photo: Сүрөт
 admin.products.col_price: Баасы
+admin.products.col_code: Коду
 admin.products.col_variants: Вариациялар
 admin.products.delete_title: Товарды өчүрөсүзбү?
 admin.products.delete_text: "«%s» өчүрүлөт жана каталогдо көрүнбөй калат."
@@ -245,6 +246,10 @@ admin.product.toast_deleted: Товар өчүрүлдү
 admin.product.new_short: Жаңы
 admin.product.no_subcategory: Ички категориясыз
 admin.product.brand: Бренд
+admin.product.code: Товардын коду
+admin.product.code_auto: Автоматтык түрдө түзүлөт
+admin.product.code_hint_new: Кампа жана колдоо үчүн. Бош калтырсаңыз, CZ-00123 сыяктуу код өзү пайда болот
+admin.product.code_hint_edit: Кампа жана колдоо үчүн. Бардык товарлардын арасында кайталанбайт
 admin.product.base_price: Негизги баасы, сом
 admin.product.old_price: Эски баасы (арзандатууга чейин), сом
 admin.product.old_price_hint: "Арзандатууну көрсөтүү үчүн толтуруңуз: эски баасы кызыл жана сызылган, учурдагы баасы жашыл болот. Бош болсо — арзандатуу жок."
@@ -560,6 +565,8 @@ admin.apperr.invalid_category_id: Категорияны тандаңыз
 admin.apperr.invalid_base_price: Баасы терс болбошу керек
 admin.apperr.invalid_old_price: Эски баасы нөлдөн чоң болушу керек
 admin.apperr.old_price_not_above_price: Эски баасы негизги баадан чоң болушу керек
+admin.apperr.invalid_product_code: Товардын коду: 40 белгиге чейин, сап которуусуз
+admin.apperr.product_code_taken: Мындай коду бар товар мурунтан эле бар — башка код жазыңыз же талааны бош калтырыңыз
 admin.apperr.invalid_variant: Ар бир вариациянын өлчөмү жана түсү болушу керек
 admin.apperr.invalid_object_key: Сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
 admin.apperr.product_not_found: Товар табылган жок

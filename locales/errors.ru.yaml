@@ -133,6 +133,7 @@ err.invalid_price_min: некорректный price_min
 err.invalid_price_override: price_override должен быть больше нуля
 err.invalid_variant_price: цена вариации должна быть больше нуля
 err.invalid_product_id: товар не найден
+err.invalid_product_code: код товара: до 40 символов, без переносов строк
 err.invalid_qty.format: некорректное количество
 err.invalid_qty: количество должно быть больше нуля
 err.invalid_quantity.form: количество не может быть отрицательным
@@ -186,6 +187,7 @@ err.point_in_use: "нельзя удалить точку продаж: на н�
 err.point_not_found: точка продаж не найдена
 err.point_required: выберите точку самовывоза
 err.product_not_found: товар не найден
+err.product_code_taken: товар с таким кодом уже есть
 err.product_unavailable.named: товар «{name}» больше не продаётся — уберите его из корзины
 err.product_unavailable: товар больше не продаётся
 err.qr_not_configured: оплата по QR-коду пока недоступна

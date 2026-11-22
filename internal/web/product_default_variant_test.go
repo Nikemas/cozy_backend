@@ -22,8 +22,8 @@ func newProductPageHandlers(t *testing.T, stockRows [][2]any) *handlers {
 	t.Cleanup(func() { _ = db.Close() })
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta("FROM products")).WithArgs("p1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "name_ru", "name_ky", "description_ru", "description_ky", "brand", "base_price", "old_price", "is_active", "created_at", "updated_at"}).
-			AddRow("p1", "c1", "Сандалии", "Сандалии", nil, nil, nil, 1000, nil, true, now, now))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "name_ru", "name_ky", "description_ru", "description_ky", "brand", "model_code", "base_price", "old_price", "is_active", "created_at", "updated_at"}).
+			AddRow("p1", "c1", "Сандалии", "Сандалии", nil, nil, nil, "CZ-00001", 1000, nil, true, now, now))
 	mock.ExpectQuery(regexp.QuoteMeta("FROM product_variants")).WithArgs("p1").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "product_id", "size", "color", "sku", "price_override"}).
 			AddRow("v1", "p1", "40", "Синий", "S1", nil).

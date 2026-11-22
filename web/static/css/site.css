@@ -918,6 +918,7 @@ button, input { font-family: inherit; }
 }
 .product-meta__brand { font-size: var(--cozy-fs-13); color: var(--cozy-ink-3); margin-bottom: 5px; }
 .product-meta__name { font-size: 26px; font-weight: 700; color: var(--cozy-ink); margin: 0 0 10px; letter-spacing: -0.01em; line-height: 1.25; }
+.product-meta__code { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin: -4px 0 10px; }
 .product-meta__price { font-size: 24px; font-weight: 700; color: var(--cozy-accent); margin-bottom: 26px; }
 
 .product-section-title { font-size: var(--cozy-fs-14); font-weight: 600; color: var(--cozy-ink); margin-bottom: 10px; }

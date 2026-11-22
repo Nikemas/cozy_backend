@@ -1978,6 +1978,14 @@ components:
         description_ru: { type: string, nullable: true }
         description_ky: { type: string, nullable: true }
         brand: { type: string, nullable: true }
+        code:
+          type: string
+          example: CZ-00123
+          description: |
+            Product code («код товара»): unique (ignoring case), never empty.
+            Products created without one get a generated `CZ-NNNNN` code.
+            Show it small on the product screen ("Код: CZ-00123") so a
+            customer can read it out to support. Also matched by `q` search.
         base_price: { type: number, format: double }
         old_price:
           type: number
@@ -2002,6 +2010,7 @@ components:
         description_ru: { type: string, nullable: true }
         description_ky: { type: string, nullable: true }
         brand: { type: string, nullable: true }
+        code: { type: string, nullable: true, maxLength: 40, description: "Product code; null/blank generates one on create (CZ-NNNNN) and keeps the stored one on update. Another product's code (ignoring case) → 409 product_code_taken." }
         base_price: { type: number, format: double, minimum: 0 }
         old_price: { type: number, format: double, nullable: true, description: "Optional pre-discount price; must be > base_price. Null/omitted = no discount (update replaces it)." }
         is_active: { type: boolean, nullable: true, description: "Defaults to true if omitted." }
