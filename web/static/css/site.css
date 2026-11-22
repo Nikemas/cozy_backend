@@ -828,10 +828,10 @@ button, input { font-family: inherit; }
 .product-card__link { display: block; color: inherit; }
 .product-card__thumb {
   background: var(--cozy-surface); border-radius: var(--cozy-r-12);
-  aspect-ratio: 1; margin-top: 34px; margin-bottom: 12px; padding: 10px; box-sizing: border-box;
+  aspect-ratio: 1; margin-top: 34px; margin-bottom: 12px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
-.product-card__thumb img { width: 100%; height: 100%; object-fit: contain; }
+.product-card__thumb img { width: 100%; height: 100%; object-fit: cover; }
 .product-card__brand { font-size: 11.5px; color: rgba(255, 255, 255, 0.8); margin-bottom: 3px; }
 .product-card__name { font-size: var(--cozy-fs-14); font-weight: 700; color: var(--cozy-surface); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .product-card__price { font-size: 15px; font-weight: 800; color: var(--cozy-surface); }
@@ -866,9 +866,9 @@ button, input { font-family: inherit; }
 .quickbuy-modal__head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; padding-right: 34px; }
 .quickbuy-modal__photo {
   width: 96px; height: 96px; flex-shrink: 0; border-radius: var(--cozy-r-16); background: var(--cozy-accent-bg);
-  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 8px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box;
 }
-.quickbuy-modal__photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.quickbuy-modal__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .quickbuy-modal__info { flex: 1; min-width: 0; }
 .quickbuy-modal__brand { font-size: var(--cozy-fs-13); color: var(--cozy-ink-2); margin-bottom: 3px; }
 .quickbuy-modal__name { font-size: var(--cozy-fs-19); font-weight: 800; color: var(--cozy-ink); margin-bottom: 6px; }
@@ -881,14 +881,14 @@ button, input { font-family: inherit; }
 .product-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
 .product-gallery { position: sticky; top: 84px; }
 .product-photo {
-  background: var(--cozy-accent-bg); border-radius: 20px; padding: 24px;
+  background: var(--cozy-accent-bg); border-radius: 20px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 12px;
   aspect-ratio: 1;
 }
-.product-photo img { width: 100%; height: 100%; object-fit: contain; border-radius: var(--cozy-r-12); }
+.product-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--cozy-r-12); }
 .product-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
 .product-thumb { width: 68px; height: 68px; padding: 0; border: 1.5px solid var(--cozy-border); border-radius: var(--cozy-r-10); background: var(--cozy-surface); cursor: pointer; overflow: hidden; }
-.product-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .product-thumb--active { border-color: var(--cozy-accent); }
 .product-stock { margin-bottom: 20px; }
 .product-stock .product-section-title i { color: var(--cozy-accent); }
@@ -1066,8 +1066,8 @@ button, input { font-family: inherit; }
 
 /* ---- Product photos in cart / order history / favourites ---- */
 .cart-line__thumb, .order-item__thumb { overflow: hidden; }
-.cart-line__thumb img, .order-item__thumb img { width: 100%; height: 100%; object-fit: contain; background: var(--cozy-surface); display: block; }
-.fav-card__photo img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--cozy-surface); }
+.cart-line__thumb img, .order-item__thumb img { width: 100%; height: 100%; object-fit: cover; background: var(--cozy-surface); display: block; }
+.fav-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--cozy-surface); }
 .fav-card__name { display: block; color: inherit; }
 .fav-card__name:hover { color: var(--cozy-accent-hover); }
 
