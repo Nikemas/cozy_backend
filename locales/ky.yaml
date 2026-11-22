@@ -318,3 +318,39 @@ account_delete.unconfirmed: Өчүрүлгөн аккаунтту калыбын
 common.days.one: күн
 common.days.few: күн
 common.days.many: күн
+
+# Support requests (feat/support-tickets)
+screen.support.title: Колдоо
+screen.support_ticket.title: Кайрылуу
+support.intro: Бизге жазыңыз — иш убагында жооп беребиз. Жооп ушул баракта көрүнөт; аккаунтка кирбей жазсаңыз, чалабыз же WhatsApp аркылуу жооп беребиз.
+support.sent: №%d кайрылуу кабыл алынды
+support.sent_guest_hint: Көрсөтүлгөн телефон аркылуу сиз менен байланышабыз.
+support.new_title: Жаңы кайрылуу
+support.topic: Тема
+support.topic_placeholder: Теманы тандаңыз
+support.topic.order: Буйрутма
+support.topic.payment: Төлөм
+support.topic.delivery: Жеткирүү
+support.topic.return: Кайтаруу / алмаштыруу
+support.topic.product: Товар
+support.topic.other: Башка
+support.order: Буйрутма
+support.order_none: Буйрутмасыз
+support.name: Аты
+support.phone: Телефон
+support.message: Билдирүү
+support.message_placeholder: Суроону жазыңыз: эмне болду, буйрутманын номери, өлчөмү…
+support.send: Жөнөтүү
+support.guest_hint: Жоопторду сайттан көрүү үчүн аккаунтка кириңиз.
+support.guest_login: Кирүү
+support.my_title: Менин кайрылууларым
+support.my_empty: Азырынча кайрылуулар жок.
+support.number: №%d кайрылуу
+support.status.new: Жаңы
+support.status.in_progress: Иштелүүдө
+support.status.closed: Жабылды
+support.author_you: Сиз
+support.author_shop: Cozy дүкөнү
+support.closed_hint: Кайрылуу жабылды. Суроо калса, жаңысын түзүңүз:
+support.reply: Билдирүү кошуу
+error.code.too_many_tickets: Бир саатта кайрылуулар өтө көп — бир аз күтүңүз же бизге чалыңыз.

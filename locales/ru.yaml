@@ -318,3 +318,39 @@ account_delete.unconfirmed: Отметьте, что понимаете — уд
 common.days.one: день
 common.days.few: дня
 common.days.many: дней
+
+# Support requests (feat/support-tickets)
+screen.support.title: Поддержка
+screen.support_ticket.title: Обращение
+support.intro: Напишите нам — ответим в рабочее время. Ответ появится на этой странице; если вы пишете без входа, мы позвоним или ответим в WhatsApp.
+support.sent: Обращение №%d принято
+support.sent_guest_hint: Мы свяжемся с вами по указанному телефону.
+support.new_title: Новое обращение
+support.topic: Тема
+support.topic_placeholder: Выберите тему
+support.topic.order: Заказ
+support.topic.payment: Оплата
+support.topic.delivery: Доставка
+support.topic.return: Возврат / обмен
+support.topic.product: Товар
+support.topic.other: Другое
+support.order: Заказ
+support.order_none: Без заказа
+support.name: Имя
+support.phone: Телефон
+support.message: Сообщение
+support.message_placeholder: Опишите вопрос: что случилось, номер заказа, размер…
+support.send: Отправить
+support.guest_hint: Войдите, чтобы видеть ответы на сайте.
+support.guest_login: Войти
+support.my_title: Мои обращения
+support.my_empty: Обращений пока нет.
+support.number: Обращение №%d
+support.status.new: Новое
+support.status.in_progress: В работе
+support.status.closed: Закрыто
+support.author_you: Вы
+support.author_shop: Магазин Cozy
+support.closed_hint: Обращение закрыто. Если вопрос остался — создайте новое:
+support.reply: Дописать сообщение
+error.code.too_many_tickets: Слишком много обращений за час — подождите немного или позвоните нам.

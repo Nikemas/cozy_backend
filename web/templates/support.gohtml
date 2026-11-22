@@ -1,0 +1,73 @@
+{{/* support.gohtml (feat/support-tickets): the support request form —
+     a guest gives a name and phone, a logged-in customer's are prefilled
+     and they may pick one of their orders — plus that customer's own
+     requests. A plain form POST; works without JS. Data is
+     internal/web/support_handlers.go's SupportData. */}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="support-screen">
+  <h1 class="screen-title">{{t "screen.support.title"}}</h1>
+  <p class="muted support-intro">{{t "support.intro"}}</p>
+
+  {{if $d.SentLabel}}
+  <div class="support-sent" role="status">
+    <i class="ti ti-circle-check" aria-hidden="true"></i>
+    <div>
+      <div class="support-sent__title">{{$d.SentLabel}}</div>
+      <div class="muted">{{t "support.sent_guest_hint"}}</div>
+    </div>
+  </div>
+  {{end}}
+
+  <form class="support-form" method="post" action="/support" id="support-form">
+    <h2 class="support-section-title">{{t "support.new_title"}}</h2>
+    {{if $d.Error}}<p class="form-error" role="alert">{{$d.Error}}</p>{{end}}
+
+    <label class="field-label" for="support-topic">{{t "support.topic"}}</label>
+    <select id="support-topic" name="topic" required>
+      <option value="">{{t "support.topic_placeholder"}}</option>
+      {{range $d.Topics}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+
+    {{if $d.Orders}}
+    <label class="field-label" for="support-order">{{t "support.order"}}</label>
+    <select id="support-order" name="order_id">
+      <option value="">{{t "support.order_none"}}</option>
+      {{range $d.Orders}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+    {{end}}
+
+    <label class="field-label" for="support-name">{{t "support.name"}}</label>
+    <input type="text" id="support-name" name="name" value="{{$d.Name}}" maxlength="{{$d.MaxName}}" autocomplete="name"{{if not .Authed}} required{{end}}>
+
+    <label class="field-label" for="support-phone">{{t "support.phone"}}</label>
+    <input type="tel" id="support-phone" name="phone" value="{{$d.Phone}}" maxlength="32" inputmode="tel" autocomplete="tel" placeholder="0700 123 456"{{if not .Authed}} required{{end}}>
+
+    <label class="field-label" for="support-message">{{t "support.message"}}</label>
+    <textarea id="support-message" name="message" rows="5" maxlength="{{$d.MaxMessage}}" required placeholder="{{t "support.message_placeholder"}}">{{$d.Message}}</textarea>
+
+    <button type="submit" class="btn btn--primary support-form__submit">{{t "support.send"}}</button>
+    {{if not .Authed}}<p class="muted support-form__hint">{{t "support.guest_hint"}} <a href="/profile">{{t "support.guest_login"}}</a></p>{{end}}
+  </form>
+
+  {{if .Authed}}
+  <section class="support-list" aria-labelledby="support-list-title">
+    <h2 class="support-section-title" id="support-list-title">{{t "support.my_title"}}</h2>
+    {{if $d.Tickets}}
+    {{range $d.Tickets}}
+    <a class="support-row" href="/support/{{.ID}}">
+      <div class="support-row__head">
+        <span class="support-row__number">{{.NumberLabel}} · {{.TopicLabel}}</span>
+        <span class="order-status {{.StatusClass}}">{{t .StatusKey}}</span>
+      </div>
+      <div class="support-row__preview">{{.Preview}}</div>
+      <div class="muted">{{.DateLabel}}</div>
+    </a>
+    {{end}}
+    {{else}}
+    <p class="muted">{{t "support.my_empty"}}</p>
+    {{end}}
+  </section>
+  {{end}}
+</div>
+{{end}}

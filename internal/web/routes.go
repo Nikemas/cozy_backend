@@ -21,6 +21,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
+	"github.com/Nikemas/cozy_backend/internal/support"
 )
 
 // staticMaxAge is how long browsers may reuse a /static/* URL that isn't
@@ -71,6 +72,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 		cartRepo:  orders.NewCartRepo(db),
 		ordersSvc: orders.NewService(db),
 		zones:     orders.NewDeliveryZoneRepo(db),
+
+		support:       support.NewService(db),
+		supportGuests: newSupportGuestLimiter(),
 	}
 	if authSvc != nil {
 		h.accounts = authSvc
@@ -144,6 +148,13 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg *config.Config, authSvc 
 	mux.Handle("POST /addresses", withSession(apperr.Wrap(h.addressCreate)))
 	mux.Handle("POST /addresses/{id}", withSession(apperr.Wrap(h.addressUpdate)))
 	mux.Handle("DELETE /addresses/{id}", withSession(apperr.Wrap(h.addressDelete)))
+
+	// Support requests (support_handlers.go): form for everyone, own
+	// requests and their conversation for a logged-in customer.
+	mux.Handle("GET /support", withSession(apperr.Wrap(h.supportForm)))
+	mux.Handle("POST /support", withSession(apperr.Wrap(h.supportSubmit)))
+	mux.Handle("GET /support/{id}", withSession(apperr.Wrap(h.supportTicket)))
+	mux.Handle("POST /support/{id}/messages", withSession(apperr.Wrap(h.supportReply)))
 
 	// Legal/info pages (footer links; the mobile app opens /privacy;
 	// Google Play Console links to /account-deletion).
