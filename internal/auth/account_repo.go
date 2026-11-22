@@ -27,7 +27,8 @@ const terminalOrderStatuses = `('delivered', 'cancelled')`
 //
 //   - refuses with 409 has_active_orders while any order is not yet
 //     delivered/cancelled — the shop still has to call/deliver/refund;
-//   - deletes cart, favorites, device tokens and every saved address not
+//   - deletes cart, favorites, device tokens, support requests (with
+//     their conversations) and every saved address not
 //     referenced by an order;
 //   - addresses referenced by orders are kept (they are part of the order
 //     record for accounting) but lose their label/default flag;
@@ -66,6 +67,7 @@ func (r *accountRepo) deleteCustomer(ctx context.Context, customerID string) err
 			`DELETE FROM cart_items WHERE customer_id = $1`,
 			`DELETE FROM favorites WHERE customer_id = $1`,
 			`DELETE FROM device_tokens WHERE customer_id = $1`,
+			`DELETE FROM support_tickets WHERE customer_id = $1`,
 			`DELETE FROM customer_addresses a WHERE a.customer_id = $1
 				AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.address_id = a.id)`,
 			`UPDATE customer_addresses SET label = NULL, is_default = false WHERE customer_id = $1`,

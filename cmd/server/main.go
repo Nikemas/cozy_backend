@@ -30,6 +30,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/reqid"
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/support"
 	"github.com/Nikemas/cozy_backend/internal/web"
 )
 
@@ -106,6 +107,9 @@ func run() error {
 		return err
 	}
 	orders.SetDefaultNotifier(notifier)
+	// Support requests: staff Telegram on new requests/follow-ups,
+	// customer push on staff replies — same dispatcher as orders.
+	support.SetDefaultNotifier(notifier)
 
 	// Order settings (DELIVERY_FEE_SOM, MAX_OPEN_ORDERS_PER_CUSTOMER,
 	// PAYMENT_PENDING_TTL) — process default for every orders.Service.
