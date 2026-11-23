@@ -354,21 +354,101 @@ func colorFilterOptions(values []string, selected, lang string) []FilterOption {
 	return out
 }
 
-// buildColorOptions backs the product page's and quick-buy modal's color
-// pickers: Label is the color in lang, Href keeps the raw color (and the
-// selected size) under basePath.
-func buildColorOptions(colors []string, variants []catalog.Variant, qtyByVariant map[string]int, selectedSize, selectedColor, basePath, lang string) []ColorOption {
-	out := make([]ColorOption, 0, len(colors))
-	for _, c := range colors {
-		v := findVariant(variants, selectedSize, c)
-		out = append(out, ColorOption{
-			Label:     i18n.ColorLabel(lang, c),
-			Selected:  c == selectedColor,
-			Available: v != nil && qtyByVariant[v.ID] > 0,
-			Href:      basePath + "?size=" + url.QueryEscape(selectedSize) + "&color=" + url.QueryEscape(c),
+// variantPickers is the size/color picker state shared by the product page
+// and the quick-buy modal. Size comes first: every size is listed, and the
+// colors are only those that exist in the selected size.
+type variantPickers struct {
+	SelectedSize  string
+	SelectedColor string
+	Sizes         []SizeOption
+	Colors        []ColorOption
+}
+
+// buildVariantPickers resolves the selection from the query (size/color) and
+// builds both pickers under basePath. A size is Available when any color has
+// stock in it; a color is Available when it has stock in the selected size.
+// A color the selected size does not have in stock moves to the first color
+// that does (colorForSize), so changing the size never lands on a dead pair.
+func buildVariantPickers(variants []catalog.Variant, qtyByVariant map[string]int, q url.Values, basePath, lang string) variantPickers {
+	sizeVals := make([]string, len(variants))
+	for i, v := range variants {
+		sizeVals[i] = v.Size
+	}
+	sizes := distinctInOrder(sizeVals)
+
+	size, color := defaultQuickBuySelection(variants, qtyByVariant, q.Get("size"), q.Get("color"))
+	color = colorForSize(variants, qtyByVariant, size, color)
+
+	sizeOpts := make([]SizeOption, 0, len(sizes))
+	for _, s := range sizes {
+		sizeOpts = append(sizeOpts, SizeOption{
+			Label:     s,
+			Selected:  s == size,
+			Available: sizeInStock(variants, qtyByVariant, s),
+			Href:      basePath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(color),
 		})
 	}
-	return out
+
+	colors := colorsForSize(variants, size)
+	colorOpts := make([]ColorOption, 0, len(colors))
+	for _, c := range colors {
+		v := findVariant(variants, size, c)
+		colorOpts = append(colorOpts, ColorOption{
+			Label:     i18n.ColorLabel(lang, c),
+			Selected:  c == color,
+			Available: v != nil && qtyByVariant[v.ID] > 0,
+			Href:      basePath + "?size=" + url.QueryEscape(size) + "&color=" + url.QueryEscape(c),
+		})
+	}
+	return variantPickers{SelectedSize: size, SelectedColor: color, Sizes: sizeOpts, Colors: colorOpts}
+}
+
+// sizeInStock reports whether any color of size has stock.
+func sizeInStock(variants []catalog.Variant, qtyByVariant map[string]int, size string) bool {
+	for _, v := range variants {
+		if v.Size == size && qtyByVariant[v.ID] > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// colorsForSize lists the colors that exist in size, in variant order.
+func colorsForSize(variants []catalog.Variant, size string) []string {
+	var colors []string
+	for _, v := range variants {
+		if v.Size == size {
+			colors = append(colors, v.Color)
+		}
+	}
+	return distinctInOrder(colors)
+}
+
+// colorForSize keeps color when it is in stock in size, otherwise returns the
+// size's first in-stock color. A size with no stock keeps color if the size
+// has it, else falls back to the size's first color (color unchanged when the
+// size is unknown).
+func colorForSize(variants []catalog.Variant, qtyByVariant map[string]int, size, color string) string {
+	colors := colorsForSize(variants, size)
+	if len(colors) == 0 {
+		return color
+	}
+	for _, c := range colors {
+		if v := findVariant(variants, size, c); c == color && v != nil && qtyByVariant[v.ID] > 0 {
+			return color
+		}
+	}
+	for _, c := range colors {
+		if v := findVariant(variants, size, c); v != nil && qtyByVariant[v.ID] > 0 {
+			return c
+		}
+	}
+	for _, c := range colors {
+		if c == color {
+			return color
+		}
+	}
+	return colors[0]
 }
 
 // ProductData backs product.gohtml (screen "product") and its
@@ -581,31 +661,10 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		qtyByVariant[s.VariantID] += s.Quantity
 	}
 
-	sizeVals := make([]string, len(variantList))
-	colorVals := make([]string, len(variantList))
-	for i, v := range variantList {
-		sizeVals[i] = v.Size
-		colorVals[i] = v.Color
-	}
-	sizes := distinctInOrder(sizeVals)
-	colors := distinctInOrder(colorVals)
-
-	selectedSize, selectedColor := defaultQuickBuySelection(variantList, qtyByVariant, q.Get("size"), q.Get("color"))
-
 	name := pickName(product.NameRu, product.NameKy, lang)
 	productPath := ProductPath(product.ID, product.NameRu)
-
-	sizeOpts := make([]SizeOption, 0, len(sizes))
-	for _, s := range sizes {
-		v := findVariant(variantList, s, selectedColor)
-		sizeOpts = append(sizeOpts, SizeOption{
-			Label:     s,
-			Selected:  s == selectedSize,
-			Available: v != nil && qtyByVariant[v.ID] > 0,
-			Href:      productPath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(selectedColor),
-		})
-	}
-	colorOpts := buildColorOptions(colors, variantList, qtyByVariant, selectedSize, selectedColor, productPath, lang)
+	pickers := buildVariantPickers(variantList, qtyByVariant, q, productPath, lang)
+	selectedSize, selectedColor := pickers.SelectedSize, pickers.SelectedColor
 
 	price := product.BasePrice
 	selectedVariantID := ""
@@ -646,8 +705,8 @@ func (h *handlers) buildProductData(ctx context.Context, q url.Values, lang, pro
 		Photos:            photos,
 		InStock:           len(availability) > 0,
 		Availability:      availability,
-		Sizes:             sizeOpts,
-		Colors:            colorOpts,
+		Sizes:             pickers.Sizes,
+		Colors:            pickers.Colors,
 		SelectedSize:      selectedSize,
 		SelectedColor:     selectedColor,
 		SelectedVariantID: selectedVariantID,
@@ -712,29 +771,9 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 		qtyByVariant[s.VariantID] += s.Quantity
 	}
 
-	sizeVals := make([]string, len(variantList))
-	colorVals := make([]string, len(variantList))
-	for i, v := range variantList {
-		sizeVals[i] = v.Size
-		colorVals[i] = v.Color
-	}
-	sizes := distinctInOrder(sizeVals)
-	colors := distinctInOrder(colorVals)
-
-	selectedSize, selectedColor := defaultQuickBuySelection(variantList, qtyByVariant, q.Get("size"), q.Get("color"))
-
 	quickBuyPath := "/quickbuy/" + product.ID
-	sizeOpts := make([]SizeOption, 0, len(sizes))
-	for _, s := range sizes {
-		v := findVariant(variantList, s, selectedColor)
-		sizeOpts = append(sizeOpts, SizeOption{
-			Label:     s,
-			Selected:  s == selectedSize,
-			Available: v != nil && qtyByVariant[v.ID] > 0,
-			Href:      quickBuyPath + "?size=" + url.QueryEscape(s) + "&color=" + url.QueryEscape(selectedColor),
-		})
-	}
-	colorOpts := buildColorOptions(colors, variantList, qtyByVariant, selectedSize, selectedColor, quickBuyPath, lang)
+	pickers := buildVariantPickers(variantList, qtyByVariant, q, quickBuyPath, lang)
+	selectedSize, selectedColor := pickers.SelectedSize, pickers.SelectedColor
 
 	price := product.BasePrice
 	selectedVariantID := ""
@@ -764,8 +803,8 @@ func (h *handlers) buildQuickBuyData(ctx context.Context, q url.Values, lang, pr
 		OldPriceText:  h.oldPriceText(product.OldPrice, price, lang),
 		HasPhoto:      len(photos) > 0,
 		PhotoURL:      photoURL,
-		Sizes:         sizeOpts,
-		Colors:        colorOpts,
+		Sizes:         pickers.Sizes,
+		Colors:        pickers.Colors,
 		SelectedSize:  selectedSize,
 		SelectedColor: selectedColor,
 		InStock:       selectedVariantID != "" && qtyByVariant[selectedVariantID] > 0,
