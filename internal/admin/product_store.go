@@ -202,7 +202,8 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 		if err := applyStockChangesTx(ctx, tx, idByKey, in.Stock); err != nil {
 			return err
 		}
-		if err := applyStockLocationsTx(ctx, tx, idByKey, in.Locations); err != nil {
+		moves, err := applyStockLocationsTx(ctx, tx, idByKey, in.Locations)
+		if err != nil {
 			return err
 		}
 
@@ -214,7 +215,11 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 			s.audit.RecordTxFunc(ctx, tx, func() ([]audit.Entry, error) {
 				entries := productSaveEntries(productID, in, oldProduct, oldVariants, idByKey)
 				stockEntries, err := stockEntriesTx(ctx, tx, idByKey, in.Stock)
-				return append(entries, stockEntries...), err
+				if err != nil {
+					return nil, err
+				}
+				moveEntries, err := locationEntriesTx(ctx, tx, moves)
+				return append(append(entries, stockEntries...), moveEntries...), err
 			})
 		}
 		return nil
@@ -443,16 +448,26 @@ func writeStockCellTx(ctx context.Context, tx *sql.Tx, variantID, pointID string
 // stock row gets one with quantity 0. The location must be an active one
 // of the same point (the composite FK would refuse another point's, but
 // not an inactive one).
-func applyStockLocationsTx(ctx context.Context, tx *sql.Tx, idByKey map[string]string, changes []stockLocationChange) error {
+//
+// It returns the moves that actually changed a location, for the audit log.
+func applyStockLocationsTx(ctx context.Context, tx *sql.Tx, idByKey map[string]string, changes []stockLocationChange) ([]locationMove, error) {
+	var moves []locationMove
 	for _, c := range changes {
 		variantID, ok := idByKey[c.RowKey]
 		if !ok {
 			continue // the row was removed in this same submission
 		}
+		toName := ""
 		if c.LocationID != nil {
-			if err := requireActiveLocationTx(ctx, tx, c.PointID, *c.LocationID); err != nil {
-				return err
+			name, err := requireActiveLocationTx(ctx, tx, c.PointID, *c.LocationID)
+			if err != nil {
+				return nil, err
 			}
+			toName = name
+		}
+		fromName, err := currentLocationNameTx(ctx, tx, variantID, c.PointID)
+		if err != nil {
+			return nil, err
 		}
 		const q = `
 			INSERT INTO stock (variant_id, point_id, quantity, location_id, updated_at)
@@ -460,22 +475,49 @@ func applyStockLocationsTx(ctx context.Context, tx *sql.Tx, idByKey map[string]s
 			ON CONFLICT (variant_id, point_id) DO UPDATE SET location_id = EXCLUDED.location_id`
 		if _, err := tx.ExecContext(ctx, q, variantID, c.PointID, c.LocationID); err != nil {
 			if pgErrCode(err) == pgForeignKeyViolation {
-				return invalidLocation()
+				return nil, invalidLocation()
 			}
-			return fmt.Errorf("set location of variant %s at %s: %w", variantID, c.PointID, err)
+			return nil, fmt.Errorf("set location of variant %s at %s: %w", variantID, c.PointID, err)
+		}
+		if fromName != toName {
+			moves = append(moves, locationMove{variantID: variantID, pointID: c.PointID, from: fromName, to: toName})
 		}
 	}
-	return nil
+	return moves, nil
 }
 
-func requireActiveLocationTx(ctx context.Context, tx *sql.Tx, pointID, locationID string) error {
+// locationMove is one applied storage-location change, by location name
+// ("" = no location), for the audit log.
+type locationMove struct {
+	variantID, pointID string
+	from, to           string
+}
+
+// currentLocationNameTx is the name of the location a stock row points at
+// now, "" if the row doesn't exist or has none.
+func currentLocationNameTx(ctx context.Context, tx *sql.Tx, variantID, pointID string) (string, error) {
+	var name string
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(l.name, '') FROM stock s
+		LEFT JOIN storage_locations l ON l.id = s.location_id
+		WHERE s.variant_id = $1 AND s.point_id = $2`, variantID, pointID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return name, err
+}
+
+// requireActiveLocationTx returns the location's name, or invalid_location
+// if it is not an active one of that point.
+func requireActiveLocationTx(ctx context.Context, tx *sql.Tx, pointID, locationID string) (string, error) {
+	var name string
 	var active bool
 	err := tx.QueryRowContext(ctx,
-		`SELECT is_active FROM storage_locations WHERE id::text = $1 AND point_id::text = $2`, locationID, pointID).Scan(&active)
+		`SELECT name, is_active FROM storage_locations WHERE id::text = $1 AND point_id::text = $2`, locationID, pointID).Scan(&name, &active)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && !active) {
-		return invalidLocation()
+		return "", invalidLocation()
 	}
-	return err
+	return name, err
 }
 
 func invalidLocation() error {

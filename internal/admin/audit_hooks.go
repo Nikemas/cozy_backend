@@ -271,6 +271,45 @@ func stockEntriesTx(ctx context.Context, tx *sql.Tx, idByKey map[string]string, 
 	return out, nil
 }
 
+// locationEntriesTx builds one stock.update entry per storage-location
+// move (old → new location name), so a move that changes no quantity still
+// shows in the audit log.
+func locationEntriesTx(ctx context.Context, tx *sql.Tx, moves []locationMove) ([]audit.Entry, error) {
+	if len(moves) == 0 {
+		return nil, nil
+	}
+	variantSet, pointSet := map[string]bool{}, map[string]bool{}
+	for _, m := range moves {
+		variantSet[m.variantID] = true
+		pointSet[m.pointID] = true
+	}
+	labels, err := variantLabelsTx(ctx, tx, keys(variantSet))
+	if err != nil {
+		return nil, err
+	}
+	points, err := pointNamesTx(ctx, tx, keys(pointSet))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]audit.Entry, 0, len(moves))
+	for _, m := range moves {
+		l := labels[m.variantID]
+		pointName := points[m.pointID]
+		if pointName == "" {
+			pointName = m.pointID
+		}
+		args := audit.StockLocationArgs(l.Product, l.Size, l.Color, pointName, m.from, m.to)
+		out = append(out, audit.Entry{
+			Action: audit.ActionStockUpdate, EntityType: audit.EntityStock, EntityID: m.variantID,
+			Summary: russianAuditSummary(audit.MsgStockLocationChanged, args, ""),
+			MsgKey:  audit.MsgStockLocationChanged, MsgArgs: args,
+			Details: map[string]any{"product_id": l.ProductID, "point_id": m.pointID, "point": pointName,
+				"location": audit.Change{From: m.from, To: m.to}},
+		})
+	}
+	return out, nil
+}
+
 func keys(m map[string]bool) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

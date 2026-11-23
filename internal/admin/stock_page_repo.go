@@ -217,12 +217,18 @@ func (r *stockPageRepo) Apply(ctx context.Context, changes []stockCellChange, lo
 		if err := applyStockChangesTx(ctx, tx, idByKey, changes); err != nil {
 			return err
 		}
-		if err := applyStockLocationsTx(ctx, tx, idByKey, locations); err != nil {
+		moves, err := applyStockLocationsTx(ctx, tx, idByKey, locations)
+		if err != nil {
 			return err
 		}
 		if r.audit.Enabled() {
 			r.audit.RecordTxFunc(ctx, tx, func() ([]audit.Entry, error) {
-				return stockEntriesTx(ctx, tx, idByKey, changes)
+				entries, err := stockEntriesTx(ctx, tx, idByKey, changes)
+				if err != nil {
+					return nil, err
+				}
+				moveEntries, err := locationEntriesTx(ctx, tx, moves)
+				return append(entries, moveEntries...), err
 			})
 		}
 		return nil

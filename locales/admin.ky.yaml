@@ -491,6 +491,7 @@ admin.audit.summary.variant_created: {size} / {color} вариациясы ко�
 admin.audit.summary.variant_updated: {size} / {color} вариациясы өзгөртүлдү
 admin.audit.summary.variant_deleted: {size} / {color} вариациясы өчүрүлдү
 admin.audit.summary.stock_changed: «{product}» {size} / {color} калдыгы, {point}: {from} → {to}
+admin.audit.summary.stock_location_changed: «{product}» {size} / {color} сактоо ордун, {point}: {from} → {to}
 admin.audit.summary.category_created: «{name}» категориясы түзүлдү
 admin.audit.summary.category_updated: «{name}» категориясы өзгөртүлдү
 admin.audit.summary.category_deleted: «{name}» категориясы өчүрүлдү

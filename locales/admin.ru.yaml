@@ -494,6 +494,7 @@ admin.audit.summary.variant_created: Добавлена вариация {size} 
 admin.audit.summary.variant_updated: Изменена вариация {size} / {color}
 admin.audit.summary.variant_deleted: Удалена вариация {size} / {color}
 admin.audit.summary.stock_changed: Остаток «{product}» {size} / {color}, {point}: {from} → {to}
+admin.audit.summary.stock_location_changed: Место хранения «{product}» {size} / {color}, {point}: {from} → {to}
 admin.audit.summary.category_created: Создана категория «{name}»
 admin.audit.summary.category_updated: Изменена категория «{name}»
 admin.audit.summary.category_deleted: Удалена категория «{name}»

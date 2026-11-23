@@ -44,6 +44,7 @@ const (
 	MsgVariantUpdated        = "admin.audit.summary.variant_updated"
 	MsgVariantDeleted        = "admin.audit.summary.variant_deleted"
 	MsgStockChanged          = "admin.audit.summary.stock_changed"
+	MsgStockLocationChanged  = "admin.audit.summary.stock_location_changed"
 	MsgCategoryCreated       = "admin.audit.summary.category_created"
 	MsgCategoryUpdated       = "admin.audit.summary.category_updated"
 	MsgCategoryDeleted       = "admin.audit.summary.category_deleted"
@@ -66,7 +67,7 @@ var SummaryKeys = []string{
 	MsgProductCreated, MsgProductUpdated, MsgProductUpdatedFields, MsgProductActivated,
 	MsgProductDeactivated, MsgProductDeleted, MsgProductCategory, MsgProductImages,
 	MsgVariantChanged, MsgVariantAdded, MsgVariantRemoved, MsgVariantCreated,
-	MsgVariantUpdated, MsgVariantDeleted, MsgStockChanged,
+	MsgVariantUpdated, MsgVariantDeleted, MsgStockChanged, MsgStockLocationChanged,
 	MsgCategoryCreated, MsgCategoryUpdated, MsgCategoryDeleted, MsgCategoryDeletedNoName,
 	MsgPointCreated, MsgPointUpdated, MsgPointEnabled, MsgPointDisabled,
 	MsgStaffCreated, MsgStaffEnabled, MsgStaffDisabled, MsgStaffPasswordReset,
@@ -99,6 +100,12 @@ func (e Entry) StoredDetails() map[string]any {
 
 // StockArgs are the arguments of MsgStockChanged.
 func StockArgs(product, size, color, point string, from, to int) Args {
+	return Args{"product": product, "size": size, "color": color, "point": point, "from": from, "to": to}
+}
+
+// StockLocationArgs are the arguments of MsgStockLocationChanged; from and
+// to are storage-location names ("" = no location).
+func StockLocationArgs(product, size, color, point, from, to string) Args {
 	return Args{"product": product, "size": size, "color": color, "point": point, "from": from, "to": to}
 }
 

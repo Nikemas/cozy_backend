@@ -178,6 +178,18 @@ func TestAdminStockPageSavesLocation(t *testing.T) {
 	if got := stockLocation(t, f.VariantA, wh); got != shelf.ID {
 		t.Fatalf("location = %q, want %q", got, shelf.ID)
 	}
+	// A move that changes no quantity still shows in the audit log, with
+	// the old (none) and new location names.
+	var moves int
+	if err := testDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM audit_log
+		WHERE action = 'stock.update' AND entity_id = $1
+		  AND details->'location'->>'to' = 'A-1'`, f.VariantA).Scan(&moves); err != nil {
+		t.Fatal(err)
+	}
+	if moves != 1 {
+		t.Fatalf("audit entries for the location move = %d, want 1", moves)
+	}
 
 	// Another warehouse's location is refused, nothing written.
 	form.Set("qty_"+f.VariantA+"_"+wh, "4")
