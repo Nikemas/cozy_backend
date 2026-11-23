@@ -246,6 +246,10 @@ func adminArgs(f ListFilter) []any {
 	if n, err := strconv.ParseInt(strings.TrimPrefix(q, "#"), 10, 64); err == nil && n > 0 {
 		number = n
 	}
+	// Local format "0555 …" → stored "+996555…": drop the trunk 0.
+	if strings.HasPrefix(d, "0") && len(d) > minPhoneSearchDigits {
+		d = d[1:]
+	}
 	if len(d) < minPhoneSearchDigits {
 		d = ""
 	}

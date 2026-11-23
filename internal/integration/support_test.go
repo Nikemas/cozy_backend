@@ -201,6 +201,12 @@ func TestSupportWebGuestAndCustomer(t *testing.T) {
 		t.Fatalf("guest ticket customer=%v channel=%s", guestCustomer, channel)
 	}
 
+	// Staff find the guest by the phone in local format.
+	owner, _ := a.newStaffSession(t, staff.RoleOwner, nil)
+	w = a.get(t, "/admin/tickets?q="+url.QueryEscape("0"+phone[4:7]+" "+phone[7:]), owner)
+	wantStatus(t, w, http.StatusOK)
+	wantBody(t, w, "Когда привезут?")
+
 	// Logged in: prefilled form, own order offered, request page.
 	cookie := a.customerSession(t, f.CustomerID)
 	orderID, orderNumber := insertOrder(t, f, f.CustomerID)
