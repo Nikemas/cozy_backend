@@ -133,6 +133,11 @@ func validateProductInput(in catalog.ProductInput) error {
 	if math.IsNaN(in.BasePrice) || math.IsInf(in.BasePrice, 0) || in.BasePrice < 0 {
 		return apperr.BadRequest("invalid_base_price", "цена не может быть отрицательной")
 	}
+	if in.Code != nil {
+		if norm, err := catalog.NormalizeProductCode(*in.Code); err != nil || norm == nil {
+			return apperr.BadRequest("invalid_product_code", "код товара: до 40 символов, без переносов строк")
+		}
+	}
 	return catalog.ValidateOldPrice(in.OldPrice)
 }
 
@@ -207,17 +212,19 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 }
 
 // upsertProductTx creates (productID == "") or updates the product row.
+// A nil Code generates one on create (the products_fill_model_code
+// trigger, migration 000051) and keeps the stored one on update.
 // Update leaves is_active untouched — the form never edits it (that's the
 // list's Деактивировать/Активировать action).
 func upsertProductTx(ctx context.Context, tx *sql.Tx, productID string, in catalog.ProductInput) (string, error) {
 	if productID == "" {
 		const q = `
-			INSERT INTO products (category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, is_active, old_price)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)
+			INSERT INTO products (category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, is_active, old_price, model_code)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9)
 			RETURNING id`
 		var id string
 		err := tx.QueryRowContext(ctx, q, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
-			in.Brand, in.BasePrice, in.OldPrice).Scan(&id)
+			in.Brand, in.BasePrice, in.OldPrice, in.Code).Scan(&id)
 		if err != nil {
 			return "", translateProductErr(err)
 		}
@@ -227,12 +234,12 @@ func upsertProductTx(ctx context.Context, tx *sql.Tx, productID string, in catal
 	const q = `
 		UPDATE products
 		SET category_id = $2, name_ru = $3, name_ky = $4, description_ru = $5, description_ky = $6,
-		    brand = $7, base_price = $8, old_price = $9, updated_at = now()
+		    brand = $7, base_price = $8, old_price = $9, model_code = COALESCE($10, model_code), updated_at = now()
 		WHERE id = $1
 		RETURNING id`
 	var id string
 	err := tx.QueryRowContext(ctx, q, productID, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
-		in.Brand, in.BasePrice, in.OldPrice).Scan(&id)
+		in.Brand, in.BasePrice, in.OldPrice, in.Code).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", apperr.NotFound("product_not_found", "товар не найден")
 	}
@@ -245,6 +252,9 @@ func upsertProductTx(ctx context.Context, tx *sql.Tx, productID string, in catal
 func translateProductErr(err error) error {
 	if pgErrCode(err) == pgForeignKeyViolation {
 		return apperr.BadRequest("invalid_category_id", "категория не найдена")
+	}
+	if catalog.IsProductCodeTaken(err) {
+		return catalog.ErrProductCodeTaken()
 	}
 	return err
 }

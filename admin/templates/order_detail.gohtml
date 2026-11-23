@@ -58,6 +58,7 @@
           <td>
             <div class="admin-order-detail__item-name">{{.Name}}</div>
             <div class="admin-order-detail__item-variant">{{.Variant}}</div>
+            {{if .Code}}<div class="admin-order-detail__item-variant">{{t "admin.products.col_code"}}: <span translate="no">{{.Code}}</span></div>{{end}}
           </td>
           <td class="admin-order-detail__item-qty">{{.Qty}}</td>
           <td class="admin-order-detail__item-price">{{.PriceLabel}}</td>

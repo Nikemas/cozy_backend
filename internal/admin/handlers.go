@@ -22,10 +22,13 @@ import (
 // services) as needed rather than inventing a second struct — see
 // RegisterRoutes for how h is built and threaded through.
 type handlers struct {
-	staffSvc   *staff.Service
-	render     *Renderer
-	reports    reportsBackend
-	pointsRepo *points.PointsRepo // Task 5 (points + staff screens), also used by Task 2's product form and Task 3's order detail
+	staffSvc *staff.Service
+	render   *Renderer
+	reports  reportsBackend
+	// reportDetails backs the detail reports (report_detail.go) — the
+	// same CachedRepo as reports.
+	reportDetails reportDetailBackend
+	pointsRepo    *points.PointsRepo // Task 5 (points + staff screens), also used by Task 2's product form and Task 3's order detail
 
 	// Task 3 (Заказы, internal/admin/orders.go): the order-management
 	// service plus the small set of other Wave 3 repos its detail page

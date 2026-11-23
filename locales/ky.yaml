@@ -224,6 +224,7 @@ product.delivery.more: Жеткирүү жана төлөө жөнүндө ке�
 product.description: Сыпаттамасы
 product.may_like: Сизге жагышы мүмкүн
 product.more_from_brand: %s брендинен дагы
+product.code: Коду
 
 # Shop filters and sorting.
 shop.heading: Бут кийим каталогу

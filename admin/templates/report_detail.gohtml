@@ -1,0 +1,183 @@
+{{/* report_detail.gohtml — detail reports (feat/product-code): one
+     category, one brand or one product by code. .Data is an
+     admin.ReportDetailData built by handlers.buildReportDetail
+     (internal/admin/report_detail.go). */}}
+{{define "content"}}
+{{with .Data}}
+<div class="admin-reports">
+  <form method="get" action="{{.Action}}" class="admin-reports__toolbar">
+    {{if eq .Kind "product"}}
+    <label for="report-subject" class="admin-visually-hidden">{{t "admin.reports.pick_code"}}</label>
+    <input type="search" id="report-subject" name="code" value="{{.Subject.Value}}" class="admin-reports__subject"
+      placeholder="{{t "admin.reports.pick_code"}}: CZ-00001" autocomplete="off" spellcheck="false" required>
+    {{else}}
+    <label for="report-subject" class="admin-visually-hidden">{{if eq .Kind "category"}}{{t "admin.reports.pick_category"}}{{else}}{{t "admin.reports.pick_brand"}}{{end}}</label>
+    <select id="report-subject" name="{{.Subject.Param}}" class="admin-reports__period admin-reports__subject" onchange="this.form.submit()">
+      {{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+    {{end}}
+    <label for="report-period" class="admin-visually-hidden">{{t "admin.common.period"}}</label>
+    <select id="report-period" name="period" class="admin-reports__period" onchange="reportsPeriodChanged(this)">
+      {{range .Periods}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+    <span class="admin-reports__custom" id="report-custom"{{if not .Custom}} hidden{{end}}>
+      <label for="report-from">{{t "admin.reports.from"}}</label>
+      <input type="date" id="report-from" name="from" value="{{.From}}">
+      <label for="report-to">{{t "admin.reports.to"}}</label>
+      <input type="date" id="report-to" name="to" value="{{.To}}">
+    </span>
+    <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.reports.show"}}</button>
+    <div class="admin-reports__spacer"></div>
+    {{if .ExportURL}}<a class="admin-btn admin-btn--secondary" href="{{.ExportURL}}">{{t "admin.reports.export"}}</a>{{end}}
+  </form>
+  {{if .Err}}<div class="admin-form-error" role="alert">{{.Err}}</div>{{end}}
+  <div class="admin-reports__note">{{t "admin.reports.note"}} {{t "admin.reports.cancelled_hint"}}</div>
+  <script>
+  function reportsPeriodChanged(sel) {
+    var custom = document.getElementById('report-custom');
+    if (sel.value === 'custom') { custom.hidden = false; document.getElementById('report-from').focus(); return; }
+    custom.hidden = true;
+    custom.querySelectorAll('input').forEach(function (i) { i.disabled = true; });
+    if (sel.form.reportValidity()) sel.form.submit();
+  }
+  </script>
+
+  {{if .HasReport}}
+  {{if eq .Kind "product"}}
+    {{with .Product}}
+    <div class="admin-reports__card">
+      <div class="admin-reports__chart-title"><span translate="no">{{.Code}}</span> · {{.Name}}{{if .Inactive}} <span class="admin-table__muted">{{t "admin.reports.inactive"}}</span>{{end}}</div>
+      <div class="admin-reports__chart-note">{{if .Brand}}{{.Brand}} · {{end}}{{$.Data.PeriodLabel}} · <a href="{{.EditURL}}">{{t "admin.reports.open_product"}}</a></div>
+    </div>
+    {{end}}
+
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">{{t "admin.reports.by_variant"}}</div>
+      {{if .Variants}}
+      <div class="admin-table-wrap">
+      <table class="admin-table admin-category-report">
+        <thead><tr>
+          <th scope="col">{{t "admin.reports.col_size"}}</th><th scope="col">{{t "admin.reports.col_color"}}</th>
+          <th scope="col">{{t "admin.reports.col_orders"}}</th><th scope="col">{{t "admin.reports.col_sold"}}</th>
+          <th scope="col">{{t "admin.reports.col_cancelled"}}</th><th scope="col" class="admin-table__num-col">{{t "admin.reports.revenue"}}</th>
+        </tr></thead>
+        <tbody>
+          {{range .Variants}}
+          <tr>
+            <td>{{.Size}}</td><td>{{.Color}}</td>
+            <td class="admin-table__muted">{{.Orders}}</td><td class="admin-table__muted">{{.SoldLabel}}</td>
+            <td class="admin-table__muted">{{if .Cancelled}}{{.Cancelled}}{{else}}—{{end}}</td>
+            <td class="admin-table__num">{{.SumLabel}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+        <tfoot><tr class="admin-report-total">
+          <th scope="row" colspan="3">{{t "admin.reports.total"}}</th>
+          <td>{{.VariantTotal.SoldLabel}}</td><td>{{if .VariantTotal.Cancelled}}{{.VariantTotal.Cancelled}}{{else}}—{{end}}</td>
+          <td class="admin-table__num">{{.VariantTotal.SumLabel}}</td>
+        </tr></tfoot>
+      </table>
+      </div>
+      {{else}}
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_variants"}}</div>
+      {{end}}
+    </div>
+
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">{{t "admin.reports.by_point"}}</div>
+      <div class="admin-reports__chart-note">{{t "admin.reports.by_point_lines_hint"}}</div>
+      {{if .Points}}
+      <div class="admin-table-wrap">
+      <table class="admin-table admin-category-report">
+        <thead><tr><th scope="col">{{t "admin.common.point_of_sale"}}</th><th scope="col">{{t "admin.reports.col_share"}}</th><th scope="col">{{t "admin.reports.col_orders"}}</th><th scope="col">{{t "admin.reports.col_sold"}}</th><th scope="col" class="admin-table__num-col">{{t "admin.reports.revenue"}}</th></tr></thead>
+        <tbody>
+          {{range .Points}}
+          <tr>
+            <td>{{.Name}}</td>
+            <td><div class="admin-brand-bar" aria-hidden="true"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div></td>
+            <td class="admin-table__muted">{{.Orders}}</td><td class="admin-table__muted">{{.Qty}}</td>
+            <td class="admin-table__num">{{.Sum}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+      </div>
+      {{else}}
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_sales"}}</div>
+      {{end}}
+    </div>
+
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">{{t "admin.reports.stock_now"}}</div>
+      <div class="admin-reports__chart-note">{{t "admin.reports.stock_note"}}</div>
+      {{if .Stock.Points}}
+      <div class="admin-table-wrap">
+      <table class="admin-table admin-category-report">
+        <thead><tr>
+          <th scope="col">{{t "admin.reports.col_variant"}}</th>
+          {{range .Stock.Points}}<th scope="col" class="admin-table__num-col">{{.}}</th>{{end}}
+          <th scope="col" class="admin-table__num-col">{{t "admin.reports.total"}}</th>
+        </tr></thead>
+        <tbody>
+          {{range .Stock.Rows}}
+          <tr>
+            <td>{{.Label}}</td>
+            {{range .Cells}}<td class="admin-table__num{{if not .}} admin-table__muted{{end}}">{{.}}</td>{{end}}
+            <td class="admin-table__num"><strong>{{.Total}}</strong></td>
+          </tr>
+          {{end}}
+        </tbody>
+        <tfoot><tr class="admin-report-total">
+          <th scope="row">{{t "admin.reports.total"}}</th>
+          {{range .Stock.Totals}}<td class="admin-table__num">{{.}}</td>{{end}}
+          <td class="admin-table__num">{{.Stock.Total}}</td>
+        </tr></tfoot>
+      </table>
+      </div>
+      {{else}}
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_stock"}}</div>
+      {{end}}
+    </div>
+  {{else}}
+    <div class="admin-reports__card admin-ranked-list">
+      <div class="admin-ranked-list__title">{{.Subject.Title}}</div>
+      <div class="admin-reports__chart-note">{{.PeriodLabel}}</div>
+      {{if .Products}}
+      <div class="admin-table-wrap">
+      <table class="admin-table admin-category-report">
+        <thead><tr>
+          <th scope="col">{{t "admin.reports.col_code"}}</th><th scope="col">{{t "admin.reports.col_product"}}</th>
+          {{if eq .Kind "category"}}<th scope="col">{{t "admin.reports.col_brand"}}</th>{{end}}
+          <th scope="col">{{t "admin.reports.col_orders"}}</th><th scope="col">{{t "admin.reports.col_sold"}}</th>
+          <th scope="col">{{t "admin.reports.col_cancelled"}}</th><th scope="col" class="admin-table__num-col">{{t "admin.reports.revenue"}}</th>
+        </tr></thead>
+        <tbody>
+          {{range .Products}}
+          <tr>
+            <td class="admin-table__code" translate="no">{{if .URL}}<a href="{{.URL}}">{{.Code}}</a>{{else}}{{.Code}}{{end}}</td>
+            <td>{{.Name}}{{if .Inactive}} <span class="admin-table__muted">{{t "admin.reports.inactive"}}</span>{{end}}</td>
+            {{if eq $.Data.Kind "category"}}<td class="admin-table__muted">{{.Brand}}</td>{{end}}
+            <td class="admin-table__muted">{{.Orders}}</td><td class="admin-table__muted">{{.SoldLabel}}</td>
+            <td class="admin-table__muted">{{if .Cancelled}}{{.Cancelled}}{{else}}—{{end}}</td>
+            <td class="admin-table__num">{{.SumLabel}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+        <tfoot><tr class="admin-report-total">
+          <th scope="row" colspan="{{if eq .Kind "category"}}4{{else}}3{{end}}">{{t "admin.reports.total"}}</th>
+          <td>{{.ProductTotal.SoldLabel}}</td><td>{{if .ProductTotal.Cancelled}}{{.ProductTotal.Cancelled}}{{else}}—{{end}}</td>
+          <td class="admin-table__num">{{.ProductTotal.SumLabel}}</td>
+        </tr></tfoot>
+      </table>
+      </div>
+      {{else}}
+      <div class="admin-ranked-list__empty">{{t "admin.reports.no_products"}}</div>
+      {{end}}
+    </div>
+  {{end}}
+  {{else if not .Err}}
+  <div class="admin-reports__card"><div class="admin-ranked-list__empty">{{t (printf "admin.reports.pick_hint_%s" .Kind)}}</div></div>
+  {{end}}
+</div>
+{{end}}
+{{end}}

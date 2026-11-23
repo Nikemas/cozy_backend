@@ -213,6 +213,43 @@ admin.reports.per_order: бир буйрутмага
 admin.reports.pcs: "%d даана"
 admin.reports.no_brand: Бренди жок
 admin.reports.build_failed: Отчетту түзүү мүмкүн болбоду
+admin.reports.detail_category: Категория боюнча отчёт
+admin.reports.detail_brand: Бренд боюнча отчёт
+admin.reports.detail_product: Товардын коду боюнча отчёт
+admin.reports.detail_links: "Кененирээк:"
+admin.reports.pick_category: Категория
+admin.reports.pick_brand: Бренд
+admin.reports.pick_code: Товардын коду
+admin.reports.pick_placeholder: Тандаңыз…
+admin.reports.pick_hint_category: Категорияны тандаңыз — отчёт анын ар бир товарын көрсөтөт (подкатегориялары менен)
+admin.reports.pick_hint_brand: Брендди тандаңыз — отчёт анын ар бир товарын көрсөтөт
+admin.reports.pick_hint_product: Товардын кодун жазыңыз — отчёт өлчөмдөр, түстөр жана сатуу жайлары боюнча сатууларды жана учурдагы калдыктарды көрсөтөт
+admin.reports.open_code_report: Ачуу
+admin.reports.open_product: Товардын карточкасы
+admin.reports.col_code: Коду
+admin.reports.col_product: Товар
+admin.reports.col_brand: Бренд
+admin.reports.col_cancelled: Жокко чыгарылды, даана
+admin.reports.col_size: Өлчөмү
+admin.reports.col_color: Түсү
+admin.reports.col_variant: Вариация
+admin.reports.total: Жыйынтык
+admin.reports.inactive: (активдүү эмес)
+admin.reports.category_not_found: Категория табылган жок — аны тизмеден тандаңыз
+admin.reports.code_not_found: "«%s» коду бар товар табылган жок"
+admin.reports.by_variant: Өлчөмдөр жана түстөр боюнча сатуулар
+admin.reports.by_point_lines_hint: Киреше — заказдардагы бул товардын баасы (жеткирүүсүз), заказдын сатуу жайы боюнча.
+admin.reports.stock_now: Учурдагы калдыктар
+admin.reports.stock_note: Сатуу жайлары жана кампалар боюнча учурдагы калдыктар — тандалган мезгилге көз каранды эмес.
+admin.reports.no_stock: Эч бир сатуу жайында калдык жок
+admin.reports.no_variants: Товардын вариациялары жок
+admin.reports.no_products: Товар жок: активдүүлөрү да, мезгил ичинде сатылгандары да жок
+admin.reports.warehouse_suffix: (кампа)
+admin.reports.cancelled_hint: «Жокко чыгарылды» — мезгил ичинде жокко чыгарылган заказдардагы даана саны, сатууга жана кирешеге кирбейт.
+admin.reports.sheet_products: Товарлар
+admin.reports.sheet_variants: Вариациялар
+admin.reports.sheet_points: Сатуу жайлары
+admin.reports.sheet_stock: Калдыктар
 
 # Products: list, form, import
 admin.points.address_placeholder: Дордой көч., 1
@@ -230,6 +267,9 @@ admin.products.subcategory: Ички категория
 admin.products.empty_text: Башка аталышты же категорияны байкап көрүңүз
 admin.products.col_photo: Сүрөт
 admin.products.col_price: Баасы
+admin.products.col_code: Коду
+admin.products.color_filter: Түсү
+admin.products.all_colors: Бардык түстөр
 admin.products.col_variants: Вариациялар
 admin.products.delete_title: Товарды өчүрөсүзбү?
 admin.products.delete_text: "«%s» өчүрүлөт жана каталогдо көрүнбөй калат."
@@ -245,6 +285,10 @@ admin.product.toast_deleted: Товар өчүрүлдү
 admin.product.new_short: Жаңы
 admin.product.no_subcategory: Ички категориясыз
 admin.product.brand: Бренд
+admin.product.code: Товардын коду
+admin.product.code_auto: Автоматтык түрдө түзүлөт
+admin.product.code_hint_new: Кампа жана колдоо үчүн. Бош калтырсаңыз, CZ-00123 сыяктуу код өзү пайда болот
+admin.product.code_hint_edit: Кампа жана колдоо үчүн. Бардык товарлардын арасында кайталанбайт
 admin.product.base_price: Негизги баасы, сом
 admin.product.old_price: Эски баасы (арзандатууга чейин), сом
 admin.product.old_price_hint: "Арзандатууну көрсөтүү үчүн толтуруңуз: эски баасы кызыл жана сызылган, учурдагы баасы жашыл болот. Бош болсо — арзандатуу жок."
@@ -560,6 +604,8 @@ admin.apperr.invalid_category_id: Категорияны тандаңыз
 admin.apperr.invalid_base_price: Баасы терс болбошу керек
 admin.apperr.invalid_old_price: Эски баасы нөлдөн чоң болушу керек
 admin.apperr.old_price_not_above_price: Эски баасы негизги баадан чоң болушу керек
+admin.apperr.invalid_product_code: Товардын коду: 40 белгиге чейин, сап которуусуз
+admin.apperr.product_code_taken: Мындай коду бар товар мурунтан эле бар — башка код жазыңыз же талааны бош калтырыңыз
 admin.apperr.invalid_variant: Ар бир вариациянын өлчөмү жана түсү болушу керек
 admin.apperr.invalid_object_key: Сүрөттүн ачкычы (object_key) көрсөтүлгөн эмес
 admin.apperr.product_not_found: Товар табылган жок

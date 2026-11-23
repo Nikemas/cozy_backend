@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -29,7 +30,7 @@ func TestProductStoreSaveWritesOnlyChangedCellsInOneTx(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`UPDATE products`).WithArgs("p1", "cat1", "Nike", "Nike", nil, nil, nil, 4500.0, nil).
+	mock.ExpectQuery(`UPDATE products`).WithArgs("p1", "cat1", "Nike", "Nike", nil, nil, nil, 4500.0, nil, nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("p1"))
 	mock.ExpectQuery(`SELECT id FROM product_variants WHERE product_id = \$1`).WithArgs("p1").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("v1"))
@@ -151,5 +152,31 @@ func TestProductStoreSaveValidatesBeforeTouchingDB(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
+	}
+}
+
+// A code another product already has is a form error, not a 500.
+func TestProductStoreSaveCodeTaken(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+
+	code := "CZ-00001"
+	in := validProductInput()
+	in.Code = &code
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO products`).
+		WillReturnError(&pgconn.PgError{Code: pgUniqueViolation, ConstraintName: "idx_products_model_code"})
+	mock.ExpectRollback()
+
+	_, err = newProductStore(db).Save(context.Background(), productSaveInput{Product: in})
+	var ae *apperr.AppError
+	if !errors.As(err, &ae) || ae.Code != "product_code_taken" {
+		t.Fatalf("Save err = %v, want product_code_taken", err)
+	}
+	if msg := appErrMessage(trFor("ky"), err); !strings.Contains(msg, "коду бар товар") {
+		t.Errorf("ky message = %q", msg)
 	}
 }

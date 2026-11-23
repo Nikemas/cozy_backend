@@ -62,6 +62,14 @@
         </div>
       </div>
 
+      {{/* feat/product-code: код товара для склада, между брендом и ценой. */}}
+      <div class="admin-field" style="max-width:260px">
+        <label for="pf-code">{{t "admin.product.code"}}</label>
+        <input type="text" id="pf-code" name="code" value="{{.Code}}" maxlength="40" autocomplete="off" spellcheck="false"
+          placeholder="{{if .IsEdit}}CZ-00001{{else}}{{t "admin.product.code_auto"}}{{end}}" aria-describedby="pf-code-hint">
+        <div class="admin-card__hint" id="pf-code-hint">{{if .IsEdit}}{{t "admin.product.code_hint_edit"}}{{else}}{{t "admin.product.code_hint_new"}}{{end}}</div>
+      </div>
+
       <div class="admin-field" style="max-width:260px">
         <label>{{t "admin.product.base_price"}}</label>
         <input type="text" inputmode="decimal" name="base_price" value="{{.BasePrice}}" placeholder="4500">

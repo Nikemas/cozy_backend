@@ -126,6 +126,7 @@ err.invalid_price_min: price_min туура эмес
 err.invalid_price_override: price_override нөлдөн чоң болушу керек
 err.invalid_variant_price: вариациянын баасы нөлдөн чоң болушу керек
 err.invalid_product_id: товар табылган жок
+err.invalid_product_code: товардын коду: 40 белгиге чейин, сап которуусуз
 err.invalid_qty: саны нөлдөн чоң болушу керек
 err.invalid_qty.format: саны туура эмес
 err.invalid_quantity: quantity терс болбошу керек
@@ -179,6 +180,7 @@ err.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага
 err.point_not_found: сатуу жайы табылган жок
 err.point_required: өзү алып кетүү пунктун тандаңыз
 err.product_not_found: товар табылган жок
+err.product_code_taken: мындай коду бар товар мурунтан эле бар
 err.product_unavailable: бул товар мындан ары сатылбайт
 err.product_unavailable.named: «{name}» товары мындан ары сатылбайт — аны себеттен алып салыңыз
 err.qr_not_configured: QR-код менен төлөө азырынча жеткиликсиз

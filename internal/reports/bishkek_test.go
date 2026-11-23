@@ -134,14 +134,14 @@ func TestCategorySalesQuery(t *testing.T) {
 	to, _ := ParseReportDate("2026-10-01")
 	mock.ExpectQuery(`LEFT JOIN categories parent ON parent.id = c.parent_id.*o.status <> 'cancelled' AND \(o.payment_method <> 'online_card' OR o.payment_status = 'paid'\)`).
 		WithArgs(from, to).
-		WillReturnRows(sqlmock.NewRows([]string{"category", "order_count", "item_count", "revenue"}).
-			AddRow("Мужская обувь", 3, 4, 18000.0).AddRow("Детская", 1, 1, 2500.0))
+		WillReturnRows(sqlmock.NewRows([]string{"category", "category_id", "order_count", "item_count", "revenue"}).
+			AddRow("Мужская обувь", "c-men", 3, 4, 18000.0).AddRow("Детская", "c-kids", 1, 1, 2500.0))
 
 	rows, err := NewRepo(db).CategorySales(context.Background(), from, to)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].Key != "Мужская обувь" || rows[0].Revenue != 18000 {
+	if len(rows) != 2 || rows[0].Key != "Мужская обувь" || rows[0].ID != "c-men" || rows[0].Revenue != 18000 {
 		t.Errorf("rows = %+v", rows)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

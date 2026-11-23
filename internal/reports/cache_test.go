@@ -68,6 +68,40 @@ func (f *fakeSource) CategorySales(_ context.Context, from, to time.Time) ([]Row
 	return f.rows("category:", from, to)
 }
 
+func (f *fakeSource) productRows(label string, from, to time.Time) ([]ProductSalesRow, error) {
+	rows, err := f.rows(label, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return []ProductSalesRow{{Name: rows[0].Key, ItemCount: 1}}, nil
+}
+
+func (f *fakeSource) CategoryProductSales(_ context.Context, categoryID string, from, to time.Time) ([]ProductSalesRow, error) {
+	return f.productRows("category_products:"+categoryID+":", from, to)
+}
+
+func (f *fakeSource) BrandProductSales(_ context.Context, brand string, from, to time.Time) ([]ProductSalesRow, error) {
+	return f.productRows("brand_products:"+brand+":", from, to)
+}
+
+func (f *fakeSource) ProductCodeSales(_ context.Context, productID string, from, to time.Time, _ map[string]string) (ProductCodeSales, error) {
+	rows, err := f.rows("product:"+productID+":", from, to)
+	if err != nil {
+		return ProductCodeSales{}, err
+	}
+	return ProductCodeSales{Variants: []VariantSalesRow{{Size: rows[0].Key}}, Points: rows}, nil
+}
+
+func (f *fakeSource) ProductByCode(_ context.Context, code string) (*ProductRef, error) {
+	f.calls.Add(1)
+	return &ProductRef{ID: "id-" + code, Code: code}, f.err
+}
+
+func (f *fakeSource) ProductStock(_ context.Context, productID string) ([]StockCell, error) {
+	f.calls.Add(1)
+	return []StockCell{{VariantID: productID, Qty: 1}}, f.err
+}
+
 func (f *fakeSource) PointNames(context.Context) (map[string]string, error) {
 	f.calls.Add(1)
 	return map[string]string{"p1": "ЦУМ"}, f.err
@@ -554,5 +588,52 @@ func TestCachedRepo_KeyHandlesYearsOutsideUnixNanoRange(t *testing.T) {
 	}
 	if got := src.calls.Load(); got != 3 {
 		t.Fatalf("source calls = %d, want 3 (one per distinct range)", got)
+	}
+}
+
+// Detail reports are cached per subject: same subject and range hits the
+// cache, another subject (category/brand/product) is a separate entry,
+// and callers get copies they may modify freely.
+func TestCachedRepoDetailReportsKeyedBySubject(t *testing.T) {
+	src := &fakeSource{}
+	clock := &fakeClock{now: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)}
+	c := NewCachedRepo(src, CacheConfig{Now: clock.Now})
+	ctx := context.Background()
+	from, to := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+
+	a1, err := c.CategoryProductSales(ctx, "cat-a", from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a1[0].Name = "mutated"
+	a2, _ := c.CategoryProductSales(ctx, "cat-a", from, to)
+	if a2[0].Name == "mutated" {
+		t.Fatal("cached rows were shared with a caller")
+	}
+	b, _ := c.CategoryProductSales(ctx, "cat-b", from, to)
+	if b[0].Name == a2[0].Name {
+		t.Fatalf("category b served category a's rows: %+v", b)
+	}
+	if _, err := c.BrandProductSales(ctx, "cat-a", from, to); err != nil {
+		t.Fatal(err)
+	}
+	p1, _ := c.ProductCodeSales(ctx, "p1", from, to, nil)
+	p1.Variants[0].Size = "mutated"
+	p2, _ := c.ProductCodeSales(ctx, "p1", from, to, nil)
+	if p2.Variants[0].Size == "mutated" {
+		t.Fatal("cached product report was shared with a caller")
+	}
+	if got := src.calls.Load(); got != 4 { // cat-a, cat-b, brand, p1
+		t.Fatalf("source calls = %d, want 4", got)
+	}
+
+	// Lookups and stock are never cached.
+	for range 2 {
+		if _, err := c.ProductStock(ctx, "p1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := src.calls.Load(); got != 6 {
+		t.Fatalf("source calls = %d, want 6 (stock not cached)", got)
 	}
 }

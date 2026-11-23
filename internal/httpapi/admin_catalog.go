@@ -146,14 +146,25 @@ type productRequest struct {
 	// (a newly created/edited product is active unless explicitly hidden)
 	// rather than silently defaulting to Go's bool zero value (false).
 	IsActive *bool `json:"is_active"`
+	// Code is the product code; null/blank generates one on create and
+	// keeps the stored one on update.
+	Code *string `json:"code"`
 }
 
-func (req productRequest) toInput() catalog.ProductInput {
+func (req productRequest) toInput() (catalog.ProductInput, error) {
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	var code *string
+	if req.Code != nil {
+		var err error
+		if code, err = catalog.NormalizeProductCode(*req.Code); err != nil {
+			return catalog.ProductInput{}, err
+		}
+	}
 	return catalog.ProductInput{
+		Code:          code,
 		CategoryID:    req.CategoryID,
 		NameRu:        req.NameRu,
 		NameKy:        req.NameKy,
@@ -163,7 +174,7 @@ func (req productRequest) toInput() catalog.ProductInput {
 		BasePrice:     req.BasePrice,
 		OldPrice:      req.OldPrice,
 		IsActive:      isActive,
-	}
+	}, nil
 }
 
 func createProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.HandlerFunc {
@@ -176,7 +187,11 @@ func createProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.
 		if err := catalog.ValidateOldPriceAbove(req.OldPrice, req.BasePrice); err != nil {
 			return err
 		}
-		p, err := repo.Create(r.Context(), req.toInput())
+		in, err := req.toInput()
+		if err != nil {
+			return err
+		}
+		p, err := repo.Create(r.Context(), in)
 		if err != nil {
 			return err
 		}
@@ -195,7 +210,11 @@ func updateProductHandler(repo *catalog.ProductRepo, journal *audit.Log) apperr.
 		if err := catalog.ValidateOldPriceAbove(req.OldPrice, req.BasePrice); err != nil {
 			return err
 		}
-		p, err := repo.Update(r.Context(), r.PathValue("id"), req.toInput())
+		in, err := req.toInput()
+		if err != nil {
+			return err
+		}
+		p, err := repo.Update(r.Context(), r.PathValue("id"), in)
 		if err != nil {
 			return err
 		}

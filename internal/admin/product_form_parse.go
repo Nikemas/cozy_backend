@@ -250,6 +250,10 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 	case err == nil && oldPrice != nil && !catalog.HasDiscount(oldPrice, price):
 		addErr(t.T("admin.product.err_old_price_not_above"))
 	}
+	code, codeErr := catalog.NormalizeProductCode(form.Get("code"))
+	if codeErr != nil {
+		addErr(appErrMessage(t, codeErr))
+	}
 	out.Input = productSaveInput{
 		ProductID: productID,
 		Product: catalog.ProductInput{
@@ -262,6 +266,7 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 			BasePrice:     price,
 			OldPrice:      oldPrice,
 			IsActive:      isActive,
+			Code:          code,
 		},
 	}
 

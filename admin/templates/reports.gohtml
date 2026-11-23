@@ -25,6 +25,16 @@
   </form>
   {{if .Data.Err}}<div class="admin-form-error" role="alert">{{.Data.Err}}</div>{{end}}
   <div class="admin-reports__note">{{t "admin.reports.note"}}</div>
+  {{/* feat/product-code: detail reports (category / brand / product code). */}}
+  <form method="get" action="{{.Data.ProductReportPath}}" class="admin-reports__detail-links">
+    <span class="admin-table__muted">{{t "admin.reports.detail_links"}}</span>
+    <a href="{{.Data.CategoryReportURL}}">{{t "admin.reports.detail_category"}}</a>
+    <a href="{{.Data.BrandReportURL}}">{{t "admin.reports.detail_brand"}}</a>
+    {{range .Data.PeriodParams}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+    <label for="report-code" class="admin-visually-hidden">{{t "admin.reports.pick_code"}}</label>
+    <input type="search" id="report-code" name="code" placeholder="{{t "admin.reports.pick_code"}}" autocomplete="off" spellcheck="false" required>
+    <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.reports.open_code_report"}}</button>
+  </form>
   <script>
   function reportsPeriodChanged(sel) {
     var custom = document.getElementById('report-custom');
@@ -79,7 +89,7 @@
       {{if .Data.TopBrands}}
         {{range .Data.TopBrands}}
         <div class="admin-ranked-list__row">
-          <div class="admin-ranked-list__name">{{.Name}}</div>
+          <div class="admin-ranked-list__name">{{if .URL}}<a href="{{.URL}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</div>
           <div class="admin-brand-bar"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div>
           <div class="admin-ranked-list__value admin-ranked-list__value--wide">{{.Sum}}</div>
         </div>
@@ -100,7 +110,7 @@
       <tbody>
         {{range .Data.Categories}}
         <tr>
-          <td>{{.Name}}</td>
+          <td>{{if .URL}}<a href="{{.URL}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td>
           <td><div class="admin-brand-bar" aria-hidden="true"><div class="admin-brand-bar__fill" style="width: {{.WidthPct}}%"></div></div></td>
           <td class="admin-table__muted">{{.Orders}}</td>
           <td class="admin-table__muted">{{.Qty}}</td>

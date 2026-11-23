@@ -108,10 +108,18 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 	}
 	pointSel := resolveProductsPoint(h.tr(r), pts, query.Get("point"), query.Get("oos") == "1")
 
+	variantColors, err := h.products.DistinctVariantColors(ctx)
+	if err != nil {
+		h.renderInternalErr(w, err)
+		return
+	}
+	color, colorOptions := resolveProductsColor(h.tr(r), variantColors, query.Get("color"))
+
 	products, total, err := h.products.ListForAdmin(ctx, catalog.AdminListFilter{
 		CategoryIDs:       categoryIDs,
 		Query:             q,
 		OutOfStockAtPoint: pointSel.oosPointID(),
+		Color:             color,
 		Page:              page,
 		PageSize:          pageSize,
 	})
@@ -165,9 +173,9 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 	data := ProductsPageData{
 		CanEdit:       true, // route is already ownerOrManager-gated; see routes.go
 		CanDelete:     st.Role == staff.RoleOwner,
-		CategoryChips: withPointParams(buildCategoryChips(h.tr(r), tree, activeTop, q), pointSel),
+		CategoryChips: withColorParam(withPointParams(buildCategoryChips(h.tr(r), tree, activeTop, q), pointSel), color),
 		ShowSubs:      activeTop != nil && len(activeTop.Children) > 0,
-		SubChips:      withPointParams(buildSubChips(h.tr(r), activeTop, activeSub, q), pointSel),
+		SubChips:      withColorParam(withPointParams(buildSubChips(h.tr(r), activeTop, activeSub, q), pointSel), color),
 		Products:      withRowReturn(rows, returnURL(r)),
 		Empty:         len(rows) == 0,
 		CountLabel:    countLabel(h.tr(r), total),
@@ -185,6 +193,8 @@ func (h *handlers) productsListPage(w http.ResponseWriter, r *http.Request) {
 		PointID:        pointSel.ID,
 		PointName:      pointSel.Name,
 		OutOfStockOnly: pointSel.OOS,
+		Color:          color,
+		ColorOptions:   colorOptions,
 		BulkURL:        "/admin/products/bulk",
 		ReturnURL:      returnURL(r),
 		BulkCategories: flatCategoryOptions(tree),
@@ -218,6 +228,7 @@ func (h *handlers) buildProductRow(t tr, p catalog.Product, tree []*catalog.Cate
 		ID:              p.ID,
 		Name:            p.NameRu,
 		Brand:           stringOrEmpty(p.Brand),
+		Code:            p.Code,
 		CategoryPath:    categoryPath(tree, p.CategoryID),
 		PriceText:       t.Som(p.BasePrice),
 		VariantsLabel:   variantsLabel(t, variantCounts[p.ID]),
@@ -376,6 +387,7 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 		TopCategoryID:  topID,
 		SubCategoryID:  subID,
 		Brand:          stringOrEmpty(product.Brand),
+		Code:           product.Code,
 		BasePrice:      strconv.FormatFloat(product.BasePrice, 'f', -1, 64),
 		OldPrice:       formatOptionalPrice(product.OldPrice),
 		DescriptionRu:  stringOrEmpty(product.DescriptionRu),
@@ -528,6 +540,7 @@ func (h *handlers) rerenderFormOnError(w http.ResponseWriter, r *http.Request, s
 		TopCategoryID:   topID,
 		SubCategoryID:   subID,
 		Brand:           r.FormValue("brand"),
+		Code:            r.FormValue("code"),
 		BasePrice:       r.FormValue("base_price"),
 		OldPrice:        r.FormValue("old_price"),
 		DescriptionRu:   r.FormValue("description_ru"),

@@ -214,7 +214,7 @@ func (t sqlImportTx) ProductsByName(ctx context.Context, brand, nameRu, category
 		WHERE category_id = $1
 		  AND lower(name_ru) = lower($2)
 		  AND lower(COALESCE(brand, '')) = lower($3)
-		  AND ($4 = '' OR model_code IS NULL)
+		  AND ($4 = '' OR model_code IS NULL OR model_code_auto)
 		ORDER BY created_at
 		LIMIT 2`, categoryID, nameRu, brand, modelCode)
 	if err != nil {
@@ -268,7 +268,7 @@ func (t sqlImportTx) UpdateProduct(ctx context.Context, id string, p ImportProdu
 func (t sqlImportTx) VariantBySKU(ctx context.Context, sku string) (*ImportVariantRef, error) {
 	var ref ImportVariantRef
 	err := t.q.QueryRowContext(ctx, `
-		SELECT v.id, v.product_id, COALESCE(p.model_code, '')
+		SELECT v.id, v.product_id, CASE WHEN p.model_code_auto THEN '' ELSE COALESCE(p.model_code, '') END
 		FROM product_variants v JOIN products p ON p.id = v.product_id
 		WHERE v.sku = $1`, sku).Scan(&ref.ID, &ref.ProductID, &ref.ProductModelCode)
 	if errors.Is(err, sql.ErrNoRows) {

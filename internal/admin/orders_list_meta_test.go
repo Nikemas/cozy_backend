@@ -69,6 +69,14 @@ func (f *fakeOrderListMeta) VariantThumbs(_ context.Context, ids []string) (map[
 	return out, f.err
 }
 
+func (f *fakeOrderListMeta) VariantProductCodes(_ context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, id := range ids {
+		out[id] = "CODE-" + id
+	}
+	return out, f.err
+}
+
 func (f *fakeOrderListMeta) OrderThumbs(_ context.Context, ids []string) (map[string]string, error) {
 	if f.err != nil {
 		return nil, f.err

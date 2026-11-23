@@ -224,6 +224,7 @@ product.delivery.more: Подробнее о доставке и оплате
 product.description: Описание
 product.may_like: Может понравиться
 product.more_from_brand: Больше от %s
+product.code: Код
 
 # Shop filters and sorting.
 shop.heading: Каталог обуви

@@ -42,6 +42,14 @@
         {{range .PointOptions}}<option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
     </div>
+    {{if gt (len .ColorOptions) 1}}
+    <div class="admin-field admin-filterbar__field">
+      <label for="products-color">{{t "admin.products.color_filter"}}</label>
+      <select id="products-color" name="color" onchange="this.form.submit()">
+        {{range .ColorOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
+    {{end}}
     {{if .PointID}}
     <label class="admin-check"><input type="checkbox" name="oos" value="1"{{if .OutOfStockOnly}} checked{{end}} onchange="this.form.submit()"> {{t "admin.products.oos_only"}}</label>
     {{end}}
@@ -87,6 +95,7 @@
           <tr>
             {{if .CanEdit}}<th class="admin-table__check-col"><input type="checkbox" class="js-bulk-all" data-bulk-for="products-bulk" aria-label="{{t "admin.bulk.select_all_products"}}"></th>{{end}}
             <th class="admin-table__photo-col">{{t "admin.products.col_photo"}}</th>
+            <th>{{t "admin.products.col_code"}}</th>
             <th>{{t "admin.common.name"}}</th>
             <th>{{t "admin.common.category"}}</th>
             <th class="admin-table__num-col">{{t "admin.products.col_price"}}</th>
@@ -108,6 +117,7 @@
               <div class="admin-thumb admin-thumb--empty"></div>
               {{end}}
             </td>
+            <td class="admin-table__code" translate="no">{{.Code}}</td>
             <td>
               <a href="{{.EditURL}}" class="admin-table__name">{{.Name}}</a>
               <div class="admin-table__brand">{{.Brand}}</div>
@@ -152,7 +162,7 @@
         {{end}}
         <div class="admin-cardrow__body">
           <div class="admin-table__name">{{.Name}}</div>
-          <div class="admin-cardrow__meta">{{.CategoryPath}} · {{.VariantsLabel}}</div>
+          <div class="admin-cardrow__meta">{{if .Code}}<span translate="no">{{.Code}}</span> · {{end}}{{.CategoryPath}} · {{.VariantsLabel}}</div>
           <div class="admin-cardrow__row">
             <span class="admin-cardrow__price">{{.PriceText}}</span>
             <span class="admin-chip" style="color:{{.StockFG}};background:{{.StockBG}}">{{.StockLabel}}</span>
@@ -173,6 +183,7 @@
         {{if .Query}}<input type="hidden" name="q" value="{{.Query}}">{{end}}
         {{if .PointID}}<input type="hidden" name="point" value="{{.PointID}}">{{end}}
         {{if .OutOfStockOnly}}<input type="hidden" name="oos" value="1">{{end}}
+        {{if .Color}}<input type="hidden" name="color" value="{{.Color}}">{{end}}
         <span class="admin-table__muted">{{t "admin.products.page_size"}}</span>
         <select name="page_size" onchange="this.form.submit()" class="admin-pagesize__select">
           <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>

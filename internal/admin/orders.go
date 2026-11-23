@@ -112,6 +112,7 @@ type OrdersListData struct {
 type OrderDetailItemView struct {
 	ThumbURL   string // product photo (the variant's color if tagged), "" when none
 	Name       string
+	Code       string // product code, "" when unknown
 	Variant    string
 	Qty        int
 	PriceLabel string
@@ -606,6 +607,14 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 			slog.WarnContext(ctx, "admin order detail: thumbnails lookup failed", "err", err)
 		}
 	}
+	codes := map[string]string{}
+	if h.orderMeta != nil && len(variantIDs) > 0 {
+		if m, err := h.orderMeta.VariantProductCodes(ctx, variantIDs); err == nil {
+			codes = m
+		} else {
+			slog.WarnContext(ctx, "admin order detail: product codes lookup failed", "err", err)
+		}
+	}
 
 	items := make([]OrderDetailItemView, 0, len(o.Items))
 	for _, it := range o.Items {
@@ -616,6 +625,7 @@ func (h *handlers) buildOrderDetailView(ctx context.Context, o *orders.Order, ro
 		items = append(items, OrderDetailItemView{
 			ThumbURL:   h.photoURL(thumbs[it.VariantID]),
 			Name:       it.ProductNameSnapshot,
+			Code:       codes[it.VariantID],
 			Variant:    variant,
 			Qty:        it.Quantity,
 			PriceLabel: t.Som(it.Price * float64(it.Quantity)),

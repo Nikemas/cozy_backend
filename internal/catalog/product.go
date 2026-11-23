@@ -21,7 +21,11 @@ type Product struct {
 	DescriptionRu *string `json:"description_ru,omitempty"`
 	DescriptionKy *string `json:"description_ky,omitempty"`
 	Brand         *string `json:"brand,omitempty"`
-	BasePrice     float64 `json:"base_price"`
+	// Code is the product code («код товара», products.model_code): shown
+	// to staff and customers, unique ignoring case, never empty — the
+	// database generates CZ-NNNNN when none is given (migration 000051).
+	Code      string  `json:"code"`
+	BasePrice float64 `json:"base_price"`
 	// OldPrice is the price before the discount (NULL = no discount). The
 	// storefront shows it struck through next to the current price, but only
 	// when it is above the price actually shown (see HasDiscount).
@@ -169,6 +173,21 @@ func listOrderBy(sort string) string {
 	}
 }
 
+// productColumns is the select list scanProduct reads, in its order.
+const productColumns = `id, category_id, name_ru, name_ky, description_ru, description_ky,
+		       brand, model_code, base_price, old_price, is_active, created_at, updated_at`
+
+// rowScanner is *sql.Row or *sql.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanProduct reads one productColumns row into p.
+func scanProduct(row rowScanner, p *Product) error {
+	return row.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
+		&p.Brand, &p.Code, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+}
+
 type ProductRepo struct {
 	db *sql.DB
 }
@@ -202,8 +221,7 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 
 	limitArgs := append(append([]any{}, args...), pageSize, safeOffset(page, pageSize))
 	listQuery := fmt.Sprintf(`
-		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
-		       brand, base_price, old_price, is_active, created_at, updated_at
+		SELECT `+productColumns+`
 		FROM %s
 		%s
 		ORDER BY %s
@@ -218,8 +236,7 @@ func (r *ProductRepo) List(ctx context.Context, filter ListFilter) ([]Product, i
 	products := []Product{}
 	for rows.Next() {
 		var p Product
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
-			&p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := scanProduct(rows, &p); err != nil {
 			return nil, 0, err
 		}
 		products = append(products, p)
@@ -246,8 +263,11 @@ type AdminListFilter struct {
 	// with no stock > 0 at that point (fix/admin-ops: the products list's
 	// "нет в наличии в точке" filter).
 	OutOfStockAtPoint string
-	Page              int // 1-based
-	PageSize          int
+	// Color (a raw product_variants.color), when set, keeps only products
+	// with a variant of that color.
+	Color    string
+	Page     int // 1-based
+	PageSize int
 }
 
 // buildAdminListConditions turns filter into SQL WHERE fragments and their
@@ -269,6 +289,11 @@ func buildAdminListConditions(filter AdminListFilter) ([]string, []any) {
 		conditions = append(conditions, fmt.Sprintf(`NOT EXISTS (
 			SELECT 1 FROM product_variants pv JOIN stock s ON s.variant_id = pv.id
 			WHERE pv.product_id = products.id AND s.point_id = $%d AND s.quantity > 0)`, len(args)))
+	}
+	if filter.Color != "" {
+		args = append(args, filter.Color)
+		conditions = append(conditions, fmt.Sprintf(
+			`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = products.id AND pv.color = $%d)`, len(args)))
 	}
 
 	return conditions, args
@@ -302,8 +327,7 @@ func (r *ProductRepo) ListForAdmin(ctx context.Context, filter AdminListFilter) 
 
 	limitArgs := append(append([]any{}, args...), pageSize, safeOffset(page, pageSize))
 	listQuery := fmt.Sprintf(`
-		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
-		       brand, base_price, old_price, is_active, created_at, updated_at
+		SELECT `+productColumns+`
 		FROM products
 		%s
 		ORDER BY created_at DESC
@@ -318,8 +342,7 @@ func (r *ProductRepo) ListForAdmin(ctx context.Context, filter AdminListFilter) 
 	products := []Product{}
 	for rows.Next() {
 		var p Product
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
-			&p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := scanProduct(rows, &p); err != nil {
 			return nil, 0, err
 		}
 		products = append(products, p)
@@ -381,19 +404,43 @@ func (r *ProductRepo) DistinctBrands(ctx context.Context) ([]string, error) {
 	return brands, rows.Err()
 }
 
+// DistinctVariantColors returns every distinct, non-empty variant color
+// (of any product, active or not), sorted — the admin products list's
+// color filter options.
+func (r *ProductRepo) DistinctVariantColors(ctx context.Context) ([]string, error) {
+	const q = `
+		SELECT DISTINCT color FROM product_variants
+		WHERE btrim(color) <> ''
+		ORDER BY color`
+
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	colors := []string{}
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			return nil, err
+		}
+		colors = append(colors, c)
+	}
+	return colors, rows.Err()
+}
+
 // GetByID returns a single active product. Returns apperr.NotFound if it
 // doesn't exist or is inactive — an inactive product looks the same as a
 // missing one to public read endpoints.
 func (r *ProductRepo) GetByID(ctx context.Context, id string) (*Product, error) {
 	const q = `
-		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
-		       brand, base_price, old_price, is_active, created_at, updated_at
+		SELECT ` + productColumns + `
 		FROM products
 		WHERE id = $1 AND is_active = true`
 
 	var p Product
-	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu,
-		&p.DescriptionKy, &p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	err := scanProduct(r.db.QueryRowContext(ctx, q, id), &p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperr.NotFound("product_not_found", "товар не найден")
 	}
@@ -414,8 +461,7 @@ func (r *ProductRepo) GetActiveByIDs(ctx context.Context, ids []string) (map[str
 	}
 
 	const q = `
-		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
-		       brand, base_price, old_price, is_active, created_at, updated_at
+		SELECT ` + productColumns + `
 		FROM products
 		WHERE id = ANY($1) AND is_active = true`
 
@@ -427,8 +473,7 @@ func (r *ProductRepo) GetActiveByIDs(ctx context.Context, ids []string) (map[str
 
 	for rows.Next() {
 		var p Product
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
-			&p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := scanProduct(rows, &p); err != nil {
 			return nil, err
 		}
 		out[p.ID] = p
@@ -442,14 +487,12 @@ func (r *ProductRepo) GetActiveByIDs(ctx context.Context, ids []string) (map[str
 // managed. Returns apperr.NotFound if no such product exists at all.
 func (r *ProductRepo) GetByIDAny(ctx context.Context, id string) (*Product, error) {
 	const q = `
-		SELECT id, category_id, name_ru, name_ky, description_ru, description_ky,
-		       brand, base_price, old_price, is_active, created_at, updated_at
+		SELECT ` + productColumns + `
 		FROM products
 		WHERE id = $1`
 
 	var p Product
-	err := r.db.QueryRowContext(ctx, q, id).Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu,
-		&p.DescriptionKy, &p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	err := scanProduct(r.db.QueryRowContext(ctx, q, id), &p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperr.NotFound("product_not_found", "товар не найден")
 	}
@@ -472,6 +515,9 @@ type ProductInput struct {
 	// OldPrice is the optional pre-discount price; nil = no discount.
 	OldPrice *float64
 	IsActive bool
+	// Code is the product code (NormalizeProductCode'd); nil generates
+	// one on Create and keeps the stored one on Update.
+	Code *string
 }
 
 // HasDiscount reports whether oldPrice should be shown struck through next
@@ -526,7 +572,10 @@ func (in ProductInput) validate() error {
 	if in.BasePrice < 0 {
 		return apperr.BadRequest("invalid_base_price", "base_price не может быть отрицательным").WithVariant("field")
 	}
-	return ValidateOldPrice(in.OldPrice)
+	if err := ValidateOldPrice(in.OldPrice); err != nil {
+		return err
+	}
+	return validateCodePtr(in.Code)
 }
 
 // Create inserts a new product and returns the row as stored.
@@ -536,16 +585,13 @@ func (r *ProductRepo) Create(ctx context.Context, in ProductInput) (*Product, er
 	}
 
 	const q = `
-		INSERT INTO products (category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, is_active, old_price)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, category_id, name_ru, name_ky, description_ru, description_ky,
-		          brand, base_price, old_price, is_active, created_at, updated_at`
+		INSERT INTO products (category_id, name_ru, name_ky, description_ru, description_ky, brand, base_price, is_active, old_price, model_code)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING ` + productColumns
 
 	var p Product
-	err := r.db.QueryRowContext(ctx, q, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
-		in.Brand, in.BasePrice, in.IsActive, in.OldPrice).
-		Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
-			&p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	err := scanProduct(r.db.QueryRowContext(ctx, q, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
+		in.Brand, in.BasePrice, in.IsActive, in.OldPrice, in.Code), &p)
 	if err != nil {
 		return nil, translateProductWriteErr(err)
 	}
@@ -564,16 +610,14 @@ func (r *ProductRepo) Update(ctx context.Context, id string, in ProductInput) (*
 	const q = `
 		UPDATE products
 		SET category_id = $2, name_ru = $3, name_ky = $4, description_ru = $5, description_ky = $6,
-		    brand = $7, base_price = $8, is_active = $9, old_price = $10, updated_at = now()
+		    brand = $7, base_price = $8, is_active = $9, old_price = $10,
+		    model_code = COALESCE($11, model_code), updated_at = now()
 		WHERE id = $1
-		RETURNING id, category_id, name_ru, name_ky, description_ru, description_ky,
-		          brand, base_price, old_price, is_active, created_at, updated_at`
+		RETURNING ` + productColumns
 
 	var p Product
-	err := r.db.QueryRowContext(ctx, q, id, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
-		in.Brand, in.BasePrice, in.IsActive, in.OldPrice).
-		Scan(&p.ID, &p.CategoryID, &p.NameRu, &p.NameKy, &p.DescriptionRu, &p.DescriptionKy,
-			&p.Brand, &p.BasePrice, &p.OldPrice, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	err := scanProduct(r.db.QueryRowContext(ctx, q, id, in.CategoryID, in.NameRu, in.NameKy, in.DescriptionRu, in.DescriptionKy,
+		in.Brand, in.BasePrice, in.IsActive, in.OldPrice, in.Code), &p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperr.NotFound("product_not_found", "товар не найден")
 	}
@@ -617,6 +661,9 @@ func (r *ProductRepo) Delete(ctx context.Context, id string) error {
 func translateProductWriteErr(err error) error {
 	if pgErrCode(err) == pgForeignKeyViolation {
 		return apperr.BadRequest("invalid_category_id", "категория не найдена")
+	}
+	if IsProductCodeTaken(err) {
+		return ErrProductCodeTaken()
 	}
 	return err
 }

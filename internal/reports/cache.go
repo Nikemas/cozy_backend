@@ -20,6 +20,13 @@ type Source interface {
 	BrandSales(ctx context.Context, from, to time.Time) ([]Row, error)
 	CategorySales(ctx context.Context, from, to time.Time) ([]Row, error)
 	PointNames(ctx context.Context) (map[string]string, error)
+
+	// Detail reports (detail.go).
+	CategoryProductSales(ctx context.Context, categoryID string, from, to time.Time) ([]ProductSalesRow, error)
+	BrandProductSales(ctx context.Context, brand string, from, to time.Time) ([]ProductSalesRow, error)
+	ProductCodeSales(ctx context.Context, productID string, from, to time.Time, pointNames map[string]string) (ProductCodeSales, error)
+	ProductByCode(ctx context.Context, code string) (*ProductRef, error)
+	ProductStock(ctx context.Context, productID string) ([]StockCell, error)
 }
 
 // Cache defaults. A closed range (ending before now) still changes when an
@@ -71,7 +78,8 @@ func (c CacheConfig) withDefaults() CacheConfig {
 }
 
 // CachedRepo is Source with an in-process TTL cache in front of the
-// aggregate queries (Sales, BrandSales, CategorySales): a year-long report
+// aggregate queries (Sales, BrandSales, CategorySales and the detail
+// reports CategoryProductSales, BrandProductSales, ProductCodeSales): a year-long report
 // costs Postgres a scan of every order row in the year, and 20 concurrent
 // identical requests used to run it 20 times. Concurrent requests for the
 // same key share one query (singleflight); distinct queries run at most
@@ -79,7 +87,8 @@ func (c CacheConfig) withDefaults() CacheConfig {
 // only when the query succeeded.
 //
 // The cache key is the query name plus every argument that reaches SQL
-// or shapes the rows: from, to, groupBy and the pointNames map. That is
+// or shapes the rows: from, to, groupBy, the pointNames map and a detail
+// report's subject (Arg). That is
 // everything the result depends on — the queries take no staff, point or
 // language argument: the report is shop-wide and served only to owner and
 // manager (point_staff gets 403 at the route), and rows carry raw keys
@@ -99,8 +108,10 @@ type CachedRepo struct {
 	entries map[string]cacheEntry
 }
 
+// cacheEntry holds one query's result: []Row, []ProductSalesRow or
+// ProductCodeSales, by query (the typed wrappers below clone it out).
 type cacheEntry struct {
-	rows    []Row
+	val     any
 	expires time.Time
 }
 
@@ -134,6 +145,8 @@ type cacheKey struct {
 	To         string            `json:"t"`
 	GroupBy    GroupBy           `json:"g,omitempty"`
 	PointNames map[string]string `json:"p,omitempty"`
+	// Arg is a detail report's subject: category id, brand or product id.
+	Arg string `json:"a,omitempty"`
 }
 
 // String encodes the key unambiguously (JSON: quoted strings, map keys
@@ -147,23 +160,72 @@ func keyTime(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 
 func (c *CachedRepo) Sales(ctx context.Context, from, to time.Time, groupBy GroupBy, pointNames map[string]string) ([]Row, error) {
 	key := cacheKey{Query: "sales", From: keyTime(from), To: keyTime(to), GroupBy: groupBy, PointNames: pointNames}
-	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
+	return loadSlice(c, ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.Sales(ctx, from, to, groupBy, pointNames)
 	})
 }
 
 func (c *CachedRepo) BrandSales(ctx context.Context, from, to time.Time) ([]Row, error) {
 	key := cacheKey{Query: "brand", From: keyTime(from), To: keyTime(to)}
-	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
+	return loadSlice(c, ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.BrandSales(ctx, from, to)
 	})
 }
 
 func (c *CachedRepo) CategorySales(ctx context.Context, from, to time.Time) ([]Row, error) {
 	key := cacheKey{Query: "category", From: keyTime(from), To: keyTime(to)}
-	return c.load(ctx, key, to, func(ctx context.Context) ([]Row, error) {
+	return loadSlice(c, ctx, key, to, func(ctx context.Context) ([]Row, error) {
 		return c.src.CategorySales(ctx, from, to)
 	})
+}
+
+func (c *CachedRepo) CategoryProductSales(ctx context.Context, categoryID string, from, to time.Time) ([]ProductSalesRow, error) {
+	key := cacheKey{Query: "category_products", From: keyTime(from), To: keyTime(to), Arg: categoryID}
+	return loadSlice(c, ctx, key, to, func(ctx context.Context) ([]ProductSalesRow, error) {
+		return c.src.CategoryProductSales(ctx, categoryID, from, to)
+	})
+}
+
+func (c *CachedRepo) BrandProductSales(ctx context.Context, brand string, from, to time.Time) ([]ProductSalesRow, error) {
+	key := cacheKey{Query: "brand_products", From: keyTime(from), To: keyTime(to), Arg: brand}
+	return loadSlice(c, ctx, key, to, func(ctx context.Context) ([]ProductSalesRow, error) {
+		return c.src.BrandProductSales(ctx, brand, from, to)
+	})
+}
+
+func (c *CachedRepo) ProductCodeSales(ctx context.Context, productID string, from, to time.Time, pointNames map[string]string) (ProductCodeSales, error) {
+	key := cacheKey{Query: "product_code", From: keyTime(from), To: keyTime(to), PointNames: pointNames, Arg: productID}
+	v, err := c.load(ctx, key, to, func(ctx context.Context) (any, error) {
+		return c.src.ProductCodeSales(ctx, productID, from, to, pointNames)
+	})
+	if err != nil {
+		return ProductCodeSales{}, err
+	}
+	res, _ := v.(ProductCodeSales)
+	return ProductCodeSales{Variants: slices.Clone(res.Variants), Points: slices.Clone(res.Points)}, nil
+}
+
+// ProductByCode and ProductStock pass through uncached: an index lookup
+// and a product's handful of stock rows — and stock must be current.
+func (c *CachedRepo) ProductByCode(ctx context.Context, code string) (*ProductRef, error) {
+	return c.src.ProductByCode(ctx, code)
+}
+
+func (c *CachedRepo) ProductStock(ctx context.Context, productID string) ([]StockCell, error) {
+	return c.src.ProductStock(ctx, productID)
+}
+
+// loadSlice is CachedRepo.load for a slice result: every caller gets its
+// own copy.
+func loadSlice[T any](c *CachedRepo, ctx context.Context, key cacheKey, to time.Time, query func(context.Context) ([]T, error)) ([]T, error) {
+	v, err := c.load(ctx, key, to, func(ctx context.Context) (any, error) {
+		return query(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	rows, _ := v.([]T)
+	return slices.Clone(rows), nil
 }
 
 func (c *CachedRepo) PointNames(ctx context.Context) (map[string]string, error) {
@@ -181,8 +243,8 @@ func (c *CachedRepo) Len() int {
 // load returns the cached rows for key, or runs query once for all
 // concurrent callers and caches a successful result. to is the range's
 // exclusive end: a range ending after now includes today and gets OpenTTL.
-// Every caller gets its own copy of the rows.
-func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query func(context.Context) ([]Row, error)) ([]Row, error) {
+// Callers copy the value out (loadSlice) before handing it on.
+func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query func(context.Context) (any, error)) (any, error) {
 	k, err := key.String()
 	if err != nil {
 		return nil, err
@@ -194,8 +256,8 @@ func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if rows, ok := c.lookup(k); ok {
-			return slices.Clone(rows), nil
+		if val, ok := c.lookup(k); ok {
+			return val, nil
 		}
 
 		ch := c.group.DoChan(k, func() (any, error) {
@@ -211,8 +273,7 @@ func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query
 			if res.Err != nil {
 				return nil, res.Err
 			}
-			rows, _ := res.Val.([]Row)
-			return slices.Clone(rows), nil
+			return res.Val, nil
 		}
 	}
 }
@@ -222,7 +283,7 @@ func (c *CachedRepo) load(ctx context.Context, key cacheKey, to time.Time, query
 // — the result is shared with other waiters, who must not fail because
 // the first requester went away — bounded by cacheLoadTimeout. A panic in
 // query is recovered and returned as ErrQueryPanicked.
-func (c *CachedRepo) flight(ctx context.Context, k string, to time.Time, query func(context.Context) ([]Row, error)) (val any, err error) {
+func (c *CachedRepo) flight(ctx context.Context, k string, to time.Time, query func(context.Context) (any, error)) (val any, err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			slog.Error("reports: report query panicked", "key", k, "panic", p, "stack", string(debug.Stack()))
@@ -230,8 +291,8 @@ func (c *CachedRepo) flight(ctx context.Context, k string, to time.Time, query f
 		}
 	}()
 
-	if rows, ok := c.lookup(k); ok { // a flight finished since the miss
-		return rows, nil
+	if cached, ok := c.lookup(k); ok { // a flight finished since the miss
+		return cached, nil
 	}
 	select {
 	case c.loadSlots <- struct{}{}:
@@ -242,25 +303,25 @@ func (c *CachedRepo) flight(ctx context.Context, k string, to time.Time, query f
 
 	loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheLoadTimeout)
 	defer cancel()
-	rows, err := query(loadCtx)
+	result, err := query(loadCtx)
 	if err != nil {
 		return nil, err
 	}
-	c.store(k, rows, to)
-	return rows, nil
+	c.store(k, result, to)
+	return result, nil
 }
 
-func (c *CachedRepo) lookup(k string) ([]Row, bool) {
+func (c *CachedRepo) lookup(k string) (any, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.entries[k]
 	if !ok || !c.cfg.Now().Before(e.expires) {
 		return nil, false
 	}
-	return e.rows, true
+	return e.val, true
 }
 
-func (c *CachedRepo) store(k string, rows []Row, to time.Time) {
+func (c *CachedRepo) store(k string, val any, to time.Time) {
 	now := c.cfg.Now()
 	ttl := c.cfg.TTL
 	if to.After(now) {
@@ -272,7 +333,7 @@ func (c *CachedRepo) store(k string, rows []Row, to time.Time) {
 	if _, exists := c.entries[k]; !exists {
 		c.makeRoom(now)
 	}
-	c.entries[k] = cacheEntry{rows: rows, expires: now.Add(ttl)}
+	c.entries[k] = cacheEntry{val: val, expires: now.Add(ttl)}
 }
 
 // makeRoom evicts until one more entry fits: expired entries first, then

@@ -28,6 +28,9 @@ type orderListMeta interface {
 	// OrderThumbs returns order_id -> the photo object key of the order's
 	// first line item (by line id), for the list's thumbnail.
 	OrderThumbs(ctx context.Context, orderIDs []string) (map[string]string, error)
+	// VariantProductCodes returns variant_id -> its product's code
+	// («код товара»), for the order page's line items.
+	VariantProductCodes(ctx context.Context, variantIDs []string) (map[string]string, error)
 }
 
 type orderListMetaRepo struct {
@@ -104,6 +107,19 @@ func (r *orderListMetaRepo) VariantThumbs(ctx context.Context, variantIDs []stri
 		JOIN product_images pi ON pi.product_id = pv.product_id
 		WHERE pv.id = ANY($1)
 		ORDER BY pv.id, ` + thumbRankSQL
+	return r.keyValues(ctx, q, variantIDs, out)
+}
+
+func (r *orderListMetaRepo) VariantProductCodes(ctx context.Context, variantIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(variantIDs))
+	if len(variantIDs) == 0 {
+		return out, nil
+	}
+	const q = `
+		SELECT pv.id, p.model_code
+		FROM product_variants pv
+		JOIN products p ON p.id = pv.product_id
+		WHERE pv.id = ANY($1) AND p.model_code IS NOT NULL`
 	return r.keyValues(ctx, q, variantIDs, out)
 }
 
