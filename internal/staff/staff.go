@@ -10,14 +10,38 @@ import (
 	"time"
 )
 
-// Role mirrors the Postgres staff_role enum (owner/manager/point_staff).
+// Role mirrors the Postgres staff_role enum
+// (owner/manager/point_staff/storekeeper).
 type Role string
 
 const (
 	RoleOwner      Role = "owner"
 	RoleManager    Role = "manager"
 	RolePointStaff Role = "point_staff"
+	// RoleStorekeeper (Кладовщик, migration 000050) is pinned to one
+	// warehouse: it sees only that warehouse's stock and storage locations.
+	RoleStorekeeper Role = "storekeeper"
 )
+
+// PinnedToPoint reports whether the role works at exactly one point
+// (staff.point_id) instead of across the whole shop.
+func (r Role) PinnedToPoint() bool {
+	return r == RolePointStaff || r == RoleStorekeeper
+}
+
+// RequiredPointKind is the points_of_sale.kind a role's point must have:
+// point_staff works at a branch, a storekeeper at a warehouse. "" for
+// roles that have no point.
+func (r Role) RequiredPointKind() string {
+	switch r {
+	case RolePointStaff:
+		return "branch"
+	case RoleStorekeeper:
+		return "warehouse"
+	default:
+		return ""
+	}
+}
 
 // Staff mirrors a row of the staff table.
 type Staff struct {
@@ -26,7 +50,7 @@ type Staff struct {
 	PasswordHash string
 	Name         string
 	Role         Role
-	PointID      *string // NULL for owner/manager
+	PointID      *string // NULL for owner/manager; a branch for point_staff, a warehouse for storekeeper
 	IsActive     bool
 	CreatedAt    time.Time
 }

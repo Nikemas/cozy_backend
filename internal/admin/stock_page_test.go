@@ -16,19 +16,36 @@ import (
 )
 
 type fakeStockStore struct {
-	listPoint string
-	rows      []stockPageRow
-	applied   []stockCellChange
-	applyErr  error
+	listPoint  string
+	listFilter stockFilter
+	rows       []stockPageRow
+	locations  []stockLocation
+	applied    []stockCellChange
+	appliedLoc []stockLocationChange
+	applyErr   error
 }
 
-func (f *fakeStockStore) List(_ context.Context, pointID, _ string, _ int) ([]stockPageRow, int, error) {
-	f.listPoint = pointID
+func (f *fakeStockStore) List(_ context.Context, sf stockFilter) ([]stockPageRow, int, error) {
+	f.listPoint = sf.PointID
+	f.listFilter = sf
 	return f.rows, len(f.rows), nil
 }
 
-func (f *fakeStockStore) Apply(_ context.Context, changes []stockCellChange) error {
+func (f *fakeStockStore) Categories(context.Context) ([]stockCategory, error) {
+	return []stockCategory{{ID: "c1", NameRu: "Обувь", NameKy: "Бут кийим"}, {ID: "c2", ParentID: "c1", NameRu: "Кеды", NameKy: "Кеддер"}}, nil
+}
+
+func (f *fakeStockStore) Colors(context.Context) ([]string, error) {
+	return []string{"Белый", "Чёрный"}, nil
+}
+
+func (f *fakeStockStore) Locations(context.Context, string) ([]stockLocation, error) {
+	return f.locations, nil
+}
+
+func (f *fakeStockStore) Apply(_ context.Context, changes []stockCellChange, locs []stockLocationChange) error {
 	f.applied = changes
+	f.appliedLoc = locs
 	return f.applyErr
 }
 
@@ -153,17 +170,17 @@ func TestStockPageRepoListQuery(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\)\s+FROM product_variants v`).WithArgs("pA", `%50\%%`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\)\s+FROM product_variants v`).WithArgs("pA", `%50\%%`, "c1", "Белый", "none").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`LEFT JOIN stock s ON s.variant_id = v.id AND s.point_id = \$1`).WithArgs("pA", `%50\%%`, stockPageSize, stockPageSize).
-		WillReturnRows(sqlmock.NewRows([]string{"v.id", "p.id", "name_ru", "brand", "size", "color", "quantity"}).
-			AddRow("v1", "p1", "Nike", "Nike", "42", "Белый", nil))
+	mock.ExpectQuery(`LEFT JOIN stock s ON s.variant_id = v.id AND s.point_id = \$1`).WithArgs("pA", `%50\%%`, "c1", "Белый", "none", stockPageSize, stockPageSize).
+		WillReturnRows(sqlmock.NewRows([]string{"v.id", "p.id", "name_ru", "model_code", "brand", "size", "color", "quantity", "location_id"}).
+			AddRow("v1", "p1", "Nike", "AB-1", "Nike", "42", "Белый", nil, ""))
 
-	rows, total, err := newStockPageRepo(db).List(context.Background(), "pA", "50%", 2)
+	rows, total, err := newStockPageRepo(db).List(context.Background(), stockFilter{PointID: "pA", Query: "50%", CategoryID: "c1", Color: "Белый", LocationID: "none", Page: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if total != 1 || len(rows) != 1 || rows[0].HasStockRow || rows[0].Quantity != 0 {
+	if total != 1 || len(rows) != 1 || rows[0].HasStockRow || rows[0].Quantity != 0 || rows[0].ModelCode != "AB-1" {
 		t.Errorf("rows = %+v, total = %d", rows, total)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

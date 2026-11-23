@@ -129,14 +129,18 @@
           {{range .Variants}}
           <tr class="admin-variant-row" data-key="{{.Key}}">
             <td data-label="{{t "admin.common.size"}}"><input type="hidden" name="variant_key" value="{{.Key}}"><input type="hidden" name="variant_id" value="{{.ID}}"><input type="text" name="variant_size" value="{{.Size}}" class="admin-variant-input" placeholder="42" aria-label="{{t "admin.common.size"}}"></td>
-            <td data-label="{{t "admin.common.color"}}"><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input" placeholder="{{t "admin.product.color_placeholder"}}" aria-label="{{t "admin.common.color"}}"></td>
+            <td data-label="{{t "admin.common.color"}}"><input type="text" name="variant_color" value="{{.Color}}" class="admin-variant-input admin-variant-color-btn" readonly onclick="pfEditVariantColor(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pfEditVariantColor(this)}" title="{{t "admin.product.color_click_hint"}}" placeholder="{{t "admin.product.color_placeholder"}}" aria-label="{{t "admin.common.color"}}"></td>
             <td data-label="{{t "admin.product.color_photos"}}"><button type="button" class="admin-variant-photo-btn" onclick="pfOpenColorPhotos(this)" aria-label="{{t "admin.product.this_color_photos"}}">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
               <span class="admin-variant-photo-count">0</span>
             </button></td>
             <td data-label="{{t "admin.product.variant_price"}}"><input type="text" inputmode="decimal" name="variant_price" value="{{.Price}}" class="admin-variant-input admin-variant-input--price{{if .PriceInvalid}} is-invalid{{end}}" placeholder="{{t "admin.product.variant_price_placeholder"}}" aria-label="{{t "admin.product.variant_price"}}"{{if .PriceInvalid}} aria-invalid="true"{{end}}>{{if .HasPriceOrig}}<input type="hidden" name="orig_variant_price_{{.Key}}" value="{{.PriceOrig}}">{{end}}</td>
             {{range .Cells}}
-            <td class="admin-variant-cell--qty" data-label="{{.PointName}}"><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}</td>
+            <td class="admin-variant-cell--qty" data-label="{{.PointName}}"><input type="number" min="0" max="100000" step="1" inputmode="numeric" name="{{.Name}}" value="{{.Value}}" class="admin-variant-input admin-variant-input--qty{{if .Conflict}} is-conflict{{end}}{{if .Invalid}} is-invalid{{end}}" aria-label="{{t "admin.common.stock"}}: {{.PointName}}"{{if or .Conflict .Invalid}} aria-invalid="true"{{end}}{{if .Conflict}} title="{{t "admin.product.conflict_cell"}}"{{end}} oninput="pfUpdateBadge(this)">{{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}{{if .Warehouse}}{{$cell := .}}
+              <select name="{{.LocName}}" class="admin-variant-input admin-variant-loc" aria-label="{{t "admin.stock.col_location"}}: {{.PointName}}">
+                <option value="">{{t "admin.stock.no_location"}}</option>
+                {{range .Locations}}{{if or (not .Inactive) (eq .ID $cell.LocValue) (eq .ID $cell.LocOrig)}}<option value="{{.ID}}"{{if eq .ID $cell.LocValue}} selected{{end}}>{{.Name}}{{if .Inactive}} {{t "admin.common.inactive_suffix"}}{{end}}</option>{{end}}{{end}}
+              </select>{{if .HasLocOrig}}<input type="hidden" name="{{.LocOrigName}}" value="{{.LocOrig}}">{{end}}{{end}}</td>
             {{end}}
             <td class="admin-variant-cell--total" data-label="{{t "admin.product.total"}}"><span class="admin-chip admin-variant-badge" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
             <td class="admin-variant-cell--remove"><button type="button" class="admin-variant-remove" onclick="pfRemoveVariantRow(this)" aria-label="{{t "admin.product.remove_variant"}}">
@@ -163,20 +167,24 @@
 <script id="pf-initial-images" type="application/json">{{.ImagesJSON}}</script>
 
 {{/* "Добавить вариацию" modal: one size, many colors, each color with its
-     own quantity per active point (филиал or склад). pfVariantModalApply
-     turns every color into a row of the table above (or adds the
-     quantities to an existing size+color row), so saving still goes through
-     the same variant_size/variant_color/qty_<key>_<point> form contract (product_form_parse.go). */}}
+     own quantity per active point — branches («Магазины») and warehouses
+     («Склады», each with a storage-location select) in separate column
+     groups. pfVariantModalApply turns every color into a row of the table
+     above (or updates an existing size+color row), so saving still goes
+     through the same variant_size/variant_color/qty_<key>_<point>/
+     loc_<key>_<point> form contract (product_form_parse.go). Clicking a
+     row's color opens the same modal in edit mode for that size, with
+     every color of the size and its current quantities and locations. */}}
 <div id="pf-variant-modal" class="admin-modal-backdrop" style="display:none">
   <div class="admin-modal admin-modal--xl" role="dialog" aria-modal="true" aria-labelledby="pf-variant-modal-title">
     <div class="admin-modal__title" id="pf-variant-modal-title">{{t "admin.product.variant_modal_title"}}</div>
-    <div class="admin-modal__text">{{t "admin.product.variant_modal_hint"}}</div>
+    <div class="admin-modal__text" id="pf-vm-hint">{{t "admin.product.variant_modal_hint"}}</div>
     <div class="admin-field-row" style="margin-top:14px">
       <div class="admin-field">
         <label for="pf-vm-size">{{t "admin.common.size"}}</label>
         <input id="pf-vm-size" type="text" placeholder="42" maxlength="20" autocomplete="off">
       </div>
-      <div class="admin-field">
+      <div class="admin-field" id="pf-vm-price-field">
         <label for="pf-vm-price">{{t "admin.product.variant_price"}}</label>
         <input id="pf-vm-price" type="text" inputmode="decimal" placeholder="{{t "admin.product.variant_price_placeholder"}}" maxlength="12" autocomplete="off">
       </div>
@@ -184,12 +192,16 @@
     <div class="admin-vm-table-wrap">
       <table class="admin-vm-table">
         <thead>
+          {{$shops := .ActiveShops}}{{$whs := .ActiveWarehouses}}
           <tr>
-            <th scope="col">{{t "admin.common.color"}}</th>
-            {{range .StockPoints}}{{if not .Inactive}}
-            <th scope="col">{{.Name}}{{if .Warehouse}} <span class="admin-variants-table__inactive">{{t "admin.product.warehouse_suffix"}}</span>{{end}}</th>
-            {{end}}{{end}}
-            <th scope="col"><span class="admin-visually-hidden">{{t "admin.common.delete"}}</span></th>
+            <th scope="col" rowspan="2">{{t "admin.common.color"}}</th>
+            {{if $shops}}<th scope="colgroup" colspan="{{len $shops}}" class="admin-vm-group">{{t "admin.product.vm_shops"}}</th>{{end}}
+            {{if $whs}}<th scope="colgroup" colspan="{{len $whs}}" class="admin-vm-group admin-vm-group--warehouses">{{t "admin.product.vm_warehouses"}}</th>{{end}}
+            <th scope="col" rowspan="2"><span class="admin-visually-hidden">{{t "admin.common.delete"}}</span></th>
+          </tr>
+          <tr>
+            {{range $shops}}<th scope="col">{{.Name}}</th>{{end}}
+            {{range $i, $p := $whs}}<th scope="col"{{if eq $i 0}} class="admin-vm-wh-first"{{end}}>{{$p.Name}} <span class="admin-variants-table__inactive">{{t "admin.product.warehouse_suffix"}}</span></th>{{end}}
           </tr>
         </thead>
         <tbody id="pf-vm-colors"></tbody>
@@ -199,7 +211,7 @@
     <div id="pf-vm-error" class="admin-form-error" role="alert" style="display:none;margin-top:12px"></div>
     <div class="admin-modal__actions">
       <button type="button" class="admin-btn admin-btn--secondary" onclick="pfCloseVariantModal()">{{t "admin.common.cancel"}}</button>
-      <button type="button" class="admin-btn admin-btn--primary" onclick="pfVariantModalApply()">{{t "admin.product.add_to_table"}}</button>
+      <button type="button" class="admin-btn admin-btn--primary" id="pf-vm-apply" onclick="pfVariantModalApply()">{{t "admin.product.add_to_table"}}</button>
     </div>
   </div>
 </div>
@@ -311,6 +323,18 @@
     errSizeRequired: {{t "admin.product.err_size_required"}},
     errColorRequired: {{t "admin.product.err_color_required"}},
     errQty: {{t "admin.product.err_qty"}},
+    shops: {{t "admin.product.vm_shops"}},
+    warehouses: {{t "admin.product.vm_warehouses"}},
+    location: {{t "admin.stock.col_location"}},
+    noLocation: {{t "admin.stock.no_location"}},
+    inactiveSuffix: {{t "admin.common.inactive_suffix"}},
+    modalTitleAdd: {{t "admin.product.variant_modal_title"}},
+    modalTitleEdit: {{t "admin.product.variant_modal_edit_title"}},
+    modalHintAdd: {{t "admin.product.variant_modal_hint"}},
+    modalHintEdit: {{t "admin.product.variant_modal_edit_hint"}},
+    applyAdd: {{t "admin.product.add_to_table"}},
+    applyEdit: {{t "admin.common.done"}},
+    colorClickHint: {{t "admin.product.color_click_hint"}},
     colorPhotosOf: {{t "admin.product.color_photos_of"}}
   };
   var initialTop = {{.TopCategoryID}};
@@ -509,8 +533,27 @@
   }
 
   var newRowSeq = 0;
+  var MAX_QTY = 100000;
+
+  // pfLocationSelect builds a storage-location <select> for warehouse p:
+  // "no location" + its active locations (+ selected, even if inactive).
+  function pfLocationSelect(p, selected, attrs) {
+    var sel = el('select', attrs);
+    var none = el('option', { value: '' });
+    none.textContent = L.noLocation;
+    sel.appendChild(none);
+    (p.Locations || []).forEach(function (l) {
+      if (l.Inactive && l.ID !== selected) return;
+      var o = el('option', { value: l.ID });
+      o.textContent = l.Name + (l.Inactive ? ' ' + L.inactiveSuffix : '');
+      sel.appendChild(o);
+    });
+    sel.value = selected || '';
+    return sel;
+  }
+
   // pfAppendVariantRow adds one size+color row to the table. v carries the
-  // prefilled values: {size, color, price, qty: {pointID: n}}.
+  // prefilled values: {size, color, price, qty: {pointID: n}, loc: {pointID: id}}.
   function pfAppendVariantRow(v) {
     newRowSeq++;
     var key = 'n' + Date.now().toString(36) + newRowSeq;
@@ -524,7 +567,12 @@
     tr.appendChild(tdSize);
 
     var tdColor = el('td', { 'data-label': L.color });
-    tdColor.appendChild(el('input', { type: 'text', name: 'variant_color', value: v.color || '', 'class': 'admin-variant-input', placeholder: L.colorPlaceholder, 'aria-label': L.color }));
+    var colorInput = el('input', { type: 'text', name: 'variant_color', value: v.color || '', 'class': 'admin-variant-input admin-variant-color-btn', readonly: 'readonly', title: L.colorClickHint, placeholder: L.colorPlaceholder, 'aria-label': L.color });
+    colorInput.addEventListener('click', function () { pfEditVariantColor(colorInput); });
+    colorInput.addEventListener('keydown', function (evt) {
+      if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); pfEditVariantColor(colorInput); }
+    });
+    tdColor.appendChild(colorInput);
     tr.appendChild(tdColor);
 
     var tdPhoto = el('td', { 'data-label': L.colorPhotos });
@@ -543,13 +591,20 @@
     stockPoints.forEach(function (p) {
       var td = el('td', { 'class': 'admin-variant-cell--qty', 'data-label': p.Name });
       var input = el('input', {
-        type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric',
+        type: 'number', min: '0', max: String(MAX_QTY), step: '1', inputmode: 'numeric',
         name: 'qty_' + key + '_' + p.ID, value: String((v.qty && v.qty[p.ID]) || 0),
         'class': 'admin-variant-input admin-variant-input--qty',
         'aria-label': L.stock + ': ' + p.Name
       });
       input.addEventListener('input', function () { pfUpdateBadge(input); });
       td.appendChild(input);
+      // A new row has no orig_loc_: the server writes the location only
+      // when one was picked.
+      if (p.Warehouse) {
+        td.appendChild(pfLocationSelect(p, (v.loc && v.loc[p.ID]) || '', {
+          name: 'loc_' + key + '_' + p.ID, 'class': 'admin-variant-input admin-variant-loc', 'aria-label': L.location + ': ' + p.Name
+        }));
+      }
       tr.appendChild(td);
     });
 
@@ -568,10 +623,17 @@
     return tr;
   }
 
-  // --- "Добавить вариацию" modal (see #pf-variant-modal) ---
-  var MAX_QTY = 100000;
+  // --- variant modal (see #pf-variant-modal) ---
+  // Add mode ("+ Добавить вариацию"): quantities are ADDED to an existing
+  // size+color row. Edit mode (click on a row's color): every color of
+  // that size is listed with its current quantities/locations, and Готово
+  // SETS them — a value left as it was stays exactly as it was, so the
+  // server sees no change for it (only changed cells are saved).
   var activePoints = stockPoints.filter(function (p) { return !p.Inactive; });
+  var shopPoints = activePoints.filter(function (p) { return !p.Warehouse; });
+  var warehousePoints = activePoints.filter(function (p) { return p.Warehouse; });
   var vmColors = document.getElementById('pf-vm-colors');
+  var vmMode = 'add';
 
   function vmError(msg) {
     var box = document.getElementById('pf-vm-error');
@@ -579,18 +641,30 @@
     box.style.display = msg ? 'block' : 'none';
   }
 
-  window.pfVariantModalAddColor = function () {
+  // vmAddLine adds one color line; v = {color, rowKey, qty: {pid: n}, loc: {pid: id}}.
+  function vmAddLine(v) {
+    v = v || {};
     var tr = el('tr', { 'class': 'admin-vm-color' });
+    if (v.rowKey) tr.setAttribute('data-row-key', v.rowKey);
     var tdColor = el('td', {});
-    tdColor.appendChild(el('input', { type: 'text', 'class': 'admin-variant-input admin-vm-color-name', placeholder: L.colorPlaceholder, 'aria-label': L.color, maxlength: '60', autocomplete: 'off' }));
+    var name = el('input', { type: 'text', 'class': 'admin-variant-input admin-vm-color-name', placeholder: L.colorPlaceholder, 'aria-label': L.color, maxlength: '60', autocomplete: 'off' });
+    name.value = v.color || '';
+    tdColor.appendChild(name);
     tr.appendChild(tdColor);
-    activePoints.forEach(function (p) {
+    shopPoints.concat(warehousePoints).forEach(function (p, i) {
       var td = el('td', {});
+      if (p.Warehouse && i === shopPoints.length) td.className = 'admin-vm-wh-first';
       td.appendChild(el('input', {
-        type: 'number', min: '0', max: String(MAX_QTY), step: '1', inputmode: 'numeric', value: '0',
+        type: 'number', min: '0', max: String(MAX_QTY), step: '1', inputmode: 'numeric',
+        value: String((v.qty && v.qty[p.ID]) || 0),
         'class': 'admin-variant-input admin-variant-input--qty admin-vm-qty', 'data-point': p.ID,
         'aria-label': L.stock + ': ' + p.Name
       }));
+      if (p.Warehouse) {
+        td.appendChild(pfLocationSelect(p, (v.loc && v.loc[p.ID]) || '', {
+          'class': 'admin-variant-input admin-variant-loc admin-vm-loc', 'data-point': p.ID, 'aria-label': L.location + ': ' + p.Name
+        }));
+      }
       tr.appendChild(td);
     });
     var tdRemove = el('td', {});
@@ -598,49 +672,102 @@
     tdRemove.firstChild.setAttribute('aria-label', L.removeColor);
     tdRemove.firstChild.addEventListener('click', function () {
       tr.remove();
-      if (!vmColors.children.length) pfVariantModalAddColor();
+      if (!vmColors.children.length) vmAddLine();
     });
     tr.appendChild(tdRemove);
     vmColors.appendChild(tr);
-    tr.querySelector('.admin-vm-color-name').focus();
+    return tr;
+  }
+
+  window.pfVariantModalAddColor = function () {
+    vmAddLine().querySelector('.admin-vm-color-name').focus();
   };
 
-  // "+ Добавить вариацию" opens the modal; size prefills it (optional).
-  window.pfAddVariant = function (size) {
-    document.getElementById('pf-vm-size').value = size || '';
+  function vmOpen(mode) {
+    vmMode = mode;
+    var edit = mode === 'edit';
+    document.getElementById('pf-variant-modal-title').textContent = edit ? L.modalTitleEdit : L.modalTitleAdd;
+    document.getElementById('pf-vm-hint').textContent = edit ? L.modalHintEdit : L.modalHintAdd;
+    document.getElementById('pf-vm-apply').textContent = edit ? L.applyEdit : L.applyAdd;
+    document.getElementById('pf-vm-price-field').style.display = edit ? 'none' : '';
     document.getElementById('pf-vm-price').value = '';
     vmColors.innerHTML = '';
     vmError('');
     document.getElementById('pf-variant-modal').style.display = 'flex';
+  }
+
+  // "+ Добавить вариацию" opens the modal; size prefills it (optional).
+  window.pfAddVariant = function (size) {
+    vmOpen('add');
+    document.getElementById('pf-vm-size').value = size || '';
     pfVariantModalAddColor();
     if (!size) document.getElementById('pf-vm-size').focus();
   };
+
+  function rowValues(row) {
+    var key = row.getAttribute('data-key');
+    var v = { rowKey: key, color: row.querySelector('input[name="variant_color"]').value, qty: {}, loc: {} };
+    activePoints.forEach(function (p) {
+      var q = row.querySelector('input[name="qty_' + key + '_' + p.ID + '"]');
+      if (q) v.qty[p.ID] = parseInt(q.value, 10) || 0;
+      var l = row.querySelector('select[name="loc_' + key + '_' + p.ID + '"]');
+      if (l) v.loc[p.ID] = l.value;
+    });
+    return v;
+  }
+
+  // Click on a row's color: edit every color of that row's size.
+  window.pfEditVariantColor = function (input) {
+    var clicked = input.closest('tr');
+    var size = clicked.querySelector('input[name="variant_size"]').value.trim();
+    vmOpen('edit');
+    document.getElementById('pf-vm-size').value = size;
+    var focus = null;
+    document.querySelectorAll('#pf-variant-rows .admin-variant-row').forEach(function (row) {
+      var s = row.querySelector('input[name="variant_size"]').value.trim();
+      if (s.toLowerCase() !== size.toLowerCase()) return;
+      var line = vmAddLine(rowValues(row));
+      if (row === clicked) focus = line;
+    });
+    if (focus) {
+      focus.classList.add('is-current');
+      focus.querySelector('.admin-vm-qty, .admin-vm-color-name').focus();
+    }
+  };
+
   window.pfCloseVariantModal = function () {
     document.getElementById('pf-variant-modal').style.display = 'none';
   };
 
   // vmReadColors collects the modal's color lines as
-  // [{color, qty: {pointID: n}}], summing a color typed twice. Returns
-  // null (after showing the error) on an invalid quantity.
+  // [{color, rowKey, qty: {pointID: n}, loc: {pointID: id}}]. In add mode
+  // a color typed twice is summed. Returns null (after showing the error)
+  // on an invalid quantity.
   function vmReadColors() {
     var byColor = {};
-    var order = [];
+    var out = [];
     var lines = vmColors.querySelectorAll('.admin-vm-color');
     for (var i = 0; i < lines.length; i++) {
       var color = lines[i].querySelector('.admin-vm-color-name').value.trim();
       if (!color) continue;
-      var k = color.toLowerCase();
-      if (!byColor[k]) { byColor[k] = { color: color, qty: {} }; order.push(k); }
+      var rowKey = lines[i].getAttribute('data-row-key') || '';
+      var k = rowKey || color.toLowerCase();
+      var entry = byColor[k];
+      if (!entry) { entry = byColor[k] = { color: color, rowKey: rowKey, qty: {}, loc: {} }; out.push(entry); }
       var inputs = lines[i].querySelectorAll('.admin-vm-qty');
       for (var j = 0; j < inputs.length; j++) {
         var raw = inputs[j].value.trim();
         var n = raw === '' ? 0 : Number(raw);
         if (!Number.isInteger(n) || n < 0 || n > MAX_QTY) { inputs[j].focus(); vmError(L.errQty); return null; }
         var pid = inputs[j].getAttribute('data-point');
-        byColor[k].qty[pid] = (byColor[k].qty[pid] || 0) + n;
+        entry.qty[pid] = (entry.qty[pid] || 0) + n;
       }
+      lines[i].querySelectorAll('.admin-vm-loc').forEach(function (s) {
+        if (s.value) entry.loc[s.getAttribute('data-point')] = s.value;
+        else if (!(s.getAttribute('data-point') in entry.loc)) entry.loc[s.getAttribute('data-point')] = '';
+      });
     }
-    return order.map(function (k) { return byColor[k]; });
+    return out;
   }
 
   function findVariantRow(size, color) {
@@ -653,15 +780,30 @@
     return null;
   }
 
-  // An existing size+color row keeps its price; the modal only adds to its
-  // per-point quantities.
-  function addQtyToRow(row, qty) {
+  function setInputValue(input, value) {
+    if (!input || input.value === value) return; // untouched stays untouched
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // applyToRow writes a modal line into an existing table row. add: the
+  // quantities are added to the row's (add mode); otherwise they replace
+  // them. A location is only written when one was picked (add mode) or
+  // always (edit mode, where the line started from the row's own value).
+  function applyToRow(row, c, add) {
     var key = row.getAttribute('data-key');
-    Object.keys(qty).forEach(function (pid) {
-      var input = row.querySelector('input[name="qty_' + key + '_' + pid + '"]');
-      if (!input || !qty[pid]) return;
-      input.value = String(Math.min(MAX_QTY, (parseInt(input.value, 10) || 0) + qty[pid]));
-      pfUpdateBadge(input);
+    activePoints.forEach(function (p) {
+      var q = row.querySelector('input[name="qty_' + key + '_' + p.ID + '"]');
+      if (q && p.ID in c.qty) {
+        var n = add ? (parseInt(q.value, 10) || 0) + c.qty[p.ID] : c.qty[p.ID];
+        if (!add || c.qty[p.ID]) setInputValue(q, String(Math.min(MAX_QTY, n)));
+        pfUpdateBadge(q);
+      }
+      var l = row.querySelector('select[name="loc_' + key + '_' + p.ID + '"]');
+      if (l && p.ID in c.loc && (!add || c.loc[p.ID])) {
+        if (c.loc[p.ID] && !l.querySelector('option[value="' + c.loc[p.ID] + '"]')) return;
+        l.value = c.loc[p.ID];
+      }
     });
   }
 
@@ -673,10 +815,18 @@
     if (colors === null) return;
     if (!colors.length) { vmError(L.errColorRequired); vmColors.querySelector('.admin-vm-color-name').focus(); return; }
     var price = document.getElementById('pf-vm-price').value.trim();
+    var edit = vmMode === 'edit';
     colors.forEach(function (c) {
+      var row = c.rowKey ? document.querySelector('#pf-variant-rows .admin-variant-row[data-key="' + c.rowKey + '"]') : null;
+      if (row) {
+        setInputValue(row.querySelector('input[name="variant_size"]'), size);
+        setInputValue(row.querySelector('input[name="variant_color"]'), c.color);
+        applyToRow(row, c, false);
+        return;
+      }
       var existing = findVariantRow(size, c.color);
-      if (existing) { addQtyToRow(existing, c.qty); return; }
-      pfAppendVariantRow({ size: size, color: c.color, price: price, qty: c.qty });
+      if (existing) { applyToRow(existing, c, !edit); return; }
+      pfAppendVariantRow({ size: size, color: c.color, price: edit ? '' : price, qty: c.qty, loc: c.loc });
     });
     pfRefreshPhotoBadges();
     pfCloseVariantModal();
@@ -685,7 +835,6 @@
   document.getElementById('pf-variant-modal').addEventListener('keydown', function (evt) {
     if (evt.key === 'Enter' && evt.target.tagName === 'INPUT') { evt.preventDefault(); pfVariantModalApply(); }
   });
-
   window.pfRemoveVariantRow = function (btn) {
     btn.closest('tr').remove();
     pfPruneOrphanColorPhotos();

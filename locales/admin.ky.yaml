@@ -44,11 +44,11 @@ admin.nav.products: Товарлар
 admin.nav.stock: Калдыктар
 admin.nav.categories: Категориялар
 admin.nav.reports: Отчеттор
-admin.nav.points: Кампа жана сатуу жайлары
+admin.nav.points: "Сатуу жайлары"
 admin.nav.staff: Кызматкерлер
 admin.role.owner: Ээси
 admin.role.manager: Менеджер
-admin.role.point_staff: Кампачы
+admin.role.point_staff: "Сатуу жайынын кызматкери"
 admin.lang.label: Интерфейстин тили
 admin.lang.ru_title: Орусча
 admin.lang.ky_title: Кыргызча
@@ -130,7 +130,7 @@ admin.categories.image: Категориянын сүрөтү
 admin.categories.image_hint: JPEG, PNG же WEBP, 10 МБга чейин, кыска жагы 200 pxтен кем эмес. Тиркемедеги категориянын плиткасында көрсөтүлөт
 admin.categories.current_image: Азыркы сүрөт
 admin.categories.remove_image: Сүрөттү өчүрүү
-admin.points.note: Калдыктар ар бир сатуу жайы боюнча өзүнчө эсептелет (товардын карточкасы, «Калдыктар» бөлүмү). Активсиздештирилген сатуу жайы сатып алуучуларга көрсөтүлбөйт, бирок анын буйрутмалар тарыхы жана калдыктары сакталат.
+admin.points.note: "Филиалдар сатып алуучуларга картада көрүнөт жана өзү алып кетүү үчүн жеткиликтүү. Калдыктар ар бир сатуу жайы боюнча өзүнчө эсептелет (товардын карточкасы, «Калдыктар» бөлүмү). Активсиздештирилген сатуу жайы сатып алуучуларга көрсөтүлбөйт, бирок анын буйрутмалар тарыхы жана калдыктары сакталат. Кампалар — өзүнчө «Кампалар» бөлүмүндө."
 admin.points.add: Сатуу жайын кошуу
 admin.points.empty: Азырынча сатуу жайлары жок
 admin.points.edit_aria: "«%s» сатуу жайын өзгөртүү"
@@ -162,7 +162,7 @@ admin.staff.load_failed: Кызматкерлерди жүктөө мүмкүн 
 admin.staff.passwords_mismatch: Сырсөздөр дал келбейт
 
 # Stock, quantities, reports
-admin.stock.search_placeholder: Аталышы, бренд же артикул
+admin.stock.search_placeholder: "Аталышы, товардын коду же артикул"
 admin.stock.empty_text: Башка аталышты байкап көрүңүз
 admin.stock.caption: "«%s» сатуу жайындагы калдыктар"
 admin.stock.col_product: Товар
@@ -170,7 +170,7 @@ admin.stock.col_level: Деңгээли
 admin.stock.save_changes: Өзгөртүүлөрдү сактоо
 admin.stock.no_point_assigned: Сиз эч бир сатуу жайына бекитилген эмессиз — ээсине кайрылыңыз.
 admin.stock.own_point_missing: Сиздин сатуу жайыңыз табылган жок — ээсине кайрылыңыз.
-admin.stock.no_points: Азырынча сатуу жайлары жок — биринчисин «Кампа жана сатуу жайлары» бөлүмүндө түзүңүз.
+admin.stock.no_points: "Азырынча сатуу жайлары жок — биринчисин «Сатуу жайлары» же «Кампалар» бөлүмүндө түзүңүз."
 admin.stock.err_invalid_qty: "Саны туура эмес: %s. Эч нерсе сакталган жок."
 admin.stock.err_conflict: Сиз форманы түзөтүп жатканда калдык өзгөрдү (сатуу же башка кызматкер). Белгиленген уячалар учурдагы маанилерге жаңыланды — текшерип, кайра сактаңыз. Эч нерсе сакталган жок.
 admin.stock.no_changes: Өзгөртүү жок
@@ -588,7 +588,7 @@ admin.apperr.last_owner: Акыркы ээсинин ролун төмөндөт
 admin.apperr.staff_not_found: Кызматкер табылган жок
 admin.apperr.invalid_role: Белгисиз роль
 admin.apperr.invalid_password: Сырсөз кеминде 8 белгиден турушу керек жана 72 байттан ашпашы керек
-admin.apperr.point_id_required: Кампачы үчүн сатуу жайын тандаңыз
+admin.apperr.point_id_required: Кызматкердин сатуу жайын же кампасын тандаңыз
 admin.apperr.point_id_forbidden: Ээси жана менеджер үчүн сатуу жайы көрсөтүлбөйт
 admin.apperr.point_not_found: Сатуу жайы табылган жок
 admin.apperr.invalid_point_id: Сатуу жайы табылган жок
@@ -790,10 +790,68 @@ admin.points.kind_warehouse: Кампа
 admin.points.kind_hint: "Филиал сатып алуучуларга картада көрүнөт жана өзү алып кетүү үчүн жеткиликтүү. Кампа товарды гана сактайт: анын калдыктары жеткирүү менен сатылат, бирок сатып алуучулар кампаны көрүшпөйт."
 admin.product.warehouse_suffix: кампа
 admin.product.variant_modal_title: Жаңы вариация
-admin.product.variant_modal_hint: "Өлчөмдү көрсөтүп, түстөрдү кошуңуз. Ар бир түстүн ар бир филиалда жана ар бир кампада өз саны бар — вариациялар таблицасында ар бир түскө бир сап пайда болот."
+admin.product.variant_modal_hint: "Өлчөмдү көрсөтүп, түстөрдү кошуңуз. Ар бир түстүн өз саны бар — дүкөндөрдө жана кампаларда өзүнчө (сактоо орду менен); вариациялар таблицасында ар бир түскө бир сап пайда болот."
 admin.product.add_color: Түс кошуу
 admin.product.remove_color: Түстү өчүрүү
 admin.product.add_to_table: Таблицага кошуу
 admin.product.err_size_required: Өлчөмдү көрсөтүңүз
 admin.product.err_color_required: Жок дегенде бир түс кошуңуз
 admin.product.err_qty: "Саны — 0дөн 100000гө чейинки бүтүн сан"
+
+# feat/warehouses: Склады, места хранения, Кладовщик
+admin.nav.warehouses: "Кампалар"
+admin.role.storekeeper: "Кампачы"
+admin.staff.warehouse: "Кампа"
+admin.staff.storekeeper_hint: "Кампачы өз кампасынын калдыктарын жана сактоо орундарын гана көрөт."
+admin.stock.filter_category: "Категория"
+admin.stock.col_model_code: "Товардын коду"
+admin.stock.col_location: "Орду"
+admin.stock.no_location: "Орду жок"
+admin.warehouses.note: "Кампа товарды сактайт: анын калдыктары жеткирүү менен сатылат, бирок сатып алуучулар кампаны көрүшпөйт жана аны өзү алып кетүү үчүн тандай алышпайт. Кампанын ичинде сактоо орундарын (текчелер, сөрөлөр) түзсө болот."
+admin.warehouses.add: "Кампа кошуу"
+admin.warehouses.empty: "Азырынча кампалар жок"
+admin.warehouses.edit_aria: "«%s» кампасын өзгөртүү"
+admin.warehouses.deactivate_text: "«%s» кампасы активдүү эмес болуп калат: анын калдыктары товардын бар-жогунда эсептелбей калат. Калдыктар жана сактоо орундары сакталат."
+admin.warehouses.deactivate_title: "Кампаны активсиздештиресизби?"
+admin.warehouses.new_title: "Жаңы кампа"
+admin.warehouses.edit_title: "Кампаны түзөтүү"
+admin.warehouses.active: "Активдүү"
+admin.warehouses.inactive: "Активдүү эмес"
+admin.warehouses.locations: "Сактоо орундары"
+admin.warehouses.open_stock: "Кампанын калдыктары"
+admin.warehouses.name_placeholder: "Башкы кампа"
+admin.warehouses.toast_saved: "Кампа сакталды"
+admin.warehouses.toast_activated: "Кампа активдештирилди"
+admin.warehouses.toast_deactivated: "Кампа активсиздештирилди"
+admin.locations.title: "Сактоо орундары"
+admin.locations.hint: "Кампанын текчелери, сөрөлөрү, уячалары. Товардын орду «Калдыктар» бөлүмүндө жана товардын карточкасында тандалат. Товар жаткан орунду өчүрүүгө болбойт — активсиздештирүүгө гана болот."
+admin.locations.name: "Ордунун аталышы"
+admin.locations.name_placeholder: "А текчеси, 3-сөрө"
+admin.locations.add: "Орун кошуу"
+admin.locations.empty: "Азырынча сактоо орундары жок"
+admin.locations.goods: "Товар"
+admin.locations.edit_aria: "«%s» ордун өзгөртүү"
+admin.locations.edit_title: "Сактоо орду"
+admin.locations.sort_order: "Тизмедеги тартиби"
+admin.locations.delete_title: "Сактоо ордун өчүрөсүзбү?"
+admin.locations.delete_text: "«%s» орду өчүрүлөт."
+admin.locations.toast_saved: "Сактоо орду сакталды"
+admin.locations.toast_activated: "Сактоо орду активдештирилди"
+admin.locations.toast_deactivated: "Сактоо орду активсиздештирилди"
+admin.locations.toast_deleted: "Сактоо орду өчүрүлдү"
+admin.plural.location.one: "сактоо орду"
+admin.plural.location.few: "сактоо орду"
+admin.plural.location.many: "сактоо орду"
+admin.product.vm_shops: "Дүкөндөр"
+admin.product.vm_warehouses: "Кампалар"
+admin.product.variant_modal_edit_title: "Түстөр жана саны"
+admin.product.variant_modal_edit_hint: "Бул өлчөмдүн бардык түстөрү. Дүкөндөрдөгү жана кампалардагы санды (жана сактоо ордун) өзгөртүңүз же түс кошуңуз. Сиз өзгөртпөгөн маанилер кайра жазылбайт."
+admin.product.color_click_hint: "Түстөрдү жана санды өзгөртүү үчүн басыңыз"
+admin.apperr.storekeeper_needs_warehouse: "Кампачыны кампага гана бекитүүгө болот"
+admin.apperr.point_staff_needs_branch: "Сатуу жайынын кызматкерин филиалга гана бекитүүгө болот"
+admin.apperr.invalid_location_name: "Сактоо ордунун аталышын көрсөтүңүз (100 белгиге чейин)"
+admin.apperr.location_name_taken: "Бул кампада мындай сактоо орду бар"
+admin.apperr.location_not_found: "Сактоо орду табылган жок"
+admin.apperr.location_in_use: "Бул сактоо ордунда товар бар — аны активсиздештирүүгө гана болот"
+admin.apperr.not_a_warehouse: "Сактоо орундары кампада гана болот"
+admin.apperr.invalid_location: "Сактоо орду бул кампада табылган жок же активдүү эмес — бетти жаңылаңыз"

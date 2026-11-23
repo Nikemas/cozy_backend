@@ -19,6 +19,10 @@
 //	orig_<key>_<pointID>  the quantity the cell was rendered with ("" when
 //	                      no stock row existed); only present for cells
 //	                      rendered by the server
+//	loc_<key>_<pointID>   warehouse cells only: the storage location id
+//	                      picked for that row ("" = none)
+//	orig_loc_<key>_<pointID>  the location the cell was rendered with; the
+//	                      location is written only when loc_ differs
 //
 // Only cells whose qty differs from orig become stockCellChanges; an
 // untouched cell is never written, so a stale form can't overwrite stock
@@ -34,6 +38,7 @@ import (
 	"strings"
 
 	"github.com/Nikemas/cozy_backend/internal/catalog"
+	"github.com/Nikemas/cozy_backend/internal/points"
 )
 
 // maxStockQty caps one cell — a typo guard ("1000000" instead of "10"),
@@ -46,6 +51,16 @@ type StockPointVM struct {
 	Name      string
 	Inactive  bool
 	Warehouse bool // points.KindWarehouse: stores goods only, never customer-facing
+	// Locations are a warehouse's storage locations (inactive ones too, so
+	// a cell still shows the one it has); empty for a branch.
+	Locations []LocationOptionVM
+}
+
+// LocationOptionVM is one storage location of a warehouse column.
+type LocationOptionVM struct {
+	ID       string
+	Name     string
+	Inactive bool
 }
 
 // StockCellVM is one (variant row × point) stock input.
@@ -59,6 +74,28 @@ type StockCellVM struct {
 	HasOrig   bool   // render the orig_ hidden input at all
 	Conflict  bool   // stock changed concurrently; Value/Orig refreshed from the DB
 	Invalid   bool   // Value failed validation
+
+	// Warehouse cells also carry a storage-location select.
+	Warehouse   bool
+	LocName     string // loc_<key>_<pointID>
+	LocOrigName string // orig_loc_<key>_<pointID>
+	LocValue    string // location id shown ("" = none)
+	LocOrig     string // location id rendered from the DB
+	HasLocOrig  bool   // render orig_loc_ at all (server-rendered rows)
+	Locations   []LocationOptionVM
+}
+
+// withLocation fills a warehouse cell's location fields from the form
+// (value, orig) for row key on point p; a branch cell is returned as is.
+func (c StockCellVM) withLocation(key string, p StockPointVM, value, orig string, hasOrig bool) StockCellVM {
+	if !p.Warehouse {
+		return c
+	}
+	c.Warehouse = true
+	c.LocName, c.LocOrigName = stockLocFieldName(key, p.ID), stockLocOrigFieldName(key, p.ID)
+	c.LocValue, c.LocOrig, c.HasLocOrig = value, orig, hasOrig
+	c.Locations = p.Locations
+	return c
 }
 
 func stockFieldName(key, pointID string) string { return "qty_" + key + "_" + pointID }
@@ -329,6 +366,15 @@ func parseProductForm(t tr, form url.Values, productID string, isActive bool, po
 			cell.Orig = strings.TrimSpace(origRaw)
 			cell.HasOrig = hasOrig
 
+			if p.Warehouse {
+				locRaw, _ := formValue(form, stockLocFieldName(key, p.ID))
+				locOrig, hasLocOrig := formValue(form, stockLocOrigFieldName(key, p.ID))
+				cell = cell.withLocation(key, p, strings.TrimSpace(locRaw), strings.TrimSpace(locOrig), hasLocOrig)
+				if loc, changed := parseLocationCell(form, cell.LocName, cell.LocOrigName); changed {
+					out.Input.Locations = append(out.Input.Locations, stockLocationChange{RowKey: key, PointID: p.ID, LocationID: loc})
+				}
+			}
+
 			pc, err := parseStockCell(raw, present, origRaw, hasOrig)
 			if err != nil {
 				if errors.Is(err, errStaleForm) {
@@ -460,10 +506,25 @@ func buildVariantRows(t tr, variants []catalog.Variant, entries []catalog.StockE
 				cell.Orig = cell.Value
 				row.Qty += q
 			}
-			row.Cells = append(row.Cells, cell)
+			row.Cells = append(row.Cells, cell.withLocation(v.ID, p, "", "", true))
 		}
 		row.BadgeLbl, row.BadgeFG, row.BadgeBG = stockChip(t, row.Qty)
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+// setStoredLocations fills the warehouse cells of the edit page's rows
+// with each stock row's stored storage location (rendered value = orig).
+func setStoredLocations(rows []VariantRowVM, assigned map[points.StockKey]string) {
+	for i := range rows {
+		for j := range rows[i].Cells {
+			c := &rows[i].Cells[j]
+			if !c.Warehouse {
+				continue
+			}
+			loc := assigned[points.StockKey{VariantID: rows[i].ID, PointID: c.PointID}]
+			c.LocValue, c.LocOrig = loc, loc
+		}
+	}
 }

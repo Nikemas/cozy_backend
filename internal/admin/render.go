@@ -41,23 +41,25 @@ const staticMaxAge = 10 * time.Minute
 // 2-5 don't add new entries here — per the Wave 4 plan they replace an
 // existing stub .gohtml's content, not the routing/screen set itself.
 var screenPages = map[string]string{
-	"login":          "login.gohtml",
-	"no_access":      "no_access.gohtml",
-	"orders":         "orders.gohtml",
-	"order_detail":   "order_detail.gohtml", // Task 3: /admin/orders/{id}, not in the sidebar's navDefs — reached only by drilling into the orders list.
-	"products":       "products.gohtml",
-	"product_form":   "product_form.gohtml",
-	"product_import": "product_import.gohtml",
-	"reports":        "reports.gohtml",
-	"report_detail":  "report_detail.gohtml", // feat/product-code: category/brand/product reports, reached from Отчёты
-	"points":         "points.gohtml",
-	"staff":          "staff.gohtml",
-	"categories":     "categories.gohtml",
-	"delivery":       "delivery.gohtml",
-	"stock":          "stock.gohtml",      // fix/admin: per-point stock screen (point_staff's catalog view)
-	"broadcasts":     "broadcasts.gohtml", // W2 fix/promo-push: Рассылки (promo push)
-	"audit":          "audit.gohtml",      // fix/admin-ops: Журнал действий (owner)
-	"banner":         "banner.gohtml",     // feat/home-banner: Баннер на главной
+	"login":            "login.gohtml",
+	"no_access":        "no_access.gohtml",
+	"orders":           "orders.gohtml",
+	"order_detail":     "order_detail.gohtml", // Task 3: /admin/orders/{id}, not in the sidebar's navDefs — reached only by drilling into the orders list.
+	"products":         "products.gohtml",
+	"product_form":     "product_form.gohtml",
+	"product_import":   "product_import.gohtml",
+	"reports":          "reports.gohtml",
+	"report_detail":    "report_detail.gohtml", // feat/product-code: category/brand/product reports, reached from Отчёты
+	"points":           "points.gohtml",
+	"warehouses":       "warehouses.gohtml",       // feat/warehouses: Склады list (owner)
+	"warehouse_detail": "warehouse_detail.gohtml", // feat/warehouses: one warehouse + storage locations
+	"staff":            "staff.gohtml",
+	"categories":       "categories.gohtml",
+	"delivery":         "delivery.gohtml",
+	"stock":            "stock.gohtml",      // fix/admin: per-point stock screen (point_staff's catalog view)
+	"broadcasts":       "broadcasts.gohtml", // W2 fix/promo-push: Рассылки (promo push)
+	"audit":            "audit.gohtml",      // fix/admin-ops: Журнал действий (owner)
+	"banner":           "banner.gohtml",     // feat/home-banner: Баннер на главной
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell
@@ -71,6 +73,7 @@ var layoutPartials = []string{
 	"_confirm_modal.gohtml",
 	"_langswitch.gohtml",
 	"_orders_badge.gohtml",
+	"_warehouse_modal.gohtml", // feat/warehouses: list + warehouse page
 }
 
 // NavItem is one already-RBAC-filtered, already-ordered sidebar entry for

@@ -125,18 +125,19 @@ func TestPointsUpdateSavesHoursAndCoords(t *testing.T) {
 	}
 }
 
-// Toggling a warehouse's active flag must keep it a warehouse — the toggle
-// re-submits every field, and a dropped Kind would default back to branch.
-func TestPointsToggleKeepsWarehouseKind(t *testing.T) {
+// Toggling a warehouse's active flag (now under «Склады») must keep it a
+// warehouse — the toggle re-submits every field, and a dropped Kind would
+// default back to branch.
+func TestWarehousesToggleKeepsWarehouseKind(t *testing.T) {
 	h, mock := newPointsHandlers(t)
 	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Склад", "Бишкек", "ул. 1", "", nil, nil, "warehouse", true, time.Now()))
 	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Склад", "Бишкек", "ул. 1", "", nil, nil, "warehouse", false).
 		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Склад", "Бишкек", "ул. 1", "", nil, nil, "warehouse", false, time.Now()))
 
-	r := requestAs(http.MethodPost, "/admin/points/p1/toggle", ownerStaff(), url.Values{})
+	r := requestAs(http.MethodPost, "/admin/warehouses/p1/toggle", ownerStaff(), url.Values{})
 	r.SetPathValue("id", "p1")
 	w := httptest.NewRecorder()
-	h.pointsToggle(w, r)
+	h.warehousesToggle(w, r)
 
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want redirect", w.Code)
@@ -146,12 +147,13 @@ func TestPointsToggleKeepsWarehouseKind(t *testing.T) {
 	}
 }
 
-// The edit form posts the chosen kind through to the repo.
-func TestPointsUpdateSavesWarehouseKind(t *testing.T) {
+// «Точки продаж» only edits branches: a posted kind is ignored, the point
+// stays a branch.
+func TestPointsUpdateKeepsBranchKind(t *testing.T) {
 	h, mock := newPointsHandlers(t)
 	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, "branch", true, time.Now()))
-	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, "warehouse", true).
-		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, "warehouse", true, time.Now()))
+	mock.ExpectQuery(`UPDATE points_of_sale`).WithArgs("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, "branch", true).
+		WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Т", "Бишкек", "ул. 1", "", nil, nil, "branch", true, time.Now()))
 
 	r := requestAs(http.MethodPost, "/admin/points/p1", ownerStaff(), url.Values{
 		"name": {"Т"}, "city": {"Бишкек"}, "address": {"ул. 1"}, "kind": {"warehouse"}})
@@ -161,6 +163,25 @@ func TestPointsUpdateSavesWarehouseKind(t *testing.T) {
 
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want redirect", w.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// A warehouse can't be edited through «Точки продаж».
+func TestPointsToggleRefusesWarehouse(t *testing.T) {
+	h, mock := newPointsHandlers(t)
+	mock.ExpectQuery(`WHERE id::text = \$1`).WillReturnRows(sqlmock.NewRows(pointCols).AddRow("p1", "Склад", "Бишкек", "ул. 1", "", nil, nil, "warehouse", true, time.Now()))
+	mock.ExpectQuery(`FROM points_of_sale ORDER BY name`).WillReturnRows(sqlmock.NewRows(pointCols))
+
+	r := requestAs(http.MethodPost, "/admin/points/p1/toggle", ownerStaff(), url.Values{})
+	r.SetPathValue("id", "p1")
+	w := httptest.NewRecorder()
+	h.pointsToggle(w, r)
+
+	if w.Code == http.StatusSeeOther {
+		t.Fatal("a warehouse was toggled from «Точки продаж»")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)

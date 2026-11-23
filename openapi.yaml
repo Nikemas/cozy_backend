@@ -1057,7 +1057,7 @@ paths:
     post:
       tags: [Admin — Staff]
       summary: Create a staff account
-      description: Password is bcrypt-hashed before storage. `point_id` is required for `point_staff`, forbidden for `owner`/`manager`.
+      description: "Password is bcrypt-hashed before storage. `point_id` is required for `point_staff` (must be a branch, else `point_staff_needs_branch`) and `storekeeper` (must be a warehouse, else `storekeeper_needs_warehouse`), forbidden for `owner`/`manager`. A storekeeper has no access to the JSON admin API (403); it uses the admin panels «Остатки»/«Склады» only."
       security: [{ staffSessionCookie: [] }]
       requestBody:
         required: true
@@ -2346,8 +2346,8 @@ components:
         id: { type: string, format: uuid }
         phone: { type: string }
         name: { type: string }
-        role: { type: string, enum: [owner, manager, point_staff] }
-        point_id: { type: string, format: uuid, nullable: true, description: "Set for `point_staff`, absent for owner/manager." }
+        role: { type: string, enum: [owner, manager, point_staff, storekeeper] }
+        point_id: { type: string, format: uuid, nullable: true, description: "Set for `point_staff` (a branch) and `storekeeper` (a warehouse), absent for owner/manager." }
         is_active: { type: boolean }
         created_at: { type: string, format: date-time }
 
@@ -2358,15 +2358,15 @@ components:
         phone: { type: string }
         password: { type: string, format: password, minLength: 8, maxLength: 72, description: "8 characters to 72 bytes (`invalid_password`)." }
         name: { type: string }
-        role: { type: string, enum: [owner, manager, point_staff] }
-        point_id: { type: string, format: uuid, nullable: true, description: "Required for point_staff, forbidden otherwise." }
+        role: { type: string, enum: [owner, manager, point_staff, storekeeper] }
+        point_id: { type: string, format: uuid, nullable: true, description: "Required for point_staff (a branch) and storekeeper (a warehouse), forbidden otherwise." }
 
     UpdateStaffRequest:
       type: object
       required: [name, role, is_active]
       properties:
         name: { type: string }
-        role: { type: string, enum: [owner, manager, point_staff] }
+        role: { type: string, enum: [owner, manager, point_staff, storekeeper] }
         point_id: { type: string, format: uuid, nullable: true }
         is_active: { type: boolean }
         password: { type: string, format: password, nullable: true, minLength: 8, maxLength: 72, description: "Omit to leave unchanged; 8 characters to 72 bytes. A new password or is_active=false ends all of the account's sessions." }

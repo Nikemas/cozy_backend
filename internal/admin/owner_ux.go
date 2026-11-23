@@ -115,6 +115,9 @@ func countNewOrdersFor(ctx context.Context, counter newOrdersCounter) (int, erro
 	if !ok || st == nil || counter == nil {
 		return 0, nil
 	}
+	if st.Role == staff.RoleStorekeeper {
+		return 0, nil // no orders screen at all
+	}
 	var pointID *string
 	if st.Role == staff.RolePointStaff {
 		if st.PointID == nil {
@@ -262,7 +265,7 @@ func pointsFormRetry(r *http.Request, t tr) *FormRetry {
 	if !isFormRetryRequest(r) {
 		return nil
 	}
-	fields := []string{"name", "city", "address", "working_hours", "latitude", "longitude", "kind"}
+	fields := []string{"name", "city", "address", "working_hours", "latitude", "longitude"}
 	switch {
 	case r.URL.Path == "/admin/points":
 		return newFormRetry(r, "admin-point-modal", r.URL.Path, t.T("admin.points.new_title"), fields...)
@@ -278,7 +281,7 @@ func staffFormRetry(r *http.Request) *FormRetry {
 	if !isFormRetryRequest(r) || r.URL.Path != "/admin/staff" {
 		return nil
 	}
-	return newFormRetry(r, "admin-staff-modal", r.URL.Path, "", "name", "phone", "role", "point_id")
+	return newFormRetry(r, "admin-staff-modal", r.URL.Path, "", "name", "phone", "role", "point_id", "warehouse_id")
 }
 
 // categoriesFormRetry: POST /admin/categories (add) or

@@ -76,6 +76,10 @@ func (r *Repo) Create(ctx context.Context, in StaffCreateInput) (*Staff, error) 
 		return nil, apperr.Conflict("phone_taken", "этот номер телефона уже используется")
 	}
 
+	if err := checkPointKind(ctx, r.db, in.Role, in.PointID); err != nil {
+		return nil, err
+	}
+
 	const q = `
 		INSERT INTO staff (phone, password_hash, name, role, point_id, is_active)
 		VALUES ($1, $2, $3, $4, $5, true)
@@ -129,6 +133,15 @@ func (r *Repo) Update(ctx context.Context, id string, in StaffUpdateInput) (*Sta
 			}
 			if others == 0 {
 				return apperr.Conflict("last_owner", "нельзя понизить или деактивировать последнего владельца")
+			}
+		}
+
+		// Only a changed role/point is checked, so toggling or renaming a
+		// legacy account (e.g. point_staff at a point later turned into a
+		// warehouse) keeps working.
+		if in.Role != current.Role || !samePointID(in.PointID, current.PointID) {
+			if err := checkPointKind(ctx, tx, in.Role, in.PointID); err != nil {
+				return err
 			}
 		}
 
@@ -212,4 +225,42 @@ func translateStaffWriteErr(err error) error {
 		return apperr.BadRequest("invalid_point_id", "точка продаж не найдена")
 	}
 	return err
+}
+
+// rowQueryer is satisfied by both *sql.DB and *sql.Tx.
+type rowQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// checkPointKind enforces that a pinned role's point is of the right kind:
+// point_staff works at a branch, a storekeeper at a warehouse
+// (Role.RequiredPointKind). An unknown point is left to the foreign key
+// (translateStaffWriteErr → invalid_point_id).
+func checkPointKind(ctx context.Context, db rowQueryer, role Role, pointID *string) error {
+	want := role.RequiredPointKind()
+	if want == "" || pointID == nil {
+		return nil
+	}
+	var kind string
+	err := db.QueryRowContext(ctx, `SELECT kind FROM points_of_sale WHERE id::text = $1`, *pointID).Scan(&kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return apperr.BadRequest("invalid_point_id", "точка продаж не найдена")
+	}
+	if err != nil {
+		return err
+	}
+	if kind == want {
+		return nil
+	}
+	if role == RoleStorekeeper {
+		return apperr.BadRequest("storekeeper_needs_warehouse", "кладовщика можно привязать только к складу")
+	}
+	return apperr.BadRequest("point_staff_needs_branch", "сотрудника точки можно привязать только к филиалу")
+}
+
+func samePointID(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }

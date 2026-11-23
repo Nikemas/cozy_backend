@@ -42,6 +42,8 @@ func roleChipClass(role staff.Role) string {
 		return "admin-chip--role-owner"
 	case staff.RoleManager:
 		return "admin-chip--role-manager"
+	case staff.RoleStorekeeper:
+		return "admin-chip--role-storekeeper"
 	default:
 		return "admin-chip--role-point-staff"
 	}
@@ -52,7 +54,7 @@ func roleChipClass(role staff.Role) string {
 // by points.Point.ID) rather than showing the raw UUID.
 func newStaffRow(t tr, s staff.Staff, pointNames map[string]string) staffRow {
 	scope := t.T("admin.common.all_points")
-	if s.Role == staff.RolePointStaff {
+	if s.Role.PinnedToPoint() {
 		scope = t.T("admin.staff.point_not_found")
 		if s.PointID != nil {
 			if name, ok := pointNames[*s.PointID]; ok {
@@ -86,10 +88,13 @@ func newStaffRow(t tr, s staff.Staff, pointNames map[string]string) staffRow {
 // staff.Service.CreateStaff requires point_id for point_staff and rejects
 // it for owner/manager (§ Business rules 1).
 type staffPageData struct {
-	Rows   []staffRow
-	Points []*points.Point
-	Error  string
-	Notice string
+	Rows []staffRow
+	// Points are the branches (for point_staff), Warehouses the warehouses
+	// (for a storekeeper) — each role may only be pinned to its own kind.
+	Points     []*points.Point
+	Warehouses []*points.Point
+	Error      string
+	Notice     string
 	// MinPasswordLength drives the password inputs' minlength/placeholder
 	// so the form hint can't drift from the server-side rule.
 	MinPasswordLength int
@@ -149,7 +154,8 @@ func (h *handlers) renderStaffPageWithNotice(w http.ResponseWriter, r *http.Requ
 	}
 
 	data := h.shellPageData("staff", "admin.nav.staff", st)
-	data.Data = staffPageData{Rows: rows, Points: pts, Error: errMsg, Notice: notice, MinPasswordLength: staff.MinPasswordLength}
+	branches, warehouses := splitPointsByKind(pts)
+	data.Data = staffPageData{Rows: rows, Points: branches, Warehouses: warehouses, Error: errMsg, Notice: notice, MinPasswordLength: staff.MinPasswordLength}
 	data.FormRetry = withRetryError(staffFormRetry(r), errMsg)
 	if err := h.render.Render(w, "staff", data); err != nil {
 		http.Error(w, h.tr(r).T("admin.err.render"), http.StatusInternalServerError)
@@ -170,12 +176,7 @@ func (h *handlers) staffCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role := staff.Role(r.FormValue("role"))
-	var pointID *string
-	if role == staff.RolePointStaff {
-		if v := strings.TrimSpace(r.FormValue("point_id")); v != "" {
-			pointID = &v
-		}
-	}
+	pointID := staffFormPointID(r, role)
 
 	in := staff.CreateStaffInput{
 		Phone:    strings.TrimSpace(r.FormValue("phone")),
@@ -267,4 +268,36 @@ func (h *handlers) staffResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditStaff(r.Context(), audit.ActionStaffPassword, r.PathValue("id"), "", nil)
 	http.Redirect(w, r, "/admin/staff?done=password", http.StatusSeeOther)
+}
+
+// staffFormPointID reads the point a pinned role is created for: the
+// branch select (point_id) for point_staff, the warehouse select
+// (warehouse_id) for a storekeeper; nil for every other role.
+func staffFormPointID(r *http.Request, role staff.Role) *string {
+	field := ""
+	switch role {
+	case staff.RolePointStaff:
+		field = "point_id"
+	case staff.RoleStorekeeper:
+		field = "warehouse_id"
+	default:
+		return nil
+	}
+	if v := strings.TrimSpace(r.FormValue(field)); v != "" {
+		return &v
+	}
+	return nil
+}
+
+// splitPointsByKind returns the branches and the warehouses of pts, each
+// in pts' order.
+func splitPointsByKind(pts []*points.Point) (branches, warehouses []*points.Point) {
+	for _, p := range pts {
+		if p.Kind == points.KindWarehouse {
+			warehouses = append(warehouses, p)
+		} else {
+			branches = append(branches, p)
+		}
+	}
+	return branches, warehouses
 }

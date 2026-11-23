@@ -20,7 +20,31 @@
       <label for="stock-q">{{t "admin.common.search"}}</label>
       <input type="search" id="stock-q" name="q" value="{{.Query}}" placeholder="{{t "admin.stock.search_placeholder"}}">
     </div>
+    <div class="admin-field admin-filterbar__field">
+      <label for="stock-cat">{{t "admin.stock.filter_category"}}</label>
+      <select id="stock-cat" name="cat" onchange="this.form.submit()">
+        <option value="">{{t "admin.common.all"}}</option>
+        {{range .Categories}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
+    <div class="admin-field admin-filterbar__field">
+      <label for="stock-color">{{t "admin.common.color"}}</label>
+      <select id="stock-color" name="color" onchange="this.form.submit()">
+        <option value="">{{t "admin.common.all"}}</option>
+        {{range .Colors}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
+    {{if .IsWarehouse}}
+    <div class="admin-field admin-filterbar__field">
+      <label for="stock-loc">{{t "admin.stock.col_location"}}</label>
+      <select id="stock-loc" name="loc" onchange="this.form.submit()">
+        <option value="">{{t "admin.common.all"}}</option>
+        {{range .Locations}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
+    {{end}}
     <button type="submit" class="admin-btn admin-btn--secondary">{{t "admin.common.find"}}</button>
+    {{if .HasFilters}}<a href="{{.ResetURL}}" class="admin-btn admin-btn--secondary">{{t "admin.common.reset"}}</a>{{end}}
   </form>
 
   {{if .Err}}<div class="admin-form-error" role="alert">{{.Err}}</div>{{end}}
@@ -31,6 +55,9 @@
   <form method="post" action="/admin/stock" class="admin-card" id="stock-form" data-dirty-guard>
     <input type="hidden" name="point" value="{{.PointID}}">
     <input type="hidden" name="q" value="{{.Query}}">
+    <input type="hidden" name="cat" value="{{.CategoryID}}">
+    <input type="hidden" name="color" value="{{.Color}}">
+    <input type="hidden" name="loc" value="{{.LocationID}}">
     <input type="hidden" name="page" value="{{.Page}}">
     {{if .Empty}}
     <div class="admin-empty">
@@ -44,9 +71,11 @@
         <thead>
           <tr>
             <th scope="col">{{t "admin.stock.col_product"}}</th>
+            <th scope="col">{{t "admin.stock.col_model_code"}}</th>
             <th scope="col">{{t "admin.common.size"}}</th>
             <th scope="col">{{t "admin.common.color"}}</th>
             <th scope="col">{{t "admin.common.stock"}}</th>
+            {{if .IsWarehouse}}<th scope="col">{{t "admin.stock.col_location"}}</th>{{end}}
             <th scope="col" class="admin-stock__level">{{t "admin.stock.col_level"}}</th>
           </tr>
         </thead>
@@ -57,6 +86,7 @@
               {{if .EditURL}}<a href="{{.EditURL}}" class="admin-table__name">{{.ProductName}}</a>{{else}}<span class="admin-table__name">{{.ProductName}}</span>{{end}}
               {{if .Brand}}<div class="admin-table__brand">{{.Brand}}</div>{{end}}
             </td>
+            <td>{{if .ModelCode}}{{.ModelCode}}{{else}}<span class="admin-table__brand">—</span>{{end}}</td>
             <td>{{.Size}}</td>
             <td>{{.Color}}</td>
             <td>
@@ -66,6 +96,14 @@
               {{if .HasOrig}}<input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">{{end}}
               {{end}}
             </td>
+            {{with .Loc}}
+            <td>
+              <select name="{{.Name}}" class="admin-variant-input admin-stock__loc" aria-label="{{t "admin.stock.col_location"}}">
+                {{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+              <input type="hidden" name="{{.OrigName}}" value="{{.Orig}}">
+            </td>
+            {{end}}
             <td class="admin-stock__level"><span class="admin-chip" style="color:{{.BadgeFG}};background:{{.BadgeBG}}">{{.BadgeLbl}}</span></td>
           </tr>
           {{end}}

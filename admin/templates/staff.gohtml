@@ -74,6 +74,7 @@
           <select id="staff-role" name="role" onchange="toggleStaffPointField()">
             <option value="manager">{{t "admin.role.manager"}}</option>
             <option value="point_staff">{{t "admin.role.point_staff"}}</option>
+            <option value="storekeeper">{{t "admin.role.storekeeper"}}</option>
           </select>
         </div>
       </div>
@@ -82,6 +83,13 @@
         <select id="staff-point" name="point_id">
           {{if $pdata}}{{range $pdata.Points}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
         </select>
+      </div>
+      <div class="admin-field" id="staff-warehouse-field" style="display:none">
+        <label for="staff-warehouse">{{t "admin.staff.warehouse"}}</label>
+        <select id="staff-warehouse" name="warehouse_id">
+          {{if $pdata}}{{range $pdata.Warehouses}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+        </select>
+        <div class="admin-list-note">{{t "admin.staff.storekeeper_hint"}}</div>
       </div>
       <div class="admin-field">
         <label for="staff-password">{{t "admin.login.password"}}</label>
@@ -143,6 +151,7 @@ function closeStaffModal() { document.getElementById('admin-staff-modal').style.
 function toggleStaffPointField() {
   var role = document.getElementById('staff-role').value;
   document.getElementById('staff-point-field').style.display = role === 'point_staff' ? 'flex' : 'none';
+  document.getElementById('staff-warehouse-field').style.display = role === 'storekeeper' ? 'flex' : 'none';
 }
 // Generates a 12-character password with the browser's CSPRNG (not
 // Math.random) and shows it in the field(s) so the owner can pass it on.

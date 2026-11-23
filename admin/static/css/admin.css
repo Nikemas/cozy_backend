@@ -411,6 +411,7 @@ h1 { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
 .admin-chip--role-owner { color: var(--admin-primary); background: var(--admin-primary-tint); }
 .admin-chip--role-manager { color: #1565C0; background: #E8F1FB; }
 .admin-chip--role-point-staff { color: #8A8A86; background: #EDEDEB; }
+.admin-chip--role-storekeeper { color: #8A5A00; background: #FBF1DC; }
 
 .admin-modal--md { width: 440px; }
 .admin-modal--lg { width: 460px; }
@@ -1139,3 +1140,11 @@ a.admin-order-detail__phone:hover { color: var(--admin-primary-hover); }
 @media (max-width: 640px) {
   .admin-modal--xl { width: auto; padding: 18px; }
 }
+
+/* feat/warehouses: storage-location select in Остатки / product form */
+.admin-stock__loc { min-width: 140px; max-width: 220px; }
+.admin-variant-loc { display: block; margin-top: 4px; width: 100%; min-width: 110px; font-size: 12px; }
+.admin-vm-group { text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+.admin-vm-group--warehouses, .admin-vm-table td.admin-vm-wh-first, .admin-vm-table th.admin-vm-wh-first { border-left: 2px solid var(--admin-primary-tint); }
+.admin-variant-color-btn { cursor: pointer; }
+.admin-vm-color.is-current td { background: var(--admin-primary-tint); }

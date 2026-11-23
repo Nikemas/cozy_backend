@@ -74,12 +74,23 @@ type stockCellChange struct {
 	Orig    *int
 }
 
+// stockLocationChange is one edited warehouse cell's storage location
+// (stock.location_id, migration 000049): LocationID nil clears it. Only
+// cells whose location select was changed become one, so an untouched
+// form never moves goods to another place.
+type stockLocationChange struct {
+	RowKey     string
+	PointID    string
+	LocationID *string
+}
+
 // productSaveInput is everything saveProduct persists in one transaction.
 type productSaveInput struct {
 	ProductID string // "" = create
 	Product   catalog.ProductInput
 	Variants  []variantRowInput
 	Stock     []stockCellChange
+	Locations []stockLocationChange
 	Images    []catalog.ImageInput
 }
 
@@ -189,6 +200,9 @@ func (s *productStore) Save(ctx context.Context, in productSaveInput) (string, e
 		}
 
 		if err := applyStockChangesTx(ctx, tx, idByKey, in.Stock); err != nil {
+			return err
+		}
+		if err := applyStockLocationsTx(ctx, tx, idByKey, in.Locations); err != nil {
 			return err
 		}
 
@@ -421,6 +435,51 @@ func writeStockCellTx(ctx context.Context, tx *sql.Tx, variantID, pointID string
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// applyStockLocationsTx sets the storage location of each changed
+// (variant × warehouse) cell. It runs after applyStockChangesTx, whose
+// "no row yet" insert must not find a row created here; a cell with no
+// stock row gets one with quantity 0. The location must be an active one
+// of the same point (the composite FK would refuse another point's, but
+// not an inactive one).
+func applyStockLocationsTx(ctx context.Context, tx *sql.Tx, idByKey map[string]string, changes []stockLocationChange) error {
+	for _, c := range changes {
+		variantID, ok := idByKey[c.RowKey]
+		if !ok {
+			continue // the row was removed in this same submission
+		}
+		if c.LocationID != nil {
+			if err := requireActiveLocationTx(ctx, tx, c.PointID, *c.LocationID); err != nil {
+				return err
+			}
+		}
+		const q = `
+			INSERT INTO stock (variant_id, point_id, quantity, location_id, updated_at)
+			VALUES ($1, $2, 0, $3, now())
+			ON CONFLICT (variant_id, point_id) DO UPDATE SET location_id = EXCLUDED.location_id`
+		if _, err := tx.ExecContext(ctx, q, variantID, c.PointID, c.LocationID); err != nil {
+			if pgErrCode(err) == pgForeignKeyViolation {
+				return invalidLocation()
+			}
+			return fmt.Errorf("set location of variant %s at %s: %w", variantID, c.PointID, err)
+		}
+	}
+	return nil
+}
+
+func requireActiveLocationTx(ctx context.Context, tx *sql.Tx, pointID, locationID string) error {
+	var active bool
+	err := tx.QueryRowContext(ctx,
+		`SELECT is_active FROM storage_locations WHERE id::text = $1 AND point_id::text = $2`, locationID, pointID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !active) {
+		return invalidLocation()
+	}
+	return err
+}
+
+func invalidLocation() error {
+	return apperr.BadRequest("invalid_location", "место хранения не найдено на этом складе или неактивно — обновите страницу")
 }
 
 func readStockTx(ctx context.Context, tx *sql.Tx, variantID, pointID string) (qty int, exists bool, err error) {

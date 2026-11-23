@@ -182,7 +182,7 @@ err.phone_taken: этот номер телефона уже используе�
 err.pickup_point_not_found: точка самовывоза не найдена
 err.pickup_disabled: самовывоз сейчас недоступен — выберите доставку
 err.point_id_forbidden: point_id должен быть пустым для роли owner/manager
-err.point_id_required: point_id обязателен для роли point_staff
+err.point_id_required: point_id обязателен для ролей point_staff и storekeeper
 err.point_in_use: "нельзя удалить точку продаж: на неё ссылаются сотрудники, остатки или заказы"
 err.point_not_found: точка продаж не найдена
 err.point_required: выберите точку самовывоза
@@ -254,3 +254,11 @@ import.stock_without_variant: остаток указан без размера 
 import.variant_needs_size_and_color: "для вариации нужны оба поля: размер и цвет"
 import.variant_price: "цена варианта: {reason}"
 err.invalid_kind: тип точки должен быть «филиал» или «склад»
+err.storekeeper_needs_warehouse: кладовщика можно привязать только к складу
+err.point_staff_needs_branch: сотрудника точки можно привязать только к филиалу
+err.invalid_location_name: укажите название места хранения (до 100 символов)
+err.location_name_taken: такое место хранения на этом складе уже есть
+err.location_not_found: место хранения не найдено
+err.location_in_use: на этом месте хранения есть товар — его можно только деактивировать
+err.not_a_warehouse: места хранения есть только у склада
+err.invalid_location: место хранения не найдено на этом складе или неактивно — обновите страницу
