@@ -104,7 +104,7 @@ func TestSupportAPIFlow(t *testing.T) {
 	wantStatus(t, w, http.StatusOK)
 	var list struct {
 		Items []struct {
-			ID          string `json:"id"`
+			ID          string                `json:"id"`
 			LastMessage struct{ Text string } `json:"last_message"`
 		} `json:"items"`
 		Total    int `json:"total"`
@@ -322,4 +322,3 @@ func TestAccountDeletionRemovesSupportTickets(t *testing.T) {
 		t.Fatalf("tickets left = %d (%v)", n, err)
 	}
 }
-
