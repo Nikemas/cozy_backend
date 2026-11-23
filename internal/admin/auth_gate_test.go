@@ -138,6 +138,7 @@ func TestFirstAllowedPath(t *testing.T) {
 		{staff.RoleOwner, "/admin/orders"},
 		{staff.RoleManager, "/admin/orders"},
 		{staff.RolePointStaff, "/admin/orders"},
+		{staff.RoleStorekeeper, "/admin/stock"},
 	}
 	for _, c := range cases {
 		if got := firstAllowedPath(c.role); got != c.want {
@@ -148,7 +149,7 @@ func TestFirstAllowedPath(t *testing.T) {
 
 func TestNavItemsForRole(t *testing.T) {
 	ownerKeys := navKeys(navItemsForRole(staff.RoleOwner, "orders"))
-	wantOwner := []string{"orders", "products", "stock", "categories", "reports", "broadcasts", "banner", "points", "delivery", "staff", "audit"}
+	wantOwner := []string{"orders", "products", "stock", "categories", "reports", "broadcasts", "banner", "points", "warehouses", "delivery", "staff", "audit"}
 	if !equalStrings(ownerKeys, wantOwner) {
 		t.Errorf("owner nav keys = %v, want %v", ownerKeys, wantOwner)
 	}
@@ -162,6 +163,12 @@ func TestNavItemsForRole(t *testing.T) {
 	pointStaffKeys := navKeys(navItemsForRole(staff.RolePointStaff, "orders"))
 	if want := []string{"orders", "stock"}; !equalStrings(pointStaffKeys, want) {
 		t.Errorf("point_staff nav keys = %v, want %v", pointStaffKeys, want)
+	}
+
+	// Кладовщик: only Остатки and Склады — no orders, products, reports…
+	storekeeperKeys := navKeys(navItemsForRole(staff.RoleStorekeeper, "stock"))
+	if want := []string{"stock", "warehouses"}; !equalStrings(storekeeperKeys, want) {
+		t.Errorf("storekeeper nav keys = %v, want %v", storekeeperKeys, want)
 	}
 
 	items := navItemsForRole(staff.RoleOwner, "products")

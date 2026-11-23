@@ -47,11 +47,11 @@ admin.nav.products: Товары
 admin.nav.stock: Остатки
 admin.nav.categories: Категории
 admin.nav.reports: Отчёты
-admin.nav.points: Склад и точки
+admin.nav.points: "Точки продаж"
 admin.nav.staff: Сотрудники
 admin.role.owner: Владелец
 admin.role.manager: Менеджер
-admin.role.point_staff: Кладовщик
+admin.role.point_staff: "Сотрудник точки"
 admin.lang.label: Язык интерфейса
 admin.lang.ru_title: Русский
 admin.lang.ky_title: Кыргызча
@@ -133,7 +133,7 @@ admin.categories.image: Фото категории
 admin.categories.image_hint: JPEG, PNG или WEBP до 10 МБ, меньшая сторона не меньше 200 px. Показывается на плитке категории в приложении
 admin.categories.current_image: Текущее фото
 admin.categories.remove_image: Удалить фото
-admin.points.note: Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются.
+admin.points.note: "Филиалы видны покупателям на карте и доступны для самовывоза. Остатки ведутся по каждой точке отдельно (карточка товара, раздел «Остатки»). Деактивированная точка не показывается покупателям, но её история заказов и остатки сохраняются. Склады — в отдельном разделе «Склады»."
 admin.points.add: Добавить точку
 admin.points.empty: Пока нет точек продаж
 admin.points.edit_aria: Изменить точку «%s»
@@ -165,7 +165,7 @@ admin.staff.load_failed: Не удалось загрузить сотрудни
 admin.staff.passwords_mismatch: Пароли не совпадают
 
 # Stock, quantities, reports
-admin.stock.search_placeholder: Название, бренд или артикул
+admin.stock.search_placeholder: "Название, код товара или артикул"
 admin.stock.empty_text: Попробуйте другое название
 admin.stock.caption: Остатки на точке «%s»
 admin.stock.col_product: Товар
@@ -173,7 +173,7 @@ admin.stock.col_level: Уровень
 admin.stock.save_changes: Сохранить изменения
 admin.stock.no_point_assigned: Вы не привязаны к точке продаж — обратитесь к владельцу.
 admin.stock.own_point_missing: Ваша точка продаж не найдена — обратитесь к владельцу.
-admin.stock.no_points: Точек продаж пока нет — создайте первую в разделе «Склад и точки».
+admin.stock.no_points: "Точек продаж пока нет — создайте первую в разделе «Точки продаж» или «Склады»."
 admin.stock.err_invalid_qty: "Некорректное количество: %s. Ничего не сохранено."
 admin.stock.err_conflict: Остаток изменился, пока вы редактировали форму (продажа или другой сотрудник). Подсвеченные ячейки обновлены до текущих значений — проверьте их и сохраните ещё раз. Ничего не сохранено.
 admin.stock.no_changes: Изменений нет
@@ -547,7 +547,7 @@ admin.apperr.last_owner: Нельзя понизить или деактивир
 admin.apperr.staff_not_found: Сотрудник не найден
 admin.apperr.invalid_role: Неизвестная роль
 admin.apperr.invalid_password: Пароль должен быть не короче 8 символов
-admin.apperr.point_id_required: point_id обязателен для роли point_staff
+admin.apperr.point_id_required: Выберите точку продаж или склад сотрудника
 admin.apperr.point_id_forbidden: point_id должен быть пустым для роли owner/manager
 admin.apperr.point_not_found: Точка продаж не найдена
 admin.apperr.invalid_point_id: Точка продаж не найдена
@@ -745,10 +745,68 @@ admin.points.kind_warehouse: Склад
 admin.points.kind_hint: "Филиал виден покупателям на карте и доступен для самовывоза. Склад только хранит товар: его остатки продаются с доставкой, но покупатели склад не видят."
 admin.product.warehouse_suffix: склад
 admin.product.variant_modal_title: Новая вариация
-admin.product.variant_modal_hint: "Укажите размер и добавьте цвета. У каждого цвета своё количество в каждом филиале и на каждом складе — по строке на цвет появится в таблице вариаций."
+admin.product.variant_modal_hint: "Укажите размер и добавьте цвета. У каждого цвета своё количество — отдельно в магазинах и на складах (с местом хранения); по строке на цвет появится в таблице вариаций."
 admin.product.add_color: Добавить цвет
 admin.product.remove_color: Удалить цвет
 admin.product.add_to_table: Добавить в таблицу
 admin.product.err_size_required: Укажите размер
 admin.product.err_color_required: Добавьте хотя бы один цвет
 admin.product.err_qty: "Количество — целое число от 0 до 100000"
+
+# feat/warehouses: Склады, места хранения, Кладовщик
+admin.nav.warehouses: "Склады"
+admin.role.storekeeper: "Кладовщик"
+admin.staff.warehouse: "Склад"
+admin.staff.storekeeper_hint: "Кладовщик видит только остатки и места хранения своего склада."
+admin.stock.filter_category: "Категория"
+admin.stock.col_model_code: "Код товара"
+admin.stock.col_location: "Место"
+admin.stock.no_location: "Без места"
+admin.warehouses.note: "Склад хранит товар: его остатки продаются с доставкой, но покупатели склад не видят и не могут выбрать его для самовывоза. Внутри склада можно завести места хранения (стеллажи, полки)."
+admin.warehouses.add: "Добавить склад"
+admin.warehouses.empty: "Пока нет складов"
+admin.warehouses.edit_aria: "Изменить склад «%s»"
+admin.warehouses.deactivate_text: "Склад «%s» станет неактивным: его остатки перестанут учитываться в наличии. Остатки и места хранения сохранятся."
+admin.warehouses.deactivate_title: "Деактивировать склад?"
+admin.warehouses.new_title: "Новый склад"
+admin.warehouses.edit_title: "Редактировать склад"
+admin.warehouses.active: "Активен"
+admin.warehouses.inactive: "Неактивен"
+admin.warehouses.locations: "Места хранения"
+admin.warehouses.open_stock: "Остатки склада"
+admin.warehouses.name_placeholder: "Главный склад"
+admin.warehouses.toast_saved: "Склад сохранён"
+admin.warehouses.toast_activated: "Склад активирован"
+admin.warehouses.toast_deactivated: "Склад деактивирован"
+admin.locations.title: "Места хранения"
+admin.locations.hint: "Стеллажи, полки, ячейки склада. Место товара выбирается в «Остатках» и в карточке товара. Место, где лежит товар, нельзя удалить — только деактивировать."
+admin.locations.name: "Название места"
+admin.locations.name_placeholder: "Стеллаж A, полка 3"
+admin.locations.add: "Добавить место"
+admin.locations.empty: "Мест хранения пока нет"
+admin.locations.goods: "Товара"
+admin.locations.edit_aria: "Изменить место «%s»"
+admin.locations.edit_title: "Место хранения"
+admin.locations.sort_order: "Порядок в списке"
+admin.locations.delete_title: "Удалить место хранения?"
+admin.locations.delete_text: "Место «%s» будет удалено."
+admin.locations.toast_saved: "Место хранения сохранено"
+admin.locations.toast_activated: "Место хранения активировано"
+admin.locations.toast_deactivated: "Место хранения деактивировано"
+admin.locations.toast_deleted: "Место хранения удалено"
+admin.plural.location.one: "место хранения"
+admin.plural.location.few: "места хранения"
+admin.plural.location.many: "мест хранения"
+admin.product.vm_shops: "Магазины"
+admin.product.vm_warehouses: "Склады"
+admin.product.variant_modal_edit_title: "Цвета и количество"
+admin.product.variant_modal_edit_hint: "Все цвета этого размера. Измените количество в магазинах и на складах (и место хранения) или добавьте цвет. Значения, которые вы не меняли, не перезаписываются."
+admin.product.color_click_hint: "Нажмите, чтобы изменить цвета и количество"
+admin.apperr.storekeeper_needs_warehouse: "Кладовщика можно привязать только к складу"
+admin.apperr.point_staff_needs_branch: "Сотрудника точки можно привязать только к филиалу"
+admin.apperr.invalid_location_name: "Укажите название места хранения (до 100 символов)"
+admin.apperr.location_name_taken: "Такое место хранения на этом складе уже есть"
+admin.apperr.location_not_found: "Место хранения не найдено"
+admin.apperr.location_in_use: "На этом месте хранения есть товар — его можно только деактивировать"
+admin.apperr.not_a_warehouse: "Места хранения есть только у склада"
+admin.apperr.invalid_location: "Место хранения не найдено на этом складе или неактивно — обновите страницу"

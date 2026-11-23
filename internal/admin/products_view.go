@@ -253,6 +253,26 @@ type ProductFormData struct {
 	Err       string
 }
 
+// ActiveShops are the active branches — the «Магазины» quantity columns
+// of the variant modal.
+func (d ProductFormData) ActiveShops() []StockPointVM { return activeStockPoints(d.StockPoints, false) }
+
+// ActiveWarehouses are the active warehouses — the modal's «Склады»
+// columns (each with a storage-location select).
+func (d ProductFormData) ActiveWarehouses() []StockPointVM {
+	return activeStockPoints(d.StockPoints, true)
+}
+
+func activeStockPoints(pts []StockPointVM, warehouse bool) []StockPointVM {
+	var out []StockPointVM
+	for _, p := range pts {
+		if !p.Inactive && p.Warehouse == warehouse {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // --- import screen view model ---
 
 type ImportRowError struct {

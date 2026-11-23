@@ -61,6 +61,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		variants:   catalog.NewVariantRepo(db),
 		images:     catalog.NewImageRepo(db),
 		stock:      catalog.NewStockRepo(db),
+		locations:  points.NewLocationsRepo(db),
 		media:      mediaClient,
 		// feat/category-photo: the Категории screen's photo uploads.
 		categoryImages: mediaClient,
@@ -95,10 +96,12 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// unprocessed orders for the sidebar badge (withNavBadges, GET only).
 	badges := withNavBadges(orderBadgeRepo{db: db})
 	anyRole := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff), badges)
-	mux.HandleFunc("GET /admin/no-access", anyRole(h.noAccessPage))
+	everyRole := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff, staff.RoleStorekeeper), badges)
+	mux.HandleFunc("GET /admin/no-access", everyRole(h.noAccessPage))
 
 	ownerOrManager := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager), badges)
 	ownerOnly := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner), badges)
+	ownerOrStorekeeper := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleStorekeeper), badges)
 
 	// The 5 real screens + /admin/products/import, all stubbed for now
 	// per Wave 4 Task 1's acceptance criteria ("RegisterRoutes регистрирует
@@ -114,10 +117,11 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// fix/admin-ops: bulk status change from the list (same RBAC per order).
 	mux.HandleFunc("POST /admin/orders/bulk-status", anyRole(h.orderBulkStatus))
 
-	// Остатки: one point's stock, editable. point_staff is pinned to its
-	// own point — see stock_page.go.
-	mux.HandleFunc("GET /admin/stock", anyRole(h.stockPage))
-	mux.HandleFunc("POST /admin/stock", anyRole(h.stockSave))
+	// Остатки: one point's stock, editable. point_staff and a storekeeper
+	// are pinned to their own point — see stock_page.go. A storekeeper
+	// reaches nothing else but «Склады» (anyRole above excludes it).
+	mux.HandleFunc("GET /admin/stock", everyRole(h.stockPage))
+	mux.HandleFunc("POST /admin/stock", everyRole(h.stockSave))
 	mux.HandleFunc("GET /admin/reports", ownerOrManager(h.reportsPage))
 
 	// W2 fix/promo-push: Рассылки (promo push) — broadcasts_page.go; the
@@ -145,6 +149,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("POST /admin/points", ownerOnly(h.pointsCreate))
 	mux.HandleFunc("POST /admin/points/{id}", ownerOnly(h.pointsUpdate))
 	mux.HandleFunc("POST /admin/points/{id}/toggle", ownerOnly(h.pointsToggle))
+	// feat/warehouses: Склады + storage locations — warehouses_page.go.
+	registerWarehouseRoutes(mux, h, ownerOnly, ownerOrStorekeeper)
 	mux.HandleFunc("GET /admin/staff", ownerOnly(h.staffPage))
 	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))
 	mux.HandleFunc("POST /admin/staff/{id}/toggle", ownerOnly(h.staffToggle))

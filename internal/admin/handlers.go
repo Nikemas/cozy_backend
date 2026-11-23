@@ -45,6 +45,7 @@ type handlers struct {
 	variants       *catalog.VariantRepo
 	images         *catalog.ImageRepo
 	stock          *catalog.StockRepo
+	locations      *points.LocationsRepo // feat/warehouses: storage locations
 	media          *media.Client
 	cfg            *config.Config
 

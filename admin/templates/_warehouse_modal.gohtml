@@ -1,0 +1,54 @@
+{{/* Add/edit-warehouse modal, used by warehouses.gohtml and
+     warehouse_detail.gohtml (owner only). */}}
+{{define "_warehouse_modal"}}
+<div id="admin-warehouse-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-warehouse-modal-title">
+    <div class="admin-modal__title" id="admin-warehouse-modal-title">{{t "admin.warehouses.new_title"}}</div>
+    <form method="post" action="/admin/warehouses" id="admin-warehouse-form">
+      <input type="hidden" name="back" id="warehouse-back" value="">
+      <div class="admin-field">
+        <label for="warehouse-name">{{t "admin.common.name"}}</label>
+        <input id="warehouse-name" name="name" placeholder="{{t "admin.warehouses.name_placeholder"}}" required maxlength="200">
+      </div>
+      <div class="admin-field">
+        <label for="warehouse-city">{{t "admin.points.city"}}</label>
+        <input id="warehouse-city" name="city" value="{{t "admin.points.default_city"}}" required maxlength="100">
+      </div>
+      <div class="admin-field">
+        <label for="warehouse-address">{{t "admin.common.address"}}</label>
+        <input id="warehouse-address" name="address" placeholder="{{t "admin.points.address_placeholder"}}" required maxlength="300">
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="closeWarehouseModal()">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openWarehouseModal(btn) {
+  var form = document.getElementById('admin-warehouse-form');
+  var title = document.getElementById('admin-warehouse-modal-title');
+  var name = document.getElementById('warehouse-name');
+  var city = document.getElementById('warehouse-city');
+  var address = document.getElementById('warehouse-address');
+  if (btn && btn.dataset && btn.dataset.id) {
+    form.action = '/admin/warehouses/' + encodeURIComponent(btn.dataset.id);
+    title.textContent = {{t "admin.warehouses.edit_title"}};
+    name.value = btn.dataset.name || '';
+    city.value = btn.dataset.city || '';
+    address.value = btn.dataset.address || '';
+    document.getElementById('warehouse-back').value = btn.dataset.back || '';
+  } else {
+    form.action = '/admin/warehouses';
+    title.textContent = {{t "admin.warehouses.new_title"}};
+    name.value = '';
+    city.value = {{t "admin.points.default_city"}};
+    address.value = '';
+    document.getElementById('warehouse-back').value = '';
+  }
+  document.getElementById('admin-warehouse-modal').style.display = 'flex';
+}
+function closeWarehouseModal() { document.getElementById('admin-warehouse-modal').style.display = 'none'; }
+</script>
+{{end}}

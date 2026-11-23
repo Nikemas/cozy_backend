@@ -144,7 +144,7 @@ func TestStockPageApplyJournalFailureDoesNotFailSave(t *testing.T) {
 	mock.ExpectCommit()
 
 	repo := &stockPageRepo{db: db, audit: audit.New(db)}
-	if err := repo.Apply(ownerCtx(), []stockCellChange{{RowKey: "v1", PointID: "pA", Qty: 7, Orig: intPtr(5)}}); err != nil {
+	if err := repo.Apply(ownerCtx(), []stockCellChange{{RowKey: "v1", PointID: "pA", Qty: 7, Orig: intPtr(5)}}, nil); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

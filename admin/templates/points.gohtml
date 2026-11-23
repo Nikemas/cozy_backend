@@ -26,13 +26,13 @@
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"></path></svg>
       </div>
       <div class="admin-row__info">
-        <div class="admin-row__title">{{.Name}} <span class="admin-chip admin-chip--kind-{{.Kind}}">{{.KindLabel}}</span></div>
+        <div class="admin-row__title">{{.Name}}</div>
         <div class="admin-row__subtitle">{{.FullAddress}}{{if .Hours}} · {{.Hours}}{{end}}</div>
       </div>
       <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
       <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
               data-id="{{.ID}}" data-name="{{.Name}}" data-city="{{.City}}" data-address="{{.Address}}"
-              data-hours="{{.Hours}}" data-lat="{{.Lat}}" data-lng="{{.Lng}}" data-kind="{{.Kind}}"
+              data-hours="{{.Hours}}" data-lat="{{.Lat}}" data-lng="{{.Lng}}"
               onclick="openPointModal(this)" aria-label="{{tf "admin.points.edit_aria" .Name}}">{{t "admin.common.change"}}</button>
       <form method="post" action="/admin/points/{{.ID}}/toggle"{{if .IsActive}}
             data-confirm="{{tf "admin.points.deactivate_text" .Name}}"
@@ -56,14 +56,6 @@
   <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-point-modal-title">
     <div class="admin-modal__title" id="admin-point-modal-title">{{t "admin.points.new_title"}}</div>
     <form method="post" action="/admin/points" id="admin-point-form">
-      <div class="admin-field">
-        <label for="point-kind">{{t "admin.points.kind"}}</label>
-        <select id="point-kind" name="kind">
-          <option value="branch">{{t "admin.points.kind_branch"}}</option>
-          <option value="warehouse">{{t "admin.points.kind_warehouse"}}</option>
-        </select>
-        <div class="admin-list-note">{{t "admin.points.kind_hint"}}</div>
-      </div>
       <div class="admin-field">
         <label for="point-name">{{t "admin.common.name"}}</label>
         <input id="point-name" name="name" placeholder="{{t "admin.points.name_placeholder"}}" required maxlength="200">
@@ -105,7 +97,6 @@ function openPointModal(btn) {
   var hours = document.getElementById('point-hours');
   var lat = document.getElementById('point-lat');
   var lng = document.getElementById('point-lng');
-  var kind = document.getElementById('point-kind');
   if (btn && btn.dataset && btn.dataset.id) {
     form.action = '/admin/points/' + encodeURIComponent(btn.dataset.id);
     title.textContent = {{t "admin.points.edit_title"}};
@@ -115,7 +106,6 @@ function openPointModal(btn) {
     hours.value = btn.dataset.hours || '';
     lat.value = btn.dataset.lat || '';
     lng.value = btn.dataset.lng || '';
-    kind.value = btn.dataset.kind || 'branch';
   } else {
     form.action = '/admin/points';
     title.textContent = {{t "admin.points.new_title"}};
@@ -125,7 +115,6 @@ function openPointModal(btn) {
     hours.value = '';
     lat.value = '';
     lng.value = '';
-    kind.value = 'branch';
   }
   document.getElementById('admin-point-modal').style.display = 'flex';
 }

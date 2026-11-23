@@ -1,0 +1,97 @@
+{{/* warehouse_detail.gohtml — one warehouse (feat/warehouses) and its
+     storage locations (места хранения): add, rename, (de)activate,
+     delete (only when no goods lie there). The owner also edits the
+     warehouse itself; a storekeeper only manages the locations of its own
+     warehouse. .Data is admin.warehouseDetailData. */}}
+{{define "content"}}
+{{with .Data}}
+<div class="admin-screen-narrow">
+  <div class="admin-list-toolbar">
+    <div>
+      <div class="admin-card__title">{{.Warehouse.Name}} <span class="admin-chip {{.Warehouse.ChipClass}}">{{.Warehouse.ChipLabel}}</span></div>
+      <div class="admin-list-note">{{.Warehouse.FullAddress}}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a href="{{.StockURL}}" class="admin-btn admin-btn--secondary">{{t "admin.warehouses.open_stock"}}</a>
+      {{if .CanEditWarehouse}}
+      <button type="button" class="admin-btn admin-btn--secondary"
+              data-id="{{.Warehouse.ID}}" data-name="{{.Warehouse.Name}}" data-city="{{.Warehouse.City}}" data-address="{{.Warehouse.Address}}" data-back="{{.URL}}"
+              onclick="openWarehouseModal(this)">{{t "admin.common.change"}}</button>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .Error}}<div class="admin-form-error" role="alert">{{.Error}}</div>{{end}}
+
+  <div class="admin-card">
+    <div class="admin-card__pad-sm">
+      <div class="admin-card__title">{{t "admin.locations.title"}}</div>
+      <div class="admin-card__hint">{{t "admin.locations.hint"}}</div>
+      <form method="post" action="{{.URL}}/locations" class="admin-filterbar" style="margin:12px 0 0">
+        <div class="admin-field admin-filterbar__field admin-filterbar__field--grow">
+          <label for="location-new-name">{{t "admin.locations.name"}}</label>
+          <input id="location-new-name" name="name" required maxlength="100" placeholder="{{t "admin.locations.name_placeholder"}}" autocomplete="off">
+        </div>
+        <button type="submit" class="admin-btn admin-btn--primary">+ {{t "admin.locations.add"}}</button>
+      </form>
+    </div>
+    <div class="admin-row-list">
+      {{if not .Locations}}<div class="admin-row-list__empty">{{t "admin.locations.empty"}}</div>{{end}}
+      {{range .Locations}}
+      <div class="admin-row">
+        <div class="admin-row__info">
+          <div class="admin-row__title">{{.Name}}</div>
+          <div class="admin-row__subtitle">{{t "admin.locations.goods"}}: {{.StockLabel}}</div>
+        </div>
+        <span class="admin-chip {{.ChipClass}}">{{.ChipLabel}}</span>
+        <button type="button" class="admin-btn admin-btn--secondary admin-btn--row"
+                data-action="{{$.Data.URL}}/locations/{{.ID}}" data-name="{{.Name}}" data-sort="{{.SortOrder}}"
+                onclick="openLocationModal(this)" aria-label="{{tf "admin.locations.edit_aria" .Name}}">{{t "admin.common.change"}}</button>
+        <form method="post" action="{{$.Data.URL}}/locations/{{.ID}}/toggle">
+          <input type="hidden" name="active" value="{{if .IsActive}}0{{else}}1{{end}}">
+          <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{.ToggleLabel}}</button>
+        </form>
+        {{if not .HasStock}}
+        <form method="post" action="{{$.Data.URL}}/locations/{{.ID}}/delete"
+              data-confirm="{{tf "admin.locations.delete_text" .Name}}" data-confirm-title="{{t "admin.locations.delete_title"}}"
+              data-confirm-label="{{t "admin.common.delete"}}" data-confirm-danger="1">
+          <button type="submit" class="admin-btn admin-btn--secondary admin-btn--row">{{t "admin.common.delete"}}</button>
+        </form>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<div id="admin-location-modal" class="admin-modal-backdrop" style="display:none">
+  <div class="admin-modal admin-modal--md" role="dialog" aria-modal="true" aria-labelledby="admin-location-modal-title">
+    <div class="admin-modal__title" id="admin-location-modal-title">{{t "admin.locations.edit_title"}}</div>
+    <form method="post" action="" id="admin-location-form">
+      <div class="admin-field">
+        <label for="location-name">{{t "admin.locations.name"}}</label>
+        <input id="location-name" name="name" required maxlength="100">
+      </div>
+      <div class="admin-field">
+        <label for="location-sort">{{t "admin.locations.sort_order"}}</label>
+        <input id="location-sort" name="sort_order" type="number" min="0" step="1" inputmode="numeric">
+      </div>
+      <div class="admin-modal__actions">
+        <button type="button" class="admin-btn admin-btn--secondary" onclick="document.getElementById('admin-location-modal').style.display='none'">{{t "admin.common.cancel"}}</button>
+        <button type="submit" class="admin-btn admin-btn--primary">{{t "admin.common.save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function openLocationModal(btn) {
+  document.getElementById('admin-location-form').action = btn.dataset.action;
+  document.getElementById('location-name').value = btn.dataset.name || '';
+  document.getElementById('location-sort').value = btn.dataset.sort || '';
+  document.getElementById('admin-location-modal').style.display = 'flex';
+  document.getElementById('location-name').focus();
+}
+</script>
+{{end}}
+{{if eq .Staff.Role "owner"}}{{template "_warehouse_modal" .}}{{end}}
+{{end}}

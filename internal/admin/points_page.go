@@ -7,10 +7,12 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/Nikemas/cozy_backend/internal/apperr"
 	"github.com/Nikemas/cozy_backend/internal/audit"
 	"github.com/Nikemas/cozy_backend/internal/points"
 	"github.com/Nikemas/cozy_backend/internal/staff"
@@ -87,8 +89,10 @@ func (h *handlers) renderPointsPage(w http.ResponseWriter, r *http.Request, errM
 		http.Error(w, h.tr(r).T("admin.points.load_failed"), http.StatusInternalServerError)
 		return
 	}
-	rows := make([]pointRow, 0, len(list))
-	for _, p := range list {
+	// Warehouses live in their own section (warehouses_page.go).
+	branches, _ := splitPointsByKind(list)
+	rows := make([]pointRow, 0, len(branches))
+	for _, p := range branches {
 		rows = append(rows, newPointRow(h.tr(r), p))
 	}
 
@@ -119,6 +123,7 @@ func (h *handlers) pointsCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.IsActive = true
+	in.Kind = points.KindBranch // warehouses are created under /admin/warehouses
 	created, err := h.pointsRepo.Create(r.Context(), in)
 	if err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
@@ -138,7 +143,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	current, err := h.pointsRepo.GetByID(r.Context(), id)
+	current, err := h.pointOfKind(r.Context(), id, points.KindBranch)
 	if err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
@@ -150,6 +155,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.IsActive = current.IsActive
+	in.Kind = current.Kind
 	if _, err := h.pointsRepo.Update(r.Context(), id, in); err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
@@ -166,7 +172,7 @@ func (h *handlers) pointsUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) pointsToggle(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	target, err := h.pointsRepo.GetByID(r.Context(), id)
+	target, err := h.pointOfKind(r.Context(), id, points.KindBranch)
 	if err != nil {
 		h.renderPointsPage(w, r, appErrMessage(h.tr(r), err))
 		return
@@ -214,8 +220,8 @@ func parseCoord(raw string) (*float64, error) {
 	return &v, nil
 }
 
-// pointInputFromForm reads the point modal's fields. IsActive is set by the
-// caller (create: true, edit: unchanged).
+// pointInputFromForm reads the point modal's fields. IsActive and Kind are
+// set by the caller (create: true / the section's kind, edit: unchanged).
 func pointInputFromForm(r *http.Request) (points.PointInput, error) {
 	lat, err := parseCoord(r.FormValue("latitude"))
 	if err != nil {
@@ -232,6 +238,23 @@ func pointInputFromForm(r *http.Request) (points.PointInput, error) {
 		WorkingHours: strings.TrimSpace(r.FormValue("working_hours")),
 		Latitude:     lat,
 		Longitude:    lng,
-		Kind:         r.FormValue("kind"),
 	}, nil
+}
+
+// pointOfKind loads a point and checks it belongs to the section asking
+// for it: «Точки продаж» edits only branches, «Склады» only warehouses —
+// a point of the other kind reads as not found.
+func (h *handlers) pointOfKind(ctx context.Context, id, kind string) (*points.Point, error) {
+	p, err := h.pointsRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if p.Kind != kind {
+		return nil, apperrPointNotFound()
+	}
+	return p, nil
+}
+
+func apperrPointNotFound() error {
+	return apperr.NotFound("point_not_found", "точка продаж не найдена")
 }

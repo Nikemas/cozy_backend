@@ -22,6 +22,7 @@ const (
 	staffIconPath      = "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"
 	broadcastsIconPath = "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0"
 	bannerIconPath     = "M3 5h18v14H3z M8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 19"
+	warehouseIconPath  = "M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35a2 2 0 0 1 1.26-1.86l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35z M6 18h12 M6 14h12 M6 22V10h12v12"
 	deliveryIconPath   = "M1 3h15v13H1z M16 8h4l3 3v5h-7z M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
 )
 
@@ -33,7 +34,8 @@ const noAccessPath = "/admin/no-access"
 // navDef is one entry from the design canvas's navDefs array — key, label,
 // icon, and the roles allowed to see it (§5 ТЗ: owner sees everything
 // here, manager sees orders/products/reports, point_staff sees orders and
-// stock of its own point). Order matters: it's both the sidebar's display order and,
+// stock of its own point, storekeeper sees stock and storage locations of its
+// own warehouse). Order matters: it's both the sidebar's display order and,
 // via firstAllowedPath, the fallback page a role lands on when it hits a
 // route/nav item it can't see.
 type navDef struct {
@@ -46,12 +48,15 @@ type navDef struct {
 var navDefs = []navDef{
 	{"orders", "admin.nav.orders", ordersIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
 	{"products", "admin.nav.products", productsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
-	{"stock", "admin.nav.stock", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff}},
+	{"stock", "admin.nav.stock", stockIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager, staff.RolePointStaff, staff.RoleStorekeeper}},
 	{"categories", "admin.nav.categories", categoriesIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"reports", "admin.nav.reports", reportsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"broadcasts", "admin.nav.broadcasts", broadcastsIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"banner", "admin.nav.banner", bannerIconPath, []staff.Role{staff.RoleOwner, staff.RoleManager}},
 	{"points", "admin.nav.points", pointsIconPath, []staff.Role{staff.RoleOwner}},
+	// feat/warehouses: Склады — owner manages every warehouse, a
+	// storekeeper only the storage locations of its own one.
+	{"warehouses", "admin.nav.warehouses", warehouseIconPath, []staff.Role{staff.RoleOwner, staff.RoleStorekeeper}},
 	{"delivery", "admin.nav.delivery", deliveryIconPath, []staff.Role{staff.RoleOwner}},
 	{"staff", "admin.nav.staff", staffIconPath, []staff.Role{staff.RoleOwner}},
 	{"audit", "admin.nav.audit", auditIconPath, []staff.Role{staff.RoleOwner}},
@@ -107,7 +112,7 @@ func firstAllowedPath(role staff.Role) string {
 // unknown role is returned as-is, which {{t}} also prints as-is.
 func roleLabel(role staff.Role) string {
 	switch role {
-	case staff.RoleOwner, staff.RoleManager, staff.RolePointStaff:
+	case staff.RoleOwner, staff.RoleManager, staff.RolePointStaff, staff.RoleStorekeeper:
 		return "admin.role." + string(role)
 	default:
 		return string(role)

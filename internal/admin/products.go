@@ -292,15 +292,28 @@ func (h *handlers) productNewPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // stockPoints returns every point of sale as a Вариации matrix column
-// (inactive ones included, so their stock stays visible and editable).
+// (inactive ones included, so their stock stays visible and editable),
+// each warehouse with its storage locations.
 func (h *handlers) stockPoints(ctx context.Context) ([]StockPointVM, error) {
 	pts, err := h.pointsRepo.List(ctx)
 	if err != nil {
 		return nil, err
 	}
+	var locs map[string][]*points.Location
+	if h.locations != nil {
+		if locs, err = h.locations.ListAll(ctx); err != nil {
+			return nil, err
+		}
+	}
 	out := make([]StockPointVM, 0, len(pts))
 	for _, p := range pts {
-		out = append(out, StockPointVM{ID: p.ID, Name: p.Name, Inactive: !p.IsActive, Warehouse: p.Kind == points.KindWarehouse})
+		vm := StockPointVM{ID: p.ID, Name: p.Name, Inactive: !p.IsActive, Warehouse: p.Kind == points.KindWarehouse}
+		if vm.Warehouse {
+			for _, l := range locs[p.ID] {
+				vm.Locations = append(vm.Locations, LocationOptionVM{ID: l.ID, Name: l.Name, Inactive: !l.IsActive})
+			}
+		}
+		out = append(out, vm)
 	}
 	return out, nil
 }
@@ -360,6 +373,14 @@ func (h *handlers) productEditPage(w http.ResponseWriter, r *http.Request) {
 	topID, subID := resolveTopAndSubIDs(tree, product.CategoryID)
 
 	variantRows := buildVariantRows(h.tr(r), variants, stockEntries, stockPoints)
+	if h.locations != nil {
+		assigned, err := h.locations.AssignedByVariants(ctx, variantIDs)
+		if err != nil {
+			h.renderInternalErr(w, err)
+			return
+		}
+		setStoredLocations(variantRows, assigned)
+	}
 
 	imageRows := make([]ImageRowVM, len(images))
 	for i, img := range images {
