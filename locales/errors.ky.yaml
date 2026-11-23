@@ -174,7 +174,7 @@ err.phone_taken: бул телефон номери колдонулуп жат�
 err.pickup_point_not_found: өзү алып кетүү пункту табылган жок
 err.pickup_disabled: өзү алып кетүү азыр жеткиликсиз — жеткирүүнү тандаңыз
 err.point_id_forbidden: owner/manager ролу үчүн point_id бош болушу керек
-err.point_id_required: point_staff ролу үчүн point_id милдеттүү
+err.point_id_required: point_staff жана storekeeper ролдору үчүн point_id милдеттүү
 err.point_in_use: "сатуу жайын өчүрүүгө болбойт: ага кызматкерлер, калдыктар же буйрутмалар шилтеме кылат"
 err.point_not_found: сатуу жайы табылган жок
 err.point_required: өзү алып кетүү пунктун тандаңыз
@@ -245,3 +245,11 @@ import.stock_without_variant: калдык өлчөмү жана түсү жок
 import.variant_needs_size_and_color: "вариация үчүн эки талаа тең керек: өлчөм жана түс"
 import.variant_price: "вариациянын баасы: {reason}"
 err.invalid_kind: "точканын түрү «филиал» же «кампа» болушу керек"
+err.storekeeper_needs_warehouse: кампачыны кампага гана бекитүүгө болот
+err.point_staff_needs_branch: сатуу жайынын кызматкерин филиалга гана бекитүүгө болот
+err.invalid_location_name: сактоо ордунун аталышын көрсөтүңүз (100 белгиге чейин)
+err.location_name_taken: бул кампада мындай сактоо орду бар
+err.location_not_found: сактоо орду табылган жок
+err.location_in_use: бул сактоо ордунда товар бар — аны активсиздештирүүгө гана болот
+err.not_a_warehouse: сактоо орундары кампада гана болот
+err.invalid_location: сактоо орду бул кампада табылган жок же активдүү эмес — бетти жаңылаңыз

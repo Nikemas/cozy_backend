@@ -232,10 +232,32 @@ func TestRepoUpdateLastOwnerInvariant(t *testing.T) {
 			setup: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin()
 				m.ExpectQuery(`WHERE id = \$1\s+FOR UPDATE`).WillReturnRows(staffRow("s1", "+996700000001", RolePointStaff, true))
-				m.ExpectQuery(`UPDATE staff`).WillReturnError(&pgconn.PgError{Code: pgForeignKeyViolation})
+				m.ExpectQuery(`SELECT kind FROM points_of_sale`).WillReturnRows(sqlmock.NewRows([]string{"kind"}))
 				m.ExpectRollback()
 			},
 			wantCode: "invalid_point_id",
+		},
+		{
+			name: "storekeeper moved to a branch",
+			in:   StaffUpdateInput{Name: "S", Role: RoleStorekeeper, IsActive: true, PointID: strPtr("p1")},
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(`WHERE id = \$1\s+FOR UPDATE`).WillReturnRows(staffRow("s1", "+996700000001", RolePointStaff, true))
+				m.ExpectQuery(`SELECT kind FROM points_of_sale`).WithArgs("p1").WillReturnRows(sqlmock.NewRows([]string{"kind"}).AddRow("branch"))
+				m.ExpectRollback()
+			},
+			wantCode: "storekeeper_needs_warehouse",
+		},
+		{
+			name: "point_staff moved to a warehouse",
+			in:   StaffUpdateInput{Name: "S", Role: RolePointStaff, IsActive: true, PointID: strPtr("w1")},
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(`WHERE id = \$1\s+FOR UPDATE`).WillReturnRows(staffRow("s1", "+996700000001", RolePointStaff, true))
+				m.ExpectQuery(`SELECT kind FROM points_of_sale`).WithArgs("w1").WillReturnRows(sqlmock.NewRows([]string{"kind"}).AddRow("warehouse"))
+				m.ExpectRollback()
+			},
+			wantCode: "point_staff_needs_branch",
 		},
 	}
 	for _, tt := range tests {

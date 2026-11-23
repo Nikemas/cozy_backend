@@ -365,7 +365,9 @@ func validatePassword(p string) error {
 }
 
 // validateStaffRolePointID enforces §"Business rules" 1: point_id is
-// required when role is point_staff, and must be absent for owner/manager.
+// required when role is point_staff or storekeeper, and must be absent for
+// owner/manager. That the point is of the right kind (branch/warehouse) is
+// checked by the repo, which can look it up.
 // Shared by CreateStaff and UpdateStaff so the rule can't drift between the
 // two.
 func validateStaffRolePointID(role Role, pointID *string) error {
@@ -374,9 +376,9 @@ func validateStaffRolePointID(role Role, pointID *string) error {
 		if pointID != nil && strings.TrimSpace(*pointID) != "" {
 			return apperr.BadRequest("point_id_forbidden", "point_id должен быть пустым для роли owner/manager")
 		}
-	case RolePointStaff:
+	case RolePointStaff, RoleStorekeeper:
 		if pointID == nil || strings.TrimSpace(*pointID) == "" {
-			return apperr.BadRequest("point_id_required", "point_id обязателен для роли point_staff")
+			return apperr.BadRequest("point_id_required", "point_id обязателен для ролей point_staff и storekeeper")
 		}
 	default:
 		return apperr.BadRequest("invalid_role", "неизвестная роль")
