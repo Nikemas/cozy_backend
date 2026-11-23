@@ -215,6 +215,21 @@ err.variant_required: товардын варианты көрсөтүлгөн �
 err.variant_required.choose: өлчөмүн жана түсүн тандаңыз
 
 # Product import report (internal/catalog import): per-row messages.
+# support tickets (feat/support-tickets)
+err.ticket_not_found: кайрылуу табылган жок
+err.ticket_closed: кайрылуу жабылган — суроо калса, жаңысын түзүңүз
+err.invalid_ticket_topic: кайрылуунун темасын тандаңыз
+err.invalid_ticket_status: кайрылуунун белгисиз статусу
+err.invalid_ticket_channel: кайрылуунун белгисиз каналы
+err.message_required: билдирүүнүн текстин жазыңыз
+err.message_too_long: билдирүү 2000 белгиден узун
+err.name_required: атыңызды жазыңыз
+err.name_too_long: аты 100 белгиден узун
+err.invalid_ticket_order: бул буйрутма сиздин буйрутмаларыңыздын арасынан табылган жок
+err.too_many_tickets: бир саатта кайрылуулар өтө көп — бир аз күтүңүз же бизге чалыңыз
+err.too_many_ticket_messages: билдирүүлөр өтө көп — бир аз күтүңүз
+err.invalid_page_size: page_size 1ден 50гө чейинки сан болушу керек
+
 import.ambiguous_product: бул категорияда «{name}» деген бир нече товар табылды — моделдин артикулун же SKU көрсөтүңүз
 import.db_conflict: "учурдагы маалыматтар менен кагылышуу: мындай өлчөм/түс, SKU же артикул башка товарда/вариацияда бар"
 import.db_internal: сактоодо ички ката кетти — кайра аракет кылыңыз

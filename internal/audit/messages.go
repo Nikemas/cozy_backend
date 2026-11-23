@@ -57,6 +57,7 @@ const (
 	MsgStaffDisabled         = "admin.audit.summary.staff_disabled"
 	MsgStaffPasswordReset    = "admin.audit.summary.staff_password_reset"
 	MsgBannerUpdated         = "admin.audit.summary.banner_updated"
+	MsgTicketStatus          = "admin.audit.summary.ticket_status"
 )
 
 // SummaryKeys lists every message key and source-suffix key, for tests
@@ -69,7 +70,7 @@ var SummaryKeys = []string{
 	MsgCategoryCreated, MsgCategoryUpdated, MsgCategoryDeleted, MsgCategoryDeletedNoName,
 	MsgPointCreated, MsgPointUpdated, MsgPointEnabled, MsgPointDisabled,
 	MsgStaffCreated, MsgStaffEnabled, MsgStaffDisabled, MsgStaffPasswordReset,
-	MsgBannerUpdated,
+	MsgBannerUpdated, MsgTicketStatus,
 	ViaKeyPrefix + ViaAPI, ViaKeyPrefix + ViaBulk,
 }
 

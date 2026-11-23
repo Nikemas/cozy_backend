@@ -37,6 +37,7 @@ var auditEntityTypes = []struct{ Value, Label string }{
 	{audit.EntityPoint, "admin.audit.entity.point"},
 	{audit.EntityStaff, "admin.audit.entity.staff"},
 	{audit.EntityBanner, "admin.audit.entity.banner"},
+	{audit.EntityTicket, "admin.audit.entity.ticket"},
 }
 
 func auditEntityLabel(t string) string {
@@ -73,6 +74,7 @@ var auditActionLabels = map[string]string{
 	audit.ActionStaffDeactivate:   "admin.audit.action.deactivate",
 	audit.ActionStaffPassword:     "admin.audit.action.password",
 	audit.ActionOrderStatus:       "admin.audit.action.order_status",
+	audit.ActionTicketStatus:      "admin.audit.action.order_status",
 }
 
 // AuditRowVM is one journal line.
@@ -289,6 +291,14 @@ func auditRowVM(t tr, row audit.Row) AuditRowVM {
 		vm.EntityURL = "/admin/staff"
 	case audit.EntityBanner:
 		vm.EntityURL = "/admin/banner"
+	case audit.EntityTicket:
+		vm.EntityURL = ticketsListPath + "/" + row.EntityID
+	}
+	if row.Action == audit.ActionTicketStatus {
+		from, _ := row.Details["from"].(string)
+		to, _ := row.Details["to"].(string)
+		vm.Summary = fmt.Sprintf("%s: %s → %s", vm.Summary, ticketStatusLabel(t, from), ticketStatusLabel(t, to))
+		return vm
 	}
 	if row.Action == audit.ActionOrderStatus {
 		from, _ := row.Details["from"].(string)

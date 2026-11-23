@@ -17,6 +17,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/reports"
 	"github.com/Nikemas/cozy_backend/internal/staff"
 	"github.com/Nikemas/cozy_backend/internal/storefront"
+	"github.com/Nikemas/cozy_backend/internal/support"
 )
 
 // RegisterRoutes mounts the admin HTML/HTMX panel on mux under /admin/*
@@ -77,6 +78,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 		audit:      auditLog,
 		auditList:  auditLog,
 		productOps: &productOpsStore{db: db, audit: auditLog},
+
+		tickets: support.NewService(db),
 	}
 
 	if importGuard != nil {
@@ -95,7 +98,8 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	// screens below, not a page with its own stricter role requirement.
 	// fix/admin-owner-ux: every staff page also counts the viewer's
 	// unprocessed orders for the sidebar badge (withNavBadges, GET only).
-	badges := withNavBadges(orderBadgeRepo{db: db})
+	// feat/support-tickets: plus new support requests on «Обращения».
+	badges := chainMiddleware(withNavBadges(orderBadgeRepo{db: db}), withTicketBadge(h.tickets))
 	anyRole := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff), badges)
 	everyRole := chainMiddleware(requireStaffRole(staffSvc, staff.RoleOwner, staff.RoleManager, staff.RolePointStaff, staff.RoleStorekeeper), badges)
 	mux.HandleFunc("GET /admin/no-access", everyRole(h.noAccessPage))
@@ -158,6 +162,9 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, staffSvc *staff.Service, med
 	mux.HandleFunc("POST /admin/staff", ownerOnly(h.staffCreate))
 	mux.HandleFunc("POST /admin/staff/{id}/toggle", ownerOnly(h.staffToggle))
 	mux.HandleFunc("POST /admin/staff/{id}/password", ownerOnly(h.staffResetPassword))
+
+	// Обращения: customer support requests — tickets_page.go.
+	registerTicketRoutes(mux, h, ownerOrManager)
 
 	// Доставка: delivery zones (fee, free-from threshold) — delivery.go.
 	registerDeliveryRoutes(mux, h, orders.NewDeliveryZoneRepo(db), ownerOnly)

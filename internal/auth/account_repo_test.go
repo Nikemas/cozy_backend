@@ -35,6 +35,7 @@ func TestDeleteCustomerAnonymizesAndCleansUp(t *testing.T) {
 		`DELETE FROM cart_items WHERE customer_id = $1`,
 		`DELETE FROM favorites WHERE customer_id = $1`,
 		`DELETE FROM device_tokens WHERE customer_id = $1`,
+		`DELETE FROM support_tickets WHERE customer_id = $1`,
 		`DELETE FROM customer_addresses a WHERE a.customer_id = $1`,
 		`UPDATE customer_addresses SET label = NULL, is_default = false WHERE customer_id = $1`,
 		`UPDATE refresh_tokens SET revoked_at = now() WHERE customer_id = $1 AND revoked_at IS NULL`,

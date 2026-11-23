@@ -56,10 +56,12 @@ var screenPages = map[string]string{
 	"staff":            "staff.gohtml",
 	"categories":       "categories.gohtml",
 	"delivery":         "delivery.gohtml",
-	"stock":            "stock.gohtml",      // fix/admin: per-point stock screen (point_staff's catalog view)
-	"broadcasts":       "broadcasts.gohtml", // W2 fix/promo-push: Рассылки (promo push)
-	"audit":            "audit.gohtml",      // fix/admin-ops: Журнал действий (owner)
-	"banner":           "banner.gohtml",     // feat/home-banner: Баннер на главной
+	"stock":            "stock.gohtml",         // fix/admin: per-point stock screen (point_staff's catalog view)
+	"broadcasts":       "broadcasts.gohtml",    // W2 fix/promo-push: Рассылки (promo push)
+	"audit":            "audit.gohtml",         // fix/admin-ops: Журнал действий (owner)
+	"banner":           "banner.gohtml",        // feat/home-banner: Баннер на главной
+	"tickets":          "tickets.gohtml",       // feat/support-tickets: Обращения
+	"ticket_detail":    "ticket_detail.gohtml", // feat/support-tickets: one request
 }
 
 // layoutPartials are parsed alongside every screen: the shared app-shell
@@ -74,6 +76,7 @@ var layoutPartials = []string{
 	"_langswitch.gohtml",
 	"_orders_badge.gohtml",
 	"_warehouse_modal.gohtml", // feat/warehouses: list + warehouse page
+	"_tickets_badge.gohtml",
 }
 
 // NavItem is one already-RBAC-filtered, already-ordered sidebar entry for
@@ -204,6 +207,9 @@ func (rr *Renderer) Render(w http.ResponseWriter, screen string, data PageData) 
 		if n := newOrdersFromWriter(w); n > 0 {
 			data.NewOrders = n
 			data.NavItems = withOrdersBadge(data.NavItems, n)
+		}
+		if n := newTicketsFromWriter(w); n > 0 {
+			data.NavItems = withTicketsBadge(data.NavItems, n)
 		}
 	}
 	t, ok := rr.tmpl[data.Lang][screen]

@@ -10,7 +10,7 @@ import (
 
 // RegisterCustomerRoutes mounts the logged-in-customer JSON API for the
 // Flutter mobile app under /api/v1/*: the customer's own profile, favorites,
-// delivery addresses, and FCM device-token registration (Task G / §6 of the
+// delivery addresses, FCM device-token registration and support requests (Task G / §6 of the
 // ТЗ). Every route is behind authSvc.RequireCustomer — there is no anonymous
 // access to any of them. Split into one register*Routes function per domain
 // (customer_profile.go, favorites.go, addresses.go, devices.go) for
@@ -22,4 +22,5 @@ func RegisterCustomerRoutes(mux *http.ServeMux, db *sql.DB, authSvc *auth.Servic
 	registerFavoritesRoutes(mux, db, authSvc, cfg)
 	registerAddressesRoutes(mux, db, authSvc)
 	registerDevicesRoutes(mux, db, authSvc)
+	registerSupportRoutes(mux, db, authSvc)
 }

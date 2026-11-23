@@ -36,6 +36,10 @@ var screenPages = map[string]string{
 	// "pay_return" is where the payment provider sends the customer back
 	// (pay_handlers.go).
 	"pay_return": "pay_return.gohtml",
+	// feat/support-tickets: the support form + own requests, and one
+	// request's conversation (support_handlers.go).
+	"support":        "support.gohtml",
+	"support_ticket": "support_ticket.gohtml",
 }
 
 // staticPages are the legal/info pages (/about, /contacts, /delivery,

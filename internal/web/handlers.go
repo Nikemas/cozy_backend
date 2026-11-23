@@ -12,6 +12,7 @@ import (
 	"github.com/Nikemas/cozy_backend/internal/auth"
 	"github.com/Nikemas/cozy_backend/internal/catalog"
 	"github.com/Nikemas/cozy_backend/internal/config"
+	"github.com/Nikemas/cozy_backend/internal/httpmw"
 	"github.com/Nikemas/cozy_backend/internal/i18n"
 	"github.com/Nikemas/cozy_backend/internal/orders"
 	"github.com/Nikemas/cozy_backend/internal/payments"
@@ -52,6 +53,11 @@ type handlers struct {
 	// accounts deletes customer accounts (POST /account/delete) — the
 	// same auth.Service method the JSON API uses; an interface for tests.
 	accounts customerDeleter
+
+	// support is customer support requests (support_handlers.go);
+	// supportGuests limits guest requests per client IP.
+	support       supportService
+	supportGuests *httpmw.KeyedLimiter
 }
 
 // t translates key into lang — used by handlers that need a translated

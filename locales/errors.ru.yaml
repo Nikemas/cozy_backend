@@ -222,6 +222,21 @@ err.variant_required.choose: выберите размер и цвет
 err.variant_required: не указан вариант товара
 
 # Product import report (internal/catalog import): per-row messages.
+# support tickets (feat/support-tickets)
+err.ticket_not_found: обращение не найдено
+err.ticket_closed: обращение закрыто — создайте новое, если вопрос остался
+err.invalid_ticket_topic: выберите тему обращения
+err.invalid_ticket_status: неизвестный статус обращения
+err.invalid_ticket_channel: неизвестный канал обращения
+err.message_required: напишите текст сообщения
+err.message_too_long: сообщение длиннее 2000 символов
+err.name_required: укажите имя
+err.name_too_long: имя длиннее 100 символов
+err.invalid_ticket_order: этот заказ не найден среди ваших заказов
+err.too_many_tickets: слишком много обращений за час — подождите немного или позвоните нам
+err.too_many_ticket_messages: слишком много сообщений подряд — подождите немного
+err.invalid_page_size: page_size должен быть числом от 1 до 50
+
 import.ambiguous_product: найдено несколько товаров «{name}» в этой категории — укажите артикул модели или SKU
 import.db_conflict: "конфликт с существующими данными: такой размер/цвет, SKU или артикул уже есть у другого товара/вариации"
 import.db_internal: внутренняя ошибка при сохранении — попробуйте ещё раз

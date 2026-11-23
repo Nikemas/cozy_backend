@@ -856,3 +856,59 @@ admin.apperr.location_not_found: "Место хранения не найден�
 admin.apperr.location_in_use: "На этом месте хранения есть товар — его можно только деактивировать"
 admin.apperr.not_a_warehouse: "Места хранения есть только у склада"
 admin.apperr.invalid_location: "Место хранения не найдено на этом складе или неактивно — обновите страницу"
+
+# Обращения (feat/support-tickets)
+admin.nav.tickets: Обращения
+admin.nav.new_tickets: Новых обращений: %d
+admin.tickets.status.new: Новое
+admin.tickets.status.in_progress: В работе
+admin.tickets.status.closed: Закрыто
+admin.tickets.status_all: Все
+admin.tickets.status_filter: Фильтр по статусу
+admin.tickets.topic.order: Заказ
+admin.tickets.topic.payment: Оплата
+admin.tickets.topic.delivery: Доставка
+admin.tickets.topic.return: Возврат / обмен
+admin.tickets.topic.product: Товар
+admin.tickets.topic.other: Другое
+admin.tickets.all_topics: Все темы
+admin.tickets.topic_label: Тема
+admin.tickets.search_placeholder: Имя, телефон или № обращения
+admin.tickets.col_number: №
+admin.tickets.col_date: Создано
+admin.tickets.col_customer: Клиент
+admin.tickets.col_message: Последнее сообщение
+admin.tickets.you_prefix: Ответ:
+admin.tickets.empty_title: Обращений пока нет
+admin.tickets.empty_text: Здесь появятся вопросы покупателей с сайта и из приложения
+admin.tickets.empty_filtered_title: Ничего не найдено
+admin.tickets.empty_filtered_text: Попробуйте изменить фильтры
+admin.tickets.count: Всего: %d
+admin.tickets.number: Обращение №%d
+admin.tickets.channel: Канал
+admin.tickets.channel.web: Сайт
+admin.tickets.channel.app: Приложение
+admin.tickets.guest: без входа
+admin.tickets.request: Обращение
+admin.tickets.order: Заказ
+admin.tickets.no_order: не указан
+admin.tickets.open_order: открыть
+admin.tickets.conversation: Переписка
+admin.tickets.author_customer: Клиент
+admin.tickets.author_staff: Сотрудник
+admin.tickets.reply: Ответ клиенту
+admin.tickets.reply_placeholder: Клиент увидит ответ на сайте и в приложении
+admin.tickets.reply_guest_hint: Клиент писал без входа и не увидит ответ на сайте — позвоните или напишите в WhatsApp.
+admin.tickets.send: Отправить ответ
+admin.tickets.closed_hint: Обращение закрыто. Чтобы ответить, верните его в работу.
+admin.tickets.toast_replied: Ответ отправлен
+admin.tickets.toast_status_new: Обращение снова новое
+admin.tickets.toast_status_in_progress: Обращение в работе
+admin.tickets.toast_status_closed: Обращение закрыто
+admin.apperr.ticket_not_found: Обращение не найдено
+admin.apperr.ticket_closed: Обращение закрыто — сначала верните его в работу
+admin.apperr.message_required: Напишите текст ответа
+admin.apperr.message_too_long: Ответ длиннее 2000 символов
+admin.apperr.invalid_ticket_status: Неизвестный статус обращения
+admin.audit.entity.ticket: Обращение
+admin.audit.summary.ticket_status: Обращение №{number}

@@ -1,0 +1,8 @@
+{{/* _tickets_badge (feat/support-tickets): the «Обращения» new-requests
+     badge, refreshed every 60s while the tab is visible from
+     GET /admin/tickets/badge (same approach as _orders_badge). Stays in
+     the DOM at 0 (hidden) so polling continues. The argument is the count. */}}
+{{define "_tickets_badge"}}<span id="admin-tickets-badge" class="admin-nav__badge" data-count="{{.}}"{{if not .}} hidden{{end}}
+  title="{{tf "admin.nav.new_tickets" .}}" aria-label="{{tf "admin.nav.new_tickets" .}}"
+  hx-get="/admin/tickets/badge" hx-select="#admin-tickets-badge" hx-swap="outerHTML"
+  hx-trigger="every 60s [document.visibilityState === 'visible'], visibilitychange[document.visibilityState === 'visible'] from:document">{{.}}</span>{{end}}

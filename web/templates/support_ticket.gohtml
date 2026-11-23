@@ -1,0 +1,38 @@
+{{/* support_ticket.gohtml (feat/support-tickets): one of the customer's
+     support requests — status, the conversation (customer on the right,
+     the shop on the left) and the follow-up form (hidden once closed).
+     Data is internal/web/support_handlers.go's SupportTicketData. */}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="support-screen">
+  <a class="support-back" href="/support"><i class="ti ti-chevron-left" aria-hidden="true"></i> {{t "screen.support.title"}}</a>
+  <div class="support-ticket__head">
+    <div>
+      <h1 class="screen-title support-ticket__title">{{$d.NumberLabel}}</h1>
+      <div class="muted">{{$d.TopicLabel}} · {{$d.DateLabel}}{{if $d.OrderNumber}} · {{t "support.order"}}: {{$d.OrderNumber}}{{end}}</div>
+    </div>
+    <span class="order-status {{$d.StatusClass}}">{{t $d.StatusKey}}</span>
+  </div>
+
+  <ol class="support-thread">
+    {{range $d.Messages}}
+    <li class="support-msg{{if .Mine}} support-msg--mine{{end}}">
+      <div class="support-msg__author">{{if .Mine}}{{t "support.author_you"}}{{else}}{{t "support.author_shop"}}{{end}}</div>
+      <div class="support-msg__text">{{.Text}}</div>
+      <div class="support-msg__date">{{.DateLabel}}</div>
+    </li>
+    {{end}}
+  </ol>
+
+  {{if $d.Closed}}
+  <p class="support-closed muted" id="reply">{{t "support.closed_hint"}} <a href="/support">{{t "support.new_title"}}</a></p>
+  {{else}}
+  <form class="support-form" method="post" action="/support/{{$d.ID}}/messages" id="reply">
+    {{if $d.Error}}<p class="form-error" role="alert">{{$d.Error}}</p>{{end}}
+    <label class="field-label" for="support-reply">{{t "support.reply"}}</label>
+    <textarea id="support-reply" name="message" rows="4" maxlength="{{$d.MaxMessage}}" required>{{$d.Draft}}</textarea>
+    <button type="submit" class="btn btn--primary support-form__submit">{{t "support.send"}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}

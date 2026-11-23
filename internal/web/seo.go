@@ -39,6 +39,7 @@ type SEOMeta struct {
 var privateScreens = map[string]bool{
 	"cart": true, "checkout": true, "done": true, "fav": true, "profile": true,
 	"orders": true, "addresses": true, "lang": true, "error": true, "pay_return": true,
+	"support": true, "support_ticket": true,
 }
 
 // siteURL is the site's public origin: PUBLIC_BASE_URL when configured

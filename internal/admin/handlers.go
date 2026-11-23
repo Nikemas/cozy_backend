@@ -75,6 +75,9 @@ type handlers struct {
 	audit      *audit.Log
 	auditList  auditLister
 	productOps productOpsBackend
+
+	// feat/support-tickets: Обращения (tickets_page.go).
+	tickets ticketsBackend
 }
 
 // loginPage renders GET /admin/login. A staff member who already has a
