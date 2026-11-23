@@ -58,7 +58,7 @@ info:
     `GET /api/v1/products/{id}`, `GET /api/v1/favorites`, `GET /api/v1/cart`,
     `POST/GET /api/v1/orders`, `GET /api/v1/orders/{id}`,
     `POST /api/v1/orders/{id}/cancel`.
-  version: "0.7.0"
+  version: "0.8.0"
 
 servers:
   - url: http://localhost:8080
@@ -71,6 +71,8 @@ tags:
     description: Public, unauthenticated read-only catalog.
   - name: Customer
     description: Mobile/JSON API for a logged-in customer (favorites, addresses, devices, orders, cart) — JWT bearer, see §6 ТЗ.
+  - name: Support
+    description: Customer support requests ("обращения") and their conversation with the shop — JWT bearer.
   - name: Payments
     description: Payment provider callbacks and the mock provider's test checkout page.
   - name: Admin — Staff
@@ -485,6 +487,10 @@ paths:
         - promo broadcast (admin "Рассылки", only while `promo_push` is on):
           `{"type":"promo","link":"<path>"}` where `link` is `/product/<id>`,
           `/catalog?category=<id>` or `""` (just open the app); default channel.
+        - support reply (staff answered a request, see `/api/v1/support/tickets`):
+          `{"type":"support_reply","ticket_id":"<uuid>"}`, default channel; title
+          "Ответ на обращение №N" / "№N кайрылууңузга жооп келди", body = the
+          start of the answer (≤ 150 characters). Open the request on tap.
       security: [{ customerBearerAuth: [] }]
       requestBody:
         required: true
@@ -526,6 +532,119 @@ paths:
           description: Body is not JSON.
           content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/support/tickets:
+    post:
+      tags: [Support]
+      summary: Create a support request ("обращение")
+      description: |
+        Creates a request from the app (`channel: app`) for the logged-in
+        customer. The `message` becomes the first message of the
+        conversation. Staff get a Telegram notification; the request then
+        shows in the admin panel (Обращения) with status `new`.
+
+        - `name` — optional (≤ 100 characters); blank → the profile name
+          (may stay `""` if the profile has none).
+        - `phone` — optional contact number, any Kyrgyz format
+          (`0700 123 456`, `+996700123456`, …), stored as `+996XXXXXXXXX`;
+          blank → the account phone.
+        - `order_id` — optional; must be one of **this customer's** orders.
+
+        Limit: at most 5 new requests per customer (or per contact phone)
+        in a rolling hour → `429 too_many_tickets`.
+      security: [{ customerBearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicketCreate" } } }
+      responses:
+        "201":
+          description: Created — the full request with its conversation (one message).
+          content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicket" } } }
+        "400":
+          description: |
+            - `bad_request` — body is not valid JSON;
+            - `invalid_ticket_topic` — `topic` missing or not one of the enum;
+            - `message_required` — `message` blank (after trimming);
+            - `message_too_long` — `message` over 2000 characters;
+            - `name_too_long` — `name` over 100 characters;
+            - `invalid_phone` — `phone` given but not a Kyrgyz number;
+            - `invalid_ticket_order` — `order_id` not a uuid or not this customer's order.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`customer_not_found` — the account was deleted."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "429":
+          description: "`too_many_tickets` — 5 requests in the last hour already."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    get:
+      tags: [Support]
+      summary: List the customer's own support requests
+      description: |
+        Requests created by this account from the app **and** from the site
+        while logged in (guest requests from the site are not linked to any
+        account and never appear here). Most recently active first
+        (`updated_at` desc — a new message bumps a request up). Each item
+        carries its latest message for a preview.
+      security: [{ customerBearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200":
+          description: One page.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicketList" } } }
+        "400":
+          description: "`invalid_page` (not an integer ≥ 1) / `invalid_page_size` (not 1..50)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/support/tickets/{id}:
+    get:
+      tags: [Support]
+      summary: One support request with its conversation
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: The request; `messages` oldest first.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicket" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`ticket_not_found` — missing, malformed id, or another customer's / a guest's request (indistinguishable)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+
+  /api/v1/support/tickets/{id}/messages:
+    post:
+      tags: [Support]
+      summary: Add a follow-up message to an open request
+      description: |
+        Appends the customer's message (staff get a Telegram notification).
+        Not allowed once staff closed the request — create a new one.
+        Limit: 30 follow-ups per customer per rolling hour (all requests).
+      security: [{ customerBearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicketMessageInput" } } }
+      responses:
+        "201":
+          description: Added — the full request with the updated conversation.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SupportTicket" } } }
+        "400":
+          description: "`bad_request` / `message_required` / `message_too_long` (over 2000 characters)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: "`ticket_not_found` — missing or not this customer's."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "409":
+          description: "`ticket_closed` — the request is closed; offer to create a new one."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        "429":
+          description: "`too_many_ticket_messages` — 30 follow-ups in the last hour already."
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
 
   /api/v1/customer:
     get:
@@ -1910,6 +2029,87 @@ components:
             "номерди +996XXXXXXXXX форматында жазыңыз". The header
             `Content-Language` tells which language it really is.
         request_id: { type: string, description: "X-Request-ID of the failed request, when known." }
+
+    SupportTopic:
+      type: string
+      enum: [order, payment, delivery, return, product, other]
+      description: |
+        Fixed list (labels are the client's): `order` Заказ / Буйрутма,
+        `payment` Оплата / Төлөм, `delivery` Доставка / Жеткирүү,
+        `return` Возврат / обмен / Кайтаруу / алмаштыруу, `product` Товар,
+        `other` Другое / Башка.
+    SupportTicketStatus:
+      type: string
+      enum: [new, in_progress, closed]
+      description: |
+        `new` — nobody has answered yet (Новое / Жаңы); `in_progress` — staff
+        are on it (В работе / Иштелүүдө; the first staff reply sets it);
+        `closed` — done (Закрыто / Жабылды), no more messages. Staff may
+        reopen a closed request.
+    SupportTicketCreate:
+      type: object
+      required: [topic, message]
+      properties:
+        topic: { $ref: "#/components/schemas/SupportTopic" }
+        message: { type: string, maxLength: 2000, example: "Хочу обменять кроссовки на размер больше" }
+        order_id: { type: string, format: uuid, description: "Optional; one of the customer's own orders." }
+        name: { type: string, maxLength: 100, description: "Optional; blank → profile name." }
+        phone: { type: string, example: "0700 123 456", description: "Optional contact number; blank → account phone." }
+    SupportTicketMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, maxLength: 2000 }
+    SupportTicketMessage:
+      type: object
+      required: [id, author, text, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        author: { type: string, enum: [customer, staff], description: "`staff` = the shop's answer (no staff name is exposed)." }
+        text: { type: string, description: "Plain text, may contain line breaks." }
+        created_at: { type: string, format: date-time }
+    SupportTicketBase:
+      type: object
+      required: [id, number, topic, status, channel, order_id, order_number, created_at, updated_at, closed_at]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer, format: int64, example: 123, description: "Short number to show (\"Обращение №123\")." }
+        topic: { $ref: "#/components/schemas/SupportTopic" }
+        status: { $ref: "#/components/schemas/SupportTicketStatus" }
+        channel: { type: string, enum: [web, app], description: "Where it was created (site or app)." }
+        order_id: { type: string, format: uuid, nullable: true }
+        order_number: { type: string, nullable: true, example: "COZY-20261101-003" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, description: "Last message or status change." }
+        closed_at: { type: string, format: date-time, nullable: true }
+    SupportTicketSummary:
+      allOf:
+        - $ref: "#/components/schemas/SupportTicketBase"
+        - type: object
+          required: [messages_count, last_message]
+          properties:
+            messages_count: { type: integer }
+            last_message: { $ref: "#/components/schemas/SupportTicketMessage" }
+    SupportTicket:
+      allOf:
+        - $ref: "#/components/schemas/SupportTicketBase"
+        - type: object
+          required: [name, phone, messages]
+          properties:
+            name: { type: string, description: "Contact name (may be empty)." }
+            phone: { type: string, example: "+996700123456", description: "Contact phone, +996XXXXXXXXX." }
+            messages:
+              type: array
+              description: Oldest first; the first one is the request text.
+              items: { $ref: "#/components/schemas/SupportTicketMessage" }
+    SupportTicketList:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/SupportTicketSummary" } }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer, description: "All of the customer's requests." }
 
     TokenPair:
       type: object
