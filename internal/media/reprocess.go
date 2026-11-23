@@ -83,6 +83,15 @@ func frameIsWhite(img image.Image, w int) bool {
 // full and thumb JPEGs without the white frame. ok == false means the
 // photo has no legacy frame and must be left alone.
 func reframeLegacyPhoto(fullJPEG []byte) (*normalizedImage, bool, error) {
+	// The header first: only a fullSize square can carry the legacy frame,
+	// so anything else is never decoded.
+	cfg, err := jpeg.DecodeConfig(bytes.NewReader(fullJPEG))
+	if err != nil {
+		return nil, false, fmt.Errorf("decode jpeg: %w", err)
+	}
+	if cfg.Width != fullSize || cfg.Height != fullSize {
+		return nil, false, nil
+	}
 	src, err := jpeg.Decode(bytes.NewReader(fullJPEG))
 	if err != nil {
 		return nil, false, fmt.Errorf("decode jpeg: %w", err)
@@ -120,17 +129,23 @@ type ReprocessStats struct {
 	Failed   int // photos that could not be read or written; left as is
 }
 
-// ReprocessLegacyPhotos removes the legacy white frame from every product
-// photo that still has it. Each reframed photo is written under fresh
-// object keys (objects are immutable and cached for a year, so they are
-// never overwritten) and its product_images row is pointed at them; the
-// old objects are left in the bucket, so a row can be pointed back if
-// needed. In a dry run nothing is written. A failure on one photo is
-// logged to logw and counted, and the run goes on with the next one.
+// ReprocessLegacyPhotos removes the legacy white frame from the product
+// photos marked product_images.legacy_frame (migration 000053 marks every
+// photo that existed before the change; photos uploaded after it are
+// never marked). Each marked photo is checked: if its frame really is
+// white it is reframed under fresh object keys (objects are immutable and
+// cached for a year, so they are never overwritten) and its row is pointed
+// at them; either way the mark is cleared, so a second run finds nothing
+// to do and a new photo with a white studio background is never touched.
+// The old objects are left in the bucket, so a row can be pointed back if
+// needed. In a dry run nothing is written and every photo that would be
+// reframed is listed. A failure on one photo is logged to logw and
+// counted, its mark stays for the next run, and the run goes on.
 func ReprocessLegacyPhotos(ctx context.Context, db *sql.DB, store photoReprocessStore, dryRun bool, logw io.Writer) (ReprocessStats, error) {
 	var stats ReprocessStats
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, object_key FROM product_images WHERE object_key LIKE 'products/%' || $1 ORDER BY id`, fullSuffix)
+		`SELECT id, object_key FROM product_images
+		 WHERE legacy_frame AND object_key LIKE 'products/%' || $1 ORDER BY id`, fullSuffix)
 	if err != nil {
 		return stats, fmt.Errorf("list product photos: %w", err)
 	}
@@ -161,6 +176,9 @@ func ReprocessLegacyPhotos(ctx context.Context, db *sql.DB, store photoReprocess
 		case err != nil:
 			stats.Failed++
 			_, _ = fmt.Fprintf(logw, "FAIL  %s %s: %v\n", p.id, p.key, err)
+		case reframed && dryRun:
+			stats.Reframed++
+			_, _ = fmt.Fprintf(logw, "WOULD %s %s\n", p.id, p.key)
 		case reframed:
 			stats.Reframed++
 			_, _ = fmt.Fprintf(logw, "OK    %s %s\n", p.id, p.key)
@@ -177,11 +195,15 @@ func reprocessOne(ctx context.Context, db *sql.DB, store photoReprocessStore, id
 		return false, fmt.Errorf("read: %w", err)
 	}
 	img, ok, err := reframeLegacyPhoto(data)
-	if err != nil || !ok {
+	if err != nil {
 		return false, err
 	}
 	if dryRun {
-		return true, nil
+		return ok, nil
+	}
+	if !ok {
+		// No white frame to strip: nothing to do, and nothing to recheck.
+		return false, clearLegacyFrame(ctx, db, id, key, key)
 	}
 	fullKey, thumbKey := newVariantKeys()
 	if err := store.PutObject(ctx, thumbKey, img.Thumb, "image/jpeg"); err != nil {
@@ -190,15 +212,24 @@ func reprocessOne(ctx context.Context, db *sql.DB, store photoReprocessStore, id
 	if err := store.PutObject(ctx, fullKey, img.Full, "image/jpeg"); err != nil {
 		return false, fmt.Errorf("write full: %w", err)
 	}
-	// object_key = old key guards against an admin replacing the photo
-	// while the run is in progress.
-	res, err := db.ExecContext(ctx,
-		`UPDATE product_images SET object_key = $1 WHERE id = $2 AND object_key = $3`, fullKey, id, key)
-	if err != nil {
-		return false, fmt.Errorf("update row: %w", err)
-	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return false, fmt.Errorf("row changed during the run, left as is (new objects %s unused)", strings.TrimSuffix(fullKey, fullSuffix))
+	if err := clearLegacyFrame(ctx, db, id, key, fullKey); err != nil {
+		return false, fmt.Errorf("%w (new objects %s unused)", err, strings.TrimSuffix(fullKey, fullSuffix))
 	}
 	return true, nil
+}
+
+// clearLegacyFrame points the row at newKey and clears its mark. The
+// WHERE on the old key guards against an admin replacing the photo while
+// the run is in progress (the replacement is a new, unmarked photo).
+func clearLegacyFrame(ctx context.Context, db *sql.DB, id, oldKey, newKey string) error {
+	res, err := db.ExecContext(ctx,
+		`UPDATE product_images SET object_key = $1, legacy_frame = false
+		 WHERE id = $2 AND object_key = $3 AND legacy_frame`, newKey, id, oldKey)
+	if err != nil {
+		return fmt.Errorf("update row: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("row changed during the run, left as is")
+	}
+	return nil
 }

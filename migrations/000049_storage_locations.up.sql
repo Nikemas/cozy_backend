@@ -1,3 +1,5 @@
+SET lock_timeout = '10s';
+
 -- Storage locations (места хранения) inside a warehouse: "Стеллаж A,
 -- полка 3". Only points_of_sale.kind = 'warehouse' gets them — checked by
 -- the app (internal/points.LocationsRepo), since a CHECK can't look at

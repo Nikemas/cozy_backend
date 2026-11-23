@@ -98,11 +98,17 @@ func (s *SQLStore) Create(ctx context.Context, in NewTicket, maxPerHour int) (st
 			return fmt.Errorf("support: lock: %w", err)
 		}
 		if maxPerHour > 0 {
+			// A signed-in customer is limited by their own tickets only; a
+			// guest by guest tickets for that phone. A guest can type any
+			// phone, so guest tickets must never count against a customer
+			// who owns that number (they could lock the real owner out).
 			var n int
 			err := tx.QueryRowContext(ctx, `
 				SELECT COUNT(*) FROM support_tickets
 				WHERE created_at > now() - interval '1 hour'
-				  AND (phone = $1 OR ($2::uuid IS NOT NULL AND customer_id = $2::uuid))`,
+				  AND CASE WHEN $2::uuid IS NOT NULL
+				           THEN customer_id = $2::uuid
+				           ELSE customer_id IS NULL AND phone = $1 END`,
 				in.Phone, in.CustomerID).Scan(&n)
 			if err != nil {
 				return fmt.Errorf("support: count recent tickets: %w", err)

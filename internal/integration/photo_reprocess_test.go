@@ -67,6 +67,15 @@ func unframedPhoto(t *testing.T) []byte {
 	return jpegOf(t, img)
 }
 
+func legacyMark(t *testing.T, id string) bool {
+	t.Helper()
+	var marked bool
+	if err := testDB.QueryRowContext(ctxT(t), `SELECT legacy_frame FROM product_images WHERE id = $1`, id).Scan(&marked); err != nil {
+		t.Fatal(err)
+	}
+	return marked
+}
+
 func photoKey(t *testing.T, id string) string {
 	t.Helper()
 	var key string
@@ -76,28 +85,34 @@ func photoKey(t *testing.T, id string) string {
 	return key
 }
 
-// TestReprocessLegacyPhotos: a framed photo gets new full/thumb objects
-// without the frame and its row points at them; an unframed one is left
-// alone; a dry run writes nothing; a second run finds nothing to do.
+// TestReprocessLegacyPhotos: a marked (legacy_frame) photo with a white
+// frame gets new full/thumb objects without it and its row points at
+// them; a marked photo without a frame is left alone; an UNMARKED photo —
+// even one that looks exactly like a framed one (a new upload with a white
+// studio background) — is never touched; a dry run writes nothing; a
+// second run finds nothing to do.
 func TestReprocessLegacyPhotos(t *testing.T) {
 	ctx := ctxT(t)
 	f := newFixture(t, 1, 1)
 	tag := strings.ReplaceAll(f.ProductID, "-", "")[:12]
 	framedKey := "products/it-framed-" + tag + "/full.jpg"
 	plainKey := "products/it-plain-" + tag + "/full.jpg"
+	studioKey := "products/it-studio-" + tag + "/full.jpg"
 	store := &memStore{objects: map[string][]byte{
 		framedKey: framedPhoto(t),
 		plainKey:  unframedPhoto(t),
+		studioKey: framedPhoto(t),
 	}}
 
-	var framedID, plainID string
+	var framedID, plainID, studioID string
 	for _, row := range []struct {
-		dst *string
-		key string
-	}{{&framedID, framedKey}, {&plainID, plainKey}} {
+		dst    *string
+		key    string
+		marked bool
+	}{{&framedID, framedKey, true}, {&plainID, plainKey, true}, {&studioID, studioKey, false}} {
 		if err := testDB.QueryRowContext(ctx,
-			`INSERT INTO product_images (product_id, object_key) VALUES ($1, $2) RETURNING id`,
-			f.ProductID, row.key).Scan(row.dst); err != nil {
+			`INSERT INTO product_images (product_id, object_key, legacy_frame) VALUES ($1, $2, $3) RETURNING id`,
+			f.ProductID, row.key, row.marked).Scan(row.dst); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -110,8 +125,11 @@ func TestReprocessLegacyPhotos(t *testing.T) {
 	if got := photoKey(t, framedID); got != framedKey {
 		t.Fatalf("dry run changed the row: %s", got)
 	}
-	if len(store.objects) != 2 {
+	if len(store.objects) != 3 {
 		t.Fatalf("dry run wrote objects: %d in store", len(store.objects))
+	}
+	if marked := legacyMark(t, framedID); !marked {
+		t.Fatal("dry run cleared the mark")
 	}
 
 	if _, err := media.ReprocessLegacyPhotos(ctx, testDB, store, false, io.Discard); err != nil {
@@ -136,6 +154,12 @@ func TestReprocessLegacyPhotos(t *testing.T) {
 	}
 	if got := photoKey(t, plainID); got != plainKey {
 		t.Fatalf("unframed photo was touched: %s", got)
+	}
+	if legacyMark(t, framedID) || legacyMark(t, plainID) {
+		t.Fatal("the mark must be cleared once a photo is processed")
+	}
+	if got := photoKey(t, studioID); got != studioKey || legacyMark(t, studioID) {
+		t.Fatalf("an unmarked photo was touched: key %s", got)
 	}
 
 	before := len(store.objects)

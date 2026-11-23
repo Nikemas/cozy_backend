@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Nikemas/cozy_backend/internal/staff"
+	"github.com/Nikemas/cozy_backend/internal/support"
 )
 
 // apiCall sends a JSON request with a bearer token.
@@ -171,6 +172,32 @@ func TestSupportAPIRateLimit(t *testing.T) {
 	if c := errorCode(t, w); c != "too_many_tickets" {
 		t.Fatalf("code = %s", c)
 	}
+}
+
+// TestSupportGuestsCannotLockOutThePhoneOwner: a guest can type any phone,
+// so five guest tickets on a customer's number must not stop that customer
+// from writing — while the same five do stop another guest on that number.
+func TestSupportGuestsCannotLockOutThePhoneOwner(t *testing.T) {
+	a := app(t)
+	ctx := ctxT(t)
+	customer := newCustomer(t)
+	access := customerAccess(t, a, customer)
+	var phone string
+	if err := testDB.QueryRowContext(ctx, `SELECT phone FROM customers WHERE id = $1`, customer).Scan(&phone); err != nil {
+		t.Fatal(err)
+	}
+	store := support.NewSQLStore(testDB)
+	guest := support.NewTicket{Name: "Гость", Phone: phone, Topic: support.TopicOther, Channel: support.ChannelWeb, Message: "звоните"}
+	for i := 0; i < 5; i++ {
+		if _, err := store.Create(ctx, guest, 5); err != nil {
+			t.Fatalf("guest ticket %d: %v", i+1, err)
+		}
+	}
+	if _, err := store.Create(ctx, guest, 5); err == nil {
+		t.Fatal("sixth guest ticket on the same phone was accepted")
+	}
+	w := a.apiCall(t, http.MethodPost, "/api/v1/support/tickets", access, `{"topic":"other","message":"я настоящий владелец номера"}`)
+	wantStatus(t, w, http.StatusCreated)
 }
 
 func TestSupportWebGuestAndCustomer(t *testing.T) {

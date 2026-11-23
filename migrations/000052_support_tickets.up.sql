@@ -7,6 +7,8 @@
 --
 -- New tables only: older code never touches them (expand-only).
 
+SET lock_timeout = '10s';
+
 CREATE TABLE support_tickets (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- Short human-readable number ("Обращение №123") for staff and customers.

@@ -10,6 +10,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -233,6 +234,11 @@ func (h *handlers) buildBrandReport(ctx context.Context, t tr, brand string, fro
 		return nil
 	}
 	query := data.Subject.Value
+	// Only a real brand (or "no brand") is queried: an arbitrary ?brand=
+	// string would otherwise add one cache entry per value.
+	if query != noBrandParam && !slices.ContainsFunc(brands, func(b string) bool { return strings.TrimSpace(b) == query }) {
+		return nil
+	}
 	data.Subject.Title = query
 	if query == noBrandParam {
 		query = ""
