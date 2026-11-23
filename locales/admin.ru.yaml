@@ -249,6 +249,7 @@ admin.reports.no_variants: У товара нет вариаций
 admin.reports.no_products: Нет товаров: ни активных, ни проданных за период
 admin.reports.warehouse_suffix: (склад)
 admin.reports.cancelled_hint: «Отменено» — штук в отменённых заказах за период, в продажи и выручку не входят.
+admin.reports.sheet_products: Товары
 admin.reports.sheet_variants: Вариации
 admin.reports.sheet_points: Точки
 admin.reports.sheet_stock: Остатки

@@ -246,6 +246,7 @@ admin.reports.no_variants: Товардын вариациялары жок
 admin.reports.no_products: Товар жок: активдүүлөрү да, мезгил ичинде сатылгандары да жок
 admin.reports.warehouse_suffix: (кампа)
 admin.reports.cancelled_hint: «Жокко чыгарылды» — мезгил ичинде жокко чыгарылган заказдардагы даана саны, сатууга жана кирешеге кирбейт.
+admin.reports.sheet_products: Товарлар
 admin.reports.sheet_variants: Вариациялар
 admin.reports.sheet_points: Сатуу жайлары
 admin.reports.sheet_stock: Калдыктар

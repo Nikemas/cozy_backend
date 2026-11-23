@@ -58,7 +58,11 @@ func (s *sheetWriter) title(t tr, d ReportDetailData) {
 	s.add()
 }
 
-func writeProductListSheet(f *excelize.File, sheet string, t tr, d ReportDetailData) error {
+func writeProductListSheet(f *excelize.File, first string, t tr, d ReportDetailData) error {
+	sheet := t.T("admin.reports.sheet_products")
+	if err := f.SetSheetName(first, sheet); err != nil {
+		return err
+	}
 	s := &sheetWriter{f: f, sheet: sheet}
 	s.title(t, d)
 	s.add(t.T("admin.reports.col_code"), t.T("admin.reports.col_product"), t.T("admin.reports.col_brand"),
